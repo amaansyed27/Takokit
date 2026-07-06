@@ -1,0 +1,22 @@
+[package]
+name = "takokit-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "takokit"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+takokit-core = { path = "../../crates/takokit-core" }
+takokit-models = { path = "../../crates/takokit-models" }
+takokit-server = { path = "../../crates/takokit-server" }
+takokit-store = { path = "../../crates/takokit-store" }
+tokio.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true

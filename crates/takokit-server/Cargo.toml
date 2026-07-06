@@ -1,0 +1,20 @@
+[package]
+name = "takokit-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+http.workspace = true
+serde_json.workspace = true
+takokit-core = { path = "../takokit-core" }
+takokit-models = { path = "../takokit-models" }
+takokit-store = { path = "../takokit-store" }
+tokio.workspace = true
+tower.workspace = true
+tracing.workspace = true
+

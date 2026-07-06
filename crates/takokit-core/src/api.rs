@@ -1,0 +1,89 @@
+use crate::{ModelInfo, VoiceInfo};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HealthResponse {
+    pub ok: bool,
+    pub service: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeStatus {
+    pub service: String,
+    pub version: String,
+    pub server: String,
+    pub storage_root: PathBuf,
+    pub installed_models: usize,
+    pub voices: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelsResponse {
+    pub data: Vec<ModelInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VoicesResponse {
+    pub data: Vec<VoiceInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SpeechRequest {
+    pub model: String,
+    pub input: String,
+    pub voice: Option<String>,
+    pub response_format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SpeechResponse {
+    pub id: Uuid,
+    pub model: String,
+    pub voice: Option<String>,
+    pub engine: String,
+    pub output_path: PathBuf,
+    pub content_type: String,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TranscriptionRequest {
+    pub file_path: PathBuf,
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CloneVoiceRequest {
+    pub sample_path: PathBuf,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TrainVoiceRequest {
+    pub samples_path: PathBuf,
+    pub name: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn speech_request_matches_openai_compatible_shape() {
+        let request = SpeechRequest {
+            model: "kokoro".to_string(),
+            input: "Hello from Takokit".to_string(),
+            voice: Some("default".to_string()),
+            response_format: Some("wav".to_string()),
+        };
+
+        let json = serde_json::to_value(request).expect("serializes");
+
+        assert_eq!(json["model"], "kokoro");
+        assert_eq!(json["input"], "Hello from Takokit");
+        assert_eq!(json["voice"], "default");
+        assert_eq!(json["response_format"], "wav");
+    }
+}

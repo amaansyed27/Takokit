@@ -1,0 +1,35 @@
+[workspace]
+members = [
+  "apps/cli",
+  "crates/takokit-audio",
+  "crates/takokit-core",
+  "crates/takokit-models",
+  "crates/takokit-safety",
+  "crates/takokit-server",
+  "crates/takokit-store",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/takokit/takokit"
+authors = ["Takokit contributors"]
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = "0.7"
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+http = "1"
+mime = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower = { version = "0.5", features = ["util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["serde", "v4"] }
