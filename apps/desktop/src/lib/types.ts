@@ -9,7 +9,8 @@ export type ModelSummary = {
   language: string;
   backend: string;
   runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp";
-  status: "installed" | "planned";
+  status: "installed" | "available" | "planned";
+  license: string;
   capabilities: ModelCapability[];
 };
 
@@ -33,3 +34,21 @@ export type RuntimeSnapshot = {
   models: ModelSummary[];
   voices: VoiceSummary[];
 };
+
+export type SpeechApiRequest = {
+  model: string;
+  input: string;
+  voice?: string;
+  response_format?: "wav" | "mp3" | "json";
+};
+
+export type SpeechApiResponse = {
+  id: string;
+  model: string;
+  voice?: string;
+  engine: string;
+  output_path: string;
+  content_type: string;
+  bytes: number;
+};
+

@@ -1,28 +1,35 @@
-import { useMemo, useState } from "react";
-import { AppShell } from "../components/AppShell";
-import { HomePage } from "../features/home/HomePage";
-import { ModelsPage } from "../features/models/ModelsPage";
-import { ServerPage } from "../features/server/ServerPage";
-import { SettingsPage } from "../features/settings/SettingsPage";
-import { SpeakPage } from "../features/speak/SpeakPage";
-import { TranscribePage } from "../features/transcribe/TranscribePage";
-import { VoicesPage } from "../features/voices/VoicesPage";
+import { useEffect, useState } from "react";
+import { AppShell } from "./AppShell";
+import { type PageId } from "./navigation";
+import { routes } from "./routes";
 import { mockRuntime } from "../lib/mockData";
-import type { PageId } from "./navigation";
+
+const routeIds = new Set<PageId>(routes.map((route) => route.id));
+
+function pageFromHash(): PageId {
+  const hash = window.location.hash.replace("#", "");
+  return routeIds.has(hash as PageId) ? (hash as PageId) : "home";
+}
 
 export function App() {
-  const [activePage, setActivePage] = useState<PageId>("speak");
-  const runtime = useMemo(() => mockRuntime, []);
+  const [activePage, setActivePage] = useState<PageId>(() => pageFromHash());
+  const route = routes.find((item) => item.id === activePage) ?? routes[0];
+  const Page = route.component;
+
+  useEffect(() => {
+    const onHashChange = () => setActivePage(pageFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  function navigate(page: PageId) {
+    setActivePage(page);
+    window.history.replaceState(null, "", `#${page}`);
+  }
 
   return (
-    <AppShell activePage={activePage} onNavigate={setActivePage} runtime={runtime}>
-      {activePage === "home" && <HomePage runtime={runtime} />}
-      {activePage === "models" && <ModelsPage models={runtime.models} />}
-      {activePage === "voices" && <VoicesPage voices={runtime.voices} />}
-      {activePage === "speak" && <SpeakPage models={runtime.models} voices={runtime.voices} onViewModels={() => setActivePage("models")} />}
-      {activePage === "transcribe" && <TranscribePage />}
-      {activePage === "server" && <ServerPage runtime={runtime} />}
-      {activePage === "settings" && <SettingsPage runtime={runtime} />}
+    <AppShell activePage={activePage} onNavigate={navigate} runtime={mockRuntime}>
+      <Page runtime={mockRuntime} onNavigate={navigate} />
     </AppShell>
   );
 }

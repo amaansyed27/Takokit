@@ -49,14 +49,16 @@ Dense tools can use 8-12px internal spacing. Page sections should breathe with 2
 - Forms should be direct and visibly functional.
 - Status indicators should be compact.
 - Avoid cards inside cards.
+- Do not hardcode macOS, Windows, or Linux window chrome in React components. Platform chrome belongs in Tauri/window configuration or platform-aware shell code, not product UI.
+- Motion should be restrained: 120-240ms transitions, opacity/translate/clip reveals, and reduced-motion support.
 
 ## Avoid
 
 - AI-purple gradients.
 - Dark neon SaaS styling.
 - Fake analytics dashboards.
+- Fake OS title bars or traffic-light controls.
 - Random stock imagery.
 - Large decorative cards for tiny facts.
 - Placeholder model inference claims.
 - Overwrapped component trees where a simple feature component is enough.
-
