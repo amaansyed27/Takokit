@@ -1,0 +1,12 @@
+/target/
+/apps/desktop/node_modules/
+/apps/desktop/dist/
+/.takokit/
+/.env
+*.log
+*.wav
+*.mp3
+*.flac
+*.sqlite
+*.db
+Takokit — Local Voice AI Runtime.pdf
