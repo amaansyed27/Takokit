@@ -1,116 +1,96 @@
 # Takokit
 
-Takokit is a Rust-first local voice AI runtime for running, cloning, training, transcribing, converting, and serving open-source voice models locally.
+Takokit is a Rust-first local voice AI runtime, similar in spirit to Ollama, but for voice models.
 
-It is similar in spirit to Ollama, but for speech: local TTS, Whisper/STT, voice cloning, voice training, voice conversion, and OpenAI-compatible local speech APIs where practical.
+Takokit is not a Tauri desktop app. It ships a Rust CLI and daemon/API. The GUI is a local web app served by the daemon and opened with:
 
-## Scaffold Status
+```bash
+takokit gui
+```
 
-This repository is an initial commit-worthy foundation. It includes:
-
-- Rust workspace with separated CLI, server, core, model, audio, store, and safety crates.
-- Axum local API server with health, status, model, voice, and mock speech routes.
-- Clap CLI with typed command handlers for serve, status, speak, pull, list, transcribe, clone, and train.
-- Model registry and adapter traits for TTS, STT, cloning, training, and conversion.
-- Mock TTS engine that writes a valid test WAV for API and CLI shape validation.
-- Local storage layout under `~/.takokit`.
-- Vite React desktop scaffold organized by features.
-- Runner folders for Python, ONNX, and whisper.cpp integration planning.
-
-No real ML inference is implemented yet.
-
-## Architecture
+Target local GUI URL:
 
 ```txt
-apps/
-  cli/                  Rust CLI binary
-  desktop/              Tauri-ready Vite + React + TypeScript app
-crates/
-  takokit-core/         shared domain types, errors, config, API contracts
-  takokit-server/       local Axum HTTP API server / daemon
-  takokit-models/       model registry, metadata, adapter traits, mock TTS
-  takokit-audio/        audio helpers and test WAV writing
-  takokit-store/        local filesystem storage layout
-  takokit-safety/       consent and policy primitives
-runners/
-  python/               isolated Python runner scaffold for PyTorch models
-  onnx/                 future native/ONNX runner notes
-  whispercpp/           future whisper.cpp runner notes
+http://127.0.0.1:5050/gui
 ```
 
-Python is intentionally constrained to runner processes for model families that require PyTorch. The local server is Rust/Axum.
+No real ML inference is implemented yet. The current speech path is a deterministic mock WAV generator for API and CLI testing.
 
-## Setup
+## What Exists
+
+- Rust workspace with separated CLI, server, core, model, package, audio, store, and safety crates.
+- Axum local daemon on `127.0.0.1:5050`.
+- React + TypeScript + Vite browser GUI in `apps/gui`.
+- Static GUI serving from `apps/gui/dist` at `/gui`.
+- Local mock model and runner registry under `registry/`.
+- Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
+- Local storage layout under `~/.takokit`.
+- Mock TTS engine for `mock-tts` only.
+
+## Commands
 
 ```bash
-cargo check
-cargo test
-cargo run -p takokit-cli -- status
-cargo run -p takokit-cli -- speak "Hello from Takokit"
 cargo run -p takokit-cli -- serve
+cargo run -p takokit-cli -- gui
+cargo run -p takokit-cli -- pull kokoro
+cargo run -p takokit-cli -- show kokoro
+cargo run -p takokit-cli -- list models
+cargo run -p takokit-cli -- list runners
+cargo run -p takokit-cli -- speak "Hello from Takokit" --model mock-tts
 ```
 
-Desktop scaffold:
+`takokit pull kokoro` currently installs the local mock registry manifest into `~/.takokit/manifests/models/`. It does not download weights or enable real Kokoro inference yet.
+
+## GUI Development
 
 ```bash
-cd apps/desktop
+cd apps/gui
 npm install
 npm run dev
 npm run build
 ```
 
-The desktop app is Vite/React today and structured for Tauri. The next wiring step is to add `src-tauri/` with Tauri commands that call the Rust server or launch the daemon.
-
-## CLI
+For normal local CLI usage, build the GUI and let the Rust server serve `apps/gui/dist`:
 
 ```bash
-takokit serve
-takokit status
-takokit speak "Hello from Takokit"
+cd apps/gui
+npm run build
+cd ../..
+cargo run -p takokit-cli -- gui
+```
+
+## Architecture
+
+```txt
+Rust CLI
+  |
+Rust daemon/API
+  |
+local browser GUI at /gui
+  |
+package registry + installed manifests
+  |
+model adapters + future runners
+```
+
+Users should not manually install random model dependencies. The intended UX is:
+
+```bash
 takokit pull kokoro
-takokit list models
-takokit list voices
-takokit transcribe ./audio.wav
-takokit clone ./sample.wav --name myvoice
-takokit train ./samples --name myvoice-v2
+takokit speak "Hello" --model kokoro
+takokit gui
 ```
 
-Implemented now:
-
-- `serve` starts the local Axum API server on `127.0.0.1:5050`.
-- `status` prints local runtime status as JSON.
-- `speak` uses the mock TTS adapter and writes a test WAV to `~/.takokit/outputs`.
-- `list models` and `list voices` print registry metadata.
-
-Other commands return typed not-implemented errors with clear phase boundaries.
-
-## API
-
-Default local server:
-
-```bash
-cargo run -p takokit-cli -- serve
-```
-
-Examples:
-
-```bash
-curl http://127.0.0.1:5050/health
-curl http://127.0.0.1:5050/v1/status
-curl http://127.0.0.1:5050/v1/models
-curl http://127.0.0.1:5050/v1/voices
-curl -X POST http://127.0.0.1:5050/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{"model":"mock-tts","input":"Hello from Takokit","voice":"default","response_format":"wav"}'
-```
-
-See [docs/api.md](docs/api.md).
+Today, `speak --model kokoro` returns a typed not-implemented error because runners are not wired. That is intentional.
 
 ## Local Storage
 
 ```txt
 ~/.takokit/
   models/
+  runners/
+  blobs/
+  manifests/
   voices/
   datasets/
   outputs/
@@ -121,11 +101,10 @@ See [docs/api.md](docs/api.md).
 
 ## Project Principles
 
-- Rust-first core, CLI, server, storage, and API contracts.
-- Model-specific logic lives behind adapter traits.
-- Python is a contained runner layer, not the application backend.
-- UI and API never depend on model-specific implementation details.
+- Rust-first core, CLI, daemon, storage, and API contracts.
+- Browser GUI, not Tauri.
 - No hidden cloud calls.
-- Voice cloning and training require explicit user action and consent-oriented flows.
-- Not-yet-built features use typed errors and roadmap entries rather than scattered comments.
-
+- No manual Python/PyTorch/FFmpeg/repo-clone setup for users.
+- Model and runner setup belongs in package/runner management.
+- UI and CLI must not hardcode model-specific behavior.
+- Not-yet-built features return typed errors instead of fake inference claims.

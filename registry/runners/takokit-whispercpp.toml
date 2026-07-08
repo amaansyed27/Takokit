@@ -1,0 +1,6 @@
+id = "takokit-whispercpp"
+name = "Takokit whisper.cpp Runner"
+version = "0.1.0"
+kind = "whispercpp"
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+description = "whisper.cpp runner contract for local transcription packages. Execution is not implemented yet."

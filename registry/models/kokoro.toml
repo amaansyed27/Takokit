@@ -1,0 +1,24 @@
+id = "kokoro"
+name = "Kokoro"
+version = "0.1.0"
+kind = "tts"
+backend = "onnx"
+runner = "takokit-onnx"
+license = "apache-2.0"
+description = "Fast local text-to-speech model. This mock registry entry does not include real weights yet."
+
+[capabilities]
+speak = true
+transcribe = false
+clone = false
+train = false
+convert = false
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "4gb"
+
+[artifacts]
+weights = []
+voices = []

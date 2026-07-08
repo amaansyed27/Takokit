@@ -13,7 +13,7 @@ export function Sidebar({ activePage, onNavigate, runtime }: SidebarProps) {
     <aside className="sidebar">
       <div className="brand">
         <strong>Takokit</strong>
-        <span>Local Voice AI Runtime</span>
+        <span>Local web GUI</span>
       </div>
 
       <nav className="nav-list" aria-label="Main navigation">

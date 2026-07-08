@@ -1,48 +1,20 @@
 # Roadmap
 
-## Phase 1: Core Runtime
+This file tracks near-term direction without phase gates. The source of truth for current work is [../TASKS.md](../TASKS.md).
 
-- Complete Rust CLI and Axum server scaffold.
-- Keep mock TTS adapter for contract testing.
-- Add robust config loading from `~/.takokit/config.toml`.
-- Add structured logs.
+## Next Useful Increments
 
-## Phase 2: TTS Runner
+- Make package pull write a fuller installed model record, including artifact slots and checksum placeholders.
+- Add installed runner registry support.
+- Add a runner selection layer that returns typed unsupported errors before execution.
+- Add config loading from `~/.takokit/config.toml`.
+- Add browser GUI controls for pulling/removing manifests through the API.
+- Add API tests for model detail, runner listing, pull, and delete.
+- Add real artifact download only after checksum verification is in place.
 
-- Add Kokoro Python runner.
-- Add Piper ONNX runner.
-- Generate real WAV output through adapter traits.
-- Add audio preview/export in desktop.
+## Keep Out For Now
 
-## Phase 3: Transcription
-
-- Add Whisper or whisper.cpp adapter.
-- Implement `/v1/audio/transcriptions`.
-- Add transcript output and dataset-preparation primitives.
-
-## Phase 4: Voice Cloning
-
-- Add Chatterbox or GPT-SoVITS runner.
-- Add voice profile storage.
-- Add consent capture and visible safety checks.
-
-## Phase 5: Training
-
-- Add multi-sample dataset handling.
-- Add transcription/cleaning flow.
-- Add GPT-SoVITS few-shot training jobs.
-- Add progress and artifact tracking.
-
-## Phase 6: Voice Design And Conversion
-
-- Add Qwen3-TTS for voice design and streaming.
-- Add RVC for conversion.
-- Define streaming API response contracts.
-
-## Phase 7: Desktop Hardening
-
-- Add Tauri `src-tauri/` wiring.
-- Add daemon launch/stop controls.
-- Add logs and hardware status.
-- Add settings persistence.
-
+- Tauri app scaffolding.
+- Fake Kokoro or Whisper inference.
+- Hidden cloud calls.
+- Model-specific dependency instructions as the primary user path.

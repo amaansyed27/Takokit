@@ -19,7 +19,7 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Models</h1>
-        <p>Registry, runners, and license labels.</p>
+        <p>Available packages, installed manifests, runners, and license labels.</p>
       </header>
 
       <div className="stats-grid">
@@ -29,23 +29,23 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
         <div className="stat-tile"><span>Native path</span><strong className="stat-tile__value">ONNX</strong><small>Preferred where practical</small></div>
       </div>
 
-      <Section title="Adapter coverage" description="Capabilities, not page logic.">
+      <Section title="Runtime honesty" description={runtime.modeNote}>
         <div className="capability-strip">
           <div className="capability-chip">
             <strong>Text to speech</strong>
-            <span>Kokoro, Piper, Qwen3-TTS.</span>
+            <span>Mock TTS can generate test WAV files. Kokoro and Piper are package metadata only.</span>
           </div>
           <div className="capability-chip">
             <strong>Transcription</strong>
-            <span>Whisper and whisper.cpp.</span>
+            <span>Whisper manifests exist; runner execution is not wired.</span>
           </div>
           <div className="capability-chip">
-            <strong>Voice work</strong>
-            <span>Clone and train behind consent.</span>
+            <strong>No manual dependency rule</strong>
+            <span>Future installs must manage runners and artifacts inside Takokit.</span>
           </div>
           <div className="capability-chip">
-            <strong>Conversion</strong>
-            <span>RVC tracked for future wiring.</span>
+            <strong>Local registry</strong>
+            <span>Mock TOML manifests drive this view.</span>
           </div>
         </div>
       </Section>
@@ -63,7 +63,7 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
             <TableRow key={model.id}>
               <strong>{model.name}</strong>
               <span>{model.purpose}</span>
-              <Tooltip content={`${model.backend} backend, ${model.params} params`}>
+              <Tooltip content={`${model.backend} backend, ${model.version} manifest version`}>
                 <span>{model.runtime}</span>
               </Tooltip>
               <Badge tone={model.status === "installed" ? "success" : model.status === "available" ? "neutral" : "warning"}>
@@ -72,6 +72,20 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
               <Tooltip content="Verify model license before commercial use.">
                 <span>{model.license}</span>
               </Tooltip>
+            </TableRow>
+          ))}
+        </Table>
+      </Section>
+
+      <Section title="Runners">
+        <Table columns={["Runner", "Kind", "Platforms", "Status", "Notes"]} ariaLabel="Runners">
+          {runtime.runners.map((runner) => (
+            <TableRow key={runner.id}>
+              <strong>{runner.name}</strong>
+              <span>{runner.kind}</span>
+              <span>{runner.platforms.join(", ")}</span>
+              <Badge tone={runner.installed ? "success" : "warning"}>{runner.installed ? "installed" : "contract"}</Badge>
+              <span>{runner.description}</span>
             </TableRow>
           ))}
         </Table>

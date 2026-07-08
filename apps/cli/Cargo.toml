@@ -13,8 +13,10 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+open.workspace = true
 takokit-core = { path = "../../crates/takokit-core" }
 takokit-models = { path = "../../crates/takokit-models" }
+takokit-package = { path = "../../crates/takokit-package" }
 takokit-server = { path = "../../crates/takokit-server" }
 takokit-store = { path = "../../crates/takokit-store" }
 tokio.workspace = true

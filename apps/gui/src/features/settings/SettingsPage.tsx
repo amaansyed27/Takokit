@@ -17,6 +17,9 @@ export function SettingsPage({ runtime }: RouteComponentProps) {
           <div className="settings-list">
             <div className="settings-row"><span>Storage root</span><code>{runtime.storagePath}</code></div>
             <div className="settings-row"><span>Models</span><code>{runtime.storagePath}/models</code></div>
+            <div className="settings-row"><span>Runners</span><code>{runtime.storagePath}/runners</code></div>
+            <div className="settings-row"><span>Blobs</span><code>{runtime.storagePath}/blobs</code></div>
+            <div className="settings-row"><span>Manifests</span><code>{runtime.storagePath}/manifests</code></div>
             <div className="settings-row"><span>Voices</span><code>{runtime.storagePath}/voices</code></div>
             <div className="settings-row"><span>Outputs</span><code>{runtime.storagePath}/outputs</code></div>
           </div>

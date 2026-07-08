@@ -1,0 +1,24 @@
+id = "piper-lessac"
+name = "Piper Lessac"
+version = "0.1.0"
+kind = "tts"
+backend = "onnx"
+runner = "takokit-onnx"
+license = "mit"
+description = "Piper English Lessac voice placeholder for package-manager flow testing."
+
+[capabilities]
+speak = true
+transcribe = false
+clone = false
+train = false
+convert = false
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "2gb"
+
+[artifacts]
+weights = []
+voices = []

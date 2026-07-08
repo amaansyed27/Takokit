@@ -4,14 +4,25 @@ export type ModelSummary = {
   id: string;
   name: string;
   purpose: string;
-  params: string;
-  size: string;
+  version: string;
+  params?: string;
+  size?: string;
   language: string;
   backend: string;
   runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp";
   status: "installed" | "available" | "planned";
   license: string;
   capabilities: ModelCapability[];
+};
+
+export type RunnerSummary = {
+  id: string;
+  name: string;
+  version: string;
+  kind: string;
+  platforms: string[];
+  description: string;
+  installed: boolean;
 };
 
 export type VoiceSummary = {
@@ -32,7 +43,9 @@ export type RuntimeSnapshot = {
     uptime: string;
   };
   models: ModelSummary[];
+  runners: RunnerSummary[];
   voices: VoiceSummary[];
+  modeNote: string;
 };
 
 export type SpeechApiRequest = {
@@ -51,4 +64,3 @@ export type SpeechApiResponse = {
   content_type: string;
   bytes: number;
 };
-

@@ -41,7 +41,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
                 label="Model"
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                hint={`${selectedModel?.language ?? "Local"} - ${selectedModel?.params ?? "-"} params - ${selectedModel?.backend ?? "Mock"}`}
+                hint={`${selectedModel?.language ?? "Local"} - ${selectedModel?.version ?? "manifest"} - ${selectedModel?.backend ?? "Mock"}`}
                 options={ttsModels.map((item) => ({ value: item.id, label: item.name }))}
               />
             </div>
@@ -122,12 +122,12 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
           {ttsModels.slice(0, 3).map((item, index) => (
             <TableRow key={item.id}>
               <strong>{item.name}</strong>
-              <span>{item.params}</span>
-              <span>{item.size}</span>
+              <span>{item.params ?? "-"}</span>
+              <span>{item.size ?? "-"}</span>
               <Tooltip content={`${item.runtime} runner, ${item.license} license label`}>
                 <span>{item.backend}</span>
               </Tooltip>
-              <Badge tone={index === 0 ? "success" : "neutral"}>{index === 0 ? "active" : item.status}</Badge>
+              <Badge tone={item.id === "mock-tts" ? "success" : "neutral"}>{item.id === "mock-tts" ? "mock ready" : item.status}</Badge>
             </TableRow>
           ))}
         </Table>

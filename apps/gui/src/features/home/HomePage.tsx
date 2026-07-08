@@ -13,8 +13,8 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
   return (
     <section className="page">
       <header className="page__header">
-        <h1>Local voice runtime</h1>
-        <p>Run and test local voice models with clear boundaries.</p>
+        <h1>Local web GUI</h1>
+        <p>Run the Rust daemon, inspect local packages, and test mock speech with clear boundaries.</p>
       </header>
 
       <div className="stats-grid" aria-label="Runtime summary">
@@ -56,14 +56,14 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
       <Section title="Runtime boundary">
         <div className="runtime-boundary">
           <div className="boundary-grid" aria-hidden="true">
-            <span>desktop</span>
             <span>cli</span>
             <span>server</span>
+            <span>gui</span>
             <span>adapters</span>
             <span>runners</span>
           </div>
           <p>
-            Desktop, CLI, server, storage, safety, and runners stay separated.
+            Rust CLI, daemon, browser GUI, storage, safety, and runners stay separated.
           </p>
           <Badge tone="success"><Server size={12} /> Local-first</Badge>
         </div>
@@ -73,7 +73,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
         <div className="runtime-lanes">
           <div className="runtime-lane">
             <strong>Control plane</strong>
-            <span>Desktop, CLI, and API coordinate jobs.</span>
+            <span>CLI, local web GUI, and API coordinate jobs.</span>
           </div>
           <div className="runtime-lane">
             <strong>Model adapters</strong>
@@ -89,7 +89,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
       <Section title="Recent outputs">
         <div className="empty-state">
           <strong>No generated audio yet</strong>
-          <p>Outputs will appear after generation.</p>
+          <p>{runtime.modeNote}</p>
         </div>
       </Section>
     </section>

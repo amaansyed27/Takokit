@@ -10,6 +10,10 @@ const endpoints = [
   "GET /health",
   "GET /v1/status",
   "GET /v1/models",
+  "GET /v1/models/:id",
+  "GET /v1/runners",
+  "POST /v1/models/pull",
+  "DELETE /v1/models/:id",
   "GET /v1/voices",
   "POST /v1/audio/speech",
   "POST /v1/audio/transcriptions",
@@ -31,7 +35,7 @@ export function ServerPage({ runtime }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Server</h1>
-        <p>Local daemon and API routes.</p>
+        <p>Local daemon, browser GUI, and API routes.</p>
       </header>
 
       <div className="stats-grid">
@@ -62,15 +66,15 @@ export function ServerPage({ runtime }: RouteComponentProps) {
 
       <Section title="Endpoints">
         <div className="command-note">
-          <code>takokit serve</code>
-          <span>start the daemon</span>
+          <code>takokit gui</code>
+          <span>starts the daemon when needed and opens the local web GUI</span>
         </div>
         <Table columns={["Route", "Action", "State", "Notes", "Copy"]} ariaLabel="Server endpoints">
           {endpoints.map((endpoint) => (
             <TableRow key={endpoint}>
               <code>{endpoint}</code>
               <span>{endpoint.split(" ")[0]}</span>
-              <span>{endpoint.includes("speech") ? "mock ready" : "scaffold"}</span>
+              <span>{endpoint.includes("speech") ? "mock ready" : endpoint.includes("models") || endpoint.includes("runners") ? "package route" : "scaffold"}</span>
               <span>{endpoint.includes("clone") || endpoint.includes("train") ? "typed placeholder" : "local route"}</span>
               <Button variant="ghost" type="button" onClick={() => copyValue(endpoint)}>
                 {copied === endpoint ? <Check size={14} /> : <Copy size={14} />} Copy

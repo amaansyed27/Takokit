@@ -1,0 +1,6 @@
+id = "takokit-onnx"
+name = "Takokit ONNX Runner"
+version = "0.1.0"
+kind = "native"
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+description = "Native ONNX runner contract for CPU-friendly models. Execution is not implemented yet."

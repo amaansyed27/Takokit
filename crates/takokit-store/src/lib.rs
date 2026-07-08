@@ -25,6 +25,26 @@ impl LocalStore {
         self.root.join("models")
     }
 
+    pub fn runners_dir(&self) -> PathBuf {
+        self.root.join("runners")
+    }
+
+    pub fn blobs_dir(&self) -> PathBuf {
+        self.root.join("blobs")
+    }
+
+    pub fn manifests_dir(&self) -> PathBuf {
+        self.root.join("manifests")
+    }
+
+    pub fn model_manifests_dir(&self) -> PathBuf {
+        self.manifests_dir().join("models")
+    }
+
+    pub fn runner_manifests_dir(&self) -> PathBuf {
+        self.manifests_dir().join("runners")
+    }
+
     pub fn voices_dir(&self) -> PathBuf {
         self.root.join("voices")
     }
@@ -52,6 +72,11 @@ impl LocalStore {
     pub fn ensure_layout(&self) -> TakokitResult<()> {
         for path in [
             self.models_dir(),
+            self.runners_dir(),
+            self.blobs_dir(),
+            self.manifests_dir(),
+            self.model_manifests_dir(),
+            self.runner_manifests_dir(),
             self.voices_dir(),
             self.datasets_dir(),
             self.outputs_dir(),
@@ -83,6 +108,9 @@ mod tests {
         store.ensure_layout().expect("layout");
 
         assert!(root.join("models").is_dir());
+        assert!(root.join("runners").is_dir());
+        assert!(root.join("blobs").is_dir());
+        assert!(root.join("manifests").is_dir());
         assert!(root.join("voices").is_dir());
         assert!(root.join("datasets").is_dir());
         assert!(root.join("outputs").is_dir());

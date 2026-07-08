@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use tokio::net::TcpListener;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::{handlers, AppState};
 
@@ -12,12 +13,27 @@ pub fn server_router(state: AppState) -> Router {
         .route("/health", get(handlers::health))
         .route("/v1/status", get(handlers::status))
         .route("/v1/models", get(handlers::models))
+        .route("/v1/models/:id", get(handlers::model).delete(handlers::remove_model))
+        .route("/v1/runners", get(handlers::runners))
+        .route("/v1/models/pull", post(handlers::pull_model))
         .route("/v1/voices", get(handlers::voices))
         .route("/v1/audio/speech", post(handlers::speech))
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
         .route("/v1/voices/clone", post(handlers::clone_voice))
         .route("/v1/voices/train", post(handlers::train_voice))
         .with_state(state)
+        .nest_service("/gui", gui_service())
+}
+
+fn gui_service() -> ServeDir<ServeFile> {
+    let dist = std::env::var("TAKOKIT_GUI_DIST")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../apps/gui/dist"));
+    let index = dist.join("index.html");
+
+    ServeDir::new(&dist)
+        .append_index_html_on_directories(true)
+        .fallback(ServeFile::new(index))
 }
 
 pub async fn run_server(state: AppState) -> anyhow::Result<()> {

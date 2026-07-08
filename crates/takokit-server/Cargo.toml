@@ -13,8 +13,9 @@ http.workspace = true
 serde_json.workspace = true
 takokit-core = { path = "../takokit-core" }
 takokit-models = { path = "../takokit-models" }
+takokit-package = { path = "../takokit-package" }
 takokit-store = { path = "../takokit-store" }
 tokio.workspace = true
 tower.workspace = true
+tower-http.workspace = true
 tracing.workspace = true
-

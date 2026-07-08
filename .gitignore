@@ -1,6 +1,6 @@
 /target/
-/apps/desktop/node_modules/
-/apps/desktop/dist/
+/apps/gui/node_modules/
+/apps/gui/dist/
 /.takokit/
 /.env
 *.log

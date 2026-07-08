@@ -25,6 +25,29 @@ pub struct ModelsResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelDetailResponse {
+    pub data: ModelInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RunnersResponse<T> {
+    pub data: Vec<T>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PullModelRequest {
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PullModelResponse {
+    pub id: String,
+    pub installed: bool,
+    pub manifest_path: PathBuf,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VoicesResponse {
     pub data: Vec<VoiceInfo>,
 }

@@ -20,4 +20,12 @@ impl RuntimeConfig {
     pub fn bind_addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
+
+    pub fn local_base_url(&self) -> String {
+        format!("http://{}", self.bind_addr())
+    }
+
+    pub fn gui_url(&self) -> String {
+        format!("{}/gui", self.local_base_url())
+    }
 }

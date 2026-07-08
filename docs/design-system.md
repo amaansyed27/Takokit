@@ -2,6 +2,13 @@
 
 Takokit should feel like a serious local developer and creator tool: calm, paper-like, practical, and precise.
 
+## Product Surface
+
+- Use "local web GUI" or "browser GUI".
+- Do not use desktop-app or Tauri wording.
+- Do not add fake OS chrome.
+- Show mock mode and not-implemented runner states honestly.
+
 ## Palette
 
 | Token | Value |
@@ -18,40 +25,21 @@ Takokit should feel like a serious local developer and creator tool: calm, paper
 
 Use restrained borders. Avoid heavy shadows.
 
-## Spacing
-
-Use a simple 4px-based scale:
-
-```txt
-4, 8, 12, 16, 20, 24, 32, 40, 52
-```
-
-Dense tools can use 8-12px internal spacing. Page sections should breathe with 20-32px gaps.
-
 ## Typography
 
-- Use Orbitron as the primary identity/display font.
-- Use Space Mono as the secondary/body and UI font.
+- Use Orbitron as the identity/display font.
+- Use Space Mono as the body and UI font.
 - Keep headings direct and compact.
 - Do not use oversized marketing hero type inside tool panels.
-- Use monospace only for paths, commands, API routes, and IDs.
 - Keep letter spacing at `0`.
-- Takokit can use a technical character, but it should still feel like a serious desktop utility rather than a novelty sci-fi dashboard.
-
-## Radius
-
-- Controls and panels: `6px` to `8px`.
-- Pills only for compact status labels.
-- Avoid excessive rounding and nested framed containers.
 
 ## Component Rules
 
 - Sidebar navigation uses icons plus labels.
-- Tables and lists are preferred over card grids for model and voice registries.
+- Tables and lists are preferred over card grids for model, runner, and voice registries.
 - Forms should be direct and visibly functional.
 - Status indicators should be compact.
 - Avoid cards inside cards.
-- Do not hardcode macOS, Windows, or Linux window chrome in React components. Platform chrome belongs in Tauri/window configuration or platform-aware shell code, not product UI.
 - Motion should be restrained: 120-240ms transitions, opacity/translate/clip reveals, and reduced-motion support.
 
 ## Avoid
@@ -60,8 +48,5 @@ Dense tools can use 8-12px internal spacing. Page sections should breathe with 2
 - Dark neon SaaS styling.
 - Fake analytics dashboards.
 - Fake OS title bars or traffic-light controls.
-- Random stock imagery.
-- Large decorative cards for tiny facts.
 - Placeholder model inference claims.
 - Overwrapped component trees where a simple feature component is enough.
-- Pages that are technically clean but visually empty or repetitive.

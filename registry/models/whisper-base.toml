@@ -1,0 +1,24 @@
+id = "whisper-base"
+name = "Whisper Base"
+version = "0.1.0"
+kind = "stt"
+backend = "whispercpp"
+runner = "takokit-whispercpp"
+license = "mit"
+description = "Base Whisper transcription package placeholder for local registry testing."
+
+[capabilities]
+speak = false
+transcribe = true
+clone = false
+train = false
+convert = false
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "4gb"
+
+[artifacts]
+weights = []
+voices = []

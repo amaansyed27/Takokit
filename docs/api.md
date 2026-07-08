@@ -5,25 +5,21 @@ Takokit serves a local HTTP API on `127.0.0.1:5050` by default.
 ## Routes
 
 ```http
-GET  /health
-GET  /v1/status
-GET  /v1/models
-GET  /v1/voices
-POST /v1/audio/speech
-POST /v1/audio/transcriptions
-POST /v1/voices/clone
-POST /v1/voices/train
+GET    /health
+GET    /v1/status
+GET    /v1/models
+GET    /v1/models/:id
+GET    /v1/runners
+POST   /v1/models/pull
+DELETE /v1/models/:id
+GET    /v1/voices
+POST   /v1/audio/speech
+POST   /v1/audio/transcriptions
+POST   /v1/voices/clone
+POST   /v1/voices/train
 ```
 
-Implemented now:
-
-- `GET /health`
-- `GET /v1/status`
-- `GET /v1/models`
-- `GET /v1/voices`
-- `POST /v1/audio/speech`
-
-The speech route accepts an OpenAI-compatible shape where practical:
+`POST /v1/audio/speech` only supports `mock-tts` right now:
 
 ```json
 {
@@ -34,19 +30,30 @@ The speech route accepts an OpenAI-compatible shape where practical:
 }
 ```
 
-Current response:
+Using package models such as `kokoro` for speech returns a typed not-implemented error until real runners exist.
+
+## Package Pull
 
 ```json
 {
-  "id": "uuid",
-  "model": "mock-tts",
-  "voice": "default",
-  "engine": "mock-tts",
-  "output_path": "~/.takokit/outputs/speech-uuid.wav",
-  "content_type": "audio/wav",
-  "bytes": 19244
+  "model": "kokoro"
 }
 ```
 
-Transcription, clone, and train routes return structured not-implemented errors until their adapters are wired.
+The current pull flow installs a manifest from the local mock registry. It does not download weights.
 
+## GUI
+
+The Rust server serves the built GUI at:
+
+```txt
+GET /gui
+GET /gui/*
+```
+
+Build it with:
+
+```bash
+cd apps/gui
+npm run build
+```

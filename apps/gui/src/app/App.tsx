@@ -3,6 +3,7 @@ import { AppShell } from "./AppShell";
 import { type PageId } from "./navigation";
 import { routes } from "./routes";
 import { mockRuntime } from "../lib/mockData";
+import { loadRuntimeSnapshot } from "../lib/api";
 
 const routeIds = new Set<PageId>(routes.map((route) => route.id));
 
@@ -13,6 +14,7 @@ function pageFromHash(): PageId {
 
 export function App() {
   const [activePage, setActivePage] = useState<PageId>(() => pageFromHash());
+  const [runtime, setRuntime] = useState(mockRuntime);
   const route = routes.find((item) => item.id === activePage) ?? routes[0];
   const Page = route.component;
 
@@ -22,14 +24,18 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  useEffect(() => {
+    void loadRuntimeSnapshot().then(setRuntime);
+  }, []);
+
   function navigate(page: PageId) {
     setActivePage(page);
     window.history.replaceState(null, "", `#${page}`);
   }
 
   return (
-    <AppShell activePage={activePage} onNavigate={navigate} runtime={mockRuntime}>
-      <Page runtime={mockRuntime} onNavigate={navigate} />
+    <AppShell activePage={activePage} onNavigate={navigate} runtime={runtime}>
+      <Page runtime={runtime} onNavigate={navigate} />
     </AppShell>
   );
 }

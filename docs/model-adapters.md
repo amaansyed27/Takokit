@@ -1,8 +1,8 @@
-# Model Adapters
+# Model Adapters And Packages
 
-Takokit keeps model-specific implementation behind adapter traits.
+Takokit keeps model-specific implementation behind adapter and package contracts.
 
-Current traits:
+Current adapter traits:
 
 ```rust
 TextToSpeechEngine
@@ -12,26 +12,51 @@ VoiceTrainingEngine
 VoiceConversionEngine
 ```
 
-The UI and API should not know whether a model runs through Python, ONNX, whisper.cpp, or native Rust. They should work with model IDs, voice IDs, request contracts, and registry metadata.
+`mock-tts` is the only executable speech engine today. It writes a deterministic test WAV and is not real inference.
 
-## Initial Registry
+## Model Manifest
 
-| Model | Purpose | Planned Runtime |
-| --- | --- | --- |
-| Kokoro | Fast local TTS | Python runner |
-| Whisper | Transcription | whisper.cpp |
-| Chatterbox | Voice cloning | Python runner |
-| GPT-SoVITS | Few-shot voice training | Python runner |
-| Qwen3-TTS | Voice design and streaming | Python runner |
-| RVC | Voice conversion | Python runner |
-| Piper | Lightweight offline voices | ONNX |
+```toml
+id = "kokoro"
+name = "Kokoro"
+version = "0.1.0"
+kind = "tts"
+backend = "onnx"
+runner = "takokit-onnx"
+license = "apache-2.0"
+description = "Fast local text-to-speech model."
 
-`mock-tts` is included as an installed test adapter. It is not a real inference engine.
+[capabilities]
+speak = true
+transcribe = false
+clone = false
+train = false
+convert = false
 
-## Adapter Rules
+[hardware]
+cpu = true
+gpu = false
+min_ram = "4gb"
 
-- Keep model setup and dependencies out of UI code.
-- Keep runner process management out of API handlers where possible.
-- Return typed errors for unsupported features.
-- Record model license, hardware, and safety metadata before download or execution.
+[artifacts]
+weights = []
+voices = []
+```
 
+## Runner Manifest
+
+```toml
+id = "takokit-onnx"
+name = "Takokit ONNX Runner"
+version = "0.1.0"
+kind = "native"
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+description = "Native ONNX runner for CPU-friendly models."
+```
+
+## Rules
+
+- Do not hardcode model-specific behavior inside CLI handlers or React components.
+- Do not require users to manually install Python, Torch, CUDA, FFmpeg, clone repos, or run model-specific Gradio apps.
+- Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
+- Return typed unsupported/not-installed errors until real runners are implemented.
