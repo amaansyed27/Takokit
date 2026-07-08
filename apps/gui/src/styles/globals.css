@@ -899,6 +899,63 @@ textarea:focus,
   min-width: 0;
 }
 
+.action-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.details-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.84), rgba(255, 253, 247, 0.52)),
+    var(--color-surface);
+  padding: var(--space-4);
+}
+
+.details-panel__main,
+.details-panel__side {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.details-panel__main p,
+.notice-line {
+  margin: 0;
+}
+
+.details-panel__runner {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.detail-grid span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.detail-grid strong {
+  color: var(--color-text);
+}
+
+.notice-line {
+  color: var(--color-text-secondary);
+}
+
 .badge--success {
   border-color: rgba(79, 111, 82, 0.3);
   background: rgba(111, 143, 114, 0.14);
@@ -1237,7 +1294,9 @@ textarea:focus,
   .status-matrix,
   .voice-meta-grid,
   .voice-workbench,
-  .upload-zone {
+  .upload-zone,
+  .details-panel,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 

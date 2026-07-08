@@ -11,6 +11,7 @@ import type { PageId } from "./navigation";
 export type RouteComponentProps = {
   runtime: RuntimeSnapshot;
   onNavigate: (page: PageId) => void;
+  onRefresh: () => Promise<void>;
 };
 
 export type AppRoute = {
@@ -27,4 +28,3 @@ export const routes: AppRoute[] = [
   { id: "server", component: ServerPage },
   { id: "settings", component: SettingsPage }
 ];
-

@@ -3,17 +3,17 @@ import type { RuntimeSnapshot } from "./types";
 export const mockRuntime: RuntimeSnapshot = {
   storagePath: "~/.takokit",
   server: {
-    status: "online",
+    status: "offline",
     url: "http://127.0.0.1:5050",
-    uptime: "00:12:47"
+    uptime: "API unavailable"
   },
   models: [
-    { id: "mock-tts", name: "Mock TTS", purpose: "Deterministic test WAV generator for API and CLI scaffolding.", version: "0.1.0", language: "Local", backend: "native_rust", runtime: "Rust", status: "installed", license: "internal-test", capabilities: ["tts", "live_audio"] },
-    { id: "kokoro", name: "Kokoro", purpose: "Fast local text-to-speech model. Mock registry entry only.", version: "0.1.0", language: "English", backend: "onnx", runtime: "ONNX", status: "available", license: "apache-2.0", capabilities: ["tts", "live_audio"] },
-    { id: "piper-lessac", name: "Piper Lessac", purpose: "Piper English Lessac placeholder.", version: "0.1.0", language: "English", backend: "onnx", runtime: "ONNX", status: "available", license: "mit", capabilities: ["tts", "live_audio"] },
-    { id: "whisper-base", name: "Whisper Base", purpose: "Whisper transcription placeholder.", version: "0.1.0", language: "Multilingual", backend: "whispercpp", runtime: "whisper.cpp", status: "available", license: "mit", capabilities: ["stt", "live_transcription"] },
-    { id: "chatterbox", name: "Chatterbox", purpose: "Voice cloning and TTS placeholder.", version: "0.1.0", language: "Local", backend: "python-managed", runtime: "Python", status: "available", license: "research-check-required", capabilities: ["tts", "voice_cloning", "live_audio"] },
-    { id: "gpt-sovits", name: "GPT-SoVITS", purpose: "Few-shot voice cloning and TTS placeholder.", version: "0.1.0", language: "Local", backend: "python-managed", runtime: "Python", status: "available", license: "research-check-required", capabilities: ["tts", "voice_cloning", "live_audio"] }
+    { id: "mock-tts", name: "Mock TTS", purpose: "Deterministic test WAV generator for API and CLI scaffolding.", version: "0.1.0", language: "Local", backend: "native_rust", runner: "takokit-mock", runnerInstalled: true, hardwareNotes: "CPU, no model weights", executionStatus: "ready", artifactCount: 0, runtime: "Rust", status: "installed", license: "internal-test", capabilities: ["tts", "live_audio"] },
+    { id: "kokoro", name: "Kokoro", purpose: "Fast local text-to-speech model. Mock registry entry only.", version: "0.1.0", language: "English", backend: "onnx", runner: "takokit-onnx", runnerInstalled: false, hardwareNotes: "CPU, minimum RAM 4gb", executionStatus: "runner not installed or not implemented", artifactCount: 0, runtime: "ONNX", status: "available", license: "apache-2.0", capabilities: ["tts", "live_audio"] },
+    { id: "piper-lessac", name: "Piper Lessac", purpose: "Piper English Lessac placeholder.", version: "0.1.0", language: "English", backend: "onnx", runner: "takokit-onnx", runnerInstalled: false, hardwareNotes: "CPU, minimum RAM 2gb", executionStatus: "runner not installed or not implemented", artifactCount: 0, runtime: "ONNX", status: "available", license: "mit", capabilities: ["tts", "live_audio"] },
+    { id: "whisper-base", name: "Whisper Base", purpose: "Whisper transcription placeholder.", version: "0.1.0", language: "Multilingual", backend: "whispercpp", runner: "takokit-whispercpp", runnerInstalled: false, hardwareNotes: "CPU, minimum RAM 4gb", executionStatus: "runner not installed or not implemented", artifactCount: 0, runtime: "whisper.cpp", status: "available", license: "mit", capabilities: ["stt", "live_transcription"] },
+    { id: "chatterbox", name: "Chatterbox", purpose: "Voice cloning and TTS placeholder.", version: "0.1.0", language: "Local", backend: "python-managed", runner: "takokit-python", runnerInstalled: false, hardwareNotes: "CPU or GPU, minimum RAM 8gb", executionStatus: "runner not installed or not implemented", artifactCount: 0, runtime: "Python", status: "available", license: "research-check-required", capabilities: ["tts", "voice_cloning", "live_audio"] },
+    { id: "gpt-sovits", name: "GPT-SoVITS", purpose: "Few-shot voice cloning and TTS placeholder.", version: "0.1.0", language: "Local", backend: "python-managed", runner: "takokit-python", runnerInstalled: false, hardwareNotes: "CPU or GPU, minimum RAM 8gb", executionStatus: "runner not installed or not implemented", artifactCount: 0, runtime: "Python", status: "available", license: "research-check-required", capabilities: ["tts", "voice_cloning", "live_audio"] }
   ],
   runners: [
     { id: "takokit-onnx", name: "Takokit ONNX Runner", version: "0.1.0", kind: "native", platforms: ["windows-x64", "linux-x64", "macos-arm64"], description: "Runner contract only. Execution is not implemented yet.", installed: false },
@@ -30,5 +30,5 @@ export const mockRuntime: RuntimeSnapshot = {
     { id: "live_transcription", label: "Live Transcription API", description: "Local STT models exposed through an API for streaming or submitted audio." },
     { id: "live_audio", label: "Live Audio API", description: "Compatible local voice models exposed through an API for speech output." }
   ],
-  modeNote: "Mock mode: package metadata is shown, but real model inference is not implemented."
+  modeNote: "Mock fallback: API unavailable. Actions are disabled until the local daemon responds."
 };

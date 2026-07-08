@@ -25,8 +25,13 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void loadRuntimeSnapshot().then(setRuntime);
+    void refreshRuntime();
   }, []);
+
+  async function refreshRuntime() {
+    const nextRuntime = await loadRuntimeSnapshot();
+    setRuntime(nextRuntime);
+  }
 
   function navigate(page: PageId) {
     setActivePage(page);
@@ -35,7 +40,7 @@ export function App() {
 
   return (
     <AppShell activePage={activePage} onNavigate={navigate} runtime={runtime}>
-      <Page runtime={runtime} onNavigate={navigate} />
+      <Page runtime={runtime} onNavigate={navigate} onRefresh={refreshRuntime} />
     </AppShell>
   );
 }

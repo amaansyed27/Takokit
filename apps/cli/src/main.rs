@@ -34,6 +34,10 @@ enum Command {
         #[command(subcommand)]
         target: ListTarget,
     },
+    Runner {
+        #[command(subcommand)]
+        command: RunnerCommand,
+    },
     Transcribe {
         audio: PathBuf,
         #[arg(long, default_value = "whisper-base")]
@@ -73,6 +77,13 @@ enum ListTarget {
     Voices,
 }
 
+#[derive(Debug, Subcommand)]
+enum RunnerCommand {
+    Pull { runner: String },
+    Show { runner: String },
+    Rm { runner: String },
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -108,15 +119,14 @@ async fn main() -> anyhow::Result<()> {
                     &args.model,
                     CapabilityKind::TextToSpeech,
                 )
-                .map_err(TakokitError::from)?;
+                .map_err(cli_error)?;
 
-                return Err(PackageError::InferenceNotImplemented {
+                return Err(cli_error(PackageError::InferenceNotImplemented {
                     model: plan.model.id,
                     runner: plan.runner.id,
                     capability: plan.capability,
                     capability_label: plan.capability.label(),
-                }
-                .into());
+                }));
             }
 
             let engine = MockTextToSpeechEngine;
@@ -134,14 +144,14 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&response)?);
         }
         Command::Pull { model } => {
-            let manifest = package_registry.model(&model).map_err(TakokitError::from)?;
+            let manifest = package_registry.model(&model).map_err(cli_error)?;
             let report = installed_registry
                 .install_model(&manifest)
-                .map_err(TakokitError::from)?;
+                .map_err(cli_error)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Command::Show { model } => {
-            let manifest = package_registry.model(&model).map_err(TakokitError::from)?;
+            let manifest = package_registry.model(&model).map_err(cli_error)?;
             let installed = installed_registry.is_model_installed(&manifest.id);
             let runner_installed = installed_registry.is_runner_installed(&manifest.runner);
             let runner = package_registry.runner(&manifest.runner).ok();
@@ -154,6 +164,18 @@ async fn main() -> anyhow::Result<()> {
                 println!("runner installed: {}", runner_installed);
             }
             println!("installed: {}", installed);
+            if let Ok(record) = installed_registry.installed_model_record(&manifest.id) {
+                println!("installed status: {:?}", record.status);
+                println!("installed at: {}", record.installed_at);
+                println!("source: {}", record.source);
+                println!("artifacts: {}", record.artifacts.len());
+            } else {
+                println!("installed status: not installed");
+                println!(
+                    "artifacts: {}",
+                    manifest.artifacts.weights.len() + manifest.artifacts.voices.len()
+                );
+            }
             println!("license: {}", manifest.license);
             println!(
                 "capabilities: {}",
@@ -173,9 +195,7 @@ async fn main() -> anyhow::Result<()> {
             println!("description: {}", manifest.description);
         }
         Command::Rm { model } => {
-            let removed = installed_registry
-                .remove_model(&model)
-                .map_err(TakokitError::from)?;
+            let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({
@@ -190,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
                 ListTarget::Models => {
                     let models: Vec<_> = package_registry
                         .models()
-                        .map_err(TakokitError::from)?
+                        .map_err(cli_error)?
                         .into_iter()
                         .map(|model| {
                             model.to_model_info(
@@ -204,9 +224,12 @@ async fn main() -> anyhow::Result<()> {
                 ListTarget::Runners => {
                     let runners: Vec<_> = package_registry
                         .runners()
-                        .map_err(TakokitError::from)?
+                        .map_err(cli_error)?
                         .into_iter()
-                        .map(|runner| runner.to_runner_info(false))
+                        .map(|runner| {
+                            runner
+                                .to_runner_info(installed_registry.is_runner_installed(&runner.id))
+                        })
                         .collect();
                     println!("{}", serde_json::to_string_pretty(&runners)?)
                 }
@@ -222,15 +245,14 @@ async fn main() -> anyhow::Result<()> {
                 &model,
                 CapabilityKind::SpeechToText,
             )
-            .map_err(TakokitError::from)?;
+            .map_err(cli_error)?;
 
-            return Err(PackageError::InferenceNotImplemented {
+            return Err(cli_error(PackageError::InferenceNotImplemented {
                 model: plan.model.id,
                 runner: plan.runner.id,
                 capability: plan.capability,
                 capability_label: plan.capability.label(),
-            }
-            .into());
+            }));
         }
         Command::Clone(args) => {
             let _ = args;
@@ -246,6 +268,46 @@ async fn main() -> anyhow::Result<()> {
                 "training jobs and dataset preparation are planned for a later phase",
             );
         }
+        Command::Runner { command } => {
+            match command {
+                RunnerCommand::Pull { runner } => {
+                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                    let report = installed_registry
+                        .install_runner(&manifest)
+                        .map_err(cli_error)?;
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                }
+                RunnerCommand::Show { runner } => {
+                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                    let installed = installed_registry.is_runner_installed(&manifest.id);
+                    println!("{} ({})", manifest.name, manifest.id);
+                    println!("version: {}", manifest.version);
+                    println!("kind: {:?}", manifest.kind);
+                    println!("platforms: {}", manifest.platforms.join(", "));
+                    println!("installed: {}", installed);
+                    if let Ok(record) = installed_registry.installed_runner_record(&manifest.id) {
+                        println!("installed status: {:?}", record.status);
+                        println!("installed at: {}", record.installed_at);
+                    } else {
+                        println!("installed status: not installed");
+                    }
+                    println!("status: runner contract installed only; execution binary is not implemented");
+                    println!("description: {}", manifest.description);
+                }
+                RunnerCommand::Rm { runner } => {
+                    let removed = installed_registry
+                        .remove_runner(&runner)
+                        .map_err(cli_error)?;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "id": runner,
+                            "removed": removed
+                        }))?
+                    );
+                }
+            }
+        }
     }
 
     Ok(())
@@ -253,6 +315,15 @@ async fn main() -> anyhow::Result<()> {
 
 fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
     Err(TakokitError::NotImplemented { feature, reason }.into())
+}
+
+fn cli_error(error: PackageError) -> anyhow::Error {
+    match TakokitError::from(error) {
+        TakokitError::Resolution { code, message } => {
+            anyhow::anyhow!("{}: {}", code.as_str(), message)
+        }
+        error => error.into(),
+    }
 }
 
 fn capability_labels(capabilities: &[CapabilityKind]) -> String {

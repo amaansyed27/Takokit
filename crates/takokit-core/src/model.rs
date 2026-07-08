@@ -74,6 +74,7 @@ pub struct ModelInfo {
     pub backend: String,
     pub runner: String,
     pub hardware_notes: String,
+    pub artifact_count: usize,
     pub capabilities: Vec<ModelCapability>,
     pub installed: bool,
     pub runner_installed: bool,

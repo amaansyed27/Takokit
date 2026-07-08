@@ -10,9 +10,12 @@ GET    /v1/status
 GET    /v1/capabilities
 GET    /v1/models
 GET    /v1/models/:id
-GET    /v1/runners
 POST   /v1/models/pull
 DELETE /v1/models/:id
+GET    /v1/runners
+GET    /v1/runners/:id
+POST   /v1/runners/pull
+DELETE /v1/runners/:id
 GET    /v1/voices
 POST   /v1/audio/speech
 POST   /v1/audio/transcriptions
@@ -34,7 +37,25 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 ## Models
 
-`GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, and honest execution status.
+`GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, and honest execution status.
+
+`POST /v1/models/pull` installs local mock metadata only. It writes an installed-model record and a manifest copy; it does not download model weights.
+
+`DELETE /v1/models/:id` removes the local installed model metadata.
+
+## Runners
+
+`GET /v1/runners` and `GET /v1/runners/:id` include runner contract metadata and installed status.
+
+`POST /v1/runners/pull` installs a local runner contract record:
+
+```json
+{
+  "runner": "takokit-onnx"
+}
+```
+
+This does not download or install an execution binary. `DELETE /v1/runners/:id` removes the local installed runner metadata.
 
 `POST /v1/audio/speech` only supports `mock-tts` right now:
 
@@ -47,7 +68,7 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 }
 ```
 
-Using package models such as `kokoro` for speech returns a typed not-implemented error until real runners exist.
+Using package models such as `kokoro` for speech runs lifecycle resolution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit returns `inference_not_implemented` until real runners exist.
 
 `POST /v1/audio/transcriptions` uses the same runner resolution layer for STT. For example, `kokoro` returns `capability_unsupported` for STT, while `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists.
 
@@ -70,7 +91,7 @@ Typed errors use this shape:
 }
 ```
 
-The current pull flow installs a manifest from the local mock registry. It does not download weights.
+The current pull flow installs metadata from the local mock registry. It does not download weights.
 
 ## GUI
 

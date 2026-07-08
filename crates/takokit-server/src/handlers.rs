@@ -7,8 +7,8 @@ use axum::{
 use takokit_core::{
     CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, ErrorCode,
     HealthResponse, ModelDetailResponse, ModelsResponse, PullModelRequest, PullModelResponse,
-    RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest, TranscriptionRequest,
-    VoicesResponse,
+    PullRunnerRequest, RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError,
+    TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::TextToSpeechEngine;
 use takokit_package::{resolve_runner, PackageError, RunnerInfo};
@@ -80,10 +80,28 @@ pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<Runn
         .runners()
         .unwrap_or_default()
         .into_iter()
-        .map(|runner| runner.to_runner_info(false))
+        .map(|runner| {
+            runner.to_runner_info(state.installed_registry.is_runner_installed(&runner.id))
+        })
         .collect();
 
     Json(RunnersResponse { data: runners })
+}
+
+pub async fn runner(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<RunnerDetailResponse<RunnerInfo>>, ApiError> {
+    let manifest = state
+        .package_registry
+        .runner(&id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let installed = state.installed_registry.is_runner_installed(&manifest.id);
+
+    Ok(Json(RunnerDetailResponse {
+        data: manifest.to_runner_info(installed),
+    }))
 }
 
 pub async fn pull_model(
@@ -109,6 +127,29 @@ pub async fn pull_model(
     }))
 }
 
+pub async fn pull_runner(
+    State(state): State<AppState>,
+    Json(request): Json<PullRunnerRequest>,
+) -> Result<Json<PullModelResponse>, ApiError> {
+    let manifest = state
+        .package_registry
+        .runner(&request.runner)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let report = state
+        .installed_registry
+        .install_runner(&manifest)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+
+    Ok(Json(PullModelResponse {
+        id: report.id,
+        installed: report.installed,
+        manifest_path: report.manifest_path,
+        note: report.note,
+    }))
+}
+
 pub async fn remove_model(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -116,6 +157,19 @@ pub async fn remove_model(
     state
         .installed_registry
         .remove_model(&id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn remove_runner(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .installed_registry
+        .remove_runner(&id)
         .map_err(Into::into)
         .map_err(ApiError)?;
 

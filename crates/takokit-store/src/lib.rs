@@ -45,6 +45,14 @@ impl LocalStore {
         self.manifests_dir().join("runners")
     }
 
+    pub fn installed_model_records_dir(&self) -> PathBuf {
+        self.manifests_dir().join("installed-models")
+    }
+
+    pub fn installed_runner_records_dir(&self) -> PathBuf {
+        self.manifests_dir().join("installed-runners")
+    }
+
     pub fn voices_dir(&self) -> PathBuf {
         self.root.join("voices")
     }
@@ -77,6 +85,8 @@ impl LocalStore {
             self.manifests_dir(),
             self.model_manifests_dir(),
             self.runner_manifests_dir(),
+            self.installed_model_records_dir(),
+            self.installed_runner_records_dir(),
             self.voices_dir(),
             self.datasets_dir(),
             self.outputs_dir(),
@@ -111,6 +121,10 @@ mod tests {
         assert!(root.join("runners").is_dir());
         assert!(root.join("blobs").is_dir());
         assert!(root.join("manifests").is_dir());
+        assert!(root.join("manifests").join("models").is_dir());
+        assert!(root.join("manifests").join("runners").is_dir());
+        assert!(root.join("manifests").join("installed-models").is_dir());
+        assert!(root.join("manifests").join("installed-runners").is_dir());
         assert!(root.join("voices").is_dir());
         assert!(root.join("datasets").is_dir());
         assert!(root.join("outputs").is_dir());

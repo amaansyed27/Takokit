@@ -34,6 +34,7 @@ Takokit models declare which local voice surfaces they support:
 - Static GUI serving from `apps/gui/dist` at `/gui`.
 - Local mock model and runner registry under `registry/`.
 - Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
+- Installed model and runner records under `~/.takokit/manifests/`.
 - Typed capability taxonomy and runner resolution layer.
 - Local storage layout under `~/.takokit`.
 - Mock TTS engine for `mock-tts` only.
@@ -46,13 +47,17 @@ cargo run -p takokit-cli -- gui
 cargo run -p takokit-cli -- capabilities
 cargo run -p takokit-cli -- pull kokoro
 cargo run -p takokit-cli -- show kokoro
+cargo run -p takokit-cli -- runner pull takokit-onnx
+cargo run -p takokit-cli -- runner show takokit-onnx
 cargo run -p takokit-cli -- list models
 cargo run -p takokit-cli -- list runners
 cargo run -p takokit-cli -- speak "Hello from Takokit" --model mock-tts
 cargo run -p takokit-cli -- transcribe ./audio.wav --model whisper-base
 ```
 
-`takokit pull kokoro` currently installs the local mock registry manifest into `~/.takokit/manifests/models/`. It does not download weights or enable real Kokoro inference yet.
+`takokit pull kokoro` currently installs local mock registry metadata into `~/.takokit/manifests/models/` and writes an installed-model record under `~/.takokit/manifests/installed-models/`. It does not download weights or enable real Kokoro inference yet.
+
+`takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
 
 `takokit speak "Hello" --model mock-tts` is the only execution path that writes audio. Package models such as `kokoro`, `piper-lessac`, and `whisper-base` go through runner resolution and return typed errors until their real runners exist.
 
@@ -94,12 +99,14 @@ Users should not manually install random model dependencies. The intended UX is:
 takokit capabilities
 takokit pull kokoro
 takokit show kokoro
+takokit runner pull takokit-onnx
+takokit list runners
 takokit speak "Hello" --model kokoro
 takokit transcribe ./audio.wav --model whisper-base
 takokit gui
 ```
 
-Today, those real-model speech and transcription commands return typed runner-resolution errors because runners are not wired. That is intentional.
+Today, model and runner lifecycle metadata works. Real-model speech and transcription commands still return typed `inference_not_implemented` errors once their model and runner records exist because real runners are not wired. That is intentional.
 
 ## Local Storage
 
@@ -109,6 +116,10 @@ Today, those real-model speech and transcription commands return typed runner-re
   runners/
   blobs/
   manifests/
+    models/
+    runners/
+    installed-models/
+    installed-runners/
   voices/
   datasets/
   outputs/

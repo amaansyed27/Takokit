@@ -51,7 +51,16 @@ Takokit should eventually own model and runner installation:
 model manifest -> runner manifest -> content-addressed blobs -> installed registry -> adapter dispatch
 ```
 
-The current implementation installs local mock manifests only. It does not download model weights, install Python packages, or execute real runners.
+The current implementation installs local mock metadata only. It writes:
+
+```txt
+~/.takokit/manifests/models/<model>.toml
+~/.takokit/manifests/runners/<runner>.toml
+~/.takokit/manifests/installed-models/<model>.toml
+~/.takokit/manifests/installed-runners/<runner>.toml
+```
+
+The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact placeholders, required runner, platforms, and metadata-only status. Takokit still does not download model weights, install Python packages, or execute real runners.
 
 ## Runner Resolution
 
@@ -61,12 +70,13 @@ Execution requests follow this flow:
 model id
   -> load model manifest
   -> check requested capability
+  -> check model install record
   -> resolve required runner
   -> check platform and installed runner status
-  -> return execution plan or typed error
+  -> return typed error until execution exists
 ```
 
-The resolver returns typed failures such as `ModelNotFound`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, `RunnerUnsupportedOnPlatform`, and `InferenceNotImplemented`. `mock-tts` remains the only path that writes a test WAV.
+The resolver returns typed failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, `RunnerUnsupportedOnPlatform`, and `InferenceNotImplemented`. `mock-tts` remains the only path that writes a test WAV.
 
 ## Runner Isolation
 

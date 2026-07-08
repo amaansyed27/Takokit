@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use takokit_core::{
     CapabilityKind, ErrorCode, ModelCapability, ModelInfo, ModelRuntime, TakokitError,
 };
@@ -24,6 +27,9 @@ pub enum PackageError {
 
     #[error("model is not installed: {0}")]
     ModelNotInstalled(String),
+
+    #[error("runner is not installed: {0}")]
+    RunnerPackageNotInstalled(String),
 
     #[error("{model} does not support {capability_label}.")]
     CapabilityUnsupported {
@@ -74,6 +80,10 @@ impl From<PackageError> for TakokitError {
             PackageError::ModelNotInstalled(id) => TakokitError::Resolution {
                 code: ErrorCode::ModelNotInstalled,
                 message: format!("model is not installed: {id}"),
+            },
+            PackageError::RunnerPackageNotInstalled(id) => TakokitError::Resolution {
+                code: ErrorCode::RunnerNotInstalled,
+                message: format!("runner is not installed: {id}"),
             },
             error @ PackageError::CapabilityUnsupported { .. } => TakokitError::Resolution {
                 code: ErrorCode::CapabilityUnsupported,
@@ -211,6 +221,47 @@ pub struct PullReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledModelRecord {
+    pub id: String,
+    pub version: String,
+    pub source: String,
+    pub manifest_path: PathBuf,
+    pub runner: String,
+    pub installed_at: String,
+    pub artifacts: Vec<InstalledArtifactRecord>,
+    pub status: InstalledPackageStatus,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledRunnerRecord {
+    pub id: String,
+    pub version: String,
+    pub kind: String,
+    pub manifest_path: PathBuf,
+    pub installed_at: String,
+    pub platforms: Vec<String>,
+    pub status: InstalledPackageStatus,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledArtifactRecord {
+    pub name: String,
+    pub sha256: String,
+    pub bytes: Option<u64>,
+    pub local_path: Option<PathBuf>,
+    pub downloaded: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum InstalledPackageStatus {
+    MetadataOnly,
+    Ready,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExecutionPlan {
     pub model: ModelManifest,
     pub capability: CapabilityKind,
@@ -298,35 +349,116 @@ impl InstalledRegistry {
             .and_then(|source| Ok(toml::from_str(&source)?))
     }
 
+    pub fn installed_model_record(&self, id: &str) -> PackageResult<InstalledModelRecord> {
+        std::fs::read_to_string(self.model_record_path(id))
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::NotFound => PackageError::ModelNotInstalled(id.to_string()),
+                _ => PackageError::Io(error),
+            })
+            .and_then(|source| Ok(toml::from_str(&source)?))
+            .or_else(|error| match error {
+                PackageError::ModelNotInstalled(_) if self.model_manifest_path(id).is_file() => {
+                    let manifest = self.installed_model(id)?;
+                    Ok(installed_model_record(
+                        &manifest,
+                        self.model_manifest_path(id),
+                    ))
+                }
+                _ => Err(error),
+            })
+    }
+
+    pub fn installed_runner_record(&self, id: &str) -> PackageResult<InstalledRunnerRecord> {
+        std::fs::read_to_string(self.runner_record_path(id))
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::NotFound => {
+                    PackageError::RunnerPackageNotInstalled(id.to_string())
+                }
+                _ => PackageError::Io(error),
+            })
+            .and_then(|source| Ok(toml::from_str(&source)?))
+            .or_else(|error| match error {
+                PackageError::RunnerPackageNotInstalled(_)
+                    if self.runner_manifest_path(id).is_file() =>
+                {
+                    let source = std::fs::read_to_string(self.runner_manifest_path(id))?;
+                    let manifest: RunnerManifest = toml::from_str(&source)?;
+                    Ok(installed_runner_record(
+                        &manifest,
+                        self.runner_manifest_path(id),
+                    ))
+                }
+                _ => Err(error),
+            })
+    }
+
     pub fn is_model_installed(&self, id: &str) -> bool {
-        self.model_manifest_path(id).is_file()
+        self.model_record_path(id).is_file() || self.model_manifest_path(id).is_file()
     }
 
     pub fn is_runner_installed(&self, id: &str) -> bool {
-        self.runner_manifest_path(id).is_file()
+        self.runner_record_path(id).is_file() || self.runner_manifest_path(id).is_file()
     }
 
     pub fn install_model(&self, manifest: &ModelManifest) -> PackageResult<PullReport> {
         std::fs::create_dir_all(self.root.join("models"))?;
+        std::fs::create_dir_all(self.root.join("installed-models"))?;
         let path = self.model_manifest_path(&manifest.id);
         std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
+        let record = installed_model_record(manifest, path.clone());
+        std::fs::write(
+            self.model_record_path(&manifest.id),
+            toml::to_string_pretty(&record)?,
+        )?;
 
         Ok(PullReport {
             id: manifest.id.clone(),
             installed: true,
             manifest_path: path,
-            note: "Installed from local mock registry. No model weights were downloaded."
-                .to_string(),
+            note: record.note,
+        })
+    }
+
+    pub fn install_runner(&self, manifest: &RunnerManifest) -> PackageResult<PullReport> {
+        std::fs::create_dir_all(self.root.join("runners"))?;
+        std::fs::create_dir_all(self.root.join("installed-runners"))?;
+        let path = self.runner_manifest_path(&manifest.id);
+        std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
+        let record = installed_runner_record(manifest, path.clone());
+        std::fs::write(
+            self.runner_record_path(&manifest.id),
+            toml::to_string_pretty(&record)?,
+        )?;
+
+        Ok(PullReport {
+            id: manifest.id.clone(),
+            installed: true,
+            manifest_path: path,
+            note: record.note,
         })
     }
 
     pub fn remove_model(&self, id: &str) -> PackageResult<bool> {
-        let path = self.model_manifest_path(id);
-        if !path.exists() {
+        let manifest_path = self.model_manifest_path(id);
+        let record_path = self.model_record_path(id);
+        if !manifest_path.exists() && !record_path.exists() {
             return Err(PackageError::ModelNotInstalled(id.to_string()));
         }
 
-        std::fs::remove_file(path)?;
+        remove_file_if_exists(manifest_path)?;
+        remove_file_if_exists(record_path)?;
+        Ok(true)
+    }
+
+    pub fn remove_runner(&self, id: &str) -> PackageResult<bool> {
+        let manifest_path = self.runner_manifest_path(id);
+        let record_path = self.runner_record_path(id);
+        if !manifest_path.exists() && !record_path.exists() {
+            return Err(PackageError::RunnerPackageNotInstalled(id.to_string()));
+        }
+
+        remove_file_if_exists(manifest_path)?;
+        remove_file_if_exists(record_path)?;
         Ok(true)
     }
 
@@ -336,6 +468,18 @@ impl InstalledRegistry {
 
     fn runner_manifest_path(&self, id: &str) -> PathBuf {
         self.root.join("runners").join(format!("{id}.toml"))
+    }
+
+    fn model_record_path(&self, id: &str) -> PathBuf {
+        self.root
+            .join("installed-models")
+            .join(format!("{id}.toml"))
+    }
+
+    fn runner_record_path(&self, id: &str) -> PathBuf {
+        self.root
+            .join("installed-runners")
+            .join(format!("{id}.toml"))
     }
 }
 
@@ -355,6 +499,7 @@ impl ModelManifest {
             backend: self.backend.as_str().to_string(),
             runner: self.runner.clone(),
             hardware_notes: self.hardware.notes(),
+            artifact_count: self.artifacts.weights.len() + self.artifacts.voices.len(),
             capabilities: self.capabilities.to_model_capabilities(),
             installed,
             runner_installed,
@@ -379,6 +524,18 @@ impl RunnerManifest {
             platforms: self.platforms.clone(),
             description: self.description.clone(),
             installed,
+        }
+    }
+}
+
+impl RunnerKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            RunnerKind::Native => "native",
+            RunnerKind::Onnx => "onnx",
+            RunnerKind::Whispercpp => "whispercpp",
+            RunnerKind::PythonManaged => "python-managed",
+            RunnerKind::External => "external",
         }
     }
 }
@@ -489,6 +646,10 @@ pub fn resolve_runner(
         });
     }
 
+    if model.id != "mock-tts" && !installed_registry.is_model_installed(&model.id) {
+        return Err(PackageError::ModelNotInstalled(model.id));
+    }
+
     let runner = package_registry.runner(&model.runner)?;
     let platform = current_platform();
     if !runner
@@ -515,13 +676,78 @@ pub fn resolve_runner(
         });
     }
 
-    Ok(ExecutionPlan {
-        model,
+    Err(PackageError::InferenceNotImplemented {
+        model: model.id,
+        runner: runner.id,
         capability,
-        runner,
-        runner_installed,
-        status: ExecutionStatus::InferenceNotImplemented,
+        capability_label: capability.label(),
     })
+}
+
+fn installed_model_record(
+    manifest: &ModelManifest,
+    manifest_path: PathBuf,
+) -> InstalledModelRecord {
+    InstalledModelRecord {
+        id: manifest.id.clone(),
+        version: manifest.version.clone(),
+        source: "local-mock-registry".to_string(),
+        manifest_path,
+        runner: manifest.runner.clone(),
+        installed_at: timestamp_now(),
+        artifacts: installed_artifacts(&manifest.artifacts),
+        status: InstalledPackageStatus::MetadataOnly,
+        note:
+            "Installed model metadata from local mock registry. No model weights were downloaded."
+                .to_string(),
+    }
+}
+
+fn installed_runner_record(
+    manifest: &RunnerManifest,
+    manifest_path: PathBuf,
+) -> InstalledRunnerRecord {
+    InstalledRunnerRecord {
+        id: manifest.id.clone(),
+        version: manifest.version.clone(),
+        kind: manifest.kind.as_str().to_string(),
+        manifest_path,
+        installed_at: timestamp_now(),
+        platforms: manifest.platforms.clone(),
+        status: InstalledPackageStatus::MetadataOnly,
+        note: "Installed runner contract from local mock registry. Execution binary is not implemented."
+            .to_string(),
+    }
+}
+
+fn installed_artifacts(manifest: &ArtifactManifest) -> Vec<InstalledArtifactRecord> {
+    manifest
+        .weights
+        .iter()
+        .chain(manifest.voices.iter())
+        .map(|artifact| InstalledArtifactRecord {
+            name: artifact.name.clone(),
+            sha256: artifact.sha256.clone(),
+            bytes: artifact.bytes,
+            local_path: None,
+            downloaded: false,
+        })
+        .collect()
+}
+
+fn timestamp_now() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "0".to_string())
+}
+
+fn remove_file_if_exists(path: PathBuf) -> PackageResult<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(PackageError::Io(error)),
+    }
 }
 
 fn current_platform() -> String {
@@ -673,11 +899,74 @@ description = "Native ONNX runner for CPU-friendly models."
     }
 
     #[test]
-    fn resolver_reports_not_installed_runner() {
+    fn install_model_writes_installed_record() {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_registry(temp.path());
         let registry = PackageRegistry::new(temp.path());
         let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.model("kokoro").expect("model");
+
+        let report = installed.install_model(&manifest).expect("install model");
+        let record = installed
+            .installed_model_record("kokoro")
+            .expect("installed model record");
+
+        assert_eq!(report.id, "kokoro");
+        assert_eq!(record.id, "kokoro");
+        assert_eq!(record.version, "0.1.0");
+        assert_eq!(record.runner, "takokit-onnx");
+        assert_eq!(record.source, "local-mock-registry");
+        assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
+        assert!(record.manifest_path.ends_with("models/kokoro.toml"));
+    }
+
+    #[test]
+    fn install_runner_writes_installed_record() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.runner("takokit-onnx").expect("runner");
+
+        let report = installed.install_runner(&manifest).expect("install runner");
+        let record = installed
+            .installed_runner_record("takokit-onnx")
+            .expect("installed runner record");
+
+        assert_eq!(report.id, "takokit-onnx");
+        assert_eq!(record.id, "takokit-onnx");
+        assert_eq!(record.version, "0.1.0");
+        assert_eq!(record.kind, "native");
+        assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
+        assert!(record.manifest_path.ends_with("runners/takokit-onnx.toml"));
+    }
+
+    #[test]
+    fn resolver_reports_model_not_installed_before_runner_missing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+
+        let error = resolve_runner(
+            &registry,
+            &installed,
+            "kokoro",
+            CapabilityKind::TextToSpeech,
+        )
+        .expect_err("missing model");
+
+        assert!(matches!(error, PackageError::ModelNotInstalled(id) if id == "kokoro"));
+    }
+
+    #[test]
+    fn resolver_reports_runner_missing_after_model_is_installed() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.model("kokoro").expect("model");
+        installed.install_model(&manifest).expect("install model");
 
         let error = resolve_runner(
             &registry,
@@ -695,32 +984,30 @@ description = "Native ONNX runner for CPU-friendly models."
     }
 
     #[test]
-    fn resolver_returns_execution_plan_when_runner_is_installed() {
+    fn resolver_reports_inference_not_implemented_after_model_and_runner_are_installed() {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_registry(temp.path());
         let installed_root = temp.path().join("installed");
         let installed = InstalledRegistry::new(&installed_root);
-        std::fs::create_dir_all(installed_root.join("runners")).expect("runners dir");
-        std::fs::write(
-            installed_root.join("runners").join("takokit-onnx.toml"),
-            RUNNER_TOML,
-        )
-        .expect("installed runner");
         let registry = PackageRegistry::new(temp.path());
+        let model = registry.model("kokoro").expect("model");
+        let runner = registry.runner("takokit-onnx").expect("runner");
+        installed.install_model(&model).expect("install model");
+        installed.install_runner(&runner).expect("install runner");
 
-        let plan = resolve_runner(
+        let error = resolve_runner(
             &registry,
             &installed,
             "kokoro",
             CapabilityKind::TextToSpeech,
         )
-        .expect("execution plan");
+        .expect_err("not implemented");
 
-        assert_eq!(plan.model.id, "kokoro");
-        assert_eq!(plan.runner.id, "takokit-onnx");
-        assert_eq!(plan.capability, CapabilityKind::TextToSpeech);
-        assert!(plan.runner_installed);
-        assert_eq!(plan.status, ExecutionStatus::InferenceNotImplemented);
+        assert!(matches!(
+            error,
+            PackageError::InferenceNotImplemented { model, runner, capability, .. }
+                if model == "kokoro" && runner == "takokit-onnx" && capability == CapabilityKind::TextToSpeech
+        ));
     }
 
     fn write_test_registry(root: &Path) {

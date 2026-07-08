@@ -18,6 +18,7 @@ type ApiModel = {
   backend: string;
   runner: string;
   hardware_notes: string;
+  artifact_count: number;
   capabilities: ApiCapabilityId[];
   installed: boolean;
   runner_installed: boolean;
@@ -34,6 +35,13 @@ type ApiCapability = {
 
 type ApiRunner = RunnerSummary;
 
+type PullResponse = {
+  id: string;
+  installed: boolean;
+  manifest_path: string;
+  note: string;
+};
+
 type ApiVoice = {
   id: string;
   name: string;
@@ -43,19 +51,51 @@ type ApiVoice = {
 };
 
 export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechApiResponse> {
-  const response = await fetch(`${LOCAL_API_BASE_URL}/v1/audio/speech`, {
+  return requestJson<SpeechApiResponse>("/v1/audio/speech", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(request)
   });
+}
 
-  if (!response.ok) {
-    throw new Error(`Speech generation failed with ${response.status}`);
-  }
+export async function getModel(id: string): Promise<ModelSummary> {
+  const response = await getJson<{ data: ApiModel }>(`/v1/models/${encodeURIComponent(id)}`);
+  return toModelSummary(response.data);
+}
 
-  return response.json() as Promise<SpeechApiResponse>;
+export async function pullModel(id: string): Promise<PullResponse> {
+  return requestJson<PullResponse>("/v1/models/pull", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ model: id })
+  });
+}
+
+export async function removeModel(id: string): Promise<void> {
+  await requestNoContent(`/v1/models/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function getRunner(id: string): Promise<RunnerSummary> {
+  const response = await getJson<{ data: ApiRunner }>(`/v1/runners/${encodeURIComponent(id)}`);
+  return response.data;
+}
+
+export async function pullRunner(id: string): Promise<PullResponse> {
+  return requestJson<PullResponse>("/v1/runners/pull", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ runner: id })
+  });
+}
+
+export async function removeRunner(id: string): Promise<void> {
+  await requestNoContent(`/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export const apiConfig = {
@@ -101,15 +141,47 @@ const mockSpeechModel: ModelSummary = {
   runtime: "Rust",
   status: "installed",
   license: "internal-test",
+  runner: "takokit-mock",
+  runnerInstalled: true,
+  hardwareNotes: "CPU, no model weights",
+  executionStatus: "ready",
+  artifactCount: 0,
   capabilities: ["tts", "live_audio"]
 };
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${LOCAL_API_BASE_URL}${path}`);
   if (!response.ok) {
-    throw new Error(`Takokit API request failed with ${response.status}`);
+    throw new Error(await errorMessage(response));
   }
   return response.json() as Promise<T>;
+}
+
+async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, init);
+  if (!response.ok) {
+    throw new Error(await errorMessage(response));
+  }
+  return response.json() as Promise<T>;
+}
+
+async function requestNoContent(path: string, init: RequestInit): Promise<void> {
+  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, init);
+  if (!response.ok) {
+    throw new Error(await errorMessage(response));
+  }
+}
+
+async function errorMessage(response: Response): Promise<string> {
+  try {
+    const body = await response.json() as { error?: { code?: string; message?: string } };
+    if (body.error?.message) {
+      return body.error.code ? `${body.error.code}: ${body.error.message}` : body.error.message;
+    }
+  } catch {
+    // Fall through to status text.
+  }
+  return `Takokit API request failed with ${response.status}`;
 }
 
 function toModelSummary(model: ApiModel): ModelSummary {
@@ -120,6 +192,11 @@ function toModelSummary(model: ApiModel): ModelSummary {
     version: model.version,
     language: model.capabilities.includes("speech_to_text") ? "Multilingual" : "Local",
     backend: model.backend,
+    runner: model.runner,
+    runnerInstalled: model.runner_installed,
+    hardwareNotes: model.hardware_notes,
+    executionStatus: model.execution_status,
+    artifactCount: model.artifact_count,
     runtime: toRuntimeLabel(model.runtime),
     status: model.installed ? "installed" : "available",
     license: model.license,

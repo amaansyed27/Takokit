@@ -60,6 +60,24 @@ platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 description = "Native ONNX runner for CPU-friendly models."
 ```
 
+## Installed Records
+
+Pulling a model writes a metadata-only installed record:
+
+```txt
+~/.takokit/manifests/installed-models/<model>.toml
+```
+
+The record stores model id, version, source registry, manifest path, required runner, installed timestamp, artifact placeholders, and status. Artifact placeholders are not downloaded yet.
+
+Pulling a runner writes:
+
+```txt
+~/.takokit/manifests/installed-runners/<runner>.toml
+```
+
+The runner record stores runner id, version, kind, platforms, manifest path, installed timestamp, and metadata-only status. It is a contract install, not an execution binary install.
+
 ## Rules
 
 - Do not hardcode model-specific behavior inside CLI handlers or React components.
@@ -67,3 +85,4 @@ description = "Native ONNX runner for CPU-friendly models."
 - Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
 - Return typed unsupported/not-installed errors until real runners are implemented.
 - Route execution requests through runner resolution before any model adapter is called.
+- Check installed model records before checking runner install state for non-mock models.

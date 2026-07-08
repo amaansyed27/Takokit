@@ -15,6 +15,11 @@ export type ModelSummary = {
   size?: string;
   language: string;
   backend: string;
+  runner: string;
+  runnerInstalled: boolean;
+  hardwareNotes: string;
+  executionStatus: string;
+  artifactCount: number;
   runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp";
   status: "installed" | "available" | "planned";
   license: string;

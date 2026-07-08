@@ -4,15 +4,13 @@ This file tracks near-term direction without phase gates. The source of truth fo
 
 ## Next Useful Increments
 
-- Add installed runner registry support.
 - Implement the first real ONNX runner.
 - Choose the first real model target: Kokoro ONNX or Piper ONNX.
 - Add checksum-backed artifact download before any real model downloads.
-- Make package pull write a fuller installed model record, including artifact slots and checksum placeholders.
 - Add config loading from `~/.takokit/config.toml`.
-- Add browser GUI controls for pulling/removing manifests through the API.
 - Add API tests for model detail, runner listing, pull, and delete.
 - Add broader API tests for capability and runner resolution errors.
+- Add GUI runner remove controls and clearer runner detail actions if needed.
 
 ## Product Surface Contract
 

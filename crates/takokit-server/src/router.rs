@@ -20,6 +20,11 @@ pub fn server_router(state: AppState) -> Router {
         )
         .route("/v1/runners", get(handlers::runners))
         .route("/v1/models/pull", post(handlers::pull_model))
+        .route("/v1/runners/pull", post(handlers::pull_runner))
+        .route(
+            "/v1/runners/:id",
+            get(handlers::runner).delete(handlers::remove_runner),
+        )
         .route("/v1/voices", get(handlers::voices))
         .route("/v1/audio/speech", post(handlers::speech))
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
@@ -103,10 +108,50 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn speech_route_returns_typed_runner_resolution_error() {
+    async fn speech_route_returns_model_not_installed_before_runner_resolution() {
         let root = std::env::temp_dir().join("takokit-server-speech-resolution-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
         let response = server_router(state)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/audio/speech")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"kokoro","input":"Hello"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["error"]["code"], "model_not_installed");
+        assert_eq!(json["error"]["message"], "model is not installed: kokoro");
+    }
+
+    #[tokio::test]
+    async fn speech_route_returns_runner_not_installed_after_model_pull() {
+        let root = std::env::temp_dir().join("takokit-server-speech-runner-resolution-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let pull_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/models/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_response.status(), StatusCode::OK);
+
+        let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
@@ -127,6 +172,57 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("kokoro supports TTS"));
+    }
+
+    #[tokio::test]
+    async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
+        let root = std::env::temp_dir().join("takokit-server-runner-lifecycle-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let pull_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/runners/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_response.status(), StatusCode::OK);
+
+        let show_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/runners/takokit-onnx")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(show_response.status(), StatusCode::OK);
+        let body = to_bytes(show_response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["data"]["id"], "takokit-onnx");
+        assert_eq!(json["data"]["installed"], true);
+
+        let remove_response = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/v1/runners/takokit-onnx")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(remove_response.status(), StatusCode::NO_CONTENT);
     }
 
     #[tokio::test]

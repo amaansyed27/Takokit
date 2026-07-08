@@ -7,20 +7,27 @@
 
 ## Next Small Tasks
 
-- [ ] Add installed runner registry behavior so runners can be tracked separately from models.
 - [ ] Implement the first real ONNX runner.
 - [ ] Choose the first real model target: Kokoro ONNX or Piper ONNX.
 - [ ] Add checksum-backed artifact download before any real model downloads.
-- [ ] Add GUI model actions for pull/remove/show using the local API, with honest mock/no-real-inference states.
 - [ ] Add API tests for capability and runner resolution errors across model-not-found, runner-not-found, unsupported platform, and installed-runner/not-implemented cases.
-- [ ] Make `takokit pull <model>` write a fuller installed-model record, including artifact slots, checksum placeholders, source metadata, install time, and runner reference.
 - [ ] Add API tests for `GET /v1/models/:id`, `GET /v1/runners`, `POST /v1/models/pull`, and `DELETE /v1/models/:id`.
+- [ ] Add GUI runner remove controls and runner detail actions if they remain useful after first-runner work.
 - [ ] Add config loading from `~/.takokit/config.toml` instead of always using `RuntimeConfig::local`.
 - [ ] Add a `takokit doctor` command to check storage layout, GUI build availability, server status, registry health, and runner availability.
 - [ ] Add `takokit list installed` or improve `takokit list models` so available vs installed state is obvious in CLI output.
 
 ## Done
 
+- [x] Added typed installed model records under `manifests/installed-models`.
+- [x] Added typed installed runner records under `manifests/installed-runners`.
+- [x] Kept legacy installed manifest copies under `manifests/models` and `manifests/runners`.
+- [x] Added runner lifecycle API routes for show, pull, and remove.
+- [x] Added `takokit runner pull/show/rm`.
+- [x] Updated runner resolution to check model install state before runner install state.
+- [x] Updated `takokit pull <model>` to write fuller installed model metadata.
+- [x] Wired GUI model show, pull, remove, and pull-required-runner actions through the local API.
+- [x] Added spec alignment tracker in `docs/spec-alignment.md`.
 - [x] Added five first-class Takokit product surfaces: TTS, STT, Voice Cloning, Live Transcription Local API, and Live Audio API.
 - [x] Added typed capability declarations to model manifests.
 - [x] Updated mock registry manifests for Kokoro, Whisper Base, Piper Lessac, Chatterbox, and GPT-SoVITS.
