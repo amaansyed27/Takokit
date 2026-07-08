@@ -15,8 +15,7 @@ export function AppShell({ activePage, onNavigate, runtime, children }: AppShell
   return (
     <div className="app-shell">
       <Sidebar activePage={activePage} onNavigate={onNavigate} runtime={runtime} />
-      <MainContent>{children}</MainContent>
+      <MainContent pageId={activePage}>{children}</MainContent>
     </div>
   );
 }
-

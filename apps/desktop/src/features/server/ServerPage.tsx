@@ -31,7 +31,7 @@ export function ServerPage({ runtime }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Server</h1>
-        <p>Local Axum daemon status, API endpoints, and logs placeholder.</p>
+        <p>Local daemon and API routes.</p>
       </header>
 
       <div className="stats-grid">
@@ -39,14 +39,39 @@ export function ServerPage({ runtime }: RouteComponentProps) {
         <div className="stat-tile"><span>Local URL</span><strong>{status.url}</strong><small>localhost only</small></div>
       </div>
 
+      <Section title="Runtime matrix" description="Daemon at a glance.">
+        <div className="status-matrix">
+          <div className="status-cell">
+            <strong>Bind</strong>
+            <span>127.0.0.1 only</span>
+          </div>
+          <div className="status-cell">
+            <strong>Speech</strong>
+            <span>Mock adapter ready</span>
+          </div>
+          <div className="status-cell">
+            <strong>Storage</strong>
+            <span>{runtime.storagePath}/outputs</span>
+          </div>
+          <div className="status-cell">
+            <strong>Logs</strong>
+            <span>~/.takokit/logs</span>
+          </div>
+        </div>
+      </Section>
+
       <Section title="Endpoints">
+        <div className="command-note">
+          <code>takokit serve</code>
+          <span>start the daemon</span>
+        </div>
         <Table columns={["Route", "Action", "State", "Notes", "Copy"]} ariaLabel="Server endpoints">
           {endpoints.map((endpoint) => (
             <TableRow key={endpoint}>
               <code>{endpoint}</code>
               <span>{endpoint.split(" ")[0]}</span>
               <span>{endpoint.includes("speech") ? "mock ready" : "scaffold"}</span>
-              <span>{endpoint.includes("clone") || endpoint.includes("train") ? "returns typed not-implemented error" : "local API shape"}</span>
+              <span>{endpoint.includes("clone") || endpoint.includes("train") ? "typed placeholder" : "local route"}</span>
               <Button variant="ghost" type="button" onClick={() => copyValue(endpoint)}>
                 {copied === endpoint ? <Check size={14} /> : <Copy size={14} />} Copy
               </Button>
@@ -56,9 +81,8 @@ export function ServerPage({ runtime }: RouteComponentProps) {
       </Section>
 
       <Section title="Logs">
-        <pre className="logs-panel">No live logs connected yet. Future daemon logs will stream here from ~/.takokit/logs.</pre>
+        <pre className="logs-panel">No live logs yet. Future daemon output streams from ~/.takokit/logs.</pre>
       </Section>
     </section>
   );
 }
-

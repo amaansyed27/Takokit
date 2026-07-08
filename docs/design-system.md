@@ -30,11 +30,13 @@ Dense tools can use 8-12px internal spacing. Page sections should breathe with 2
 
 ## Typography
 
-- Use system sans-serif fonts by default.
+- Use Orbitron as the primary identity/display font.
+- Use Space Mono as the secondary/body and UI font.
 - Keep headings direct and compact.
 - Do not use oversized marketing hero type inside tool panels.
 - Use monospace only for paths, commands, API routes, and IDs.
 - Keep letter spacing at `0`.
+- Takokit can use a technical character, but it should still feel like a serious desktop utility rather than a novelty sci-fi dashboard.
 
 ## Radius
 
@@ -62,3 +64,4 @@ Dense tools can use 8-12px internal spacing. Page sections should breathe with 2
 - Large decorative cards for tiny facts.
 - Placeholder model inference claims.
 - Overwrapped component trees where a simple feature component is enough.
+- Pages that are technically clean but visually empty or repetitive.

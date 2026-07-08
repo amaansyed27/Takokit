@@ -1,6 +1,5 @@
 import { navItems, type PageId } from "../../app/navigation";
 import type { RuntimeSnapshot } from "../../lib/types";
-import { Tooltip } from "../ui/Tooltip";
 import { ServerStatusCard } from "./ServerStatusCard";
 
 type SidebarProps = {
@@ -23,17 +22,16 @@ export function Sidebar({ activePage, onNavigate, runtime }: SidebarProps) {
           const active = item.id === activePage;
 
           return (
-            <Tooltip key={item.id} content={item.label}>
-              <button
-                className={active ? "nav-item active" : "nav-item"}
-                aria-current={active ? "page" : undefined}
-                onClick={() => onNavigate(item.id)}
-                type="button"
-              >
-                <Icon size={17} aria-hidden="true" />
-                <span>{item.label}</span>
-              </button>
-            </Tooltip>
+            <button
+              key={item.id}
+              className={active ? "nav-item active" : "nav-item"}
+              aria-current={active ? "page" : undefined}
+              onClick={() => onNavigate(item.id)}
+              type="button"
+            >
+              <Icon size={16} aria-hidden="true" />
+              <span>{item.label}</span>
+            </button>
           );
         })}
       </nav>
@@ -45,4 +43,3 @@ export function Sidebar({ activePage, onNavigate, runtime }: SidebarProps) {
     </aside>
   );
 }
-

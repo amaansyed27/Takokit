@@ -9,20 +9,44 @@ export function TranscribePage(_props: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Transcribe</h1>
-        <p>Whisper and whisper.cpp adapters will connect through the speech-to-text trait.</p>
+        <p>Speech to text, ready for Whisper runners.</p>
       </header>
 
       <Section title="Audio input">
-        <div className="empty-state">
-          <Upload size={24} aria-hidden="true" />
-          <strong>Transcription runner not installed</strong>
-          <p>Drop-zone wiring, transcript output, and dataset preparation belong here after the runner boundary is implemented.</p>
+        <div className="upload-zone">
+          <div className="upload-zone__icon">
+            <Upload size={24} aria-hidden="true" />
+          </div>
+          <div>
+            <strong>Transcription runner not installed</strong>
+            <p>Drop audio here once a runner is wired.</p>
+          </div>
           <Tooltip content="Disabled because no real Whisper runner is connected yet.">
             <Button disabled>Select audio</Button>
           </Tooltip>
         </div>
       </Section>
+
+      <Section title="Pipeline preview" description="Local steps stay visible.">
+        <div className="pipeline-strip">
+          <div className="pipeline-node">
+            <strong>Audio file</strong>
+            <span>WAV, MP3, samples.</span>
+          </div>
+          <div className="pipeline-node is-disabled">
+            <strong>Whisper runner</strong>
+            <span>Not installed.</span>
+          </div>
+          <div className="pipeline-node is-disabled">
+            <strong>Transcript</strong>
+            <span>Text and timestamps.</span>
+          </div>
+          <div className="pipeline-node is-disabled">
+            <strong>Dataset prep</strong>
+            <span>Clips and metadata.</span>
+          </div>
+        </div>
+      </Section>
     </section>
   );
 }
-

@@ -2,14 +2,19 @@
   --color-background: #f7f2e8;
   --color-surface: #fffdf7;
   --color-surface-muted: #efe7da;
+  --color-surface-strong: #f2eadc;
   --color-text: #1f1d1a;
   --color-text-secondary: #6f675e;
+  --color-text-soft: #91877a;
   --color-border: #d8ccba;
+  --color-border-strong: #b9aa96;
   --color-accent: #6f8f72;
   --color-accent-dark: #4f6f52;
+  --color-ink-green: #263929;
   --color-danger: #a9564a;
   --color-warning: #a7773c;
-  --shadow-shell: 0 16px 42px rgba(76, 62, 43, 0.11);
+  --shadow-shell: 0 18px 48px rgba(76, 62, 43, 0.12);
+  --shadow-lift: 0 10px 24px rgba(76, 62, 43, 0.08);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -22,11 +27,13 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --font-body: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  --font-brand: Georgia, "Times New Roman", serif;
+  --sidebar-width: 276px;
+  --font-primary: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  --font-secondary: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --font-body: var(--font-secondary);
+  --font-brand: var(--font-primary);
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-slow: 240ms;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-

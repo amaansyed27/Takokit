@@ -8,11 +8,12 @@ export function SettingsPage({ runtime }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Settings</h1>
-        <p>Local paths and runtime defaults stay explicit and user-controlled.</p>
+        <p>Local paths and safe defaults.</p>
       </header>
 
       <Section title="Storage">
         <div className="settings-group">
+          <p>Files stay under the Takokit storage root.</p>
           <div className="settings-list">
             <div className="settings-row"><span>Storage root</span><code>{runtime.storagePath}</code></div>
             <div className="settings-row"><span>Models</span><code>{runtime.storagePath}/models</code></div>
@@ -24,6 +25,7 @@ export function SettingsPage({ runtime }: RouteComponentProps) {
 
       <Section title="Runtime">
         <div className="settings-group">
+          <p>No hidden remote calls.</p>
           <div className="settings-row"><span>Theme</span><Badge>Paper</Badge></div>
           <div className="settings-row"><span>Runtime mode</span><Badge tone="success">Local</Badge></div>
           <div className="settings-row">
@@ -34,7 +36,34 @@ export function SettingsPage({ runtime }: RouteComponentProps) {
           </div>
         </div>
       </Section>
+
+      <Section title="Controls" description="Safe by default.">
+        <div className="settings-group">
+          <div className="setting-switch-grid">
+            <div className="setting-toggle-row">
+              <div>
+                <strong>No hidden cloud calls</strong>
+                <span>Remote providers disabled.</span>
+              </div>
+              <span className="switch" aria-hidden="true" />
+            </div>
+            <div className="setting-toggle-row">
+              <div>
+                <strong>Consent gate for cloning</strong>
+                <span>Required before clone or train.</span>
+              </div>
+              <span className="switch" aria-hidden="true" />
+            </div>
+            <div className="setting-toggle-row">
+              <div>
+                <strong>Auto-download models</strong>
+                <span>User initiated only.</span>
+              </div>
+              <span className="switch is-off" aria-hidden="true" />
+            </div>
+          </div>
+        </div>
+      </Section>
     </section>
   );
 }
-

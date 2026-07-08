@@ -24,7 +24,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Speak</h1>
-        <p>Generate natural speech from text using local models.</p>
+        <p>Text to local speech.</p>
       </header>
 
       <form
@@ -68,6 +68,10 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
           />
 
           <aside className="generation-actions">
+            <div className="generation-actions__meta">
+              <strong>Mock speech path</strong>
+              <span>API shape only. No real inference yet.</span>
+            </div>
             <Button variant="primary" type="submit" loading={isGenerating}>
               <Waves size={16} /> Generate Speech
             </Button>
@@ -134,4 +138,3 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
     </section>
   );
 }
-

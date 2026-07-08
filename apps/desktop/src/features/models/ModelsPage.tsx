@@ -19,8 +19,36 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Models</h1>
-        <p>Installed and available registry entries. Real inference only starts after a runner is wired.</p>
+        <p>Registry, runners, and license labels.</p>
       </header>
+
+      <div className="stats-grid">
+        <div className="stat-tile"><span>Installed</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "installed").length}</strong><small>Ready entries</small></div>
+        <div className="stat-tile"><span>Available</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "available").length}</strong><small>Can be wired next</small></div>
+        <div className="stat-tile"><span>Planned</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "planned").length}</strong><small>Runner backlog</small></div>
+        <div className="stat-tile"><span>Native path</span><strong className="stat-tile__value">ONNX</strong><small>Preferred where practical</small></div>
+      </div>
+
+      <Section title="Adapter coverage" description="Capabilities, not page logic.">
+        <div className="capability-strip">
+          <div className="capability-chip">
+            <strong>Text to speech</strong>
+            <span>Kokoro, Piper, Qwen3-TTS.</span>
+          </div>
+          <div className="capability-chip">
+            <strong>Transcription</strong>
+            <span>Whisper and whisper.cpp.</span>
+          </div>
+          <div className="capability-chip">
+            <strong>Voice work</strong>
+            <span>Clone and train behind consent.</span>
+          </div>
+          <div className="capability-chip">
+            <strong>Conversion</strong>
+            <span>RVC tracked for future wiring.</span>
+          </div>
+        </div>
+      </Section>
 
       <Section title="Registry">
         <input
@@ -51,4 +79,3 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
     </section>
   );
 }
-

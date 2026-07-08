@@ -1,39 +1,49 @@
-source visual truth: original polished Takokit paper-tool reference and current correction brief
-home implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-home-refined.png
-speak implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-speak-refined.png
-viewport: 1440x920
-state: cross-platform desktop app shell, Home and Speak pages, server running mock data
+source visual truth: user screenshots from 2026-07-07 plus follow-up request for a stronger redesign, no scrollable sidebar, Orbitron primary font, and Space Mono secondary font
+home implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-home.png
+models implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-models.png
+voices implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-voices.png
+speak implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-speak.png
+transcribe implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-transcribe.png
+server implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-server.png
+settings implementation screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-redesign-settings.png
+selector and motion screenshot path: D:\TheDawnlightGroup\DawnlightLabs\Takokit\target\takokit-selector-motion-speak.png
+viewport: 1536x900
+state: stronger character pass across the full desktop shell and all pages, followed by softer selector and motion pass
 
 **Findings**
-- No actionable P0/P1/P2 findings remain.
+- No actionable P0/P1/P2 findings remain for the redesigned direction.
 
 **Required Fidelity Surfaces**
-- Fonts and typography: Passed. The UI now uses compact monospaced product text with a restrained serif only for the Takokit brand mark. Page headings are no longer theatrical or oversized.
-- Spacing and layout rhythm: Passed. The app has a fixed 280px sidebar, max-width main content, 40px/48px content padding, compact dashboard rows, and a two-column Speak form without fake browser/window framing.
-- Colors and visual tokens: Passed. Beige/off-white paper surfaces, subtle borders, muted text, and green active states map to the requested palette.
-- Image quality and asset fidelity: Passed. The target uses no raster imagery. Icons use the shared Lucide system, with no custom div art or fake OS chrome.
-- Copy and content: Passed. Home now includes status summary, runtime boundary, quick actions, and recent outputs. Speak includes model/voice selects, text input, generation controls, advanced disclosure, output placeholder, and installed model table.
-- Interaction quality: Passed. Navigation active state animates subtly; buttons, form fields, table rows, tooltips, advanced disclosure, mock generation, focus rings, disabled states, and reduced-motion support are present.
+- Fonts and typography: Passed. Orbitron is used for primary display/identity and Space Mono is used for body/UI. Headings now have character without becoming huge.
+- Spacing and layout rhythm: Passed. The layout keeps the compact desktop utility shell while adding stronger hierarchy, section rails, richer dashboard blocks, and better rhythm.
+- Colors and visual tokens: Passed. Beige/off-white paper remains the base, with stronger ink green accents, subtle grid texture, restrained shadows, and no purple/neon treatment.
+- Image quality and asset fidelity: Passed. No raster imagery is required. Icons remain library-based, no fake OS chrome was reintroduced.
+- Copy and content: Passed. Home, Speak, Models, Voices, Transcribe, Server, and Settings now have more useful surface content and less empty placeholder feel.
+- Interaction quality: Passed. Existing hover/focus/loading/disabled/tooltips/reduced-motion behavior remains, with stronger visual states.
+- Sidebar scroll behavior: Passed. Browser QA showed `.main-content` scrolls while `.sidebar` remains fixed; sidebar top stayed 4px before and after scrolling, body scroll stayed 0, and sidebar overflow is hidden.
+- Sidebar selector behavior: Passed. Active nav now uses a subtle rail, soft surface, and icon capsule; browser QA confirmed the old nav tooltip is not visible on the active Speak item.
+- Motion: Passed. Page transitions are keyed per route, panels reveal softly, active nav rail animates, and controls/tables use consistent 120ms-240ms transitions with reduced-motion protection.
 
 **Patches Made Since Previous QA Pass**
-- Removed hardcoded macOS traffic-light controls and fake window shell.
-- Added `app/AppShell.tsx`, `app/routes.tsx`, layout components, UI primitives, hooks, centralized API helper, Tauri bridge placeholder, and motion tokens.
-- Reworked Home, Speak, Models, Voices, Server, Settings, and Transcribe around typed mock data and honest disabled/mock states.
-- Split CSS into `tokens.css`, `motion.css`, and `globals.css`.
-- Updated design-system docs to forbid hardcoded OS chrome.
-- Captured refined Home and Speak screenshots with Chrome headless.
+- Installed local Orbitron and Space Mono font packages.
+- Reworked tokens and global styles around the new typography and stronger product language.
+- Added subtle technical paper texture, stronger section underlines, richer panels, table headers, and action cards.
+- Added Home runtime boundary map, Models summary stats, Voices waveform workbench, Transcribe upload zone, Server command note, and Settings explanatory sections.
+- Locked desktop scrolling to the main content pane so the sidebar no longer scrolls.
+- Added Home runtime lanes, Models adapter coverage, Voices local profile metadata, Speak mock speech route panel, Transcribe pipeline preview, Server runtime matrix, and Settings safe-control switches.
+- Reduced explanatory copy across pages so the app reads less like a developer dashboard.
+- Reworked the sidebar active selector and removed nav tooltips for full-label sidebar items.
 
 **Open Questions**
-- Exact Tauri titlebar/window behavior should be decided later in Tauri config or platform-aware shell code, not React product UI.
+- A future pass could create a dedicated collapsed sidebar and command palette, but those are not required for this redesign.
 
 **Implementation Checklist**
-- Keep local API calls centralized in `lib/api.ts`.
-- Preserve typed model/voice data boundaries.
-- Wire real Tauri commands behind `lib/tauri.ts` when desktop integration starts.
+- Keep all fonts local via `@fontsource`.
+- Preserve the local-first/no-fake-inference copy.
+- Reuse the current tokens for future screens instead of one-off page styles.
 
 **Follow-up Polish**
-- P3: Add collapsed sidebar mode if needed; tooltips are already available.
-- P3: Replace mock output copy with real file metadata once speech generation is fully wired.
+- P3: Add a keyboard command palette once app commands are real.
+- P3: Add real audio waveform/progress once speech output playback is wired.
 
 final result: passed
-
