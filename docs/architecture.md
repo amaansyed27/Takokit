@@ -3,7 +3,7 @@
 Takokit is organized as:
 
 ```txt
-Rust CLI
+Rust CLI + interactive terminal launcher
   |
 Rust daemon / local HTTP API
   |
@@ -40,8 +40,14 @@ Model manifests declare these surfaces as typed capabilities. CLI, API, and GUI 
 
 ## Apps
 
-- `apps/cli`: Clap CLI. It starts the daemon, opens the GUI, and calls package/model functionality.
+- `apps/cli`: Clap CLI. Bare `takokit` opens a lightweight interactive terminal launcher. Subcommands start the daemon, open the GUI, run doctor checks, and call package/model functionality.
 - `apps/gui`: Browser GUI. It calls the local API through `src/lib/api.ts`.
+
+## Local Launcher And Doctor
+
+Running `takokit` without a subcommand opens a simple terminal launcher for common local actions: mock speech generation, model metadata pulls, runner contract pulls, GUI launch, server startup, package listing, and doctor checks. The launcher is honest about current execution limits and does not claim real Kokoro, Whisper, voice cloning, training, or conversion inference works yet.
+
+`takokit doctor` checks storage directories, `config.toml`, local registry availability, model and runner manifest parsing, installed model and runner record parsing, server availability, GUI build output, `mock-tts` availability, and the platform identifier. Missing GUI build output and unimplemented real runners are warnings, not fatal errors for current mock/runtime development.
 
 ## Package Manager Boundary
 
@@ -89,3 +95,7 @@ Runner types are modeled now for future backends:
 - `external`
 
 Runners must communicate through explicit contracts. UI and API callers should only see model IDs, voice IDs, request contracts, package metadata, and typed errors.
+
+## Installer Scaffolds
+
+The repository includes `scripts/install.sh` and `scripts/install.ps1` as safe future-release scaffolds. They detect OS/architecture and describe the planned GitHub Releases artifact/checksum/install flow, but they do not download binaries until real release artifacts and checksums exist.

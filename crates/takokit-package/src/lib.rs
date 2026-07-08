@@ -293,6 +293,10 @@ impl PackageRegistry {
         Self::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../registry"))
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     pub fn model(&self, id: &str) -> PackageResult<ModelManifest> {
         self.read_model(id)
             .map_err(|error| match error.kind() {
@@ -390,6 +394,14 @@ impl InstalledRegistry {
                 }
                 _ => Err(error),
             })
+    }
+
+    pub fn installed_model_records(&self) -> PackageResult<Vec<InstalledModelRecord>> {
+        read_manifest_dir(&self.root.join("installed-models"))
+    }
+
+    pub fn installed_runner_records(&self) -> PackageResult<Vec<InstalledRunnerRecord>> {
+        read_manifest_dir(&self.root.join("installed-runners"))
     }
 
     pub fn is_model_installed(&self, id: &str) -> bool {
@@ -651,7 +663,7 @@ pub fn resolve_runner(
     }
 
     let runner = package_registry.runner(&model.runner)?;
-    let platform = current_platform();
+    let platform = current_platform_id();
     if !runner
         .platforms
         .iter()
@@ -750,7 +762,7 @@ fn remove_file_if_exists(path: PathBuf) -> PackageResult<()> {
     }
 }
 
-fn current_platform() -> String {
+pub fn current_platform_id() -> String {
     let os = if cfg!(target_os = "windows") {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -939,6 +951,45 @@ description = "Native ONNX runner for CPU-friendly models."
         assert_eq!(record.kind, "native");
         assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
         assert!(record.manifest_path.ends_with("runners/takokit-onnx.toml"));
+    }
+
+    #[test]
+    fn package_registry_exposes_registry_root_for_health_checks() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::new(temp.path());
+
+        assert_eq!(registry.root(), temp.path());
+    }
+
+    #[test]
+    fn installed_registry_lists_installed_model_and_runner_records() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let model = registry.model("kokoro").expect("model");
+        let runner = registry.runner("takokit-onnx").expect("runner");
+        installed.install_model(&model).expect("install model");
+        installed.install_runner(&runner).expect("install runner");
+
+        let models = installed.installed_model_records().expect("model records");
+        let runners = installed
+            .installed_runner_records()
+            .expect("runner records");
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].id, "kokoro");
+        assert_eq!(runners.len(), 1);
+        assert_eq!(runners[0].id, "takokit-onnx");
+    }
+
+    #[test]
+    fn exposes_current_platform_identifier() {
+        let platform = current_platform_id();
+
+        assert!(platform.contains('-'));
+        assert!(!platform.starts_with('-'));
+        assert!(!platform.ends_with('-'));
     }
 
     #[test]

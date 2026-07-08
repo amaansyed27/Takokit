@@ -8,6 +8,8 @@
 - Model registry
 - Engine adapter layer
 - GUI
+- CLI-first runtime
+- Local model lifecycle
 - TTS/STT/voice cloning/training/conversion goals
 - Safety/licensing concerns
 
@@ -16,6 +18,8 @@
 - Tauri desktop app replaced by local browser GUI.
 - Python FastAPI backend replaced by Rust Axum daemon.
 - Python is allowed only as an isolated managed runner later, not the main app backend.
+- Bare `takokit` opens a local interactive terminal launcher.
+- `curl`/`irm` installers are planned for release distribution, with scaffold scripts in the repo until real artifacts exist.
 
 ## Not Built Yet
 
@@ -26,4 +30,6 @@
 - Voice conversion
 - Artifact downloads
 - Checksums/signatures
+- Release packaging
+- Actual install script release URLs
 - Public model library website

@@ -10,15 +10,16 @@
 - [ ] Implement the first real ONNX runner.
 - [ ] Choose the first real model target: Kokoro ONNX or Piper ONNX.
 - [ ] Add checksum-backed artifact download before any real model downloads.
-- [ ] Add API tests for capability and runner resolution errors across model-not-found, runner-not-found, unsupported platform, and installed-runner/not-implemented cases.
-- [ ] Add API tests for `GET /v1/models/:id`, `GET /v1/runners`, `POST /v1/models/pull`, and `DELETE /v1/models/:id`.
-- [ ] Add GUI runner remove controls and runner detail actions if they remain useful after first-runner work.
-- [ ] Add config loading from `~/.takokit/config.toml` instead of always using `RuntimeConfig::local`.
-- [ ] Add a `takokit doctor` command to check storage layout, GUI build availability, server status, registry health, and runner availability.
-- [ ] Add `takokit list installed` or improve `takokit list models` so available vs installed state is obvious in CLI output.
+- [ ] Add release packaging.
+- [ ] Add actual install script release URLs after artifacts and checksums exist.
+- [ ] Add public model library website.
 
 ## Done
 
+- [x] Added bare `takokit` interactive terminal launcher.
+- [x] Added `takokit doctor` for storage, registry, installed record, server, GUI, mock execution, and platform checks.
+- [x] Added safe future installer scaffolds in `scripts/install.sh` and `scripts/install.ps1`.
+- [x] Added `takokit models` and `takokit runners` aliases for model and runner listings.
 - [x] Added typed installed model records under `manifests/installed-models`.
 - [x] Added typed installed runner records under `manifests/installed-runners`.
 - [x] Kept legacy installed manifest copies under `manifests/models` and `manifests/runners`.

@@ -2,6 +2,15 @@
 
 Takokit serves a local HTTP API on `127.0.0.1:5050` by default.
 
+The CLI also includes local inspection commands:
+
+```bash
+takokit
+takokit doctor
+```
+
+These are CLI features rather than HTTP routes. `takokit` opens the interactive terminal launcher, and `takokit doctor` checks local storage, registry manifests, installed records, server availability, GUI build output, mock TTS availability, and platform state.
+
 ## Routes
 
 ```http
@@ -108,3 +117,5 @@ Build it with:
 cd apps/gui
 npm run build
 ```
+
+If `takokit doctor` reports the GUI build as missing, that is a warning for packaged/local serving only. `npm run dev` remains valid for GUI development.

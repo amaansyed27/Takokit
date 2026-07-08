@@ -9,11 +9,15 @@ import { useServerStatus } from "../../hooks/useServerStatus";
 const endpoints = [
   "GET /health",
   "GET /v1/status",
+  "GET /v1/capabilities",
   "GET /v1/models",
   "GET /v1/models/:id",
-  "GET /v1/runners",
   "POST /v1/models/pull",
   "DELETE /v1/models/:id",
+  "GET /v1/runners",
+  "GET /v1/runners/:id",
+  "POST /v1/runners/pull",
+  "DELETE /v1/runners/:id",
   "GET /v1/voices",
   "POST /v1/audio/speech",
   "POST /v1/audio/transcriptions",
@@ -68,6 +72,14 @@ export function ServerPage({ runtime }: RouteComponentProps) {
         <div className="command-note">
           <code>takokit gui</code>
           <span>starts the daemon when needed and opens the local web GUI</span>
+        </div>
+        <div className="command-note">
+          <code>takokit</code>
+          <span>opens the interactive terminal launcher for mock speech and metadata pulls</span>
+        </div>
+        <div className="command-note">
+          <code>takokit doctor</code>
+          <span>checks storage, registry manifests, runner records, server status, and GUI build output</span>
         </div>
         <Table columns={["Route", "Action", "State", "Notes", "Copy"]} ariaLabel="Server endpoints">
           {endpoints.map((endpoint) => (

@@ -838,6 +838,7 @@ dependencies = [
  "takokit-package",
  "takokit-server",
  "takokit-store",
+ "tempfile",
  "tokio",
  "tracing-subscriber",
 ]

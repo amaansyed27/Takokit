@@ -7,10 +7,24 @@ This file tracks near-term direction without phase gates. The source of truth fo
 - Implement the first real ONNX runner.
 - Choose the first real model target: Kokoro ONNX or Piper ONNX.
 - Add checksum-backed artifact download before any real model downloads.
-- Add config loading from `~/.takokit/config.toml`.
-- Add API tests for model detail, runner listing, pull, and delete.
-- Add broader API tests for capability and runner resolution errors.
-- Add GUI runner remove controls and clearer runner detail actions if needed.
+- Add release packaging.
+- Add actual install script release URLs after artifacts and checksums exist.
+- Add public model library website.
+
+## Current Product Shell
+
+Takokit now supports the Ollama-like command shape for local development:
+
+```bash
+takokit
+takokit doctor
+takokit pull kokoro
+takokit runner pull takokit-onnx
+takokit speak "Hello" --model mock-tts
+takokit gui
+```
+
+The bare command opens an interactive terminal launcher. The doctor command checks local setup health. Real Kokoro, Piper, Whisper, Chatterbox, and GPT-SoVITS execution remains unimplemented.
 
 ## Product Surface Contract
 
@@ -22,3 +36,4 @@ Takokit's first-class surfaces are TTS, STT, Voice Cloning, Live Transcription L
 - Fake Kokoro or Whisper inference.
 - Hidden cloud calls.
 - Model-specific dependency instructions as the primary user path.
+- Install scripts that download nonexistent release artifacts.

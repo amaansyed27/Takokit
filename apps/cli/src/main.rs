@@ -1,25 +1,31 @@
+mod doctor;
+mod gui;
+mod tui;
+
 use clap::{Args, Parser, Subcommand};
-use std::{path::PathBuf, process::Stdio, time::Duration};
+use std::path::PathBuf;
 use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{MockTextToSpeechEngine, ModelRegistry, TextToSpeechEngine};
 use takokit_package::{resolve_runner, InstalledRegistry, PackageError, PackageRegistry};
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
-use tokio::net::TcpStream;
 
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 struct Cli {
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Debug, Subcommand)]
 enum Command {
     Serve,
     Gui,
+    Doctor,
     Status,
     Capabilities,
+    Models,
+    Runners,
     Speak(SpeakArgs),
     Pull {
         model: String,
@@ -98,20 +104,31 @@ async fn main() -> anyhow::Result<()> {
     let installed_registry = InstalledRegistry::new(store.manifests_dir());
 
     match cli.command {
-        Command::Serve => {
+        None => tui::run_launcher(&config, &store, &package_registry, &installed_registry).await?,
+        Some(Command::Serve) => {
             run_server(AppState::new(config, store)).await?;
         }
-        Command::Gui => open_gui(&config).await?,
-        Command::Status => {
+        Some(Command::Gui) => gui::open_gui(&config).await?,
+        Some(Command::Doctor) => {
+            let report =
+                doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
+            doctor::print_report(&report);
+            if report.has_failures() {
+                std::process::exit(1);
+            }
+        }
+        Some(Command::Status) => {
             let state = AppState::new(config, store);
             println!("{}", serde_json::to_string_pretty(&state.status())?);
         }
-        Command::Capabilities => {
+        Some(Command::Capabilities) => {
             for capability in CapabilityKind::ALL {
                 println!("{} - {}", capability.label(), capability.explanation());
             }
         }
-        Command::Speak(args) => {
+        Some(Command::Models) => print_models(&package_registry, &installed_registry)?,
+        Some(Command::Runners) => print_runners(&package_registry, &installed_registry)?,
+        Some(Command::Speak(args)) => {
             if args.model != "mock-tts" {
                 let plan = resolve_runner(
                     &package_registry,
@@ -143,14 +160,14 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             println!("{}", serde_json::to_string_pretty(&response)?);
         }
-        Command::Pull { model } => {
+        Some(Command::Pull { model }) => {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
             let report = installed_registry
                 .install_model(&manifest)
                 .map_err(cli_error)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::Show { model } => {
+        Some(Command::Show { model }) => {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
             let installed = installed_registry.is_model_installed(&manifest.id);
             let runner_installed = installed_registry.is_runner_installed(&manifest.runner);
@@ -194,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
             println!("status: {}", execution_status(installed, runner_installed));
             println!("description: {}", manifest.description);
         }
-        Command::Rm { model } => {
+        Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
             println!(
                 "{}",
@@ -204,41 +221,17 @@ async fn main() -> anyhow::Result<()> {
                 }))?
             );
         }
-        Command::List { target } => {
+        Some(Command::List { target }) => {
             let registry = ModelRegistry::default();
             match target {
-                ListTarget::Models => {
-                    let models: Vec<_> = package_registry
-                        .models()
-                        .map_err(cli_error)?
-                        .into_iter()
-                        .map(|model| {
-                            model.to_model_info(
-                                installed_registry.is_model_installed(&model.id),
-                                installed_registry.is_runner_installed(&model.runner),
-                            )
-                        })
-                        .collect();
-                    println!("{}", serde_json::to_string_pretty(&models)?)
-                }
-                ListTarget::Runners => {
-                    let runners: Vec<_> = package_registry
-                        .runners()
-                        .map_err(cli_error)?
-                        .into_iter()
-                        .map(|runner| {
-                            runner
-                                .to_runner_info(installed_registry.is_runner_installed(&runner.id))
-                        })
-                        .collect();
-                    println!("{}", serde_json::to_string_pretty(&runners)?)
-                }
+                ListTarget::Models => print_models(&package_registry, &installed_registry)?,
+                ListTarget::Runners => print_runners(&package_registry, &installed_registry)?,
                 ListTarget::Voices => {
                     println!("{}", serde_json::to_string_pretty(registry.voices())?)
                 }
             }
         }
-        Command::Transcribe { audio: _, model } => {
+        Some(Command::Transcribe { audio: _, model }) => {
             let plan = resolve_runner(
                 &package_registry,
                 &installed_registry,
@@ -254,21 +247,21 @@ async fn main() -> anyhow::Result<()> {
                 capability_label: plan.capability.label(),
             }));
         }
-        Command::Clone(args) => {
+        Some(Command::Clone(args)) => {
             let _ = args;
             return not_implemented(
                 "voice cloning",
                 "clone adapters require explicit model runner integration",
             );
         }
-        Command::Train(args) => {
+        Some(Command::Train(args)) => {
             let _ = args;
             return not_implemented(
                 "voice training",
                 "training jobs and dataset preparation are planned for a later phase",
             );
         }
-        Command::Runner { command } => {
+        Some(Command::Runner { command }) => {
             match command {
                 RunnerCommand::Pull { runner } => {
                     let manifest = package_registry.runner(&runner).map_err(cli_error)?;
@@ -313,6 +306,39 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn print_models(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+) -> anyhow::Result<()> {
+    let models: Vec<_> = package_registry
+        .models()
+        .map_err(cli_error)?
+        .into_iter()
+        .map(|model| {
+            model.to_model_info(
+                installed_registry.is_model_installed(&model.id),
+                installed_registry.is_runner_installed(&model.runner),
+            )
+        })
+        .collect();
+    println!("{}", serde_json::to_string_pretty(&models)?);
+    Ok(())
+}
+
+fn print_runners(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+) -> anyhow::Result<()> {
+    let runners: Vec<_> = package_registry
+        .runners()
+        .map_err(cli_error)?
+        .into_iter()
+        .map(|runner| runner.to_runner_info(installed_registry.is_runner_installed(&runner.id)))
+        .collect();
+    println!("{}", serde_json::to_string_pretty(&runners)?);
+    Ok(())
+}
+
 fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
     Err(TakokitError::NotImplemented { feature, reason }.into())
 }
@@ -346,51 +372,66 @@ fn execution_status(installed: bool, runner_installed: bool) -> &'static str {
     }
 }
 
-async fn open_gui(config: &RuntimeConfig) -> anyhow::Result<()> {
-    if !server_available(config).await {
-        start_server_process()?;
-        wait_for_server(config).await?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_accepts_bare_command_for_interactive_launcher() {
+        let cli = Cli::try_parse_from(["takokit"]).expect("bare cli parse");
+
+        assert!(cli.command.is_none());
     }
 
-    let url = config.gui_url();
-    match open::that(&url) {
-        Ok(()) => println!("Opened Takokit local web GUI at {url}"),
-        Err(error) => {
-            println!("Takokit local web GUI: {url}");
-            eprintln!("Could not open the browser automatically: {error}");
-        }
+    #[test]
+    fn cli_parses_doctor_command() {
+        let cli = Cli::try_parse_from(["takokit", "doctor"]).expect("doctor cli parse");
+
+        assert!(matches!(cli.command, Some(Command::Doctor)));
     }
 
-    Ok(())
-}
+    #[test]
+    fn cli_parses_model_and_runner_aliases() {
+        let models = Cli::try_parse_from(["takokit", "models"]).expect("models alias");
+        let runners = Cli::try_parse_from(["takokit", "runners"]).expect("runners alias");
 
-async fn server_available(config: &RuntimeConfig) -> bool {
-    TcpStream::connect(config.bind_addr()).await.is_ok()
-}
-
-async fn wait_for_server(config: &RuntimeConfig) -> anyhow::Result<()> {
-    for _ in 0..20 {
-        if server_available(config).await {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(matches!(models.command, Some(Command::Models)));
+        assert!(matches!(runners.command, Some(Command::Runners)));
     }
 
-    Err(TakokitError::Storage(format!(
-        "Takokit server did not become available at {}",
-        config.local_base_url()
-    ))
-    .into())
-}
+    #[test]
+    fn launcher_menu_is_available_without_running_it() {
+        let labels: Vec<_> = tui::launcher_actions()
+            .iter()
+            .map(|action| action.label())
+            .collect();
 
-fn start_server_process() -> anyhow::Result<()> {
-    let exe = std::env::current_exe()?;
-    std::process::Command::new(exe)
-        .arg("serve")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
+        assert!(labels.contains(&"Generate speech with mock-tts"));
+        assert!(labels.contains(&"Pull model metadata"));
+        assert!(labels.contains(&"Pull runner contract"));
+        assert!(labels.contains(&"Doctor"));
+        assert!(labels.contains(&"Quit"));
+    }
 
-    Ok(())
+    #[test]
+    fn doctor_reports_storage_layout_and_registry_health() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let store = LocalStore::new(temp.path().join("takokit"));
+        store.ensure_layout().expect("layout");
+        let config = RuntimeConfig::local(store.root().to_path_buf());
+        let package_registry = PackageRegistry::bundled();
+        let installed_registry = InstalledRegistry::new(store.manifests_dir());
+
+        let report = doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
+
+        assert!(!report.has_failures());
+        assert!(report
+            .checks()
+            .iter()
+            .any(|check| check.label().contains("model manifests found") && check.is_ok()));
+        assert!(report
+            .checks()
+            .iter()
+            .any(|check| check.label().contains("installed model records parse") && check.is_ok()));
+    }
 }
