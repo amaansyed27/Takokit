@@ -5,8 +5,11 @@ mod tui;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
-use takokit_models::{MockTextToSpeechEngine, ModelRegistry, TextToSpeechEngine};
-use takokit_package::{resolve_runner, InstalledRegistry, PackageError, PackageRegistry};
+use takokit_models::{
+    execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
+    TextToSpeechEngine,
+};
+use takokit_package::{resolve_execution_plan, InstalledRegistry, PackageError, PackageRegistry};
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
 
@@ -130,20 +133,27 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::Runners) => print_runners(&package_registry, &installed_registry)?,
         Some(Command::Speak(args)) => {
             if args.model != "mock-tts" {
-                let plan = resolve_runner(
+                let plan = resolve_execution_plan(
                     &package_registry,
                     &installed_registry,
                     &args.model,
                     CapabilityKind::TextToSpeech,
                 )
                 .map_err(cli_error)?;
-
-                return Err(cli_error(PackageError::InferenceNotImplemented {
-                    model: plan.model.id,
-                    runner: plan.runner.id,
-                    capability: plan.capability,
-                    capability_label: plan.capability.label(),
-                }));
+                let response = execute_speech(
+                    &plan,
+                    SpeechRequest {
+                        model: args.model,
+                        input: args.text,
+                        voice: Some(args.voice),
+                        response_format: Some("wav".to_string()),
+                    },
+                    &store.outputs_dir(),
+                )
+                .await
+                .map_err(runtime_error)?;
+                println!("{}", serde_json::to_string_pretty(&response)?);
+                return Ok(());
             }
 
             let engine = MockTextToSpeechEngine;
@@ -231,21 +241,25 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Some(Command::Transcribe { audio: _, model }) => {
-            let plan = resolve_runner(
+        Some(Command::Transcribe { audio, model }) => {
+            let plan = resolve_execution_plan(
                 &package_registry,
                 &installed_registry,
                 &model,
                 CapabilityKind::SpeechToText,
             )
             .map_err(cli_error)?;
-
-            return Err(cli_error(PackageError::InferenceNotImplemented {
-                model: plan.model.id,
-                runner: plan.runner.id,
-                capability: plan.capability,
-                capability_label: plan.capability.label(),
-            }));
+            let response = execute_transcription(
+                &plan,
+                takokit_core::TranscriptionRequest {
+                    file_path: audio,
+                    model: Some(model),
+                },
+            )
+            .await
+            .map_err(runtime_error)?;
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            return Ok(());
         }
         Some(Command::Clone(args)) => {
             let _ = args;
@@ -344,7 +358,11 @@ fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Resul
 }
 
 fn cli_error(error: PackageError) -> anyhow::Error {
-    match TakokitError::from(error) {
+    runtime_error(TakokitError::from(error))
+}
+
+fn runtime_error(error: TakokitError) -> anyhow::Error {
+    match error {
         TakokitError::Resolution { code, message } => {
             anyhow::anyhow!("{}: {}", code.as_str(), message)
         }
@@ -433,5 +451,20 @@ mod tests {
             .checks()
             .iter()
             .any(|check| check.label().contains("installed model records parse") && check.is_ok()));
+    }
+
+    #[test]
+    fn runtime_resolution_errors_include_code_prefix() {
+        let error = runtime_error(TakokitError::Resolution {
+            code: takokit_core::ErrorCode::InferenceNotImplemented,
+            message:
+                "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
+                    .to_string(),
+        });
+
+        assert_eq!(
+            error.to_string(),
+            "inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet."
+        );
     }
 }

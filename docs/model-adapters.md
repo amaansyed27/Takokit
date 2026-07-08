@@ -12,6 +12,23 @@ VoiceCloneEngine
 
 `mock-tts` is the only executable speech engine today. It writes a deterministic test WAV and is not real inference.
 
+Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records. Runner engines consume that plan and either produce output or return a typed execution error.
+
+Current runner traits:
+
+```rust
+SpeechRunner
+TranscriptionRunner
+```
+
+The ONNX runner scaffold exists in `takokit-models`, but it returns:
+
+```txt
+inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet.
+```
+
+It does not generate Kokoro, Piper, or any other real-model audio yet.
+
 Takokit model manifests describe the five product surfaces:
 
 - TTS
@@ -55,7 +72,7 @@ voices = []
 id = "takokit-onnx"
 name = "Takokit ONNX Runner"
 version = "0.1.0"
-kind = "native"
+kind = "onnx"
 platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 description = "Native ONNX runner for CPU-friendly models."
 ```
@@ -83,6 +100,12 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 - Do not hardcode model-specific behavior inside CLI handlers or React components.
 - Do not require users to manually install Python, Torch, CUDA, FFmpeg, clone repos, or run model-specific Gradio apps.
 - Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
-- Return typed unsupported/not-installed errors until real runners are implemented.
-- Route execution requests through runner resolution before any model adapter is called.
+- Return typed unsupported/not-installed planning errors before execution.
+- Return typed `inference_not_implemented` from runner execution scaffolds until real runners are implemented.
+- Route execution requests through execution planning before any runner engine is called.
 - Check installed model records before checking runner install state for non-mock models.
+- Keep `takokit-package` responsible for manifests, installed state, and planning only. Keep execution in model/runner crates.
+
+## First ONNX Target
+
+Piper ONNX is the first real ONNX target. The decision is recorded in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Kokoro ONNX remains the next target after Piper proves the artifact and runner path.

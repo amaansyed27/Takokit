@@ -4,9 +4,9 @@ This file tracks near-term direction without phase gates. The source of truth fo
 
 ## Next Useful Increments
 
-- Implement the first real ONNX runner.
-- Choose the first real model target: Kokoro ONNX or Piper ONNX.
+- Implement the chosen first ONNX model runner: Piper ONNX.
 - Add checksum-backed artifact download before any real model downloads.
+- Add a real Piper ONNX artifact manifest.
 - Add release packaging.
 - Add actual install script release URLs after artifacts and checksums exist.
 - Add public model library website.
@@ -29,6 +29,12 @@ The bare command opens an interactive terminal launcher. The doctor command chec
 ## Product Surface Contract
 
 Takokit's first-class surfaces are TTS, STT, Voice Cloning, Live Transcription Local API, and Live Audio API. New model work should start by declaring which of those surfaces a manifest supports, then resolving the required runner before any execution code is added.
+
+## Planning And Execution Contract
+
+Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. Runner execution is separate. The current ONNX runner scaffold returns typed `inference_not_implemented` until real Piper ONNX execution is implemented.
+
+The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md).
 
 ## Keep Out For Now
 

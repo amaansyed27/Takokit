@@ -175,6 +175,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn speech_route_returns_inference_not_implemented_after_model_and_runner_pull() {
+        let root = std::env::temp_dir().join("takokit-server-speech-onnx-executor-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let pull_model_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/models/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_model_response.status(), StatusCode::OK);
+
+        let pull_runner_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/runners/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_runner_response.status(), StatusCode::OK);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/audio/speech")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"kokoro","input":"Hello"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["error"]["code"], "inference_not_implemented");
+        assert_eq!(
+            json["error"]["message"],
+            "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
+        );
+    }
+
+    #[tokio::test]
     async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         let root = std::env::temp_dir().join("takokit-server-runner-lifecycle-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
@@ -229,7 +286,23 @@ mod tests {
     async fn transcription_route_returns_unsupported_capability_error() {
         let root = std::env::temp_dir().join("takokit-server-transcription-resolution-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
-        let response = server_router(state)
+        let app = server_router(state);
+
+        let pull_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/models/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_response.status(), StatusCode::OK);
+
+        let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
@@ -247,5 +320,64 @@ mod tests {
 
         assert_eq!(json["error"]["code"], "capability_unsupported");
         assert_eq!(json["error"]["message"], "kokoro does not support STT.");
+    }
+
+    #[tokio::test]
+    async fn transcription_route_returns_executor_not_implemented_after_model_and_runner_pull() {
+        let root = std::env::temp_dir().join("takokit-server-transcription-executor-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let pull_model_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/models/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"whisper-base"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_model_response.status(), StatusCode::OK);
+
+        let pull_runner_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/runners/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"runner":"takokit-whispercpp"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(pull_runner_response.status(), StatusCode::OK);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/audio/transcriptions")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"model":"whisper-base","file_path":"audio.wav"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["error"]["code"], "inference_not_implemented");
+        assert_eq!(
+            json["error"]["message"],
+            "Runner takokit-whispercpp contract resolved, but transcription execution is not implemented yet."
+        );
     }
 }

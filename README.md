@@ -37,7 +37,8 @@ Takokit models declare which local voice surfaces they support:
 - Local mock model and runner registry under `registry/`.
 - Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
 - Installed model and runner records under `~/.takokit/manifests/`.
-- Typed capability taxonomy and runner resolution layer.
+- Typed capability taxonomy and execution planning layer.
+- Runner execution interface with an ONNX runner scaffold.
 - Local storage layout under `~/.takokit`.
 - Mock TTS engine for `mock-tts` only.
 
@@ -69,7 +70,7 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
 
-`takokit speak "Hello" --model mock-tts` is the only execution path that writes audio. Package models such as `kokoro`, `piper-lessac`, and `whisper-base` go through runner resolution and return typed errors until their real runners exist.
+`takokit speak "Hello" --model mock-tts` is the only execution path that writes audio. Package models such as `kokoro`, `piper-lessac`, and `whisper-base` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner scaffold returns typed `inference_not_implemented` instead of pretending to run a real model.
 
 ## GUI Development
 
@@ -117,6 +118,15 @@ takokit gui
 ```
 
 Today, model and runner lifecycle metadata works. Real-model speech and transcription commands still return typed `inference_not_implemented` errors once their model and runner records exist because real runners are not wired. That is intentional.
+
+Execution planning and execution are separate:
+
+```txt
+model manifest + installed records -> ExecutionPlan
+ExecutionPlan + runner engine -> output or typed execution error
+```
+
+The first real ONNX target decision is documented in [docs/decisions/0001-first-onnx-model.md](docs/decisions/0001-first-onnx-model.md). Takokit will implement Piper ONNX first, then Kokoro ONNX after the artifact and runner path is proven.
 
 ## Installer Scaffolds
 

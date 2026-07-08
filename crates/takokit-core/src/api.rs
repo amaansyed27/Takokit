@@ -93,6 +93,13 @@ pub struct TranscriptionRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TranscriptionResponse {
+    pub id: Uuid,
+    pub model: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CloneVoiceRequest {
     pub sample_path: PathBuf,
     pub name: String,

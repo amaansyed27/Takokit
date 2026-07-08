@@ -10,8 +10,8 @@ use takokit_core::{
     PullRunnerRequest, RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError,
     TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
 };
-use takokit_models::TextToSpeechEngine;
-use takokit_package::{resolve_runner, PackageError, RunnerInfo};
+use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
+use takokit_package::{resolve_execution_plan, RunnerInfo};
 
 use crate::AppState;
 
@@ -187,7 +187,7 @@ pub async fn speech(
     Json(request): Json<SpeechRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     if request.model != "mock-tts" {
-        let plan = resolve_runner(
+        let plan = resolve_execution_plan(
             &state.package_registry,
             &state.installed_registry,
             &request.model,
@@ -196,15 +196,10 @@ pub async fn speech(
         .map_err(Into::into)
         .map_err(ApiError)?;
 
-        return Err(ApiError(
-            PackageError::InferenceNotImplemented {
-                model: plan.model.id,
-                runner: plan.runner.id,
-                capability: plan.capability,
-                capability_label: plan.capability.label(),
-            }
-            .into(),
-        ));
+        let response = execute_speech(&plan, request, &state.store.outputs_dir())
+            .await
+            .map_err(ApiError)?;
+        return Ok((StatusCode::OK, Json(response)));
     }
 
     let response = state
@@ -219,26 +214,24 @@ pub async fn speech(
 pub async fn transcriptions(
     State(state): State<AppState>,
     Json(request): Json<TranscriptionRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let model = request.model.as_deref().unwrap_or("whisper-base");
-    let plan = resolve_runner(
+) -> Result<Json<takokit_core::TranscriptionResponse>, ApiError> {
+    let model = request
+        .model
+        .clone()
+        .unwrap_or_else(|| "whisper-base".to_string());
+    let plan = resolve_execution_plan(
         &state.package_registry,
         &state.installed_registry,
-        model,
+        &model,
         CapabilityKind::SpeechToText,
     )
     .map_err(Into::into)
     .map_err(ApiError)?;
 
-    Err(ApiError(
-        PackageError::InferenceNotImplemented {
-            model: plan.model.id,
-            runner: plan.runner.id,
-            capability: plan.capability,
-            capability_label: plan.capability.label(),
-        }
-        .into(),
-    ))
+    let response = execute_transcription(&plan, request)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(response))
 }
 
 pub async fn clone_voice(

@@ -32,8 +32,8 @@ Model manifests declare these surfaces as typed capabilities. CLI, API, and GUI 
 
 - `takokit-core`: API request/response types, shared model metadata, runtime config, and typed errors.
 - `takokit-server`: Axum router, daemon entry point, API handlers, and static GUI serving.
-- `takokit-package`: model manifests, runner manifests, local mock registry lookup, and installed manifest registry.
-- `takokit-models`: adapter traits and mock TTS implementation.
+- `takokit-package`: model manifests, runner manifests, local mock registry lookup, installed manifest registry, and execution planning.
+- `takokit-models`: adapter traits, runner execution traits, ONNX runner scaffold, and mock TTS implementation.
 - `takokit-audio`: audio helpers and valid mock WAV writing.
 - `takokit-store`: local filesystem layout under `~/.takokit`.
 - `takokit-safety`: consent, license, and safety policy primitives.
@@ -68,21 +68,31 @@ The current implementation installs local mock metadata only. It writes:
 
 The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact placeholders, required runner, platforms, and metadata-only status. Takokit still does not download model weights, install Python packages, or execute real runners.
 
-## Runner Resolution
+## Execution Planning And Runner Execution
 
 Execution requests follow this flow:
 
 ```txt
 model id
   -> load model manifest
-  -> check requested capability
   -> check model install record
+  -> check requested capability
   -> resolve required runner
   -> check platform and installed runner status
-  -> return typed error until execution exists
+  -> return ExecutionPlan
+  -> execute plan through runner engine
+  -> return output or typed execution error
 ```
 
-The resolver returns typed failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, `RunnerUnsupportedOnPlatform`, and `InferenceNotImplemented`. `mock-tts` remains the only path that writes a test WAV.
+Planning belongs to `takokit-package`. It returns typed planning failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, and `RunnerUnsupportedOnPlatform`.
+
+Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the message:
+
+```txt
+ONNX runner contract resolved, but real ONNX execution is not implemented yet.
+```
+
+`mock-tts` remains the only path that writes a test WAV.
 
 ## Runner Isolation
 
@@ -95,6 +105,10 @@ Runner types are modeled now for future backends:
 - `external`
 
 Runners must communicate through explicit contracts. UI and API callers should only see model IDs, voice IDs, request contracts, package metadata, and typed errors.
+
+## First ONNX Target
+
+The first real ONNX model target is Piper ONNX, documented in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Piper is the shortest path to one real model artifact manifest, checksum-backed artifact download, and local ONNX execution. Kokoro ONNX remains the next TTS target after the Piper runner path is proven.
 
 ## Installer Scaffolds
 

@@ -56,14 +56,6 @@ pub enum PackageError {
         capability_label: &'static str,
         platform: String,
     },
-
-    #[error("{model} supports {capability_label}, but inference is not implemented for runner {runner} yet.")]
-    InferenceNotImplemented {
-        model: String,
-        runner: String,
-        capability: CapabilityKind,
-        capability_label: &'static str,
-    },
 }
 
 impl From<PackageError> for TakokitError {
@@ -95,10 +87,6 @@ impl From<PackageError> for TakokitError {
             },
             error @ PackageError::RunnerUnsupportedOnPlatform { .. } => TakokitError::Resolution {
                 code: ErrorCode::RunnerUnsupportedOnPlatform,
-                message: error.to_string(),
-            },
-            error @ PackageError::InferenceNotImplemented { .. } => TakokitError::Resolution {
-                code: ErrorCode::InferenceNotImplemented,
                 message: error.to_string(),
             },
             PackageError::Io(error) => TakokitError::Storage(error.to_string()),
@@ -273,8 +261,7 @@ pub struct ExecutionPlan {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
-    Ready,
-    InferenceNotImplemented,
+    Planned,
 }
 
 #[derive(Debug, Clone)]
@@ -643,23 +630,23 @@ where
     Ok(manifests)
 }
 
-pub fn resolve_runner(
+pub fn resolve_execution_plan(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     model_id: &str,
     capability: CapabilityKind,
 ) -> PackageResult<ExecutionPlan> {
     let model = package_registry.model(model_id)?;
+    if model.id != "mock-tts" && !installed_registry.is_model_installed(&model.id) {
+        return Err(PackageError::ModelNotInstalled(model.id));
+    }
+
     if !model.supports(capability) {
         return Err(PackageError::CapabilityUnsupported {
             model: model.id,
             capability,
             capability_label: capability.label(),
         });
-    }
-
-    if model.id != "mock-tts" && !installed_registry.is_model_installed(&model.id) {
-        return Err(PackageError::ModelNotInstalled(model.id));
     }
 
     let runner = package_registry.runner(&model.runner)?;
@@ -688,12 +675,22 @@ pub fn resolve_runner(
         });
     }
 
-    Err(PackageError::InferenceNotImplemented {
-        model: model.id,
-        runner: runner.id,
+    Ok(ExecutionPlan {
+        model,
         capability,
-        capability_label: capability.label(),
+        runner,
+        runner_installed,
+        status: ExecutionStatus::Planned,
     })
+}
+
+pub fn resolve_runner(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    model_id: &str,
+    capability: CapabilityKind,
+) -> PackageResult<ExecutionPlan> {
+    resolve_execution_plan(package_registry, installed_registry, model_id, capability)
 }
 
 fn installed_model_record(
@@ -819,7 +816,7 @@ voices = []
 id = "takokit-onnx"
 name = "Takokit ONNX Runner"
 version = "0.1.0"
-kind = "native"
+kind = "onnx"
 platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 description = "Native ONNX runner for CPU-friendly models."
 "#;
@@ -856,7 +853,7 @@ description = "Native ONNX runner for CPU-friendly models."
         let manifest: RunnerManifest = toml::from_str(RUNNER_TOML).expect("runner manifest");
 
         assert_eq!(manifest.id, "takokit-onnx");
-        assert_eq!(manifest.kind, RunnerKind::Native);
+        assert_eq!(manifest.kind, RunnerKind::Onnx);
         assert_eq!(
             manifest.platforms,
             vec!["windows-x64", "linux-x64", "macos-arm64"]
@@ -894,8 +891,10 @@ description = "Native ONNX runner for CPU-friendly models."
         write_test_registry(temp.path());
         let registry = PackageRegistry::new(temp.path());
         let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.model("kokoro").expect("model");
+        installed.install_model(&manifest).expect("install model");
 
-        let error = resolve_runner(
+        let error = resolve_execution_plan(
             &registry,
             &installed,
             "kokoro",
@@ -908,6 +907,24 @@ description = "Native ONNX runner for CPU-friendly models."
             PackageError::CapabilityUnsupported { model, capability, .. }
                 if model == "kokoro" && capability == CapabilityKind::SpeechToText
         ));
+    }
+
+    #[test]
+    fn resolver_reports_model_not_installed_before_unsupported_capability() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+
+        let error = resolve_execution_plan(
+            &registry,
+            &installed,
+            "kokoro",
+            CapabilityKind::SpeechToText,
+        )
+        .expect_err("model not installed");
+
+        assert!(matches!(error, PackageError::ModelNotInstalled(id) if id == "kokoro"));
     }
 
     #[test]
@@ -948,7 +965,7 @@ description = "Native ONNX runner for CPU-friendly models."
         assert_eq!(report.id, "takokit-onnx");
         assert_eq!(record.id, "takokit-onnx");
         assert_eq!(record.version, "0.1.0");
-        assert_eq!(record.kind, "native");
+        assert_eq!(record.kind, "onnx");
         assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
         assert!(record.manifest_path.ends_with("runners/takokit-onnx.toml"));
     }
@@ -999,7 +1016,7 @@ description = "Native ONNX runner for CPU-friendly models."
         let registry = PackageRegistry::new(temp.path());
         let installed = InstalledRegistry::new(temp.path().join("installed"));
 
-        let error = resolve_runner(
+        let error = resolve_execution_plan(
             &registry,
             &installed,
             "kokoro",
@@ -1019,7 +1036,7 @@ description = "Native ONNX runner for CPU-friendly models."
         let manifest = registry.model("kokoro").expect("model");
         installed.install_model(&manifest).expect("install model");
 
-        let error = resolve_runner(
+        let error = resolve_execution_plan(
             &registry,
             &installed,
             "kokoro",
@@ -1035,7 +1052,7 @@ description = "Native ONNX runner for CPU-friendly models."
     }
 
     #[test]
-    fn resolver_reports_inference_not_implemented_after_model_and_runner_are_installed() {
+    fn resolver_returns_execution_plan_after_model_and_runner_are_installed() {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_registry(temp.path());
         let installed_root = temp.path().join("installed");
@@ -1046,19 +1063,19 @@ description = "Native ONNX runner for CPU-friendly models."
         installed.install_model(&model).expect("install model");
         installed.install_runner(&runner).expect("install runner");
 
-        let error = resolve_runner(
+        let plan = resolve_execution_plan(
             &registry,
             &installed,
             "kokoro",
             CapabilityKind::TextToSpeech,
         )
-        .expect_err("not implemented");
+        .expect("execution plan");
 
-        assert!(matches!(
-            error,
-            PackageError::InferenceNotImplemented { model, runner, capability, .. }
-                if model == "kokoro" && runner == "takokit-onnx" && capability == CapabilityKind::TextToSpeech
-        ));
+        assert_eq!(plan.model.id, "kokoro");
+        assert_eq!(plan.runner.id, "takokit-onnx");
+        assert_eq!(plan.capability, CapabilityKind::TextToSpeech);
+        assert!(plan.runner_installed);
+        assert_eq!(plan.status, ExecutionStatus::Planned);
     }
 
     fn write_test_registry(root: &Path) {

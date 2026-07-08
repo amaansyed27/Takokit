@@ -7,15 +7,19 @@
 
 ## Next Small Tasks
 
-- [ ] Implement the first real ONNX runner.
-- [ ] Choose the first real model target: Kokoro ONNX or Piper ONNX.
+- [ ] Implement the chosen first ONNX model runner: Piper ONNX.
 - [ ] Add checksum-backed artifact download before any real model downloads.
+- [ ] Add real model artifact manifest for Piper ONNX.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
 
 ## Done
 
+- [x] Split execution planning from runner execution.
+- [x] Added a runner execution interface for speech and transcription.
+- [x] Added an ONNX runner scaffold that returns typed `inference_not_implemented`.
+- [x] Chose Piper ONNX as the first real ONNX target in `docs/decisions/0001-first-onnx-model.md`.
 - [x] Added bare `takokit` interactive terminal launcher.
 - [x] Added `takokit doctor` for storage, registry, installed record, server, GUI, mock execution, and platform checks.
 - [x] Added safe future installer scaffolds in `scripts/install.sh` and `scripts/install.ps1`.

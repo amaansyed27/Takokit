@@ -77,9 +77,9 @@ This does not download or install an execution binary. `DELETE /v1/runners/:id` 
 }
 ```
 
-Using package models such as `kokoro` for speech runs lifecycle resolution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit returns `inference_not_implemented` until real runners exist.
+Using package models such as `kokoro` for speech runs lifecycle resolution and then runner execution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit builds an execution plan and passes it to the runner layer. The current ONNX runner scaffold then returns `inference_not_implemented` until real ONNX execution exists.
 
-`POST /v1/audio/transcriptions` uses the same runner resolution layer for STT. For example, `kokoro` returns `capability_unsupported` for STT, while `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists.
+`POST /v1/audio/transcriptions` uses the same planning and execution split for STT. Planning checks model install state before capability support, so an unpulled model returns `model_not_installed`. After `kokoro` metadata is pulled, transcription with `kokoro` returns `capability_unsupported` for STT. `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists, then the executor returns `inference_not_implemented`.
 
 Typed errors use this shape:
 
@@ -88,6 +88,17 @@ Typed errors use this shape:
   "error": {
     "code": "runner_not_installed",
     "message": "whisper-base supports STT, but runner takokit-whispercpp is not installed or not implemented yet."
+  }
+}
+```
+
+After a model and its runner contract are installed, ONNX execution currently returns:
+
+```json
+{
+  "error": {
+    "code": "inference_not_implemented",
+    "message": "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
   }
 }
 ```

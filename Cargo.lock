@@ -860,6 +860,8 @@ dependencies = [
  "async-trait",
  "takokit-audio",
  "takokit-core",
+ "takokit-package",
+ "tempfile",
  "tokio",
  "uuid",
 ]
