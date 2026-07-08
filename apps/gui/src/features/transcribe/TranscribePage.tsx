@@ -9,7 +9,7 @@ export function TranscribePage(_props: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Transcribe</h1>
-        <p>Speech to text, ready for Whisper runners.</p>
+        <p>STT through the local Live Transcription API surface. Whisper runner execution is not wired yet.</p>
       </header>
 
       <Section title="Audio input">
@@ -18,8 +18,8 @@ export function TranscribePage(_props: RouteComponentProps) {
             <Upload size={24} aria-hidden="true" />
           </div>
           <div>
-            <strong>Transcription runner not installed</strong>
-            <p>Drop audio here once a runner is wired.</p>
+            <strong>STT runner not installed</strong>
+            <p>Drop audio here once the local Live Transcription API has a real runner.</p>
           </div>
           <Tooltip content="Disabled because no real Whisper runner is connected yet.">
             <Button disabled>Select audio</Button>
@@ -34,11 +34,11 @@ export function TranscribePage(_props: RouteComponentProps) {
             <span>WAV, MP3, samples.</span>
           </div>
           <div className="pipeline-node is-disabled">
-            <strong>Whisper runner</strong>
+            <strong>STT runner</strong>
             <span>Not installed.</span>
           </div>
           <div className="pipeline-node is-disabled">
-            <strong>Transcript</strong>
+            <strong>Live Transcription API</strong>
             <span>Text and timestamps.</span>
           </div>
           <div className="pipeline-node is-disabled">

@@ -4,6 +4,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
 import { Tooltip } from "../../components/ui/Tooltip";
+import type { ModelCapability } from "../../lib/types";
 
 export function ModelsPage({ runtime }: RouteComponentProps) {
   const [query, setQuery] = useState("");
@@ -32,20 +33,20 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
       <Section title="Runtime honesty" description={runtime.modeNote}>
         <div className="capability-strip">
           <div className="capability-chip">
-            <strong>Text to speech</strong>
-            <span>Mock TTS can generate test WAV files. Kokoro and Piper are package metadata only.</span>
+            <strong>TTS</strong>
+            <span>Mock TTS can generate test WAV files. Real TTS runners are not wired yet.</span>
           </div>
           <div className="capability-chip">
-            <strong>Transcription</strong>
+            <strong>STT</strong>
             <span>Whisper manifests exist; runner execution is not wired.</span>
           </div>
           <div className="capability-chip">
-            <strong>No manual dependency rule</strong>
-            <span>Future installs must manage runners and artifacts inside Takokit.</span>
+            <strong>Voice Cloning</strong>
+            <span>Voice profile models are tracked as capability metadata only.</span>
           </div>
           <div className="capability-chip">
-            <strong>Local registry</strong>
-            <span>Mock TOML manifests drive this view.</span>
+            <strong>Live APIs</strong>
+            <span>Live transcription and live audio are local API surfaces, not cloud calls.</span>
           </div>
         </div>
       </Section>
@@ -58,11 +59,15 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
           placeholder="Filter by model, runtime, license, or status..."
           aria-label="Filter models"
         />
-        <Table columns={["Model", "Purpose", "Runtime", "Status", "License"]} ariaLabel="Models">
+        <Table columns={["Model", "Capabilities", "Runtime", "Status", "License"]} ariaLabel="Models">
           {models.map((model) => (
             <TableRow key={model.id}>
               <strong>{model.name}</strong>
-              <span>{model.purpose}</span>
+              <span className="badge-list" aria-label={`${model.name} capabilities`}>
+                {model.capabilities.map((capability) => (
+                  <Badge key={capability} tone="neutral">{capabilityLabel(capability)}</Badge>
+                ))}
+              </span>
               <Tooltip content={`${model.backend} backend, ${model.version} manifest version`}>
                 <span>{model.runtime}</span>
               </Tooltip>
@@ -92,4 +97,19 @@ export function ModelsPage({ runtime }: RouteComponentProps) {
       </Section>
     </section>
   );
+}
+
+function capabilityLabel(capability: ModelCapability): string {
+  switch (capability) {
+    case "tts":
+      return "TTS";
+    case "stt":
+      return "STT";
+    case "voice_cloning":
+      return "Voice Cloning";
+    case "live_transcription":
+      return "Live Transcription";
+    case "live_audio":
+      return "Live Audio";
+  }
 }

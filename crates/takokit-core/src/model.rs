@@ -2,13 +2,55 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ModelCapability {
+pub enum CapabilityKind {
     TextToSpeech,
     SpeechToText,
     VoiceCloning,
-    VoiceTraining,
-    VoiceConversion,
-    Streaming,
+    LiveTranscription,
+    LiveAudio,
+}
+
+pub type ModelCapability = CapabilityKind;
+
+impl CapabilityKind {
+    pub const ALL: [CapabilityKind; 5] = [
+        CapabilityKind::TextToSpeech,
+        CapabilityKind::SpeechToText,
+        CapabilityKind::VoiceCloning,
+        CapabilityKind::LiveTranscription,
+        CapabilityKind::LiveAudio,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            CapabilityKind::TextToSpeech => "TTS",
+            CapabilityKind::SpeechToText => "STT",
+            CapabilityKind::VoiceCloning => "Voice Cloning",
+            CapabilityKind::LiveTranscription => "Live Transcription API",
+            CapabilityKind::LiveAudio => "Live Audio API",
+        }
+    }
+
+    pub fn explanation(self) -> &'static str {
+        match self {
+            CapabilityKind::TextToSpeech => "Text input to speech or audio output.",
+            CapabilityKind::SpeechToText => "Audio file or input to text transcript.",
+            CapabilityKind::VoiceCloning => "Voice samples to a reusable local voice profile.",
+            CapabilityKind::LiveTranscription => {
+                "Local STT models exposed through an API for streaming or submitted audio."
+            }
+            CapabilityKind::LiveAudio => {
+                "Compatible local voice models exposed through an API for speech output."
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CapabilityInfo {
+    pub id: CapabilityKind,
+    pub label: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,11 +67,17 @@ pub enum ModelRuntime {
 pub struct ModelInfo {
     pub id: String,
     pub name: String,
+    pub version: String,
     pub summary: String,
     pub license: String,
     pub runtime: ModelRuntime,
+    pub backend: String,
+    pub runner: String,
+    pub hardware_notes: String,
     pub capabilities: Vec<ModelCapability>,
     pub installed: bool,
+    pub runner_installed: bool,
+    pub execution_status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

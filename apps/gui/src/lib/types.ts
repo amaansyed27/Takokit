@@ -1,4 +1,10 @@
-export type ModelCapability = "tts" | "stt" | "clone" | "train" | "convert" | "streaming";
+export type ModelCapability = "tts" | "stt" | "voice_cloning" | "live_transcription" | "live_audio";
+
+export type CapabilitySummary = {
+  id: ModelCapability;
+  label: string;
+  description: string;
+};
 
 export type ModelSummary = {
   id: string;
@@ -45,6 +51,7 @@ export type RuntimeSnapshot = {
   models: ModelSummary[];
   runners: RunnerSummary[];
   voices: VoiceSummary[];
+  capabilities: CapabilitySummary[];
   modeNote: string;
 };
 

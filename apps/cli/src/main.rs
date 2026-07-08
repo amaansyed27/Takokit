@@ -1,8 +1,8 @@
 use clap::{Args, Parser, Subcommand};
 use std::{path::PathBuf, process::Stdio, time::Duration};
-use takokit_core::{RuntimeConfig, SpeechRequest, TakokitError};
+use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{MockTextToSpeechEngine, ModelRegistry, TextToSpeechEngine};
-use takokit_package::{InstalledRegistry, PackageRegistry};
+use takokit_package::{resolve_runner, InstalledRegistry, PackageError, PackageRegistry};
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
 use tokio::net::TcpStream;
@@ -19,6 +19,7 @@ enum Command {
     Serve,
     Gui,
     Status,
+    Capabilities,
     Speak(SpeakArgs),
     Pull {
         model: String,
@@ -94,12 +95,28 @@ async fn main() -> anyhow::Result<()> {
             let state = AppState::new(config, store);
             println!("{}", serde_json::to_string_pretty(&state.status())?);
         }
+        Command::Capabilities => {
+            for capability in CapabilityKind::ALL {
+                println!("{} - {}", capability.label(), capability.explanation());
+            }
+        }
         Command::Speak(args) => {
             if args.model != "mock-tts" {
-                return not_implemented(
-                    "real model speech inference",
-                    "model packages can be registered, but runners are not implemented yet; use --model mock-tts for the test WAV path",
-                );
+                let plan = resolve_runner(
+                    &package_registry,
+                    &installed_registry,
+                    &args.model,
+                    CapabilityKind::TextToSpeech,
+                )
+                .map_err(TakokitError::from)?;
+
+                return Err(PackageError::InferenceNotImplemented {
+                    model: plan.model.id,
+                    runner: plan.runner.id,
+                    capability: plan.capability,
+                    capability_label: plan.capability.label(),
+                }
+                .into());
             }
 
             let engine = MockTextToSpeechEngine;
@@ -126,32 +143,34 @@ async fn main() -> anyhow::Result<()> {
         Command::Show { model } => {
             let manifest = package_registry.model(&model).map_err(TakokitError::from)?;
             let installed = installed_registry.is_model_installed(&manifest.id);
+            let runner_installed = installed_registry.is_runner_installed(&manifest.runner);
             let runner = package_registry.runner(&manifest.runner).ok();
             println!("{} ({})", manifest.name, manifest.id);
             println!("version: {}", manifest.version);
-            println!("kind: {:?}", manifest.kind);
             println!("backend: {:?}", manifest.backend);
             println!("runner: {}", manifest.runner);
             if let Some(runner) = runner {
-                println!("runner_kind: {:?}", runner.kind);
+                println!("runner kind: {:?}", runner.kind);
+                println!("runner installed: {}", runner_installed);
             }
-            println!("license: {}", manifest.license);
             println!("installed: {}", installed);
-            println!("description: {}", manifest.description);
+            println!("license: {}", manifest.license);
             println!(
-                "capabilities: speak={}, transcribe={}, clone={}, train={}, convert={}",
-                manifest.capabilities.speak,
-                manifest.capabilities.transcribe,
-                manifest.capabilities.clone,
-                manifest.capabilities.train,
-                manifest.capabilities.convert
+                "capabilities: {}",
+                capability_labels(&manifest.capabilities.to_model_capabilities())
             );
             println!(
                 "hardware: cpu={}, gpu={}, min_ram={}",
                 manifest.hardware.cpu,
                 manifest.hardware.gpu,
-                manifest.hardware.min_ram.as_deref().unwrap_or("unspecified")
+                manifest
+                    .hardware
+                    .min_ram
+                    .as_deref()
+                    .unwrap_or("unspecified")
             );
+            println!("status: {}", execution_status(installed, runner_installed));
+            println!("description: {}", manifest.description);
         }
         Command::Rm { model } => {
             let removed = installed_registry
@@ -173,7 +192,12 @@ async fn main() -> anyhow::Result<()> {
                         .models()
                         .map_err(TakokitError::from)?
                         .into_iter()
-                        .map(|model| model.to_model_info(installed_registry.is_model_installed(&model.id)))
+                        .map(|model| {
+                            model.to_model_info(
+                                installed_registry.is_model_installed(&model.id),
+                                installed_registry.is_runner_installed(&model.runner),
+                            )
+                        })
                         .collect();
                     println!("{}", serde_json::to_string_pretty(&models)?)
                 }
@@ -191,8 +215,22 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Command::Transcribe { audio: _, model: _ } => {
-            return not_implemented("speech transcription", "Whisper adapters are not wired yet")
+        Command::Transcribe { audio: _, model } => {
+            let plan = resolve_runner(
+                &package_registry,
+                &installed_registry,
+                &model,
+                CapabilityKind::SpeechToText,
+            )
+            .map_err(TakokitError::from)?;
+
+            return Err(PackageError::InferenceNotImplemented {
+                model: plan.model.id,
+                runner: plan.runner.id,
+                capability: plan.capability,
+                capability_label: plan.capability.label(),
+            }
+            .into());
         }
         Command::Clone(args) => {
             let _ = args;
@@ -215,6 +253,26 @@ async fn main() -> anyhow::Result<()> {
 
 fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
     Err(TakokitError::NotImplemented { feature, reason }.into())
+}
+
+fn capability_labels(capabilities: &[CapabilityKind]) -> String {
+    if capabilities.is_empty() {
+        return "none".to_string();
+    }
+
+    capabilities
+        .iter()
+        .map(|capability| capability.label())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn execution_status(installed: bool, runner_installed: bool) -> &'static str {
+    match (installed, runner_installed) {
+        (false, _) => "model manifest is available, but the model is not installed",
+        (true, false) => "model installed; required runner is not installed or not implemented yet",
+        (true, true) => "runner installed; real inference is not implemented yet",
+    }
 }
 
 async fn open_gui(config: &RuntimeConfig) -> anyhow::Result<()> {

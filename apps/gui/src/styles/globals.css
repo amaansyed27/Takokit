@@ -551,7 +551,7 @@ code {
 }
 
 .capability-strip {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .capability-chip {
@@ -890,6 +890,13 @@ textarea:focus,
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 13px;
+}
+
+.badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
 .badge--success {

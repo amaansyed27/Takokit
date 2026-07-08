@@ -1,5 +1,5 @@
 import { mockRuntime } from "./mockData";
-import type { ModelCapability, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, VoiceSummary } from "./types";
+import type { CapabilitySummary, ModelCapability, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, VoiceSummary } from "./types";
 
 const LOCAL_API_BASE_URL = "http://127.0.0.1:5050";
 
@@ -11,11 +11,25 @@ type ApiStatus = {
 type ApiModel = {
   id: string;
   name: string;
+  version: string;
   summary: string;
   license: string;
   runtime: "python" | "onnx" | "whisper_cpp" | "native_rust" | "external";
-  capabilities: Array<"text_to_speech" | "speech_to_text" | "voice_cloning" | "voice_training" | "voice_conversion" | "streaming">;
+  backend: string;
+  runner: string;
+  hardware_notes: string;
+  capabilities: ApiCapabilityId[];
   installed: boolean;
+  runner_installed: boolean;
+  execution_status: string;
+};
+
+type ApiCapabilityId = "text_to_speech" | "speech_to_text" | "voice_cloning" | "live_transcription" | "live_audio";
+
+type ApiCapability = {
+  id: ApiCapabilityId;
+  label: string;
+  description: string;
 };
 
 type ApiRunner = RunnerSummary;
@@ -51,8 +65,9 @@ export const apiConfig = {
 
 export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
   try {
-    const [status, models, runners, voices] = await Promise.all([
+    const [status, capabilities, models, runners, voices] = await Promise.all([
       getJson<ApiStatus>("/v1/status"),
+      getJson<{ data: ApiCapability[] }>("/v1/capabilities"),
       getJson<{ data: ApiModel[] }>("/v1/models"),
       getJson<{ data: ApiRunner[] }>("/v1/runners"),
       getJson<{ data: ApiVoice[] }>("/v1/voices")
@@ -68,6 +83,7 @@ export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
       models: [mockSpeechModel, ...models.data.map(toModelSummary)],
       runners: runners.data,
       voices: voices.data.map(toVoiceSummary),
+      capabilities: capabilities.data.map(toCapabilitySummary),
       modeNote: "Mock mode: packages and runners are managed locally, but real model inference is not implemented."
     };
   } catch {
@@ -85,7 +101,7 @@ const mockSpeechModel: ModelSummary = {
   runtime: "Rust",
   status: "installed",
   license: "internal-test",
-  capabilities: ["tts"]
+  capabilities: ["tts", "live_audio"]
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -101,13 +117,21 @@ function toModelSummary(model: ApiModel): ModelSummary {
     id: model.id,
     name: model.name,
     purpose: model.summary,
-    version: "manifest",
+    version: model.version,
     language: model.capabilities.includes("speech_to_text") ? "Multilingual" : "Local",
-    backend: model.runtime,
+    backend: model.backend,
     runtime: toRuntimeLabel(model.runtime),
     status: model.installed ? "installed" : "available",
     license: model.license,
     capabilities: model.capabilities.map(toCapability).filter(Boolean) as ModelCapability[]
+  };
+}
+
+function toCapabilitySummary(capability: ApiCapability): CapabilitySummary {
+  return {
+    id: toCapability(capability.id) ?? "tts",
+    label: capability.label,
+    description: capability.description
   };
 }
 
@@ -130,13 +154,11 @@ function toCapability(capability: ApiModel["capabilities"][number]): ModelCapabi
     case "speech_to_text":
       return "stt";
     case "voice_cloning":
-      return "clone";
-    case "voice_training":
-      return "train";
-    case "voice_conversion":
-      return "convert";
-    case "streaming":
-      return "streaming";
+      return "voice_cloning";
+    case "live_transcription":
+      return "live_transcription";
+    case "live_audio":
+      return "live_audio";
     default:
       return null;
   }

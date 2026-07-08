@@ -8,11 +8,11 @@ license = "mit"
 description = "Piper English Lessac voice placeholder for package-manager flow testing."
 
 [capabilities]
-speak = true
-transcribe = false
-clone = false
-train = false
-convert = false
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
 
 [hardware]
 cpu = true

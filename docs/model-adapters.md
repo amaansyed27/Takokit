@@ -8,11 +8,17 @@ Current adapter traits:
 TextToSpeechEngine
 SpeechToTextEngine
 VoiceCloneEngine
-VoiceTrainingEngine
-VoiceConversionEngine
 ```
 
 `mock-tts` is the only executable speech engine today. It writes a deterministic test WAV and is not real inference.
+
+Takokit model manifests describe the five product surfaces:
+
+- TTS
+- STT
+- Voice Cloning
+- Live Transcription Local API
+- Live Audio API
 
 ## Model Manifest
 
@@ -27,11 +33,11 @@ license = "apache-2.0"
 description = "Fast local text-to-speech model."
 
 [capabilities]
-speak = true
-transcribe = false
-clone = false
-train = false
-convert = false
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
 
 [hardware]
 cpu = true
@@ -60,3 +66,4 @@ description = "Native ONNX runner for CPU-friendly models."
 - Do not require users to manually install Python, Torch, CUDA, FFmpeg, clone repos, or run model-specific Gradio apps.
 - Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
 - Return typed unsupported/not-installed errors until real runners are implemented.
+- Route execution requests through runner resolution before any model adapter is called.

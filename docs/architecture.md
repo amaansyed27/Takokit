@@ -16,6 +16,18 @@ model adapters + future runners
 
 The GUI is a normal React + TypeScript + Vite web app in `apps/gui`. The daemon serves the built GUI at `/gui`, and `takokit gui` opens `http://127.0.0.1:5050/gui`.
 
+## Product Surfaces
+
+Takokit has five first-class local voice surfaces:
+
+1. TTS: text input to speech/audio output.
+2. STT: audio file/input to text transcript.
+3. Voice Cloning: voice sample(s) to a reusable voice profile.
+4. Live Transcription Local API: local Whisper or other STT models exposed through an API for streaming or submitted audio.
+5. Live Audio API: compatible local voice models exposed through an API for speech output.
+
+Model manifests declare these surfaces as typed capabilities. CLI, API, and GUI code should read capabilities from manifests rather than hardcoding model-specific behavior.
+
 ## Crates
 
 - `takokit-core`: API request/response types, shared model metadata, runtime config, and typed errors.
@@ -40,6 +52,21 @@ model manifest -> runner manifest -> content-addressed blobs -> installed regist
 ```
 
 The current implementation installs local mock manifests only. It does not download model weights, install Python packages, or execute real runners.
+
+## Runner Resolution
+
+Execution requests follow this flow:
+
+```txt
+model id
+  -> load model manifest
+  -> check requested capability
+  -> resolve required runner
+  -> check platform and installed runner status
+  -> return execution plan or typed error
+```
+
+The resolver returns typed failures such as `ModelNotFound`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, `RunnerUnsupportedOnPlatform`, and `InferenceNotImplemented`. `mock-tts` remains the only path that writes a test WAV.
 
 ## Runner Isolation
 

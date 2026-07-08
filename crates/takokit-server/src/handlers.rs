@@ -1,11 +1,17 @@
-use axum::{extract::{Path, State}, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use takokit_core::{
-    CloneVoiceRequest, HealthResponse, ModelDetailResponse, ModelsResponse, PullModelRequest,
-    PullModelResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
-    TranscriptionRequest, VoicesResponse,
+    CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, ErrorCode,
+    HealthResponse, ModelDetailResponse, ModelsResponse, PullModelRequest, PullModelResponse,
+    RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest, TranscriptionRequest,
+    VoicesResponse,
 };
 use takokit_models::TextToSpeechEngine;
-use takokit_package::RunnerInfo;
+use takokit_package::{resolve_runner, PackageError, RunnerInfo};
 
 use crate::AppState;
 
@@ -20,6 +26,19 @@ pub async fn status(State(state): State<AppState>) -> Json<takokit_core::Runtime
     Json(state.status())
 }
 
+pub async fn capabilities() -> Json<CapabilitiesResponse> {
+    Json(CapabilitiesResponse {
+        data: CapabilityKind::ALL
+            .into_iter()
+            .map(|capability| CapabilityInfo {
+                id: capability,
+                label: capability.label().to_string(),
+                description: capability.explanation().to_string(),
+            })
+            .collect(),
+    })
+}
+
 pub async fn models(State(state): State<AppState>) -> Json<ModelsResponse> {
     let models = state
         .package_registry
@@ -28,24 +47,30 @@ pub async fn models(State(state): State<AppState>) -> Json<ModelsResponse> {
         .into_iter()
         .map(|model| {
             let installed = state.installed_registry.is_model_installed(&model.id);
-            model.to_model_info(installed)
+            let runner_installed = state.installed_registry.is_runner_installed(&model.runner);
+            model.to_model_info(installed, runner_installed)
         })
         .collect();
 
-    Json(ModelsResponse {
-        data: models,
-    })
+    Json(ModelsResponse { data: models })
 }
 
 pub async fn model(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ModelDetailResponse>, ApiError> {
-    let manifest = state.package_registry.model(&id).map_err(Into::into).map_err(ApiError)?;
+    let manifest = state
+        .package_registry
+        .model(&id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
     let installed = state.installed_registry.is_model_installed(&manifest.id);
+    let runner_installed = state
+        .installed_registry
+        .is_runner_installed(&manifest.runner);
 
     Ok(Json(ModelDetailResponse {
-        data: manifest.to_model_info(installed),
+        data: manifest.to_model_info(installed, runner_installed),
     }))
 }
 
@@ -108,10 +133,24 @@ pub async fn speech(
     Json(request): Json<SpeechRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     if request.model != "mock-tts" {
-        return Err(ApiError(TakokitError::NotImplemented {
-            feature: "real model speech inference",
-            reason: "model packages can be registered, but runners are not implemented yet; use mock-tts for the test WAV path",
-        }));
+        let plan = resolve_runner(
+            &state.package_registry,
+            &state.installed_registry,
+            &request.model,
+            CapabilityKind::TextToSpeech,
+        )
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+
+        return Err(ApiError(
+            PackageError::InferenceNotImplemented {
+                model: plan.model.id,
+                runner: plan.runner.id,
+                capability: plan.capability,
+                capability_label: plan.capability.label(),
+            }
+            .into(),
+        ));
     }
 
     let response = state
@@ -124,12 +163,28 @@ pub async fn speech(
 }
 
 pub async fn transcriptions(
-    Json(_request): Json<TranscriptionRequest>,
+    State(state): State<AppState>,
+    Json(request): Json<TranscriptionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    Err(ApiError(TakokitError::NotImplemented {
-        feature: "speech transcription",
-        reason: "Whisper and whisper.cpp adapters are scaffolded but not wired yet",
-    }))
+    let model = request.model.as_deref().unwrap_or("whisper-base");
+    let plan = resolve_runner(
+        &state.package_registry,
+        &state.installed_registry,
+        model,
+        CapabilityKind::SpeechToText,
+    )
+    .map_err(Into::into)
+    .map_err(ApiError)?;
+
+    Err(ApiError(
+        PackageError::InferenceNotImplemented {
+            model: plan.model.id,
+            runner: plan.runner.id,
+            capability: plan.capability,
+            capability_label: plan.capability.label(),
+        }
+        .into(),
+    ))
 }
 
 pub async fn clone_voice(
@@ -156,13 +211,31 @@ pub struct ApiError(pub TakokitError);
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         let status = match self.0 {
+            TakokitError::Resolution { code, .. } => match code {
+                ErrorCode::CapabilityUnsupported => StatusCode::BAD_REQUEST,
+                ErrorCode::ModelNotFound
+                | ErrorCode::ModelNotInstalled
+                | ErrorCode::RunnerNotFound => StatusCode::NOT_FOUND,
+                ErrorCode::RunnerNotInstalled
+                | ErrorCode::RunnerUnsupportedOnPlatform
+                | ErrorCode::InferenceNotImplemented => StatusCode::NOT_IMPLEMENTED,
+            },
             TakokitError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
             TakokitError::NotImplemented { .. } => StatusCode::NOT_IMPLEMENTED,
             TakokitError::Model(_) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
+        let code = match &self.0 {
+            TakokitError::Resolution { code, .. } => code.as_str(),
+            TakokitError::InvalidRequest(_) => "invalid_request",
+            TakokitError::NotImplemented { .. } => "inference_not_implemented",
+            TakokitError::Model(_) => "model_error",
+            TakokitError::Storage(_) => "storage_error",
+            TakokitError::Audio(_) => "audio_error",
+        };
         let body = Json(serde_json::json!({
             "error": {
+                "code": code,
                 "message": self.0.to_string()
             }
         }));

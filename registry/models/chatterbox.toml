@@ -1,0 +1,24 @@
+id = "chatterbox"
+name = "Chatterbox"
+version = "0.1.0"
+kind = "voice-cloning"
+backend = "python-managed"
+runner = "takokit-python"
+license = "research-check-required"
+description = "Voice cloning and TTS package placeholder. This mock registry entry does not include real weights yet."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = true
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "8gb"
+
+[artifacts]
+weights = []
+voices = []

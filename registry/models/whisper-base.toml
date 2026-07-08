@@ -8,11 +8,11 @@ license = "mit"
 description = "Base Whisper transcription package placeholder for local registry testing."
 
 [capabilities]
-speak = false
-transcribe = true
-clone = false
-train = false
-convert = false
+tts = false
+stt = true
+voice_cloning = false
+live_transcription = true
+live_audio = false
 
 [hardware]
 cpu = true

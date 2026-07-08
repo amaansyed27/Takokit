@@ -8,11 +8,11 @@ license = "apache-2.0"
 description = "Fast local text-to-speech model. This mock registry entry does not include real weights yet."
 
 [capabilities]
-speak = true
-transcribe = false
-clone = false
-train = false
-convert = false
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
 
 [hardware]
 cpu = true

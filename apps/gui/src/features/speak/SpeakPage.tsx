@@ -24,7 +24,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Speak</h1>
-        <p>Text to local speech.</p>
+        <p>TTS through the local Live Audio API surface. Only the mock TTS path generates audio today.</p>
       </header>
 
       <form
@@ -69,8 +69,8 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
 
           <aside className="generation-actions">
             <div className="generation-actions__meta">
-              <strong>Mock speech path</strong>
-              <span>API shape only. No real inference yet.</span>
+              <strong>TTS + Live Audio API</strong>
+              <span>Mock WAV generation only. Real model runners are not wired yet.</span>
             </div>
             <Button variant="primary" type="submit" loading={isGenerating}>
               <Waves size={16} /> Generate Speech
@@ -118,11 +118,14 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
       </Section>
 
       <Section title="Installed models">
-        <Table columns={["Model", "Params", "Size", "Backend", "Status"]} ariaLabel="Installed text to speech models">
-          {ttsModels.slice(0, 3).map((item, index) => (
+        <Table columns={["Model", "Capabilities", "Size", "Backend", "Status"]} ariaLabel="Installed text to speech models">
+          {ttsModels.slice(0, 3).map((item) => (
             <TableRow key={item.id}>
               <strong>{item.name}</strong>
-              <span>{item.params ?? "-"}</span>
+              <span className="badge-list">
+                <Badge tone="neutral">TTS</Badge>
+                {item.capabilities.includes("live_audio") ? <Badge tone="neutral">Live Audio</Badge> : null}
+              </span>
               <span>{item.size ?? "-"}</span>
               <Tooltip content={`${item.runtime} runner, ${item.license} license label`}>
                 <span>{item.backend}</span>

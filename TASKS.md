@@ -8,18 +8,30 @@
 ## Next Small Tasks
 
 - [ ] Add installed runner registry behavior so runners can be tracked separately from models.
-- [ ] Make `takokit pull <model>` write a fuller installed-model record, including artifact slots, checksum placeholders, source metadata, install time, and runner reference.
-- [ ] Add a runner resolution layer: model manifest -> required runner -> installed runner check -> typed error if runner is missing/unsupported.
-- [ ] Add API tests for `GET /v1/models/:id`, `GET /v1/runners`, `POST /v1/models/pull`, and `DELETE /v1/models/:id`.
+- [ ] Implement the first real ONNX runner.
+- [ ] Choose the first real model target: Kokoro ONNX or Piper ONNX.
+- [ ] Add checksum-backed artifact download before any real model downloads.
 - [ ] Add GUI model actions for pull/remove/show using the local API, with honest mock/no-real-inference states.
+- [ ] Add API tests for capability and runner resolution errors across model-not-found, runner-not-found, unsupported platform, and installed-runner/not-implemented cases.
+- [ ] Make `takokit pull <model>` write a fuller installed-model record, including artifact slots, checksum placeholders, source metadata, install time, and runner reference.
+- [ ] Add API tests for `GET /v1/models/:id`, `GET /v1/runners`, `POST /v1/models/pull`, and `DELETE /v1/models/:id`.
 - [ ] Add config loading from `~/.takokit/config.toml` instead of always using `RuntimeConfig::local`.
 - [ ] Add a `takokit doctor` command to check storage layout, GUI build availability, server status, registry health, and runner availability.
 - [ ] Add `takokit list installed` or improve `takokit list models` so available vs installed state is obvious in CLI output.
-- [ ] Decide the first real no-dependency runner target: Kokoro ONNX or Piper ONNX.
-- [ ] Define artifact download policy before network downloads: source URL, checksum, retries, partial download cleanup, and no hidden cloud calls.
 
 ## Done
 
+- [x] Added five first-class Takokit product surfaces: TTS, STT, Voice Cloning, Live Transcription Local API, and Live Audio API.
+- [x] Added typed capability declarations to model manifests.
+- [x] Updated mock registry manifests for Kokoro, Whisper Base, Piper Lessac, Chatterbox, and GPT-SoVITS.
+- [x] Added runner resolution: model manifest -> capability check -> required runner -> platform/install check -> typed plan/error.
+- [x] Added `takokit capabilities`.
+- [x] Routed `takokit speak` and `takokit transcribe` through runner resolution while preserving the `mock-tts` WAV path.
+- [x] Updated `takokit show <model>` to print capabilities, hardware notes, runner status, installed status, and honest execution status.
+- [x] Added `GET /v1/capabilities`.
+- [x] Added API model capability and runner status fields.
+- [x] Routed speech and transcription API endpoints through runner resolution with typed JSON errors.
+- [x] Updated the GUI to show the five product surfaces and model capability badges.
 - [x] Renamed `apps/desktop` to `apps/gui`.
 - [x] Removed the Tauri-ready desktop direction from README/docs and changed product direction to Rust CLI + daemon/API + local browser GUI.
 - [x] Added `takokit gui`.

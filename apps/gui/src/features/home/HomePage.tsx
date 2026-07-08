@@ -53,6 +53,17 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
         </div>
       </Section>
 
+      <Section title="Product surfaces" description="The runtime treats each surface as an explicit model capability.">
+        <div className="capability-strip">
+          {runtime.capabilities.map((capability) => (
+            <div className="capability-chip" key={capability.id}>
+              <strong>{capability.label}</strong>
+              <span>{capability.description}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Runtime boundary">
         <div className="runtime-boundary">
           <div className="boundary-grid" aria-hidden="true">
@@ -77,7 +88,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           </div>
           <div className="runtime-lane">
             <strong>Model adapters</strong>
-            <span>TTS, STT, clone, train, and conversion traits.</span>
+            <span>TTS, STT, voice cloning, live transcription, and live audio.</span>
           </div>
           <div className="runtime-lane">
             <strong>Runner boundary</strong>

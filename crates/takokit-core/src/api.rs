@@ -20,6 +20,11 @@ pub struct RuntimeStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CapabilitiesResponse {
+    pub data: Vec<crate::CapabilityInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModelsResponse {
     pub data: Vec<ModelInfo>,
 }

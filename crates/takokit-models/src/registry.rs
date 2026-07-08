@@ -36,11 +36,17 @@ pub fn built_in_models() -> Vec<ModelInfo> {
         ModelInfo {
             id: "mock-tts".to_string(),
             name: "Mock TTS".to_string(),
+            version: "0.1.0".to_string(),
             summary: "Deterministic test WAV generator for API and CLI scaffolding.".to_string(),
             license: "internal-test".to_string(),
             runtime: ModelRuntime::NativeRust,
+            backend: "native_rust".to_string(),
+            runner: "takokit-mock".to_string(),
+            hardware_notes: "CPU, no model weights".to_string(),
             capabilities: vec![ModelCapability::TextToSpeech],
             installed: true,
+            runner_installed: true,
+            execution_status: "ready".to_string(),
         },
         model(
             "kokoro",
@@ -64,7 +70,11 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             "Voice cloning",
             "unknown",
             ModelRuntime::Python,
-            vec![ModelCapability::VoiceCloning],
+            vec![
+                ModelCapability::TextToSpeech,
+                ModelCapability::VoiceCloning,
+                ModelCapability::LiveAudio,
+            ],
         ),
         model(
             "gpt-sovits",
@@ -73,8 +83,9 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             "unknown",
             ModelRuntime::Python,
             vec![
-                ModelCapability::VoiceTraining,
+                ModelCapability::TextToSpeech,
                 ModelCapability::VoiceCloning,
+                ModelCapability::LiveAudio,
             ],
         ),
         model(
@@ -83,7 +94,7 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             "Voice design and streaming",
             "unknown",
             ModelRuntime::Python,
-            vec![ModelCapability::TextToSpeech, ModelCapability::Streaming],
+            vec![ModelCapability::TextToSpeech, ModelCapability::LiveAudio],
         ),
         model(
             "rvc",
@@ -91,7 +102,7 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             "Voice conversion",
             "unknown",
             ModelRuntime::Python,
-            vec![ModelCapability::VoiceConversion],
+            vec![ModelCapability::VoiceCloning],
         ),
         model(
             "piper",
@@ -115,11 +126,17 @@ fn model(
     ModelInfo {
         id: id.to_string(),
         name: name.to_string(),
+        version: "0.1.0".to_string(),
         summary: summary.to_string(),
         license: license.to_string(),
         runtime,
+        backend: "registry".to_string(),
+        runner: "unresolved".to_string(),
+        hardware_notes: "runner contract pending".to_string(),
         capabilities,
         installed: false,
+        runner_installed: false,
+        execution_status: "runner not installed or not implemented".to_string(),
     }
 }
 
