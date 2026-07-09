@@ -12,8 +12,9 @@ use takokit_core::{
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
-    initialize_runner_runtime, plan_model, resolve_execution_plan, InstallModelOptions,
-    LibraryModelManifest, LibraryRunnerManifest, ModelPlan, RunnerInfo,
+    initialize_runner_runtime, model_info_from_plan, plan_model, resolve_execution_plan,
+    runner_runtime_layout, InstallModelOptions, LibraryModelManifest, LibraryRunnerManifest,
+    ModelPlan, RunnerInfo, RunnerLifecycleState,
 };
 
 use crate::AppState;
@@ -29,6 +30,135 @@ pub async fn status(State(state): State<AppState>) -> Json<takokit_core::Runtime
     Json(state.status())
 }
 
+pub async fn doctor(
+    State(state): State<AppState>,
+) -> Json<RunnerDetailResponse<serde_json::Value>> {
+    let mut checks = vec![
+        doctor_check(
+            "storage",
+            "storage root",
+            state.store.root().is_dir(),
+            state.store.root().display().to_string(),
+        ),
+        doctor_check(
+            "storage",
+            "config.toml",
+            state.store.config_path().is_file(),
+            state.store.config_path().display().to_string(),
+        ),
+        doctor_check(
+            "registry",
+            "runtime model manifests",
+            state.package_registry.models().is_ok(),
+            "registry/models".to_string(),
+        ),
+        doctor_check(
+            "registry",
+            "runtime runner manifests",
+            state.package_registry.runners().is_ok(),
+            "registry/runners".to_string(),
+        ),
+        doctor_check(
+            "registry",
+            "library model manifests",
+            state.package_registry.library_models().is_ok(),
+            "registry/library/models".to_string(),
+        ),
+        doctor_check(
+            "registry",
+            "library runner manifests",
+            state.package_registry.library_runners().is_ok(),
+            "registry/library/runners".to_string(),
+        ),
+        doctor_check(
+            "installed",
+            "installed model records",
+            state.installed_registry.installed_model_records().is_ok(),
+            "manifests/installed-models".to_string(),
+        ),
+        doctor_check(
+            "installed",
+            "installed runner records",
+            state.installed_registry.installed_runner_records().is_ok(),
+            "manifests/installed-runners".to_string(),
+        ),
+        doctor_check(
+            "gui",
+            "GUI dist",
+            crate::router::gui_dist_path().join("index.html").is_file(),
+            crate::router::gui_dist_path().display().to_string(),
+        ),
+        doctor_check(
+            "runner",
+            "python-managed adapters",
+            state.store.python_managed_adapters_dir().is_dir(),
+            state
+                .store
+                .python_managed_adapters_dir()
+                .display()
+                .to_string(),
+        ),
+    ];
+    for runner_id in [
+        "takokit-whispercpp",
+        "takokit-onnx",
+        "takokit-python-managed",
+    ] {
+        let check = match state.package_registry.runner(runner_id) {
+            Ok(manifest) => {
+                let layout = runner_runtime_layout(state.store.root(), &manifest);
+                match state.installed_registry.installed_runner_record(runner_id) {
+                    Ok(record) => runner_doctor_check(
+                        runner_id,
+                        record.status,
+                        format!("{}; logs: {}", record.note, layout.logs.display()),
+                    ),
+                    Err(_) => serde_json::json!({
+                        "section": "runner",
+                        "label": format!("{runner_id} runtime missing"),
+                        "status": "warn",
+                        "detail": format!("run: takokit runner pull {runner_id} && takokit runner install {runner_id}"),
+                    }),
+                }
+            }
+            Err(error) => serde_json::json!({
+                "section": "runner",
+                "label": format!("{runner_id} manifest"),
+                "status": "fail",
+                "detail": error.to_string(),
+            }),
+        };
+        checks.push(check);
+    }
+
+    let executable_models = state
+        .package_registry
+        .models()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|model| {
+            plan_model(
+                &state.package_registry,
+                &state.installed_registry,
+                &model.id,
+            )
+            .ok()
+        })
+        .filter(|plan| plan.executable)
+        .map(|plan| plan.model_id)
+        .collect::<Vec<_>>();
+
+    Json(RunnerDetailResponse {
+        data: serde_json::json!({
+            "storage_root": state.store.root(),
+            "server": state.config.bind_addr(),
+            "checks": checks,
+            "executable_models": executable_models,
+            "logs_path": state.store.logs_dir(),
+        }),
+    })
+}
+
 pub async fn capabilities() -> Json<CapabilitiesResponse> {
     Json(CapabilitiesResponse {
         data: CapabilityKind::ALL
@@ -42,39 +172,69 @@ pub async fn capabilities() -> Json<CapabilitiesResponse> {
     })
 }
 
-pub async fn models(State(state): State<AppState>) -> Json<ModelsResponse> {
-    let models = state
+fn doctor_check(
+    section: &'static str,
+    label: &'static str,
+    ok: bool,
+    detail: String,
+) -> serde_json::Value {
+    serde_json::json!({
+        "section": section,
+        "label": label,
+        "status": if ok { "ok" } else { "warn" },
+        "detail": detail,
+    })
+}
+
+fn runner_doctor_check(
+    runner_id: &'static str,
+    state: RunnerLifecycleState,
+    detail: String,
+) -> serde_json::Value {
+    let (status, label) = match state {
+        RunnerLifecycleState::Ready => ("ok", format!("{runner_id} ready")),
+        RunnerLifecycleState::Failed => ("fail", format!("{runner_id} failed")),
+        _ => ("warn", format!("{runner_id} state: {state}")),
+    };
+    serde_json::json!({
+        "section": "runner",
+        "label": label,
+        "status": status,
+        "detail": detail,
+    })
+}
+
+pub async fn models(State(state): State<AppState>) -> Result<Json<ModelsResponse>, ApiError> {
+    let manifests = state
         .package_registry
         .models()
-        .unwrap_or_default()
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let models = manifests
         .into_iter()
         .map(|model| {
-            let installed = state.installed_registry.is_model_installed(&model.id);
-            let runner_installed = state.installed_registry.is_runner_installed(&model.runner);
-            model.to_model_info(installed, runner_installed)
+            model_info_from_plan(
+                &state.package_registry,
+                &state.installed_registry,
+                &model.id,
+            )
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+        .map_err(ApiError)?;
 
-    Json(ModelsResponse { data: models })
+    Ok(Json(ModelsResponse { data: models }))
 }
 
 pub async fn model(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ModelDetailResponse>, ApiError> {
-    let manifest = state
-        .package_registry
-        .model(&id)
+    let info = model_info_from_plan(&state.package_registry, &state.installed_registry, &id)
         .map_err(Into::into)
         .map_err(ApiError)?;
-    let installed = state.installed_registry.is_model_installed(&manifest.id);
-    let runner_installed = state
-        .installed_registry
-        .is_runner_installed(&manifest.runner);
 
-    Ok(Json(ModelDetailResponse {
-        data: manifest.to_model_info(installed, runner_installed),
-    }))
+    Ok(Json(ModelDetailResponse { data: info }))
 }
 
 pub async fn model_plan(
@@ -88,11 +248,14 @@ pub async fn model_plan(
     Ok(Json(RunnerDetailResponse { data: plan }))
 }
 
-pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<RunnerInfo>> {
+pub async fn runners(
+    State(state): State<AppState>,
+) -> Result<Json<RunnersResponse<RunnerInfo>>, ApiError> {
     let runners = state
         .package_registry
         .runners()
-        .unwrap_or_default()
+        .map_err(Into::into)
+        .map_err(ApiError)?
         .into_iter()
         .map(|runner| {
             if let Ok(record) = state.installed_registry.installed_runner_record(&runner.id) {
@@ -103,23 +266,119 @@ pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<Runn
         })
         .collect();
 
-    Json(RunnersResponse { data: runners })
+    Ok(Json(RunnersResponse { data: runners }))
+}
+
+pub async fn runner_doctor(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<RunnerDetailResponse<serde_json::Value>>, ApiError> {
+    let manifest = state
+        .package_registry
+        .runner(&id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let layout = runner_runtime_layout(state.store.root(), &manifest);
+    let record = state.installed_registry.installed_runner_record(&id).ok();
+    let adapters = if id == "takokit-python-managed" {
+        std::fs::read_dir(state.store.python_managed_adapters_dir())
+            .ok()
+            .into_iter()
+            .flat_map(|entries| entries.flatten())
+            .filter_map(|entry| {
+                entry
+                    .file_type()
+                    .ok()
+                    .filter(|kind| kind.is_dir())
+                    .and_then(|_| entry.file_name().into_string().ok())
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    Ok(Json(RunnerDetailResponse {
+        data: serde_json::json!({
+            "id": manifest.id,
+            "name": manifest.name,
+            "contract_installed": state.installed_registry.is_runner_installed(&id),
+            "runtime_state": record
+                .as_ref()
+                .map(|record| record.status.to_string())
+                .unwrap_or_else(|| "runtime-missing".to_string()),
+            "note": record.as_ref().map(|record| record.note.clone()),
+            "runtime_path": layout.root,
+            "logs_path": layout.logs,
+            "adapters": adapters,
+        }),
+    }))
+}
+
+pub async fn launch_test(
+    State(state): State<AppState>,
+) -> Json<RunnersResponse<serde_json::Value>> {
+    let ids = [
+        "piper-lessac",
+        "kokoro",
+        "whisper-base",
+        "qwen3-tts",
+        "cosyvoice2",
+        "f5-tts",
+        "dia",
+        "fish-speech",
+        "sensevoice",
+        "parakeet",
+        "canary",
+        "openvoice",
+    ];
+    let data = ids
+        .into_iter()
+        .map(
+            |id| match plan_model(&state.package_registry, &state.installed_registry, id) {
+                Ok(plan) => serde_json::json!({
+                    "model": plan.model_id,
+                    "task": plan.task,
+                    "runner": plan.required_runner,
+                    "lifecycle": plan.lifecycle_state,
+                    "artifacts": plan.artifact_state,
+                    "runner_runtime": plan.runner_runtime_state,
+                    "executable": plan.executable,
+                    "missing": plan.missing,
+                    "next_command": plan.next_command,
+                }),
+                Err(error) => serde_json::json!({
+                    "model": id,
+                    "error": error.to_string(),
+                }),
+            },
+        )
+        .collect();
+
+    Json(RunnersResponse { data })
 }
 
 pub async fn library_models(
     State(state): State<AppState>,
-) -> Json<RunnersResponse<LibraryModelManifest>> {
-    Json(RunnersResponse {
-        data: state.package_registry.library_models().unwrap_or_default(),
-    })
+) -> Result<Json<RunnersResponse<LibraryModelManifest>>, ApiError> {
+    Ok(Json(RunnersResponse {
+        data: state
+            .package_registry
+            .library_models()
+            .map_err(Into::into)
+            .map_err(ApiError)?,
+    }))
 }
 
 pub async fn library_runners(
     State(state): State<AppState>,
-) -> Json<RunnersResponse<LibraryRunnerManifest>> {
-    Json(RunnersResponse {
-        data: state.package_registry.library_runners().unwrap_or_default(),
-    })
+) -> Result<Json<RunnersResponse<LibraryRunnerManifest>>, ApiError> {
+    Ok(Json(RunnersResponse {
+        data: state
+            .package_registry
+            .library_runners()
+            .map_err(Into::into)
+            .map_err(ApiError)?,
+    }))
 }
 
 pub async fn runner(

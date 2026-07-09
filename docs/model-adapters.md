@@ -14,6 +14,8 @@ VoiceCloneEngine
 
 Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records, including the installed model record when a package model is pulled. Runner engines consume that plan and either produce output or return a typed execution error.
 
+Lifecycle planning is also centralized in `takokit-package`. CLI output, `/v1/models`, `/v1/models/:id/plan`, and GUI cards should all reflect the same artifact state, runner state, executable flag, missing blockers, and next command.
+
 Curated library manifests are separate from runtime manifests. Files in `registry/library/models/` and `registry/library/runners/` are for browsing and discovery in future GUI/site surfaces. They can describe original projects, forks, optimized exports, quantized variants, community models, or voice packs without making those entries executable.
 
 Current runner traits:

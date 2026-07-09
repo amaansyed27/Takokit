@@ -24,11 +24,14 @@ POST   /v1/models/pull
 DELETE /v1/models/:id
 GET    /v1/runners
 GET    /v1/runners/:id
+GET    /v1/runners/:id/doctor
 POST   /v1/runners/pull
 POST   /v1/runners/install
 DELETE /v1/runners/:id
 GET    /v1/library/models
 GET    /v1/library/runners
+GET    /v1/doctor
+GET    /v1/test/launch
 GET    /v1/voices
 POST   /v1/audio/speech
 POST   /v1/audio/transcriptions
@@ -50,7 +53,25 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 ## Models
 
-`GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, and honest execution status.
+`GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, license warning, runner runtime state, lifecycle state, executable flag, missing pieces, next command, and honest execution status. These fields are derived from the same planner used by `takokit plan <model>`.
+
+Important summary fields:
+
+```json
+{
+  "id": "whisper-base",
+  "family": "whisper",
+  "runner": "takokit-whispercpp",
+  "artifact_count": 1,
+  "installed": true,
+  "runner_installed": true,
+  "runner_runtime_state": "ready",
+  "lifecycle_state": "executable",
+  "executable": true,
+  "missing": [],
+  "next_command": "takokit transcribe <audio.wav> --model whisper-base"
+}
+```
 
 `GET /v1/models/:id/plan` returns the structured lifecycle plan for a model: required runner, model lifecycle state, artifact state, runner contract state, runner runtime state, executable today, missing pieces, and next command.
 
@@ -70,6 +91,8 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 ## Runners
 
 `GET /v1/runners` and `GET /v1/runners/:id` include runner contract metadata and installed status.
+
+`GET /v1/runners/:id/doctor` returns contract/runtime state, note, runtime path, logs path, and Python-managed adapter slots when applicable.
 
 `POST /v1/runners/pull` installs a local runner contract record:
 
@@ -92,6 +115,29 @@ This does not download or install an execution binary. `DELETE /v1/runners/:id` 
 On Windows x64, `takokit-whispercpp` installs and verifies the whisper.cpp release binary and marks the runner `ready` when `whisper-cli.exe` is present. `takokit-python-managed` initializes the managed directory layout and adapter slots but does not install Python/Torch yet.
 
 `GET /v1/library/models` and `GET /v1/library/runners` return curated discovery metadata. These routes do not imply runtime executability and do not trigger downloads.
+
+`GET /v1/doctor` returns storage, registry, installed-record, GUI, and runner checks:
+
+```json
+{
+  "data": {
+    "storage_root": "C:\\Users\\Amaan\\.takokit",
+    "server": "127.0.0.1:5050",
+    "checks": [
+      {
+        "section": "runner",
+        "label": "takokit-whispercpp ready",
+        "status": "ok",
+        "detail": "whisper.cpp runtime installed..."
+      }
+    ],
+    "executable_models": ["mock-tts", "whisper-base"],
+    "logs_path": "C:\\Users\\Amaan\\.takokit\\logs"
+  }
+}
+```
+
+`GET /v1/test/launch` returns the same non-destructive launch matrix style data as `takokit test --suite launch`.
 
 `POST /v1/audio/speech` only supports `mock-tts` right now:
 

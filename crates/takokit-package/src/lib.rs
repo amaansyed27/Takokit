@@ -319,6 +319,24 @@ impl Default for RunnerLifecycleState {
     }
 }
 
+impl RunnerLifecycleState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RunnerLifecycleState::RuntimeMissing => "runtime-missing",
+            RunnerLifecycleState::ContractInstalled => "contract-installed",
+            RunnerLifecycleState::RuntimeInstalled => "runtime-installed",
+            RunnerLifecycleState::Ready => "ready",
+            RunnerLifecycleState::Failed => "failed",
+        }
+    }
+}
+
+impl std::fmt::Display for RunnerLifecycleState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelLifecycleState {
@@ -327,6 +345,24 @@ pub enum ModelLifecycleState {
     RunnerReady,
     Executable,
     Failed,
+}
+
+impl ModelLifecycleState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ModelLifecycleState::MetadataOnly => "metadata-only",
+            ModelLifecycleState::ArtifactsReady => "artifacts-ready",
+            ModelLifecycleState::RunnerReady => "runner-ready",
+            ModelLifecycleState::Executable => "executable",
+            ModelLifecycleState::Failed => "failed",
+        }
+    }
+}
+
+impl std::fmt::Display for ModelLifecycleState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -871,12 +907,61 @@ impl ModelManifest {
     }
 
     pub fn to_model_info(&self, installed: bool, runner_installed: bool) -> ModelInfo {
+        let fallback = ModelPlan {
+            model_id: self.id.clone(),
+            model_name: self.name.clone(),
+            family: self.family.clone(),
+            task: model_task_label(self),
+            required_runner: self.runner.clone(),
+            lifecycle_state: if installed {
+                ModelLifecycleState::ArtifactsReady
+            } else {
+                ModelLifecycleState::MetadataOnly
+            },
+            artifact_state: if installed {
+                ModelLifecycleState::ArtifactsReady
+            } else {
+                ModelLifecycleState::MetadataOnly
+            },
+            runner_contract_state: if runner_installed {
+                RunnerLifecycleState::ContractInstalled
+            } else {
+                RunnerLifecycleState::RuntimeMissing
+            },
+            runner_runtime_state: if runner_installed {
+                RunnerLifecycleState::ContractInstalled
+            } else {
+                RunnerLifecycleState::RuntimeMissing
+            },
+            executable: false,
+            missing: if installed {
+                vec![format!("runner contract: {}", self.runner)]
+            } else {
+                vec!["verified artifacts".to_string()]
+            },
+            next_command: if installed {
+                format!("takokit runner pull {}", self.runner)
+            } else {
+                format!("takokit pull {}", self.id)
+            },
+        };
+        self.to_model_info_from_plan(&fallback, installed, runner_installed)
+    }
+
+    pub fn to_model_info_from_plan(
+        &self,
+        plan: &ModelPlan,
+        installed: bool,
+        runner_installed: bool,
+    ) -> ModelInfo {
         ModelInfo {
             id: self.id.clone(),
             name: self.name.clone(),
+            family: self.family.clone(),
             version: self.version.clone(),
             summary: self.description.clone(),
             license: self.license.clone(),
+            license_warning: license_warning(&self.license),
             runtime: self.backend.to_model_runtime(),
             backend: self.backend.as_str().to_string(),
             runner: self.runner.clone(),
@@ -885,13 +970,12 @@ impl ModelManifest {
             capabilities: self.capabilities.to_model_capabilities(),
             installed,
             runner_installed,
-            execution_status: if self.id == "mock-tts" {
-                "ready".to_string()
-            } else if runner_installed {
-                "runner installed; inference not implemented".to_string()
-            } else {
-                "runner not installed or not implemented".to_string()
-            },
+            runner_runtime_state: plan.runner_runtime_state.to_string(),
+            lifecycle_state: plan.lifecycle_state.to_string(),
+            executable: plan.executable,
+            missing: plan.missing.clone(),
+            next_command: plan.next_command.clone(),
+            execution_status: model_execution_status(plan),
         }
     }
 }
@@ -1116,6 +1200,20 @@ pub fn resolve_runner(
     resolve_execution_plan(package_registry, installed_registry, model_id, capability)
 }
 
+pub fn model_info_from_plan(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    model_id: &str,
+) -> PackageResult<ModelInfo> {
+    let model = package_registry.model(model_id)?;
+    let plan = plan_model(package_registry, installed_registry, model_id)?;
+    Ok(model.to_model_info_from_plan(
+        &plan,
+        installed_registry.is_model_installed(&model.id),
+        installed_registry.is_runner_installed(&model.runner),
+    ))
+}
+
 pub fn plan_model(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
@@ -1252,7 +1350,20 @@ pub fn initialize_runner_runtime(
                 layout.root.display()
             ),
         ),
-        RunnerKind::Whispercpp => install_whispercpp_runtime(installed_registry, manifest, &layout),
+        RunnerKind::Whispercpp => match install_whispercpp_runtime(installed_registry, manifest, &layout) {
+            Ok(report) => Ok(report),
+            Err(error) => {
+                let _ = installed_registry.install_runner_runtime(
+                    manifest,
+                    RunnerLifecycleState::Failed,
+                    format!(
+                        "whisper.cpp runtime install failed: {error}. Logs: {}",
+                        layout.logs.display()
+                    ),
+                );
+                Err(error)
+            }
+        },
         RunnerKind::TransformersAudio => installed_registry.install_runner_runtime(
             manifest,
             RunnerLifecycleState::RuntimeInstalled,
@@ -1414,6 +1525,41 @@ fn runner_missing_component(runner: &RunnerManifest) -> String {
         RunnerKind::Nemo => "NeMo runtime adapter".to_string(),
         RunnerKind::External => "external runner adapter".to_string(),
         RunnerKind::Native => "native runner implementation".to_string(),
+    }
+}
+
+fn model_execution_status(plan: &ModelPlan) -> String {
+    if plan.executable {
+        return "executable".to_string();
+    }
+
+    match plan.lifecycle_state {
+        ModelLifecycleState::MetadataOnly => {
+            format!("metadata-only; missing {}", plan.missing.join("; "))
+        }
+        ModelLifecycleState::ArtifactsReady => {
+            format!("artifacts ready; missing {}", plan.missing.join("; "))
+        }
+        ModelLifecycleState::RunnerReady => {
+            format!("runner ready; missing {}", plan.missing.join("; "))
+        }
+        ModelLifecycleState::Executable => "executable".to_string(),
+        ModelLifecycleState::Failed => {
+            format!("failed; run {}", plan.next_command)
+        }
+    }
+}
+
+fn license_warning(license: &str) -> Option<String> {
+    let value = license.to_ascii_lowercase();
+    if value.contains("non-commercial") || value.contains("cc-by-nc") || value.contains("nc") {
+        Some("Non-commercial or restricted license; do not treat as commercial-safe.".to_string())
+    } else if value.contains("gpl") {
+        Some("GPL/runtime boundary review required before bundling or auto-install.".to_string())
+    } else if value.contains("unknown") || value.contains("check-required") {
+        Some("License requires review before supported runtime installation.".to_string())
+    } else {
+        None
     }
 }
 
@@ -2674,6 +2820,52 @@ role = "config"
         let missing = plan_model(&registry, &installed, "does-not-exist")
             .expect_err("missing model should not plan");
         assert!(matches!(missing, PackageError::ModelNotFound(id) if id == "does-not-exist"));
+    }
+
+    #[test]
+    fn model_info_is_derived_from_canonical_lifecycle_plan() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::bundled();
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+        let whisper = registry.model("whisper-base").expect("whisper manifest");
+        let runner = registry
+            .runner("takokit-whispercpp")
+            .expect("whisper runner");
+
+        installed
+            .install_model_with_options(
+                &whisper,
+                InstallModelOptions {
+                    metadata_only: true,
+                },
+            )
+            .expect("metadata-only whisper");
+        installed
+            .install_runner_runtime(&runner, RunnerLifecycleState::Ready, "test runner ready")
+            .expect("runner ready");
+
+        let plan = plan_model(&registry, &installed, "whisper-base").expect("plan");
+        let info = registry
+            .model("whisper-base")
+            .expect("manifest")
+            .to_model_info_from_plan(&plan, true, true);
+
+        assert_eq!(info.family, "whisper");
+        assert_eq!(
+            info.lifecycle_state,
+            ModelLifecycleState::MetadataOnly.to_string()
+        );
+        assert_eq!(
+            info.runner_runtime_state,
+            RunnerLifecycleState::Ready.to_string()
+        );
+        assert!(!info.executable);
+        assert!(info.execution_status.contains("metadata-only"));
+        assert_eq!(
+            info.next_command,
+            "takokit runner doctor takokit-whispercpp"
+        );
+        assert!(info.missing.iter().any(|item| item == "verified artifacts"));
     }
 
     #[test]

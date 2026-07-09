@@ -67,9 +67,11 @@ pub enum ModelRuntime {
 pub struct ModelInfo {
     pub id: String,
     pub name: String,
+    pub family: String,
     pub version: String,
     pub summary: String,
     pub license: String,
+    pub license_warning: Option<String>,
     pub runtime: ModelRuntime,
     pub backend: String,
     pub runner: String,
@@ -78,6 +80,11 @@ pub struct ModelInfo {
     pub capabilities: Vec<ModelCapability>,
     pub installed: bool,
     pub runner_installed: bool,
+    pub runner_runtime_state: String,
+    pub lifecycle_state: String,
+    pub executable: bool,
+    pub missing: Vec<String>,
+    pub next_command: String,
     pub execution_status: String,
 }
 

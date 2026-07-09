@@ -14,7 +14,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Local web GUI</h1>
-        <p>Run the Rust daemon, inspect local packages, and test mock speech with clear boundaries.</p>
+        <p>Run the Rust daemon, inspect model plans, install shared runners, and execute models only when they are truly ready.</p>
       </header>
 
       <div className="stats-grid" aria-label="Runtime summary">
@@ -33,7 +33,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           <button className="quick-action" type="button" onClick={() => onNavigate("speak")}>
             <Volume2 size={18} />
             <strong>Generate speech</strong>
-            <span>Mock speech path</span>
+            <span>Executable TTS only</span>
           </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
             <Mic size={18} />
@@ -43,7 +43,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           <button className="quick-action" type="button" onClick={() => onNavigate("transcribe")}>
             <FileAudio size={18} />
             <strong>Transcribe audio</strong>
-            <span>Runner pending</span>
+            <span>Whisper runner path</span>
           </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("models")}>
             <Library size={18} />

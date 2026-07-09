@@ -4,23 +4,26 @@ use std::{
     time::Duration,
 };
 
+use serde::Serialize;
 use takokit_core::RuntimeConfig;
 use takokit_models::ModelRegistry;
 use takokit_package::{
-    current_platform_id, InstalledRegistry, PackageRegistry, RunnerLifecycleState,
+    current_platform_id, runner_runtime_layout, InstalledRegistry, PackageRegistry,
+    RunnerLifecycleState,
 };
 use takokit_store::LocalStore;
 
 use crate::gui;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub enum CheckStatus {
     Ok,
     Warn,
     Fail,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct DoctorCheck {
     section: &'static str,
     status: CheckStatus,
@@ -40,7 +43,7 @@ impl DoctorCheck {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 pub struct DoctorReport {
     checks: Vec<DoctorCheck>,
 }
@@ -73,6 +76,26 @@ pub fn run_doctor(
     for (label, path) in [
         ("models", store.models_dir()),
         ("runners", store.runners_dir()),
+        ("blobs", store.blobs_dir()),
+        ("manifests/models", store.model_manifests_dir()),
+        ("manifests/runners", store.runner_manifests_dir()),
+        (
+            "manifests/installed-models",
+            store.installed_model_records_dir(),
+        ),
+        (
+            "manifests/installed-runners",
+            store.installed_runner_records_dir(),
+        ),
+        ("voices", store.voices_dir()),
+        ("datasets", store.datasets_dir()),
+        ("outputs", store.outputs_dir()),
+        ("cache", store.cache_dir()),
+        ("logs", store.logs_dir()),
+    ] {
+        check_path(&mut report, "Storage", label, &path, true);
+    }
+    for (label, path) in [
         ("runners/python-managed", store.python_managed_runner_dir()),
         (
             "runners/python-managed/runtime",
@@ -103,24 +126,8 @@ pub fn run_doctor(
             "runners/python-managed/adapters",
             store.python_managed_adapters_dir(),
         ),
-        ("blobs", store.blobs_dir()),
-        ("manifests/models", store.model_manifests_dir()),
-        ("manifests/runners", store.runner_manifests_dir()),
-        (
-            "manifests/installed-models",
-            store.installed_model_records_dir(),
-        ),
-        (
-            "manifests/installed-runners",
-            store.installed_runner_records_dir(),
-        ),
-        ("voices", store.voices_dir()),
-        ("datasets", store.datasets_dir()),
-        ("outputs", store.outputs_dir()),
-        ("cache", store.cache_dir()),
-        ("logs", store.logs_dir()),
     ] {
-        check_path(&mut report, "Storage", label, &path, true);
+        check_optional_path(&mut report, "Managed runners", label, &path, true);
     }
     check_file(&mut report, "Storage", "config.toml", store.config_path());
 
@@ -205,6 +212,36 @@ pub fn run_doctor(
             "python-managed runtime not initialized",
             "run: takokit runner pull takokit-python-managed && takokit runner install takokit-python-managed",
         )),
+    }
+    for runner_id in [
+        "takokit-whispercpp",
+        "takokit-onnx",
+        "takokit-python-managed",
+    ] {
+        match package_registry.runner(runner_id) {
+            Ok(manifest) => {
+                let layout = runner_runtime_layout(store.root(), &manifest);
+                match installed_registry.installed_runner_record(runner_id) {
+                    Ok(record) => report.push(runner_state_check(
+                        runner_id,
+                        record.status,
+                        format!("{}; logs: {}", record.note, pretty_path(&layout.logs)),
+                    )),
+                    Err(_) => report.push(warn(
+                        "Runners",
+                        format!("{runner_id} runtime missing"),
+                        format!(
+                            "run: takokit runner pull {runner_id} && takokit runner install {runner_id}"
+                        ),
+                    )),
+                }
+            }
+            Err(error) => report.push(fail(
+                "Runners",
+                format!("{runner_id} manifest"),
+                error.to_string(),
+            )),
+        }
     }
 
     if server_is_available(config) {
@@ -317,6 +354,33 @@ fn check_path(
     }
 }
 
+fn check_optional_path(
+    report: &mut DoctorReport,
+    section: &'static str,
+    label: impl Into<String>,
+    path: &Path,
+    should_be_dir: bool,
+) {
+    let label = label.into();
+    let exists = if should_be_dir {
+        path.is_dir()
+    } else {
+        path.exists()
+    };
+    if exists {
+        report.push(ok(section, format!("{label}: {}", pretty_path(path))));
+    } else {
+        report.push(warn(
+            section,
+            label,
+            format!(
+                "not initialized at {}; run takokit runner install takokit-python-managed",
+                pretty_path(path)
+            ),
+        ));
+    }
+}
+
 fn check_file(
     report: &mut DoctorReport,
     section: &'static str,
@@ -382,6 +446,25 @@ fn fail(section: &'static str, label: impl Into<String>, detail: impl Into<Strin
         status: CheckStatus::Fail,
         label: label.into(),
         detail: Some(detail.into()),
+    }
+}
+
+fn runner_state_check(
+    runner_id: &'static str,
+    state: RunnerLifecycleState,
+    detail: impl Into<String>,
+) -> DoctorCheck {
+    match state {
+        RunnerLifecycleState::Ready => ok("Runners", format!("{runner_id} ready")),
+        RunnerLifecycleState::Failed => fail("Runners", format!("{runner_id} failed"), detail),
+        RunnerLifecycleState::RuntimeInstalled | RunnerLifecycleState::ContractInstalled => {
+            warn("Runners", format!("{runner_id} state: {state}"), detail)
+        }
+        RunnerLifecycleState::RuntimeMissing => warn(
+            "Runners",
+            format!("{runner_id} runtime missing"),
+            "run takokit runner install <runner>",
+        ),
     }
 }
 

@@ -29,6 +29,12 @@
 - [x] Added `takokit test <model>` and `takokit test --suite launch`.
 - [x] Added Python-managed adapter slots for Qwen3-TTS, Chatterbox, F5-TTS, CosyVoice2, Dia, Fish Speech, OpenVoice, GPT-SoVITS, and RVC.
 - [x] Added model lifecycle states and `takokit plan <model>`.
+- [x] Centralized `ModelInfo.execution_status` and GUI/API model summaries on lifecycle planning state.
+- [x] Added JSON output for doctor, plan, and runner doctor commands.
+- [x] Added API diagnostics endpoints for `/v1/doctor`, `/v1/test/launch`, and `/v1/runners/:id/doctor`.
+- [x] Added GUI Runners, Library, Transcribe, and Diagnostics flows backed by local API data.
+- [x] Hardened runner install failure recording so failed whisper.cpp installs persist `failed` state.
+- [x] Added local testing and GUI documentation for the complete local product shell.
 - [x] Added `GET /v1/models/:id/plan`, `GET /v1/library/models`, and `GET /v1/library/runners`.
 - [x] Added runtime model manifests for Piper, Kokoro, Whisper Base, Qwen3-TTS, CosyVoice2, F5-TTS, Fish Speech, Dia, Chatterbox, GPT-SoVITS, OpenVoice, RVC, Qwen Omni, Voxtral, SenseVoice, Parakeet, and Canary.
 - [x] Added Python-managed runner storage layout under `~/.takokit/runners/python-managed/`.

@@ -29,8 +29,9 @@ export function useMockGeneration() {
         response_format: "wav"
       });
       setResult(response?.output_path ?? "Local output prepared.");
-    } catch {
-      setResult("Local API unavailable; no inference was run.");
+    } catch (caught) {
+      setResult(null);
+      setError(caught instanceof Error ? caught.message : "Speech generation failed.");
     } finally {
       setIsGenerating(false);
     }

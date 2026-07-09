@@ -6,8 +6,10 @@ This matrix tracks launch-relevant runtime manifests. It is intentionally honest
 
 ```bash
 takokit test --suite launch
+takokit test --suite launch --json
 takokit plan <model>
-takokit test <model>
+takokit plan <model> --json
+takokit test <model> --file ./sample.wav
 ```
 
 The suite is non-destructive. It parses manifests and installed records, then reports lifecycle state, missing pieces, and next command. It does not pull artifacts or install runners.

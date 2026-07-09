@@ -9,6 +9,7 @@ export type CapabilitySummary = {
 export type ModelSummary = {
   id: string;
   name: string;
+  family: string;
   purpose: string;
   version: string;
   params?: string;
@@ -23,6 +24,12 @@ export type ModelSummary = {
   runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp" | "External";
   status: "installed" | "available" | "planned";
   license: string;
+  licenseWarning?: string;
+  lifecycleState: ModelPlan["lifecycle_state"];
+  runnerRuntimeState: ModelPlan["runner_runtime_state"];
+  executable: boolean;
+  missing: string[];
+  nextCommand: string;
   capabilities: ModelCapability[];
 };
 
@@ -95,4 +102,30 @@ export type SpeechApiResponse = {
   output_path: string;
   content_type: string;
   bytes: number;
+};
+
+export type TranscriptionApiRequest = {
+  model?: string;
+  file_path: string;
+};
+
+export type TranscriptionApiResponse = {
+  id: string;
+  model: string;
+  text: string;
+};
+
+export type DoctorCheck = {
+  section: string;
+  label: string;
+  status: "ok" | "warn" | "fail";
+  detail?: string;
+};
+
+export type DoctorResponse = {
+  storage_root: string;
+  server: string;
+  checks: DoctorCheck[];
+  executable_models: string[];
+  logs_path: string;
 };

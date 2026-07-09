@@ -33,7 +33,8 @@ Takokit models declare which local voice surfaces they support:
 - Rust workspace with separated CLI, server, core, model, package, audio, store, and safety crates.
 - Bare `takokit` interactive terminal launcher for common local actions.
 - `tako` short command alias backed by the same CLI entrypoint and `~/.takokit` storage.
-- `takokit doctor` setup check for storage, registry, server, GUI build, mock execution, and platform state.
+- `takokit doctor` setup check for storage, registry, server, GUI build, runner state, mock execution, and platform state.
+- `takokit doctor --json`, `takokit plan --json <model>`, and `takokit runner doctor --json <runner>` for scriptable diagnostics.
 - Axum local daemon on `127.0.0.1:5050`.
 - React + TypeScript + Vite browser GUI in `apps/gui`.
 - Static GUI serving from `apps/gui/dist` at `/gui`.
@@ -43,7 +44,7 @@ Takokit models declare which local voice surfaces they support:
 - Installed model and runner records under `~/.takokit/manifests/`.
 - Checksum-backed artifact install foundation with content-addressed blobs.
 - Verified Piper Lessac medium ONNX artifact-backed pull.
-- Typed capability taxonomy, lifecycle states, and execution planning layer.
+- Typed capability taxonomy, lifecycle states, and execution planning layer shared by CLI, API, and GUI.
 - Shared runner contracts for ONNX, whisper.cpp, managed Python, Transformers audio, and NeMo.
 - Explicit runner runtime install path via `takokit runner install <runner>`.
 - Runner execution interface with Piper/ONNX boundaries and a real whisper.cpp transcription adapter.
@@ -80,9 +81,9 @@ cargo run -p takokit-cli -- transcribe ./audio.wav --model whisper-base
 cargo run -p takokit-cli --bin tako -- doctor
 ```
 
-Running bare `takokit` opens a lightweight interactive terminal launcher. It can generate speech through `mock-tts`, pull model metadata, pull runner contracts, open the local web GUI, start the server, and run doctor checks. It does not imply Kokoro, Whisper, or other real model execution works yet.
+Running bare `takokit` opens a lightweight interactive terminal launcher. It can generate speech through `mock-tts`, pull model metadata, pull runner contracts, open the local web GUI, start the server, and run doctor checks. It does not imply Kokoro, Piper, or Python-managed model execution works yet.
 
-`takokit doctor` prints readable `[ok]`, `[warn]`, and `[fail]` checks for the local storage layout, mock registry parsing, installed record parsing, server availability, GUI build output, mock TTS availability, and platform identifier. Warnings such as missing GUI build output or real runners not being implemented do not fail the current mock/runtime development path.
+`takokit doctor` prints readable `[ok]`, `[warn]`, and `[fail]` checks for the local storage layout, registry parsing, installed record parsing, server availability, GUI build output, runner state, mock TTS availability, and platform identifier. The Python-managed layout is a non-failing warning until `takokit runner install takokit-python-managed` initializes it.
 
 `tako doctor`, `tako pull piper-lessac`, and `tako gui` are aliases for the same commands. They still read and write `~/.takokit/`.
 
@@ -98,6 +99,8 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit plan <model>` prints the model family, task, required runner, artifact state, runner contract/runtime state, whether it is executable today, missing pieces, and the next command to run.
 
+`takokit models`, `GET /v1/models`, and the GUI Models page use the same lifecycle planning state. After `whisper-base` is pulled and `takokit-whispercpp` is ready, it is shown as executable. `piper-lessac` is shown as artifacts-ready but blocked on ONNX TTS execution. `qwen3-tts` is shown as metadata-only or adapter-blocked until a managed Python adapter exists.
+
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 
 `takokit speak "Hello" --model mock-tts` is the only current speech path that writes audio. Package models such as `kokoro` and `piper-lessac` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner returns typed `inference_not_implemented` with the missing Piper components instead of pretending to run a real model.
@@ -108,6 +111,34 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 takokit pull whisper-base
 takokit runner pull takokit-whispercpp
 takokit runner install takokit-whispercpp
+```
+
+The GUI Transcribe page uses the same `/v1/audio/transcriptions` path. Provide a local audio file path that the daemon can read; Takokit does not upload the file to a cloud service.
+
+## Local Testing
+
+The shortest fresh local flow is:
+
+```bash
+cargo build --release
+target/release/takokit.exe version
+target/release/takokit.exe doctor
+target/release/takokit.exe models
+target/release/takokit.exe runners
+target/release/takokit.exe plan whisper-base
+target/release/takokit.exe runner pull takokit-whispercpp
+target/release/takokit.exe runner install takokit-whispercpp
+target/release/takokit.exe pull whisper-base
+target/release/takokit.exe transcribe ./sample.wav --model whisper-base
+target/release/takokit.exe test --suite launch
+target/release/tako.exe doctor
+```
+
+Use `TAKOKIT_HOME` for isolated tests:
+
+```powershell
+$env:TAKOKIT_HOME="$env:TEMP\takokit-smoke"
+target/release/takokit.exe doctor --json
 ```
 
 ## GUI Development

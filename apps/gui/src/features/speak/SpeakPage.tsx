@@ -19,18 +19,26 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   const selectedModel = ttsModels.find((item) => item.id === model) ?? ttsModels[0];
   const selectedVoice = runtime.voices.find((item) => item.id === voice) ?? runtime.voices[0];
   const { error, generate, isGenerating, result } = useMockGeneration();
+  const apiUnavailable = runtime.server.status !== "online";
+  const canGenerate = Boolean(selectedModel?.executable && !apiUnavailable);
+  const blocker = apiUnavailable
+    ? "Start takokit serve or takokit gui to use the local API."
+    : selectedModel?.executable
+      ? null
+      : selectedModel?.missing.join("; ") || "This TTS model is not executable today.";
 
   return (
     <section className="page">
       <header className="page__header">
         <h1>Speak</h1>
-        <p>TTS through the local Live Audio API surface. Only the mock TTS path generates audio today.</p>
+        <p>TTS through the local Live Audio API surface. Real models only run when their planner state is executable.</p>
       </header>
 
       <form
         className="section"
         onSubmit={(event) => {
           event.preventDefault();
+          if (!canGenerate) return;
           void generate({ model, voice, input: text });
         }}
       >
@@ -41,7 +49,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
                 label="Model"
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                hint={`${selectedModel?.language ?? "Local"} - ${selectedModel?.version ?? "manifest"} - ${selectedModel?.backend ?? "Mock"}`}
+                hint={`${selectedModel?.family ?? "local"} - ${selectedModel?.lifecycleState ?? "unknown"} - ${selectedModel?.backend ?? "runtime"}`}
                 options={ttsModels.map((item) => ({ value: item.id, label: item.name }))}
               />
             </div>
@@ -70,9 +78,13 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
           <aside className="generation-actions">
             <div className="generation-actions__meta">
               <strong>TTS + Live Audio API</strong>
-              <span>Mock WAV generation only. Real model runners are not wired yet.</span>
+              <span>{selectedModel?.executable ? "Selected model can run through the local API." : blocker}</span>
             </div>
-            <Button variant="primary" type="submit" loading={isGenerating}>
+            <span className="badge-list">
+              <Badge tone={selectedModel?.executable ? "success" : "warning"}>{selectedModel?.executable ? "executable" : "blocked"}</Badge>
+              <Badge tone={selectedModel?.id === "mock-tts" ? "neutral" : "warning"}>{selectedModel?.id === "mock-tts" ? "internal test path" : selectedModel?.runnerRuntimeState ?? "unknown"}</Badge>
+            </span>
+            <Button variant="primary" type="submit" loading={isGenerating} disabled={!canGenerate}>
               <Waves size={16} /> Generate Speech
             </Button>
             <Tooltip content="Preview is disabled until real audio playback is wired.">
@@ -130,10 +142,11 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
               <Tooltip content={`${item.runtime} runner, ${item.license} license label`}>
                 <span>{item.backend}</span>
               </Tooltip>
-              <Badge tone={item.id === "mock-tts" ? "success" : "neutral"}>{item.id === "mock-tts" ? "mock ready" : item.status}</Badge>
+              <Badge tone={item.executable ? "success" : "warning"}>{item.executable ? "executable" : item.lifecycleState}</Badge>
             </TableRow>
           ))}
         </Table>
+        {blocker && <p className="notice-line">Selected blocker: {blocker} Next: {selectedModel?.nextCommand}</p>}
         <Button className="align-start" variant="ghost" type="button" onClick={() => onNavigate("models")}>
           View all models
         </Button>

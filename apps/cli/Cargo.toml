@@ -18,6 +18,7 @@ path = "src/bin/tako.rs"
 anyhow.workspace = true
 clap.workspace = true
 open.workspace = true
+serde = { workspace = true }
 takokit-core = { path = "../../crates/takokit-core" }
 takokit-models = { path = "../../crates/takokit-models" }
 takokit-package = { path = "../../crates/takokit-package" }

@@ -36,9 +36,11 @@ pub fn built_in_models() -> Vec<ModelInfo> {
         ModelInfo {
             id: "mock-tts".to_string(),
             name: "Mock TTS".to_string(),
+            family: "internal-test".to_string(),
             version: "0.1.0".to_string(),
             summary: "Deterministic test WAV generator for API and CLI scaffolding.".to_string(),
             license: "internal-test".to_string(),
+            license_warning: None,
             runtime: ModelRuntime::NativeRust,
             backend: "native_rust".to_string(),
             runner: "takokit-mock".to_string(),
@@ -47,7 +49,12 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             capabilities: vec![ModelCapability::TextToSpeech],
             installed: true,
             runner_installed: true,
-            execution_status: "ready".to_string(),
+            runner_runtime_state: "ready".to_string(),
+            lifecycle_state: "executable".to_string(),
+            executable: true,
+            missing: Vec::new(),
+            next_command: "takokit speak \"hello\" --model mock-tts".to_string(),
+            execution_status: "internal test path executable".to_string(),
         },
         model(
             "kokoro",
@@ -127,9 +134,13 @@ fn model(
     ModelInfo {
         id: id.to_string(),
         name: name.to_string(),
+        family: id.to_string(),
         version: "0.1.0".to_string(),
         summary: summary.to_string(),
         license: license.to_string(),
+        license_warning: Some(
+            "Fallback registry entry; use runtime manifests for support status.".to_string(),
+        ),
         runtime,
         backend: "registry".to_string(),
         runner: "unresolved".to_string(),
@@ -138,7 +149,12 @@ fn model(
         capabilities,
         installed: false,
         runner_installed: false,
-        execution_status: "runner not installed or not implemented".to_string(),
+        runner_runtime_state: "runtime-missing".to_string(),
+        lifecycle_state: "metadata-only".to_string(),
+        executable: false,
+        missing: vec!["runtime manifest planning required".to_string()],
+        next_command: format!("takokit plan {id}"),
+        execution_status: "fallback registry entry; inspect runtime manifest plan".to_string(),
     }
 }
 

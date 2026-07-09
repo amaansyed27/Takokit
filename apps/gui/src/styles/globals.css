@@ -899,6 +899,13 @@ textarea:focus,
   min-width: 0;
 }
 
+.table-note {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .action-cluster {
   display: flex;
   flex-wrap: wrap;

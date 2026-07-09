@@ -10,9 +10,9 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    initialize_runner_runtime, plan_model, resolve_execution_plan, runner_runtime_layout,
-    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
-    RunnerManifest,
+    initialize_runner_runtime, model_info_from_plan, plan_model, resolve_execution_plan,
+    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
+    PackageRegistry, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -28,7 +28,7 @@ struct Cli {
 enum Command {
     Serve,
     Gui,
-    Doctor,
+    Doctor(DoctorArgs),
     Version,
     Status,
     Capabilities,
@@ -43,9 +43,7 @@ enum Command {
     Show {
         model: String,
     },
-    Plan {
-        model: String,
-    },
+    Plan(PlanArgs),
     Rm {
         model: String,
     },
@@ -84,10 +82,27 @@ struct PullArgs {
 }
 
 #[derive(Debug, Args)]
+struct DoctorArgs {
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct PlanArgs {
+    model: String,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
 struct TestArgs {
     model: Option<String>,
     #[arg(long)]
     suite: Option<String>,
+    #[arg(long)]
+    json: bool,
+    #[arg(long)]
+    file: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -119,11 +134,23 @@ enum LibraryTarget {
 
 #[derive(Debug, Subcommand)]
 enum RunnerCommand {
-    Pull { runner: String },
-    Install { runner: String },
-    Doctor { runner: String },
-    Show { runner: String },
-    Rm { runner: String },
+    Pull {
+        runner: String,
+    },
+    Install {
+        runner: String,
+    },
+    Doctor {
+        runner: String,
+        #[arg(long)]
+        json: bool,
+    },
+    Show {
+        runner: String,
+    },
+    Rm {
+        runner: String,
+    },
 }
 
 fn cli_storage_root() -> PathBuf {
@@ -148,10 +175,14 @@ pub async fn run() -> anyhow::Result<()> {
             run_server(AppState::new(config, store)).await?;
         }
         Some(Command::Gui) => gui::open_gui(&config).await?,
-        Some(Command::Doctor) => {
+        Some(Command::Doctor(args)) => {
             let report =
                 doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
-            doctor::print_report(&report);
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                doctor::print_report(&report);
+            }
             if report.has_failures() {
                 std::process::exit(1);
             }
@@ -275,10 +306,14 @@ pub async fn run() -> anyhow::Result<()> {
             }
             println!("description: {}", manifest.description);
         }
-        Some(Command::Plan { model }) => {
-            let plan =
-                plan_model(&package_registry, &installed_registry, &model).map_err(cli_error)?;
-            print_model_plan(&plan);
+        Some(Command::Plan(args)) => {
+            let plan = plan_model(&package_registry, &installed_registry, &args.model)
+                .map_err(cli_error)?;
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&plan)?);
+            } else {
+                print_model_plan(&plan);
+            }
         }
         Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
@@ -350,9 +385,13 @@ pub async fn run() -> anyhow::Result<()> {
                             .map_err(cli_error)?;
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 }
-                RunnerCommand::Doctor { runner } => {
+                RunnerCommand::Doctor { runner, json } => {
                     let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                    print_runner_doctor(&store, &installed_registry, &manifest);
+                    if json {
+                        print_runner_doctor_json(&store, &installed_registry, &manifest)?;
+                    } else {
+                        print_runner_doctor(&store, &installed_registry, &manifest);
+                    }
                 }
                 RunnerCommand::Show { runner } => {
                     let manifest = package_registry.runner(&runner).map_err(cli_error)?;
@@ -408,20 +447,20 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Test(args)) => {
-            run_test_command(&package_registry, &installed_registry, args)?
+            run_test_command(&package_registry, &installed_registry, args).await?
         }
     }
 
     Ok(())
 }
 
-fn run_test_command(
+async fn run_test_command(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     args: TestArgs,
 ) -> anyhow::Result<()> {
     if args.suite.as_deref() == Some("launch") {
-        print_launch_suite(package_registry, installed_registry)?;
+        print_launch_suite(package_registry, installed_registry, args.json)?;
         return Ok(());
     }
 
@@ -432,21 +471,52 @@ fn run_test_command(
         .into());
     };
     let plan = plan_model(package_registry, installed_registry, &model).map_err(cli_error)?;
-    print_model_plan(&plan);
-    println!(
-        "Test result: {}",
-        if plan.executable {
-            "executable"
-        } else {
-            "blocked"
+    if let Some(file) = args.file {
+        if !plan.executable {
+            print_or_json_plan(&plan, args.json)?;
+            return Err(anyhow::anyhow!(
+                "model is not executable; missing: {}",
+                plan.missing.join("; ")
+            ));
         }
-    );
+        let execution = resolve_execution_plan(
+            package_registry,
+            installed_registry,
+            &model,
+            CapabilityKind::SpeechToText,
+        )
+        .map_err(cli_error)?;
+        let response = execute_transcription(
+            &execution,
+            takokit_core::TranscriptionRequest {
+                file_path: file,
+                model: Some(model),
+            },
+        )
+        .await
+        .map_err(runtime_error)?;
+        println!("{}", serde_json::to_string_pretty(&response)?);
+        return Ok(());
+    }
+
+    print_or_json_plan(&plan, args.json)?;
+    if !args.json {
+        println!(
+            "Test result: {}",
+            if plan.executable {
+                "executable; provide --file <audio.wav> for a real STT smoke test when applicable"
+            } else {
+                "blocked"
+            }
+        );
+    }
     Ok(())
 }
 
 fn print_launch_suite(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
+    _json: bool,
 ) -> anyhow::Result<()> {
     let ids = [
         "piper-lessac",
@@ -486,6 +556,15 @@ fn print_launch_suite(
     Ok(())
 }
 
+fn print_or_json_plan(plan: &ModelPlan, json: bool) -> anyhow::Result<()> {
+    if json {
+        println!("{}", serde_json::to_string_pretty(plan)?);
+    } else {
+        print_model_plan(plan);
+    }
+    Ok(())
+}
+
 fn print_models(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
@@ -495,12 +574,9 @@ fn print_models(
         .map_err(cli_error)?
         .into_iter()
         .map(|model| {
-            model.to_model_info(
-                installed_registry.is_model_installed(&model.id),
-                installed_registry.is_runner_installed(&model.runner),
-            )
+            model_info_from_plan(package_registry, installed_registry, &model.id).map_err(cli_error)
         })
-        .collect();
+        .collect::<anyhow::Result<Vec<_>>>()?;
     println!("{}", serde_json::to_string_pretty(&models)?);
     Ok(())
 }
@@ -581,6 +657,50 @@ fn print_runner_doctor(
     println!("logs path: {}", layout.logs.display());
 }
 
+fn print_runner_doctor_json(
+    store: &LocalStore,
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+) -> anyhow::Result<()> {
+    let layout = runner_runtime_layout(store.root(), manifest);
+    let record = installed_registry
+        .installed_runner_record(&manifest.id)
+        .ok();
+    let adapters = if manifest.id == "takokit-python-managed" {
+        std::fs::read_dir(store.python_managed_adapters_dir())
+            .ok()
+            .into_iter()
+            .flat_map(|entries| entries.flatten())
+            .filter_map(|entry| {
+                entry
+                    .file_type()
+                    .ok()
+                    .filter(|kind| kind.is_dir())
+                    .and_then(|_| entry.file_name().into_string().ok())
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "id": manifest.id,
+            "name": manifest.name,
+            "contract_installed": installed_registry.is_runner_installed(&manifest.id),
+            "runtime_state": record
+                .as_ref()
+                .map(|record| record.status.to_string())
+                .unwrap_or_else(|| "runtime-missing".to_string()),
+            "note": record.as_ref().map(|record| record.note.clone()),
+            "runtime_path": layout.root,
+            "logs_path": layout.logs,
+            "adapters": adapters,
+        }))?
+    );
+    Ok(())
+}
+
 fn yes_no(value: bool) -> &'static str {
     if value {
         "yes"
@@ -641,7 +761,58 @@ mod tests {
     fn cli_parses_doctor_command() {
         let cli = Cli::try_parse_from(["takokit", "doctor"]).expect("doctor cli parse");
 
-        assert!(matches!(cli.command, Some(Command::Doctor)));
+        assert!(matches!(
+            cli.command,
+            Some(Command::Doctor(DoctorArgs { json: false }))
+        ));
+    }
+
+    #[test]
+    fn cli_parses_json_plan_doctor_runner_doctor_and_test_file_options() {
+        let doctor = Cli::try_parse_from(["takokit", "doctor", "--json"]).expect("doctor json");
+        let plan =
+            Cli::try_parse_from(["takokit", "plan", "whisper-base", "--json"]).expect("plan json");
+        let runner = Cli::try_parse_from([
+            "takokit",
+            "runner",
+            "doctor",
+            "takokit-whispercpp",
+            "--json",
+        ])
+        .expect("runner doctor json");
+        let test = Cli::try_parse_from([
+            "takokit",
+            "test",
+            "whisper-base",
+            "--file",
+            "sample.wav",
+            "--json",
+        ])
+        .expect("test file json");
+
+        assert!(matches!(
+            doctor.command,
+            Some(Command::Doctor(DoctorArgs { json: true }))
+        ));
+        assert!(matches!(
+            plan.command,
+            Some(Command::Plan(PlanArgs { model, json: true })) if model == "whisper-base"
+        ));
+        assert!(matches!(
+            runner.command,
+            Some(Command::Runner {
+                command: RunnerCommand::Doctor { runner, json: true }
+            }) if runner == "takokit-whispercpp"
+        ));
+        assert!(matches!(
+            test.command,
+            Some(Command::Test(TestArgs {
+                model: Some(model),
+                suite: None,
+                json: true,
+                file: Some(file)
+            })) if model == "whisper-base" && file == PathBuf::from("sample.wav")
+        ));
     }
 
     #[test]
@@ -656,7 +827,7 @@ mod tests {
         let cli = Cli::try_parse_from(["tako", "doctor"]).expect("tako doctor cli parse");
         let storage_root = cli_storage_root();
 
-        assert!(matches!(cli.command, Some(Command::Doctor)));
+        assert!(matches!(cli.command, Some(Command::Doctor(_))));
         assert_eq!(storage_root, LocalStore::default_root());
         assert_eq!(
             storage_root.file_name().and_then(|name| name.to_str()),
@@ -711,7 +882,7 @@ mod tests {
 
         assert!(matches!(
             cli.command,
-            Some(Command::Plan { model }) if model == "qwen3-tts"
+            Some(Command::Plan(PlanArgs { model, json: false })) if model == "qwen3-tts"
         ));
     }
 
@@ -731,7 +902,7 @@ mod tests {
         assert!(matches!(
             doctor.command,
             Some(Command::Runner {
-                command: RunnerCommand::Doctor { runner }
+                command: RunnerCommand::Doctor { runner, json: false }
             }) if runner == "takokit-onnx"
         ));
     }
@@ -744,11 +915,11 @@ mod tests {
 
         assert!(matches!(
             model.command,
-            Some(Command::Test(TestArgs { model: Some(model), suite: None })) if model == "whisper-base"
+            Some(Command::Test(TestArgs { model: Some(model), suite: None, json: false, file: None })) if model == "whisper-base"
         ));
         assert!(matches!(
             suite.command,
-            Some(Command::Test(TestArgs { model: None, suite: Some(suite) })) if suite == "launch"
+            Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None })) if suite == "launch"
         ));
     }
 

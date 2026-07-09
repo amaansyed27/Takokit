@@ -1,5 +1,7 @@
 import { HomePage } from "../features/home/HomePage";
+import { LibraryPage } from "../features/library/LibraryPage";
 import { ModelsPage } from "../features/models/ModelsPage";
+import { RunnersPage } from "../features/runners/RunnersPage";
 import { ServerPage } from "../features/server/ServerPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { SpeakPage } from "../features/speak/SpeakPage";
@@ -22,9 +24,11 @@ export type AppRoute = {
 export const routes: AppRoute[] = [
   { id: "home", component: HomePage },
   { id: "models", component: ModelsPage },
+  { id: "runners", component: RunnersPage },
+  { id: "library", component: LibraryPage },
   { id: "voices", component: VoicesPage },
   { id: "speak", component: SpeakPage },
   { id: "transcribe", component: TranscribePage },
-  { id: "server", component: ServerPage },
+  { id: "diagnostics", component: ServerPage },
   { id: "settings", component: SettingsPage }
 ];

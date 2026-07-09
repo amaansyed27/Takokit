@@ -61,14 +61,14 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Models</h1>
-        <p>Available packages, installed manifests, runners, and license labels.</p>
+        <p>Runtime manifests, installed artifacts, shared runners, and executable state from the canonical planner.</p>
       </header>
 
       <div className="stats-grid">
-        <div className="stat-tile"><span>Installed</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "installed").length}</strong><small>Ready entries</small></div>
-        <div className="stat-tile"><span>Available</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "available").length}</strong><small>Can be wired next</small></div>
-        <div className="stat-tile"><span>Planned</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "planned").length}</strong><small>Runner backlog</small></div>
-        <div className="stat-tile"><span>Native path</span><strong className="stat-tile__value">ONNX</strong><small>Preferred where practical</small></div>
+        <div className="stat-tile"><span>Installed</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "installed").length}</strong><small>Artifacts present</small></div>
+        <div className="stat-tile"><span>Executable</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.executable).length}</strong><small>Can run today</small></div>
+        <div className="stat-tile"><span>Blocked</span><strong className="stat-tile__value">{runtime.models.filter((model) => !model.executable).length}</strong><small>Missing pieces shown</small></div>
+        <div className="stat-tile"><span>Runners</span><strong className="stat-tile__value">{runtime.runners.length}</strong><small>Shared runtime families</small></div>
       </div>
 
       <Section title="Runtime honesty" description={runtime.modeNote}>
@@ -100,10 +100,13 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
           placeholder="Filter by model, runtime, license, or status..."
           aria-label="Filter models"
         />
-        <Table columns={["Model", "Capabilities", "Runner", "Status", "Actions"]} ariaLabel="Models">
+        <Table columns={["Model", "Capabilities", "Runner", "Lifecycle", "Actions"]} ariaLabel="Models">
           {models.map((model) => (
             <TableRow key={model.id}>
-              <strong>{model.name}</strong>
+              <div>
+                <strong>{model.name}</strong>
+                <span className="table-note">{model.family}</span>
+              </div>
               <span className="badge-list" aria-label={`${model.name} capabilities`}>
                 {model.capabilities.map((capability) => (
                   <Badge key={capability} tone="neutral">{capabilityLabel(capability)}</Badge>
@@ -112,9 +115,14 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
               <Tooltip content={`${model.backend} backend, ${model.version} manifest version`}>
                 <span>{model.runner}</span>
               </Tooltip>
-              <Badge tone={model.status === "installed" ? "success" : model.status === "available" ? "neutral" : "warning"}>
-                {model.status}
-              </Badge>
+              <span className="badge-list">
+                <Badge tone={model.executable ? "success" : model.lifecycleState === "failed" ? "warning" : "neutral"}>
+                  {stateLabel(model.lifecycleState)}
+                </Badge>
+                <Badge tone={model.runnerRuntimeState === "ready" ? "success" : "warning"}>
+                  runner {stateLabel(model.runnerRuntimeState)}
+                </Badge>
+              </span>
               <span className="action-cluster">
                 <Button type="button" variant="ghost" onClick={() => setSelectedId(model.id)}>Show</Button>
                 {model.id !== "mock-tts" && (
@@ -155,29 +163,28 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
               <div className="detail-grid">
                 <span><strong>ID</strong>{selectedModel.id}</span>
                 <span><strong>Version</strong>{selectedModel.version}</span>
+                <span><strong>Family</strong>{selectedModel.family}</span>
                 <span><strong>Backend</strong>{selectedModel.backend}</span>
                 <span><strong>License</strong>{selectedModel.license}</span>
                 <span><strong>Artifacts</strong>{selectedModel.artifactCount}</span>
                 <span><strong>Hardware</strong>{selectedModel.hardwareNotes}</span>
                 <span><strong>Execution</strong>{selectedModel.executionStatus}</span>
-                {modelPlan && (
-                  <>
-                    <span><strong>Lifecycle</strong>{stateLabel(modelPlan.lifecycle_state)}</span>
-                    <span><strong>Artifact state</strong>{stateLabel(modelPlan.artifact_state)}</span>
-                    <span><strong>Runner runtime</strong>{stateLabel(modelPlan.runner_runtime_state)}</span>
-                    <span><strong>Executable today</strong>{modelPlan.executable ? "yes" : "no"}</span>
-                    <span><strong>Next command</strong>{modelPlan.next_command}</span>
-                  </>
-                )}
+                <span><strong>Lifecycle</strong>{stateLabel(modelPlan?.lifecycle_state ?? selectedModel.lifecycleState)}</span>
+                <span><strong>Artifact state</strong>{stateLabel(modelPlan?.artifact_state ?? selectedModel.lifecycleState)}</span>
+                <span><strong>Runner runtime</strong>{stateLabel(modelPlan?.runner_runtime_state ?? selectedModel.runnerRuntimeState)}</span>
+                <span><strong>Executable today</strong>{(modelPlan?.executable ?? selectedModel.executable) ? "yes" : "no"}</span>
+                <span><strong>Next command</strong>{modelPlan?.next_command ?? selectedModel.nextCommand}</span>
+                {selectedModel.licenseWarning && <span><strong>License warning</strong>{selectedModel.licenseWarning}</span>}
               </div>
-              {modelPlan && modelPlan.missing.length > 0 && (
-                <p className="notice-line">Missing: {modelPlan.missing.join("; ")}</p>
+              {(modelPlan?.missing.length ?? selectedModel.missing.length) > 0 && (
+                <p className="notice-line">Missing: {(modelPlan?.missing ?? selectedModel.missing).join("; ")}</p>
               )}
             </div>
             <div className="details-panel__side">
+              <Badge tone={selectedModel.executable ? "success" : "warning"}>{selectedModel.executable ? "executable" : "not executable"}</Badge>
               <Badge tone={selectedModel.status === "installed" ? "success" : "neutral"}>{selectedModel.status}</Badge>
-              <Badge tone={selectedModel.runnerInstalled ? "success" : "warning"}>
-                {selectedModel.runnerInstalled ? "runner installed" : "runner missing"}
+              <Badge tone={selectedModel.runnerRuntimeState === "ready" ? "success" : "warning"}>
+                runner {stateLabel(selectedModel.runnerRuntimeState)}
               </Badge>
               <span className="details-panel__runner">Required runner: {selectedModel.runner}</span>
               {requiredRunner && !requiredRunner.installed && selectedModel.id !== "mock-tts" && (

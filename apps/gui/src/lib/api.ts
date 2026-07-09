@@ -1,5 +1,5 @@
 import { mockRuntime } from "./mockData";
-import type { CapabilitySummary, ModelCapability, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, VoiceSummary } from "./types";
+import type { CapabilitySummary, DoctorResponse, ModelCapability, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, TranscriptionApiRequest, TranscriptionApiResponse, VoiceSummary } from "./types";
 
 const LOCAL_API_BASE_URL = "http://127.0.0.1:5050";
 
@@ -11,9 +11,11 @@ type ApiStatus = {
 type ApiModel = {
   id: string;
   name: string;
+  family: string;
   version: string;
   summary: string;
   license: string;
+  license_warning?: string;
   runtime: "python" | "onnx" | "whisper_cpp" | "native_rust" | "external";
   backend: string;
   runner: string;
@@ -22,6 +24,11 @@ type ApiModel = {
   capabilities: ApiCapabilityId[];
   installed: boolean;
   runner_installed: boolean;
+  runner_runtime_state: ModelPlan["runner_runtime_state"];
+  lifecycle_state: ModelPlan["lifecycle_state"];
+  executable: boolean;
+  missing: string[];
+  next_command: string;
   execution_status: string;
 };
 
@@ -34,6 +41,7 @@ type ApiCapability = {
 };
 
 type ApiRunner = RunnerSummary;
+export type LibraryEntry = Record<string, unknown>;
 
 type PullResponse = {
   id: string;
@@ -58,6 +66,36 @@ export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechA
     },
     body: JSON.stringify(request)
   });
+}
+
+export async function transcribeAudio(request: TranscriptionApiRequest): Promise<TranscriptionApiResponse> {
+  return requestJson<TranscriptionApiResponse>("/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function getDoctor(): Promise<DoctorResponse> {
+  const response = await getJson<{ data: DoctorResponse }>("/v1/doctor");
+  return response.data;
+}
+
+export async function getRunnerDoctor(id: string): Promise<Record<string, unknown>> {
+  const response = await getJson<{ data: Record<string, unknown> }>(`/v1/runners/${encodeURIComponent(id)}/doctor`);
+  return response.data;
+}
+
+export async function getLibraryModels(): Promise<LibraryEntry[]> {
+  const response = await getJson<{ data: LibraryEntry[] }>("/v1/library/models");
+  return response.data;
+}
+
+export async function getLibraryRunners(): Promise<LibraryEntry[]> {
+  const response = await getJson<{ data: LibraryEntry[] }>("/v1/library/runners");
+  return response.data;
 }
 
 export async function getModel(id: string): Promise<ModelSummary> {
@@ -149,6 +187,7 @@ export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
 const mockSpeechModel: ModelSummary = {
   id: "mock-tts",
   name: "Mock TTS",
+  family: "internal-test",
   purpose: "Deterministic test WAV generator for API and CLI scaffolding.",
   version: "0.1.0",
   language: "Local",
@@ -156,6 +195,11 @@ const mockSpeechModel: ModelSummary = {
   runtime: "Rust",
   status: "installed",
   license: "internal-test",
+  lifecycleState: "executable",
+  runnerRuntimeState: "ready",
+  executable: true,
+  missing: [],
+  nextCommand: "takokit speak \"hello\" --model mock-tts",
   runner: "takokit-mock",
   runnerInstalled: true,
   hardwareNotes: "CPU, no model weights",
@@ -203,6 +247,7 @@ function toModelSummary(model: ApiModel): ModelSummary {
   return {
     id: model.id,
     name: model.name,
+    family: model.family,
     purpose: model.summary,
     version: model.version,
     language: model.capabilities.includes("speech_to_text") ? "Multilingual" : "Local",
@@ -215,6 +260,12 @@ function toModelSummary(model: ApiModel): ModelSummary {
     runtime: toRuntimeLabel(model.runtime),
     status: model.installed ? "installed" : "available",
     license: model.license,
+    licenseWarning: model.license_warning,
+    lifecycleState: model.lifecycle_state,
+    runnerRuntimeState: model.runner_runtime_state,
+    executable: model.executable,
+    missing: model.missing,
+    nextCommand: model.next_command,
     capabilities: model.capabilities.map(toCapability).filter(Boolean) as ModelCapability[]
   };
 }

@@ -102,6 +102,8 @@ model id
 
 Planning belongs to `takokit-package`. It returns typed planning failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, and `RunnerUnsupportedOnPlatform`.
 
+`plan_model(...)` is the canonical lifecycle source for model summaries. `ModelInfo.execution_status`, `/v1/models`, `/v1/models/:id/plan`, `takokit models`, `takokit show`, `takokit plan`, and the GUI model cards are expected to agree on lifecycle state, runner runtime state, executable yes/no, missing pieces, and next command.
+
 Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the missing ONNX component.
 
 The whisper.cpp runner executes `whisper-cli` for `whisper-base` after the model artifact and runner runtime are installed. It returns real transcript text and typed errors for missing files, artifacts, binaries, or whisper.cpp process failures.

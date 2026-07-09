@@ -12,6 +12,8 @@ pub fn server_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(handlers::health))
         .route("/v1/status", get(handlers::status))
+        .route("/v1/doctor", get(handlers::doctor))
+        .route("/v1/test/launch", get(handlers::launch_test))
         .route("/v1/capabilities", get(handlers::capabilities))
         .route("/v1/models", get(handlers::models))
         .route("/v1/library/models", get(handlers::library_models))
@@ -25,6 +27,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/models/pull", post(handlers::pull_model))
         .route("/v1/runners/pull", post(handlers::pull_runner))
         .route("/v1/runners/install", post(handlers::install_runner))
+        .route("/v1/runners/:id/doctor", get(handlers::runner_doctor))
         .route(
             "/v1/runners/:id",
             get(handlers::runner).delete(handlers::remove_runner),
@@ -39,16 +42,20 @@ pub fn server_router(state: AppState) -> Router {
 }
 
 fn gui_service() -> ServeDir<ServeFile> {
-    let dist = std::env::var("TAKOKIT_GUI_DIST")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../apps/gui/dist")
-        });
+    let dist = gui_dist_path();
     let index = dist.join("index.html");
 
     ServeDir::new(&dist)
         .append_index_html_on_directories(true)
         .fallback(ServeFile::new(index))
+}
+
+pub fn gui_dist_path() -> std::path::PathBuf {
+    std::env::var("TAKOKIT_GUI_DIST")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../apps/gui/dist")
+        })
 }
 
 pub async fn run_server(state: AppState) -> anyhow::Result<()> {
@@ -74,7 +81,10 @@ mod tests {
     #[tokio::test]
     async fn health_route_returns_ok() {
         let root = std::env::temp_dir().join("takokit-server-health-test");
-        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let state = AppState::new(
+            RuntimeConfig::local(root.clone()),
+            LocalStore::new(root.clone()),
+        );
         let response = server_router(state)
             .oneshot(
                 Request::builder()
@@ -91,7 +101,10 @@ mod tests {
     #[tokio::test]
     async fn capabilities_route_returns_five_surfaces() {
         let root = std::env::temp_dir().join("takokit-server-capabilities-test");
-        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let state = AppState::new(
+            RuntimeConfig::local(root.clone()),
+            LocalStore::new(root.clone()),
+        );
         let response = server_router(state)
             .oneshot(
                 Request::builder()
@@ -379,6 +392,106 @@ mod tests {
         assert_eq!(json["data"]["artifact_state"], "metadata-only");
         assert_eq!(json["data"]["runner_runtime_state"], "runtime-missing");
         assert_eq!(json["data"]["executable"], false);
+    }
+
+    #[tokio::test]
+    async fn diagnostics_routes_return_doctor_runner_doctor_and_launch_suite() {
+        let root = std::env::temp_dir().join("takokit-server-diagnostics-routes-test");
+        let state = AppState::new(
+            RuntimeConfig::local(root.clone()),
+            LocalStore::new(root.clone()),
+        );
+        let app = server_router(state);
+
+        let doctor = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/doctor")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(doctor.status(), StatusCode::OK);
+        let body = to_bytes(doctor.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["data"]["storage_root"], root.display().to_string());
+        assert!(json["data"]["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|check| check["label"] == "runtime model manifests"));
+
+        let runner = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/runners/takokit-whispercpp/doctor")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(runner.status(), StatusCode::OK);
+        let body = to_bytes(runner.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["data"]["id"], "takokit-whispercpp");
+        assert_eq!(json["data"]["runtime_state"], "runtime-missing");
+
+        let suite = app
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/test/launch")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(suite.status(), StatusCode::OK);
+        let body = to_bytes(suite.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["model"] == "whisper-base"));
+    }
+
+    #[tokio::test]
+    async fn models_route_includes_canonical_plan_summary_fields() {
+        let root = std::env::temp_dir().join("takokit-server-models-plan-summary-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let response = server_router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/models")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let whisper = json["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == "whisper-base")
+            .expect("whisper-base summary");
+
+        assert_eq!(whisper["family"], "whisper");
+        assert_eq!(whisper["lifecycle_state"], "metadata-only");
+        assert_eq!(whisper["runner_runtime_state"], "runtime-missing");
+        assert_eq!(whisper["executable"], false);
+        assert_eq!(whisper["next_command"], "takokit pull whisper-base");
+        assert!(whisper["missing"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item == "verified artifacts"));
     }
 
     #[tokio::test]

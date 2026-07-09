@@ -1187,6 +1187,7 @@ dependencies = [
  "anyhow",
  "clap",
  "open",
+ "serde",
  "serde_json",
  "takokit-core",
  "takokit-models",
