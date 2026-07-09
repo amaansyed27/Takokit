@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fs::File,
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -10,6 +10,23 @@ use takokit_core::{
     CapabilityKind, ErrorCode, ModelCapability, ModelInfo, ModelRuntime, TakokitError,
 };
 use thiserror::Error;
+use zip::ZipArchive;
+
+const WHISPERCPP_WIN_X64_URL: &str =
+    "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip";
+const WHISPERCPP_WIN_X64_SHA256: &str =
+    "7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539";
+const PYTHON_MANAGED_ADAPTERS: &[(&str, &str)] = &[
+    ("qwen3_tts", "qwen3-tts"),
+    ("chatterbox", "chatterbox"),
+    ("f5_tts", "f5-tts"),
+    ("cosyvoice2", "cosyvoice2"),
+    ("dia", "dia"),
+    ("fish_speech", "fish-speech"),
+    ("openvoice", "openvoice"),
+    ("gpt_sovits", "gpt-sovits"),
+    ("rvc", "rvc"),
+];
 
 #[derive(Debug, Error)]
 pub enum PackageError {
@@ -144,6 +161,7 @@ pub type PackageResult<T> = Result<T, PackageError>;
 pub struct ModelManifest {
     pub id: String,
     pub name: String,
+    pub family: String,
     pub version: String,
     pub kind: ModelKind,
     pub backend: ModelBackend,
@@ -494,6 +512,7 @@ pub struct ModelPlan {
     pub family: String,
     pub task: String,
     pub required_runner: String,
+    pub lifecycle_state: ModelLifecycleState,
     pub artifact_state: ModelLifecycleState,
     pub runner_contract_state: RunnerLifecycleState,
     pub runner_runtime_state: RunnerLifecycleState,
@@ -512,6 +531,13 @@ pub struct PythonManagedRunnerLayout {
     pub logs: PathBuf,
     pub manifests: PathBuf,
     pub cache: PathBuf,
+    pub adapters: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunnerRuntimeLayout {
+    pub root: PathBuf,
+    pub logs: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -706,6 +732,37 @@ impl InstalledRegistry {
         })
     }
 
+    pub fn install_runner_runtime(
+        &self,
+        manifest: &RunnerManifest,
+        status: RunnerLifecycleState,
+        note: impl Into<String>,
+    ) -> PackageResult<PullReport> {
+        std::fs::create_dir_all(self.root.join("runners"))?;
+        std::fs::create_dir_all(self.root.join("installed-runners"))?;
+        let path = self.runner_manifest_path(&manifest.id);
+        if !path.is_file() {
+            std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
+        }
+        let mut record = self
+            .installed_runner_record(&manifest.id)
+            .unwrap_or_else(|_| installed_runner_record(manifest, path.clone()));
+        record.status = status;
+        record.note = note.into();
+        record.installed_at = timestamp_now();
+        std::fs::write(
+            self.runner_record_path(&manifest.id),
+            toml::to_string_pretty(&record)?,
+        )?;
+
+        Ok(PullReport {
+            id: manifest.id.clone(),
+            installed: true,
+            manifest_path: path,
+            note: record.note,
+        })
+    }
+
     pub fn remove_model(&self, id: &str) -> PackageResult<bool> {
         let manifest_path = self.model_manifest_path(id);
         let record_path = self.model_record_path(id);
@@ -841,6 +898,21 @@ impl ModelManifest {
 
 impl RunnerManifest {
     pub fn to_runner_info(&self, installed: bool) -> RunnerInfo {
+        self.to_runner_info_with_state(
+            installed,
+            if installed {
+                RunnerLifecycleState::ContractInstalled
+            } else {
+                self.install_state
+            },
+        )
+    }
+
+    pub fn to_runner_info_with_state(
+        &self,
+        installed: bool,
+        install_state: RunnerLifecycleState,
+    ) -> RunnerInfo {
         RunnerInfo {
             id: self.id.clone(),
             name: self.name.clone(),
@@ -850,11 +922,7 @@ impl RunnerManifest {
             supported_model_families: self.supported_model_families.clone(),
             supported_tasks: self.supported_tasks.clone(),
             dependency_strategy: self.dependency_strategy,
-            install_state: if installed {
-                RunnerLifecycleState::ContractInstalled
-            } else {
-                self.install_state
-            },
+            install_state,
             notes: self.notes.clone(),
             description: self.description.clone(),
             installed,
@@ -1068,8 +1136,9 @@ pub fn plan_model(
         .as_ref()
         .map(|record| record.status)
         .unwrap_or(RunnerLifecycleState::RuntimeMissing);
-    let executable = artifact_state == ModelLifecycleState::Executable
-        && runner_runtime_state == RunnerLifecycleState::Ready;
+    let lifecycle_state =
+        model_lifecycle_state(&model, &runner, artifact_state, runner_runtime_state);
+    let executable = lifecycle_state == ModelLifecycleState::Executable;
     let mut missing = Vec::new();
 
     if matches!(artifact_state, ModelLifecycleState::MetadataOnly) {
@@ -1081,6 +1150,9 @@ pub fn plan_model(
     if runner_runtime_state != RunnerLifecycleState::Ready {
         missing.push(runner_missing_component(&runner));
     }
+    if lifecycle_state == ModelLifecycleState::RunnerReady {
+        missing.push(runner_missing_component(&runner));
+    }
     if executable {
         missing.clear();
     }
@@ -1088,9 +1160,10 @@ pub fn plan_model(
     Ok(ModelPlan {
         model_id: model.id.clone(),
         model_name: model.name.clone(),
-        family: model.name.clone(),
+        family: model.family.clone(),
         task: model_task_label(&model),
         required_runner: runner.id.clone(),
+        lifecycle_state,
         artifact_state,
         runner_contract_state,
         runner_runtime_state,
@@ -1099,7 +1172,8 @@ pub fn plan_model(
         next_command: next_plan_command(
             &model,
             installed_model.is_some(),
-            installed_runner.is_some(),
+            runner_runtime_state,
+            executable,
         ),
     })
 }
@@ -1114,8 +1188,169 @@ pub fn python_managed_runner_layout(takokit_root: &Path) -> PythonManagedRunnerL
         logs: root.join("logs"),
         manifests: root.join("manifests"),
         cache: root.join("cache"),
+        adapters: root.join("adapters"),
         root,
     }
+}
+
+pub fn runner_runtime_layout(
+    takokit_root: &Path,
+    manifest: &RunnerManifest,
+) -> RunnerRuntimeLayout {
+    let root = if manifest.id == "takokit-python-managed" {
+        python_managed_runner_layout(takokit_root).root
+    } else {
+        let suffix = manifest.id.strip_prefix("takokit-").unwrap_or(&manifest.id);
+        takokit_root.join("runners").join(suffix)
+    };
+
+    RunnerRuntimeLayout {
+        logs: root.join("logs"),
+        root,
+    }
+}
+
+pub fn initialize_runner_runtime(
+    takokit_root: &Path,
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+) -> PackageResult<PullReport> {
+    let layout = runner_runtime_layout(takokit_root, manifest);
+    std::fs::create_dir_all(&layout.logs)?;
+
+    match manifest.kind {
+        RunnerKind::PythonManaged => {
+            let managed = python_managed_runner_layout(takokit_root);
+            for path in [
+                &managed.root,
+                &managed.runtime,
+                &managed.env,
+                &managed.packages,
+                &managed.wheels,
+                &managed.logs,
+                &managed.manifests,
+                &managed.cache,
+                &managed.adapters,
+            ] {
+                std::fs::create_dir_all(path)?;
+            }
+            write_python_adapter_manifests(&managed)?;
+            installed_registry.install_runner_runtime(
+                manifest,
+                RunnerLifecycleState::RuntimeInstalled,
+                format!(
+                    "Managed Python layout initialized at {}. Adapter installation is not ready yet; Takokit will manage Python, wheels, caches, logs, and adapters here.",
+                    managed.root.display()
+                ),
+            )
+        }
+        RunnerKind::Onnx => installed_registry.install_runner_runtime(
+            manifest,
+            RunnerLifecycleState::RuntimeInstalled,
+            format!(
+                "ONNX runner runtime directory initialized at {}. Missing component: phonemizer/token preparation and ONNX session execution.",
+                layout.root.display()
+            ),
+        ),
+        RunnerKind::Whispercpp => install_whispercpp_runtime(installed_registry, manifest, &layout),
+        RunnerKind::TransformersAudio => installed_registry.install_runner_runtime(
+            manifest,
+            RunnerLifecycleState::RuntimeInstalled,
+            format!(
+                "Transformers audio runner runtime directory initialized at {}. Missing component: managed transformers audio adapter.",
+                layout.root.display()
+            ),
+        ),
+        RunnerKind::Nemo => installed_registry.install_runner_runtime(
+            manifest,
+            RunnerLifecycleState::RuntimeInstalled,
+            format!(
+                "NeMo runner runtime directory initialized at {}. Missing component: NeMo adapter and managed dependencies.",
+                layout.root.display()
+            ),
+        ),
+        RunnerKind::Native | RunnerKind::External => installed_registry.install_runner_runtime(
+            manifest,
+            RunnerLifecycleState::Failed,
+            "No runtime installer is defined for this runner kind.",
+        ),
+    }
+}
+
+fn write_python_adapter_manifests(layout: &PythonManagedRunnerLayout) -> PackageResult<()> {
+    for (adapter, model_family) in PYTHON_MANAGED_ADAPTERS {
+        let adapter_dir = layout.adapters.join(adapter);
+        std::fs::create_dir_all(&adapter_dir)?;
+        let manifest = adapter_dir.join("adapter.toml");
+        if !manifest.is_file() {
+            std::fs::write(
+                manifest,
+                format!(
+                    "id = \"{adapter}\"\nmodel_family = \"{model_family}\"\nstate = \"not-installed\"\ndependency_strategy = \"takokit-managed-python\"\ninput_contract = \"json request on stdin\"\noutput_contract = \"json response on stdout\"\nlogs = \"../../logs\"\nnotes = \"Adapter slot only. Takokit has not installed Python dependencies or model weights for this adapter.\"\n"
+                ),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn install_whispercpp_runtime(
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+    layout: &RunnerRuntimeLayout,
+) -> PackageResult<PullReport> {
+    let runtime_dir = layout.root.join("runtime");
+    let downloads_dir = layout.root.join("cache").join("downloads");
+    std::fs::create_dir_all(&runtime_dir)?;
+    std::fs::create_dir_all(&downloads_dir)?;
+
+    if !(cfg!(target_os = "windows") && cfg!(target_arch = "x86_64")) {
+        return installed_registry.install_runner_runtime(
+            manifest,
+            RunnerLifecycleState::RuntimeInstalled,
+            format!(
+                "whisper.cpp runtime directory initialized at {}. Automatic binary installation is currently implemented for Windows x64 only.",
+                layout.root.display()
+            ),
+        );
+    }
+
+    let archive_path = downloads_dir.join("whisper-bin-x64-v1.9.1.zip");
+    if !archive_path.is_file() {
+        download_to_temp(WHISPERCPP_WIN_X64_URL, "whisper-bin-x64.zip", &archive_path)?;
+    }
+    let actual =
+        sha256_file(&archive_path).map_err(|error| PackageError::ArtifactInstallFailed {
+            artifact: "whisper-bin-x64.zip".to_string(),
+            reason: error.to_string(),
+        })?;
+    if actual != WHISPERCPP_WIN_X64_SHA256 {
+        let _ = std::fs::remove_file(&archive_path);
+        return Err(PackageError::ArtifactChecksumMismatch {
+            artifact: "whisper-bin-x64.zip".to_string(),
+            expected: WHISPERCPP_WIN_X64_SHA256.to_string(),
+            actual,
+        });
+    }
+
+    extract_zip_safely(&archive_path, &runtime_dir, "whisper-bin-x64.zip")?;
+    let binary =
+        find_file_named(&runtime_dir, executable_name("whisper-cli")).ok_or_else(|| {
+            PackageError::ArtifactInstallFailed {
+                artifact: "whisper-bin-x64.zip".to_string(),
+                reason: "archive did not contain whisper-cli executable".to_string(),
+            }
+        })?;
+
+    installed_registry.install_runner_runtime(
+        manifest,
+        RunnerLifecycleState::Ready,
+        format!(
+            "whisper.cpp v1.9.1 runtime installed at {}. Executable: {}",
+            runtime_dir.display(),
+            binary.display()
+        ),
+    )
 }
 
 fn model_artifact_state(
@@ -1137,6 +1372,35 @@ fn model_artifact_state(
     }
 }
 
+fn model_lifecycle_state(
+    model: &ModelManifest,
+    runner: &RunnerManifest,
+    artifact_state: ModelLifecycleState,
+    runner_runtime_state: RunnerLifecycleState,
+) -> ModelLifecycleState {
+    if runner_runtime_state == RunnerLifecycleState::Failed {
+        return ModelLifecycleState::Failed;
+    }
+    if artifact_state == ModelLifecycleState::MetadataOnly {
+        return ModelLifecycleState::MetadataOnly;
+    }
+    if runner_runtime_state == RunnerLifecycleState::Ready {
+        if has_verified_executor(model, runner) {
+            ModelLifecycleState::Executable
+        } else {
+            ModelLifecycleState::RunnerReady
+        }
+    } else {
+        ModelLifecycleState::ArtifactsReady
+    }
+}
+
+fn has_verified_executor(model: &ModelManifest, runner: &RunnerManifest) -> bool {
+    runner.kind == RunnerKind::Whispercpp
+        && model.capabilities.stt
+        && matches!(model.id.as_str(), "whisper-base")
+}
+
 fn model_task_label(model: &ModelManifest) -> String {
     capability_labels(&model.capabilities.to_model_capabilities())
 }
@@ -1156,14 +1420,21 @@ fn runner_missing_component(runner: &RunnerManifest) -> String {
 fn next_plan_command(
     model: &ModelManifest,
     model_installed: bool,
-    runner_installed: bool,
+    runner_runtime_state: RunnerLifecycleState,
+    executable: bool,
 ) -> String {
     if !model_installed {
         format!("takokit pull {}", model.id)
-    } else if !runner_installed {
+    } else if runner_runtime_state == RunnerLifecycleState::RuntimeMissing {
         format!("takokit runner pull {}", model.runner)
+    } else if runner_runtime_state == RunnerLifecycleState::ContractInstalled {
+        format!("takokit runner install {}", model.runner)
+    } else if runner_runtime_state == RunnerLifecycleState::Failed {
+        format!("takokit runner doctor {}", model.runner)
+    } else if executable {
+        format!("takokit test {}", model.id)
     } else {
-        "wait for runner execution implementation".to_string()
+        format!("takokit runner doctor {}", model.runner)
     }
 }
 
@@ -1456,6 +1727,74 @@ fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> PackageResul
     Ok(())
 }
 
+fn extract_zip_safely(archive_path: &Path, output_dir: &Path, artifact: &str) -> PackageResult<()> {
+    let file = File::open(archive_path)?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| PackageError::ArtifactInstallFailed {
+            artifact: artifact.to_string(),
+            reason: error.to_string(),
+        })?;
+
+    for index in 0..archive.len() {
+        let mut item =
+            archive
+                .by_index(index)
+                .map_err(|error| PackageError::ArtifactInstallFailed {
+                    artifact: artifact.to_string(),
+                    reason: error.to_string(),
+                })?;
+        let Some(enclosed_name) = item.enclosed_name() else {
+            continue;
+        };
+        let output_path = output_dir.join(enclosed_name);
+        if item.is_dir() {
+            std::fs::create_dir_all(&output_path)?;
+            continue;
+        }
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut output = File::create(&output_path)?;
+        std::io::copy(&mut item, &mut output).map_err(|error| {
+            PackageError::ArtifactInstallFailed {
+                artifact: artifact.to_string(),
+                reason: error.to_string(),
+            }
+        })?;
+        output.flush()?;
+    }
+
+    Ok(())
+}
+
+fn executable_name(name: &str) -> String {
+    if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    }
+}
+
+fn find_file_named(root: &Path, name: String) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(root).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_file_named(&path, name.clone()) {
+                return Some(found);
+            }
+        } else if path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .map(|value| value.eq_ignore_ascii_case(&name))
+            .unwrap_or(false)
+        {
+            return Some(path);
+        }
+    }
+    None
+}
+
 fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
@@ -1523,6 +1862,7 @@ mod tests {
     const MODEL_TOML: &str = r#"
 id = "kokoro"
 name = "Kokoro"
+family = "kokoro"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"
@@ -1563,6 +1903,7 @@ description = "Native ONNX runner for CPU-friendly models."
         let manifest: ModelManifest = toml::from_str(MODEL_TOML).expect("model manifest");
 
         assert_eq!(manifest.id, "kokoro");
+        assert_eq!(manifest.family, "kokoro");
         assert_eq!(manifest.kind, ModelKind::Tts);
         assert_eq!(manifest.backend, ModelBackend::Onnx);
         assert_eq!(manifest.runner, "takokit-onnx");
@@ -1883,7 +2224,7 @@ role = "config"
         let registry = PackageRegistry::bundled();
         let installed = InstalledRegistry::new(temp.path().join("manifests"));
 
-        for model_id in ["kokoro", "whisper-base", "chatterbox", "gpt-sovits"] {
+        for model_id in ["kokoro", "chatterbox", "gpt-sovits"] {
             let manifest = registry.model(model_id).expect("model manifest");
             installed.install_model(&manifest).expect("install model");
             let record = installed
@@ -1893,6 +2234,22 @@ role = "config"
             assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
             assert!(record.artifacts.iter().all(|artifact| !artifact.downloaded));
         }
+    }
+
+    #[test]
+    fn bundled_whisper_base_manifest_has_verified_artifact_metadata() {
+        let registry = PackageRegistry::bundled();
+        let manifest = registry.model("whisper-base").expect("whisper manifest");
+
+        assert!(!manifest.artifacts.metadata_only);
+        assert_eq!(manifest.family, "whisper");
+        assert_eq!(manifest.artifacts.weights.len(), 1);
+        assert_eq!(manifest.artifacts.weights[0].name, "ggml-base.bin");
+        assert_eq!(manifest.artifacts.weights[0].bytes, Some(147_951_465));
+        assert_eq!(
+            manifest.artifacts.weights[0].sha256,
+            "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
+        );
     }
 
     #[test]
@@ -1943,6 +2300,31 @@ role = "config"
         assert_eq!(record.kind, "onnx");
         assert_eq!(record.status, RunnerLifecycleState::ContractInstalled);
         assert!(record.manifest_path.ends_with("runners/takokit-onnx.toml"));
+    }
+
+    #[test]
+    fn install_runner_runtime_updates_runner_record_state_and_note() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.runner("takokit-onnx").expect("runner");
+        installed.install_runner(&manifest).expect("install runner");
+
+        let report = installed
+            .install_runner_runtime(
+                &manifest,
+                RunnerLifecycleState::RuntimeInstalled,
+                "ONNX runtime dependency path initialized.",
+            )
+            .expect("install runner runtime");
+        let record = installed
+            .installed_runner_record("takokit-onnx")
+            .expect("installed runner record");
+
+        assert_eq!(report.id, "takokit-onnx");
+        assert_eq!(record.status, RunnerLifecycleState::RuntimeInstalled);
+        assert!(record.note.contains("ONNX runtime dependency path"));
     }
 
     #[test]
@@ -2249,6 +2631,7 @@ role = "config"
 
         let piper_plan = plan_model(&registry, &installed, "piper-lessac").expect("piper plan");
         assert_eq!(piper_plan.model_id, "piper-lessac");
+        assert_eq!(piper_plan.family, "piper");
         assert_eq!(
             piper_plan.artifact_state,
             ModelLifecycleState::ArtifactsReady
@@ -2268,6 +2651,7 @@ role = "config"
 
         let whisper_plan = plan_model(&registry, &installed, "whisper-base").expect("whisper plan");
         assert_eq!(whisper_plan.required_runner, "takokit-whispercpp");
+        assert_eq!(whisper_plan.family, "whisper");
         assert_eq!(
             whisper_plan.artifact_state,
             ModelLifecycleState::MetadataOnly
@@ -2280,6 +2664,7 @@ role = "config"
 
         let qwen_plan = plan_model(&registry, &installed, "qwen3-tts").expect("qwen plan");
         assert_eq!(qwen_plan.required_runner, "takokit-python-managed");
+        assert_eq!(qwen_plan.family, "qwen");
         assert_eq!(qwen_plan.artifact_state, ModelLifecycleState::MetadataOnly);
         assert!(qwen_plan
             .missing
@@ -2304,6 +2689,31 @@ role = "config"
         assert_eq!(layout.logs, layout.root.join("logs"));
         assert_eq!(layout.manifests, layout.root.join("manifests"));
         assert_eq!(layout.cache, layout.root.join("cache"));
+        assert_eq!(layout.adapters, layout.root.join("adapters"));
+    }
+
+    #[test]
+    fn initializing_python_managed_runner_writes_adapter_slots() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::bundled();
+        let manifest = registry
+            .runner("takokit-python-managed")
+            .expect("python runner");
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        initialize_runner_runtime(temp.path(), &installed, &manifest).expect("runtime init");
+
+        let adapters = temp
+            .path()
+            .join("runners")
+            .join("python-managed")
+            .join("adapters");
+        for adapter in ["qwen3_tts", "chatterbox", "f5_tts", "rvc"] {
+            assert!(
+                adapters.join(adapter).join("adapter.toml").is_file(),
+                "missing {adapter} adapter manifest"
+            );
+        }
     }
 
     #[test]
@@ -2350,6 +2760,7 @@ role = "config"
             r#"
 id = "piper-lessac"
 name = "Piper Lessac"
+family = "piper"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"
@@ -2395,6 +2806,7 @@ role = "model"
             r#"
 id = "piper-lessac"
 name = "Piper Lessac"
+family = "piper"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"

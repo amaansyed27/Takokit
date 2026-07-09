@@ -1,5 +1,6 @@
 id = "openvoice"
 name = "OpenVoice"
+family = "openvoice"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

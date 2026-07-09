@@ -1,5 +1,6 @@
 id = "fish-speech"
 name = "Fish Speech"
+family = "fish-speech"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

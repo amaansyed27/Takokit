@@ -6,7 +6,7 @@ This file tracks near-term direction without phase gates. The source of truth fo
 
 - Implement Piper ONNX session loading and audio generation.
 - Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
-- Initialize the whisper.cpp runtime binary path behind `takokit-whispercpp`.
+- Add Whisper Tiny/Small manifests after verifying exact artifact SHA256 values.
 - Design explicit managed Python installation flow before installing Python/Torch.
 - Add release packaging and actual install script release URLs after artifacts and checksums exist.
 
@@ -19,12 +19,14 @@ takokit
 takokit doctor
 takokit pull kokoro
 takokit runner pull takokit-onnx
+takokit runner install takokit-whispercpp
 takokit plan kokoro
 takokit speak "Hello" --model mock-tts
+takokit transcribe ./audio.wav --model whisper-base
 takokit gui
 ```
 
-The bare command opens an interactive terminal launcher. The doctor command checks local setup health. Real Kokoro, Piper, Whisper, Chatterbox, and GPT-SoVITS execution remains unimplemented.
+The bare command opens an interactive terminal launcher. The doctor command checks local setup health. Whisper Base execution works through whisper.cpp after model pull and runner install. Real Kokoro, Piper, Chatterbox, GPT-SoVITS, and Python-managed execution remains unimplemented.
 
 ## Product Surface Contract
 
@@ -32,7 +34,7 @@ Takokit's first-class surfaces are TTS, STT, Voice Cloning, Live Transcription L
 
 ## Planning And Execution Contract
 
-Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. `takokit plan <model>` produces a user-facing lifecycle plan even before the model is installed. Runner execution is separate. The current ONNX and whisper.cpp scaffolds return typed `inference_not_implemented` until real execution is implemented.
+Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. `takokit plan <model>` produces a user-facing lifecycle plan even before the model is installed. Runner execution is separate. The current ONNX scaffold returns typed `inference_not_implemented` until real TTS execution is implemented. The whisper.cpp runner executes `whisper-base` when artifacts and runtime are ready.
 
 The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md).
 
@@ -47,7 +49,7 @@ The ONNX runner scaffold now loads the installed Piper artifact paths and parses
 ## Keep Out For Now
 
 - Tauri app scaffolding.
-- Fake Kokoro or Whisper inference.
+- Fake Kokoro, Piper, or Python-managed inference.
 - Hidden cloud calls.
 - Model-specific dependency instructions as the primary user path.
 - Install scripts that download nonexistent release artifacts.

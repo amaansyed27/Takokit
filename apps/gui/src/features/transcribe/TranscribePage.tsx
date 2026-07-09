@@ -9,7 +9,7 @@ export function TranscribePage(_props: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Transcribe</h1>
-        <p>STT through the local Live Transcription API surface. Whisper runner execution is not wired yet.</p>
+        <p>STT through the local Live Transcription API surface. Whisper Base runs when its model artifact and whisper.cpp runner are installed.</p>
       </header>
 
       <Section title="Audio input">
@@ -18,10 +18,10 @@ export function TranscribePage(_props: RouteComponentProps) {
             <Upload size={24} aria-hidden="true" />
           </div>
           <div>
-            <strong>STT runner not installed</strong>
-            <p>Drop audio here once the local Live Transcription API has a real runner.</p>
+            <strong>Browser upload not wired yet</strong>
+            <p>Use the CLI or API transcription endpoint while the GUI upload flow is being built.</p>
           </div>
-          <Tooltip content="Disabled because no real Whisper runner is connected yet.">
+          <Tooltip content="Disabled because the browser upload workflow is not implemented yet.">
             <Button disabled>Select audio</Button>
           </Tooltip>
         </div>
@@ -33,13 +33,13 @@ export function TranscribePage(_props: RouteComponentProps) {
             <strong>Audio file</strong>
             <span>WAV, MP3, samples.</span>
           </div>
-          <div className="pipeline-node is-disabled">
+          <div className="pipeline-node">
             <strong>STT runner</strong>
-            <span>Not installed.</span>
+            <span>whisper.cpp when installed.</span>
           </div>
-          <div className="pipeline-node is-disabled">
+          <div className="pipeline-node">
             <strong>Live Transcription API</strong>
-            <span>Text and timestamps.</span>
+            <span>Text response.</span>
           </div>
           <div className="pipeline-node is-disabled">
             <strong>Dataset prep</strong>

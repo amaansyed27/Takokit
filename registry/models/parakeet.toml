@@ -1,5 +1,6 @@
 id = "parakeet"
 name = "Parakeet"
+family = "parakeet"
 version = "0.1.0"
 kind = "stt"
 backend = "nemo"

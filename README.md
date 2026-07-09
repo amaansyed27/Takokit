@@ -16,7 +16,7 @@ Target local GUI URL:
 http://127.0.0.1:5050/gui
 ```
 
-No real ML inference is implemented yet. The current speech path is a deterministic mock WAV generator for API and CLI testing.
+Real execution is now available for `whisper-base` through the managed `takokit-whispercpp` runner on Windows x64. TTS execution is still limited to `mock-tts`; Piper has verified artifacts, but phonemizer/token preparation and ONNX session execution are not implemented yet.
 
 ## Product Surfaces
 
@@ -45,7 +45,9 @@ Takokit models declare which local voice surfaces they support:
 - Verified Piper Lessac medium ONNX artifact-backed pull.
 - Typed capability taxonomy, lifecycle states, and execution planning layer.
 - Shared runner contracts for ONNX, whisper.cpp, managed Python, Transformers audio, and NeMo.
-- Runner execution interface with ONNX and whisper.cpp scaffolds.
+- Explicit runner runtime install path via `takokit runner install <runner>`.
+- Runner execution interface with Piper/ONNX boundaries and a real whisper.cpp transcription adapter.
+- Verified Whisper Base ggml artifact pull and Windows x64 whisper.cpp runtime install.
 - Local storage layout under `~/.takokit`.
 - Mock TTS engine for `mock-tts` only.
 
@@ -56,6 +58,7 @@ cargo run -p takokit-cli
 cargo run -p takokit-cli -- serve
 cargo run -p takokit-cli -- gui
 cargo run -p takokit-cli -- doctor
+cargo run -p takokit-cli -- version
 cargo run -p takokit-cli -- capabilities
 cargo run -p takokit-cli -- pull kokoro
 cargo run -p takokit-cli -- pull piper-lessac
@@ -63,7 +66,9 @@ cargo run -p takokit-cli -- pull piper-lessac --metadata-only
 cargo run -p takokit-cli -- show kokoro
 cargo run -p takokit-cli -- plan qwen3-tts
 cargo run -p takokit-cli -- runner pull takokit-onnx
+cargo run -p takokit-cli -- runner install takokit-whispercpp
 cargo run -p takokit-cli -- runner show takokit-python-managed
+cargo run -p takokit-cli -- test --suite launch
 cargo run -p takokit-cli -- models
 cargo run -p takokit-cli -- runners
 cargo run -p takokit-cli -- library models
@@ -85,13 +90,25 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit pull piper-lessac` downloads the Piper Lessac medium ONNX model and config files, validates byte sizes and SHA256 checksums, stores verified blobs under `~/.takokit/blobs/sha256/`, and writes downloaded artifact records. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
 
-`takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
+`takokit runner pull <runner>` installs a runner contract record under `~/.takokit/manifests/installed-runners/`.
+
+`takokit runner install takokit-whispercpp` downloads the official whisper.cpp Windows x64 release ZIP, verifies its SHA256, extracts it under `~/.takokit/runners/whispercpp/runtime/`, and marks the runner `ready` only when `whisper-cli.exe` is present. Other platforms currently get an honest runtime-installed state with a platform-specific blocker.
+
+`takokit runner install takokit-python-managed` initializes the managed layout and adapter slots. It does not install Python, Torch, CUDA, or model dependencies yet.
 
 `takokit plan <model>` prints the model family, task, required runner, artifact state, runner contract/runtime state, whether it is executable today, missing pieces, and the next command to run.
 
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 
-`takokit speak "Hello" --model mock-tts` is the only execution path that writes audio. Package models such as `kokoro`, `piper-lessac`, and `whisper-base` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner scaffold returns typed `inference_not_implemented` instead of pretending to run a real model.
+`takokit speak "Hello" --model mock-tts` is the only current speech path that writes audio. Package models such as `kokoro` and `piper-lessac` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner returns typed `inference_not_implemented` with the missing Piper components instead of pretending to run a real model.
+
+`takokit transcribe ./audio.wav --model whisper-base` can produce a real transcript after:
+
+```bash
+takokit pull whisper-base
+takokit runner pull takokit-whispercpp
+takokit runner install takokit-whispercpp
+```
 
 ## GUI Development
 
@@ -122,7 +139,7 @@ local browser GUI at /gui
   |
 package registry + installed manifests
   |
-model adapters + future runners
+shared runners and model adapters
 ```
 
 Users should not manually install random model dependencies. The intended UX is:
@@ -139,7 +156,7 @@ takokit transcribe ./audio.wav --model whisper-base
 takokit gui
 ```
 
-Today, model and runner lifecycle metadata works. Real-model speech and transcription commands still return typed `inference_not_implemented` errors once their model and runner records exist because real runners are not wired. That is intentional. Runtime manifests cover launch families such as Piper, Kokoro, Whisper Base, Qwen3-TTS, CosyVoice2, F5-TTS, Fish Speech, Dia, Chatterbox, GPT-SoVITS, OpenVoice, RVC, Qwen Omni, Voxtral, SenseVoice, Parakeet, and Canary without marking them executable.
+Today, lifecycle metadata works and Whisper Base has a real execution path through whisper.cpp. Real TTS, Python-managed, Transformers-audio, and NeMo execution remain blocked and return typed errors or non-executable plan states. Runtime manifests cover launch families such as Piper, Kokoro, Whisper Base, Qwen3-TTS, CosyVoice2, F5-TTS, Fish Speech, Dia, Chatterbox, GPT-SoVITS, OpenVoice, RVC, Qwen Omni, Voxtral, SenseVoice, Parakeet, and Canary without marking them executable unless execution has been proven.
 
 Execution planning and execution are separate:
 
@@ -184,6 +201,7 @@ Today, `scripts/install.sh` and `scripts/install.ps1` are safe scaffolds only. T
       logs/
       manifests/
       cache/
+      adapters/
   blobs/
     sha256/
   manifests/
@@ -199,6 +217,8 @@ Today, `scripts/install.sh` and `scripts/install.ps1` are safe scaffolds only. T
   logs/
   config.toml
 ```
+
+Set `TAKOKIT_HOME` to use a temporary or test storage root. If it is unset, both `takokit` and `tako` use `~/.takokit/`.
 
 ## Project Principles
 

@@ -6,7 +6,9 @@ use std::{
 
 use takokit_core::RuntimeConfig;
 use takokit_models::ModelRegistry;
-use takokit_package::{current_platform_id, InstalledRegistry, PackageRegistry};
+use takokit_package::{
+    current_platform_id, InstalledRegistry, PackageRegistry, RunnerLifecycleState,
+};
 use takokit_store::LocalStore;
 
 use crate::gui;
@@ -97,6 +99,10 @@ pub fn run_doctor(
             "runners/python-managed/cache",
             store.python_managed_cache_dir(),
         ),
+        (
+            "runners/python-managed/adapters",
+            store.python_managed_adapters_dir(),
+        ),
         ("blobs", store.blobs_dir()),
         ("manifests/models", store.model_manifests_dir()),
         ("manifests/runners", store.runner_manifests_dir()),
@@ -177,11 +183,29 @@ pub fn run_doctor(
         )),
     }
 
-    report.push(warn(
-        "Managed runners",
-        "python-managed runtime not initialized",
-        "layout exists under ~/.takokit/runners/python-managed; Python/Torch installation is not implemented",
-    ));
+    match installed_registry.installed_runner_record("takokit-python-managed") {
+        Ok(record)
+            if matches!(
+                record.status,
+                RunnerLifecycleState::RuntimeInstalled | RunnerLifecycleState::Ready
+            ) =>
+        {
+            report.push(ok(
+                "Managed runners",
+                format!("python-managed runtime state: {:?}", record.status),
+            ));
+        }
+        Ok(record) => report.push(warn(
+            "Managed runners",
+            format!("python-managed runtime state: {:?}", record.status),
+            record.note,
+        )),
+        Err(_) => report.push(warn(
+            "Managed runners",
+            "python-managed runtime not initialized",
+            "run: takokit runner pull takokit-python-managed && takokit runner install takokit-python-managed",
+        )),
+    }
 
     if server_is_available(config) {
         report.push(ok(
@@ -220,11 +244,25 @@ pub fn run_doctor(
             "built-in mock model is missing",
         ));
     }
-    report.push(warn(
-        "Execution",
-        "real runners not implemented yet",
-        "metadata lifecycle works; real inference remains pending",
-    ));
+    match installed_registry.installed_runner_records() {
+        Ok(records)
+            if records
+                .iter()
+                .any(|record| record.status == RunnerLifecycleState::Ready) =>
+        {
+            report.push(ok("Execution", "at least one real runner is ready"));
+        }
+        Ok(_) => report.push(warn(
+            "Execution",
+            "no real runner is ready",
+            "install a runtime with takokit runner install <runner>",
+        )),
+        Err(error) => report.push(fail(
+            "Execution",
+            "runner runtime records",
+            error.to_string(),
+        )),
+    }
     report.push(ok(
         "Platform",
         format!("platform: {}", current_platform_id()),

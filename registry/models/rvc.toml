@@ -1,5 +1,6 @@
 id = "rvc"
 name = "RVC"
+family = "rvc"
 version = "0.1.0"
 kind = "voice-convert"
 backend = "python-managed"

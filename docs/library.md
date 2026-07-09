@@ -22,7 +22,7 @@ They describe models and runners that should appear in a future Takokit website 
 
 ## Status Values
 
-- `supported`: Takokit has concrete lifecycle support for the entry. Today this only means `piper-lessac` artifact pull is supported; ONNX inference is still not implemented.
+- `supported`: Takokit has concrete lifecycle support for the entry. Today this includes `piper-lessac` artifact pull and `whisper-base` pull/runtime execution through whisper.cpp on Windows x64. Piper ONNX inference is still not implemented.
 - `experimental`: a runner contract or scaffold exists, but execution is incomplete.
 - `planned`: useful target for Takokit, not executable yet.
 - `metadata-only`: catalog entry only.

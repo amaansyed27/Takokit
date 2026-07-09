@@ -1,5 +1,6 @@
 id = "qwen3-tts"
 name = "Qwen3-TTS"
+family = "qwen"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

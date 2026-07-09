@@ -24,6 +24,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/runners", get(handlers::runners))
         .route("/v1/models/pull", post(handlers::pull_model))
         .route("/v1/runners/pull", post(handlers::pull_runner))
+        .route("/v1/runners/install", post(handlers::install_runner))
         .route(
             "/v1/runners/:id",
             get(handlers::runner).delete(handlers::remove_runner),
@@ -272,6 +273,37 @@ mod tests {
         assert_eq!(json["data"]["id"], "takokit-onnx");
         assert_eq!(json["data"]["installed"], true);
 
+        let install_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/runners/install")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(install_response.status(), StatusCode::OK);
+
+        let show_installed_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/runners/takokit-onnx")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(show_installed_response.status(), StatusCode::OK);
+        let body = to_bytes(show_installed_response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["data"]["install_state"], "runtime-installed");
+
         let remove_response = app
             .oneshot(
                 Request::builder()
@@ -424,8 +456,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn transcription_route_returns_executor_not_implemented_after_model_and_runner_pull() {
+    async fn transcription_route_reports_metadata_only_whisper_artifact_before_execution() {
         let root = std::env::temp_dir().join("takokit-server-transcription-executor-test");
+        let audio_path = root.join("audio.wav");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(&audio_path, b"not a real wav").unwrap();
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
         let app = server_router(state);
 
@@ -436,7 +471,9 @@ mod tests {
                     .method("POST")
                     .uri("/v1/models/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"model":"whisper-base"}"#))
+                    .body(Body::from(
+                        r#"{"model":"whisper-base","metadata_only":true}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -463,22 +500,23 @@ mod tests {
                     .method("POST")
                     .uri("/v1/audio/transcriptions")
                     .header("content-type", "application/json")
-                    .body(Body::from(
-                        r#"{"model":"whisper-base","file_path":"audio.wav"}"#,
-                    ))
+                    .body(Body::from(format!(
+                        r#"{{"model":"whisper-base","file_path":"{}"}}"#,
+                        audio_path.display().to_string().replace('\\', "\\\\")
+                    )))
                     .unwrap(),
             )
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(json["error"]["code"], "inference_not_implemented");
-        assert_eq!(
-            json["error"]["message"],
-            "Runner takokit-whispercpp contract resolved, but transcription execution is not implemented yet."
-        );
+        assert_eq!(json["error"]["code"], "artifact_not_downloaded");
+        assert!(json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("recorded but not downloaded"));
     }
 }

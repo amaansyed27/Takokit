@@ -1,5 +1,6 @@
 id = "qwen3-omni"
 name = "Qwen3 Omni"
+family = "qwen"
 version = "0.1.0"
 kind = "omni-audio"
 backend = "transformers-audio"

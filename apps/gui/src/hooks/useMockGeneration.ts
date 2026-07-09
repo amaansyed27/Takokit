@@ -28,9 +28,9 @@ export function useMockGeneration() {
         input: input.input,
         response_format: "wav"
       });
-      setResult(response?.output_path ?? "Mock mode output prepared.");
+      setResult(response?.output_path ?? "Local output prepared.");
     } catch {
-      setResult("Mock mode: backend not connected, no real inference was run.");
+      setResult("Local API unavailable; no inference was run.");
     } finally {
       setIsGenerating(false);
     }
@@ -38,4 +38,3 @@ export function useMockGeneration() {
 
   return { error, generate, isGenerating, result };
 }
-

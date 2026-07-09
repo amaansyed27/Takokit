@@ -7,7 +7,7 @@ use takokit_core::{
 };
 use takokit_package::{ArtifactRole, ExecutionPlan, InstalledArtifactRecord};
 
-use super::{onnx_not_implemented, SpeechRunner, TranscriptionRunner};
+use super::{onnx_not_implemented, piper_not_implemented, SpeechRunner, TranscriptionRunner};
 
 pub const PIPER_LESSAC_MODEL_ARTIFACT: &str = "en_US-lessac-medium.onnx";
 pub const PIPER_LESSAC_CONFIG_ARTIFACT: &str = "en_US-lessac-medium.onnx.json";
@@ -69,6 +69,7 @@ impl SpeechRunner for OnnxRunner {
     ) -> TakokitResult<SpeechResponse> {
         if plan.model.id == "piper-lessac" {
             prepare_piper_lessac(plan)?;
+            return Err(piper_not_implemented());
         }
 
         Err(onnx_not_implemented())
@@ -300,6 +301,7 @@ mod tests {
             model: ModelManifest {
                 id: "piper-lessac".to_string(),
                 name: "Piper Lessac".to_string(),
+                family: "piper".to_string(),
                 version: "0.1.0".to_string(),
                 kind: ModelKind::Tts,
                 backend: ModelBackend::Onnx,

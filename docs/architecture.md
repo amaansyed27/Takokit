@@ -11,7 +11,9 @@ local browser GUI
   |
 package registry + installed manifests
   |
-model adapters + future runners
+shared runner runtime install
+  |
+model adapters and runner executors
 ```
 
 The GUI is a normal React + TypeScript + Vite web app in `apps/gui`. The daemon serves the built GUI at `/gui`, and `takokit gui` opens `http://127.0.0.1:5050/gui`.
@@ -45,11 +47,11 @@ Model manifests declare these surfaces as typed capabilities. CLI, API, and GUI 
 
 ## Local Launcher And Doctor
 
-Running `takokit` without a subcommand opens a simple terminal launcher for common local actions: mock speech generation, model metadata pulls, runner contract pulls, GUI launch, server startup, package listing, and doctor checks. The launcher is honest about current execution limits and does not claim real Kokoro, Whisper, voice cloning, training, or conversion inference works yet.
+Running `takokit` without a subcommand opens a simple terminal launcher for common local actions: mock speech generation, model metadata pulls, runner contract pulls, GUI launch, server startup, package listing, and doctor checks. The launcher is honest about current execution limits and does not claim real Kokoro, Piper TTS, voice cloning, training, or conversion inference works yet.
 
 Running `tako` invokes the same CLI implementation. It intentionally continues to use `~/.takokit/`, not a separate `~/.tako/` tree.
 
-`takokit doctor` checks storage directories, `config.toml`, local registry availability, model and runner manifest parsing, installed model and runner record parsing, server availability, GUI build output, `mock-tts` availability, and the platform identifier. Missing GUI build output and unimplemented real runners are warnings, not fatal errors for current mock/runtime development.
+`takokit doctor` checks storage directories, `config.toml`, local registry availability, model and runner manifest parsing, installed model and runner record parsing, server availability, GUI build output, Python-managed layout, ready runner records, `mock-tts` availability, and the platform identifier. Missing GUI build output and absent ready runners are warnings, not fatal errors for current runtime development.
 
 ## Package Manager Boundary
 
@@ -74,9 +76,11 @@ It writes:
 ~/.takokit/manifests/installed-runners/<runner>.toml
 ```
 
-The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact URL/checksum/role/local path, required runner, platforms, and status. Takokit still does not install Python packages or execute real runners.
+The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact URL/checksum/role/local path, required runner, platforms, and status.
 
-The managed runner layout exists at `~/.takokit/runners/python-managed/` with `runtime`, `env`, `packages`, `wheels`, `logs`, `manifests`, and `cache` directories so future Python/PyTorch models can be isolated behind Takokit-managed setup.
+Runner runtime install is explicit. `takokit runner pull <runner>` installs the contract. `takokit runner install <runner>` initializes or installs runtime bits and updates the installed runner record. The first real runtime install is `takokit-whispercpp` on Windows x64, which verifies and extracts the official whisper.cpp binary ZIP.
+
+The managed runner layout exists at `~/.takokit/runners/python-managed/` with `runtime`, `env`, `packages`, `wheels`, `logs`, `manifests`, `cache`, and `adapters` directories so future Python/PyTorch models can be isolated behind Takokit-managed setup.
 
 Artifact install refuses missing URLs or checksums unless the manifest or request is explicitly metadata-only. Checksum mismatches delete the temporary download and return a typed error. See [artifacts.md](artifacts.md).
 
@@ -98,13 +102,11 @@ model id
 
 Planning belongs to `takokit-package`. It returns typed planning failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, and `RunnerUnsupportedOnPlatform`.
 
-Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the message:
+Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the missing ONNX component.
 
-```txt
-ONNX runner contract resolved, but real ONNX execution is not implemented yet.
-```
+The whisper.cpp runner executes `whisper-cli` for `whisper-base` after the model artifact and runner runtime are installed. It returns real transcript text and typed errors for missing files, artifacts, binaries, or whisper.cpp process failures.
 
-`mock-tts` remains the only path that writes a test WAV.
+`mock-tts` remains the only TTS path that writes a test WAV.
 
 ## Runner Isolation
 

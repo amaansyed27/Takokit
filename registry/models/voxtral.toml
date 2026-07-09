@@ -1,5 +1,6 @@
 id = "voxtral"
 name = "Voxtral"
+family = "voxtral"
 version = "0.1.0"
 kind = "omni-audio"
 backend = "transformers-audio"

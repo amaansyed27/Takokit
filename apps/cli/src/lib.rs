@@ -10,8 +10,9 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    plan_model, resolve_execution_plan, InstallModelOptions, InstalledRegistry, ModelPlan,
-    PackageError, PackageRegistry,
+    initialize_runner_runtime, plan_model, resolve_execution_plan, runner_runtime_layout,
+    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
+    RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -28,6 +29,7 @@ enum Command {
     Serve,
     Gui,
     Doctor,
+    Version,
     Status,
     Capabilities,
     Models,
@@ -55,6 +57,7 @@ enum Command {
         #[command(subcommand)]
         command: RunnerCommand,
     },
+    Test(TestArgs),
     Transcribe {
         audio: PathBuf,
         #[arg(long, default_value = "whisper-base")]
@@ -78,6 +81,13 @@ struct PullArgs {
     model: String,
     #[arg(long)]
     metadata_only: bool,
+}
+
+#[derive(Debug, Args)]
+struct TestArgs {
+    model: Option<String>,
+    #[arg(long)]
+    suite: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -110,6 +120,8 @@ enum LibraryTarget {
 #[derive(Debug, Subcommand)]
 enum RunnerCommand {
     Pull { runner: String },
+    Install { runner: String },
+    Doctor { runner: String },
     Show { runner: String },
     Rm { runner: String },
 }
@@ -143,6 +155,10 @@ pub async fn run() -> anyhow::Result<()> {
             if report.has_failures() {
                 std::process::exit(1);
             }
+        }
+        Some(Command::Version) => {
+            println!("takokit {}", env!("CARGO_PKG_VERSION"));
+            println!("storage: {}", store.root().display());
         }
         Some(Command::Status) => {
             let state = AppState::new(config, store);
@@ -327,6 +343,17 @@ pub async fn run() -> anyhow::Result<()> {
                         .map_err(cli_error)?;
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 }
+                RunnerCommand::Install { runner } => {
+                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                    let report =
+                        initialize_runner_runtime(store.root(), &installed_registry, &manifest)
+                            .map_err(cli_error)?;
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                }
+                RunnerCommand::Doctor { runner } => {
+                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                    print_runner_doctor(&store, &installed_registry, &manifest);
+                }
                 RunnerCommand::Show { runner } => {
                     let manifest = package_registry.runner(&runner).map_err(cli_error)?;
                     let installed = installed_registry.is_runner_installed(&manifest.id);
@@ -380,8 +407,82 @@ pub async fn run() -> anyhow::Result<()> {
                 }
             }
         }
+        Some(Command::Test(args)) => {
+            run_test_command(&package_registry, &installed_registry, args)?
+        }
     }
 
+    Ok(())
+}
+
+fn run_test_command(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    args: TestArgs,
+) -> anyhow::Result<()> {
+    if args.suite.as_deref() == Some("launch") {
+        print_launch_suite(package_registry, installed_registry)?;
+        return Ok(());
+    }
+
+    let Some(model) = args.model else {
+        return Err(TakokitError::InvalidRequest(
+            "provide a model id or --suite launch".to_string(),
+        )
+        .into());
+    };
+    let plan = plan_model(package_registry, installed_registry, &model).map_err(cli_error)?;
+    print_model_plan(&plan);
+    println!(
+        "Test result: {}",
+        if plan.executable {
+            "executable"
+        } else {
+            "blocked"
+        }
+    );
+    Ok(())
+}
+
+fn print_launch_suite(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+) -> anyhow::Result<()> {
+    let ids = [
+        "piper-lessac",
+        "kokoro",
+        "whisper-base",
+        "qwen3-tts",
+        "cosyvoice2",
+        "f5-tts",
+        "dia",
+        "fish-speech",
+        "sensevoice",
+        "parakeet",
+        "canary",
+        "openvoice",
+    ];
+    let mut rows = Vec::new();
+    for id in ids {
+        match plan_model(package_registry, installed_registry, id) {
+            Ok(plan) => rows.push(serde_json::json!({
+                "model": plan.model_id,
+                "task": plan.task,
+                "runner": plan.required_runner,
+                "lifecycle": plan.lifecycle_state,
+                "artifacts": plan.artifact_state,
+                "runner_runtime": plan.runner_runtime_state,
+                "executable": plan.executable,
+                "missing": plan.missing,
+                "next_command": plan.next_command,
+            })),
+            Err(error) => rows.push(serde_json::json!({
+                "model": id,
+                "error": error.to_string(),
+            })),
+        }
+    }
+    println!("{}", serde_json::to_string_pretty(&rows)?);
     Ok(())
 }
 
@@ -413,6 +514,16 @@ fn print_runners(
         .map_err(cli_error)?
         .into_iter()
         .map(|runner| runner.to_runner_info(installed_registry.is_runner_installed(&runner.id)))
+        .map(|info| {
+            if let Ok(record) = installed_registry.installed_runner_record(&info.id) {
+                let manifest = package_registry
+                    .runner(&info.id)
+                    .expect("runner listed by registry is readable");
+                manifest.to_runner_info_with_state(true, record.status)
+            } else {
+                info
+            }
+        })
         .collect();
     println!("{}", serde_json::to_string_pretty(&runners)?);
     Ok(())
@@ -434,6 +545,7 @@ fn print_model_plan(plan: &ModelPlan) {
     println!("Model: {} ({})", plan.model_name, plan.model_id);
     println!("Task: {}", plan.task);
     println!("Runner: {}", plan.required_runner);
+    println!("Lifecycle: {:?}", plan.lifecycle_state);
     println!("Artifacts: {:?}", plan.artifact_state);
     println!("Runner contract: {:?}", plan.runner_contract_state);
     println!("Runner runtime: {:?}", plan.runner_runtime_state);
@@ -444,6 +556,29 @@ fn print_model_plan(plan: &ModelPlan) {
         println!("Missing: {}", plan.missing.join("; "));
     }
     println!("Next command: {}", plan.next_command);
+}
+
+fn print_runner_doctor(
+    store: &LocalStore,
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+) {
+    println!("Runner Doctor: {} ({})", manifest.name, manifest.id);
+    println!(
+        "contract manifest: {}",
+        yes_no(installed_registry.is_runner_installed(&manifest.id))
+    );
+    match installed_registry.installed_runner_record(&manifest.id) {
+        Ok(record) => {
+            println!("runtime state: {:?}", record.status);
+            println!("recorded at: {}", record.installed_at);
+            println!("note: {}", record.note);
+        }
+        Err(_) => println!("runtime state: RuntimeMissing"),
+    }
+    let layout = runner_runtime_layout(store.root(), manifest);
+    println!("runtime path: {}", layout.root.display());
+    println!("logs path: {}", layout.logs.display());
 }
 
 fn yes_no(value: bool) -> &'static str {
@@ -510,6 +645,13 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_version_command() {
+        let cli = Cli::try_parse_from(["takokit", "version"]).expect("version cli parse");
+
+        assert!(matches!(cli.command, Some(Command::Version)));
+    }
+
+    #[test]
     fn tako_alias_parses_doctor_and_uses_takokit_storage_root() {
         let cli = Cli::try_parse_from(["tako", "doctor"]).expect("tako doctor cli parse");
         let storage_root = cli_storage_root();
@@ -570,6 +712,43 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Command::Plan { model }) if model == "qwen3-tts"
+        ));
+    }
+
+    #[test]
+    fn cli_parses_runner_install_and_doctor_commands() {
+        let install = Cli::try_parse_from(["takokit", "runner", "install", "takokit-onnx"])
+            .expect("runner install");
+        let doctor = Cli::try_parse_from(["takokit", "runner", "doctor", "takokit-onnx"])
+            .expect("runner doctor");
+
+        assert!(matches!(
+            install.command,
+            Some(Command::Runner {
+                command: RunnerCommand::Install { runner }
+            }) if runner == "takokit-onnx"
+        ));
+        assert!(matches!(
+            doctor.command,
+            Some(Command::Runner {
+                command: RunnerCommand::Doctor { runner }
+            }) if runner == "takokit-onnx"
+        ));
+    }
+
+    #[test]
+    fn cli_parses_model_and_launch_suite_test_commands() {
+        let model = Cli::try_parse_from(["takokit", "test", "whisper-base"]).expect("model test");
+        let suite =
+            Cli::try_parse_from(["takokit", "test", "--suite", "launch"]).expect("suite test");
+
+        assert!(matches!(
+            model.command,
+            Some(Command::Test(TestArgs { model: Some(model), suite: None })) if model == "whisper-base"
+        ));
+        assert!(matches!(
+            suite.command,
+            Some(Command::Test(TestArgs { model: None, suite: Some(suite) })) if suite == "launch"
         ));
     }
 

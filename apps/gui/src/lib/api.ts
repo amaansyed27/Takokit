@@ -99,6 +99,16 @@ export async function pullRunner(id: string): Promise<PullResponse> {
   });
 }
 
+export async function installRunner(id: string): Promise<PullResponse> {
+  return requestJson<PullResponse>("/v1/runners/install", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ runner: id })
+  });
+}
+
 export async function removeRunner(id: string): Promise<void> {
   await requestNoContent(`/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
@@ -129,7 +139,7 @@ export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
       runners: runners.data,
       voices: voices.data.map(toVoiceSummary),
       capabilities: capabilities.data.map(toCapabilitySummary),
-      modeNote: "Mock mode: packages and runners are managed locally, but real model inference is not implemented."
+      modeNote: "Local runtime mode: each model shows its real execution state."
     };
   } catch {
     return mockRuntime;

@@ -1,5 +1,6 @@
 id = "dia"
 name = "Dia"
+family = "dia"
 version = "0.1.0"
 kind = "tts"
 backend = "python-managed"

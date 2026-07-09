@@ -47,6 +47,7 @@ export type ModelPlan = {
   family: string;
   task: string;
   required_runner: string;
+  lifecycle_state: "metadata-only" | "artifacts-ready" | "runner-ready" | "executable" | "failed";
   artifact_state: "metadata-only" | "artifacts-ready" | "runner-ready" | "executable" | "failed";
   runner_contract_state: "runtime-missing" | "contract-installed" | "runtime-installed" | "ready" | "failed";
   runner_runtime_state: "runtime-missing" | "contract-installed" | "runtime-installed" | "ready" | "failed";

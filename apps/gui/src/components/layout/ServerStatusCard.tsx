@@ -21,11 +21,10 @@ export function ServerStatusCard({ runtime }: ServerStatusCardProps) {
       </div>
       <div className="server-status-card__state">
         <Circle className={isOnline ? "status-pulse" : ""} size={10} fill="currentColor" />
-        <strong>{isOnline ? "Running" : "Mock mode"}</strong>
+        <strong>{isOnline ? "Running" : "Offline"}</strong>
       </div>
       <code>{runtime.server.url}</code>
       <span>Uptime {runtime.server.uptime}</span>
     </section>
   );
 }
-

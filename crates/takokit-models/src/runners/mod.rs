@@ -65,6 +65,12 @@ pub(crate) fn onnx_not_implemented() -> TakokitError {
     )
 }
 
+pub(crate) fn piper_not_implemented() -> TakokitError {
+    runner_not_implemented(
+        "Piper artifacts and config resolved, but phonemizer/token preparation and ONNX session execution are not implemented yet.",
+    )
+}
+
 fn runner_not_implemented(message: impl Into<String>) -> TakokitError {
     TakokitError::Resolution {
         code: ErrorCode::InferenceNotImplemented,
@@ -131,6 +137,7 @@ mod tests {
             r#"
 id = "kokoro"
 name = "Kokoro"
+family = "kokoro"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"

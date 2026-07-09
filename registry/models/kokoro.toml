@@ -1,5 +1,6 @@
 id = "kokoro"
 name = "Kokoro"
+family = "kokoro"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"

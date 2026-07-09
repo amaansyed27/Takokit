@@ -12,8 +12,8 @@ use takokit_core::{
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
-    plan_model, resolve_execution_plan, InstallModelOptions, LibraryModelManifest,
-    LibraryRunnerManifest, ModelPlan, RunnerInfo,
+    initialize_runner_runtime, plan_model, resolve_execution_plan, InstallModelOptions,
+    LibraryModelManifest, LibraryRunnerManifest, ModelPlan, RunnerInfo,
 };
 
 use crate::AppState;
@@ -95,7 +95,11 @@ pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<Runn
         .unwrap_or_default()
         .into_iter()
         .map(|runner| {
-            runner.to_runner_info(state.installed_registry.is_runner_installed(&runner.id))
+            if let Ok(record) = state.installed_registry.installed_runner_record(&runner.id) {
+                runner.to_runner_info_with_state(true, record.status)
+            } else {
+                runner.to_runner_info(false)
+            }
         })
         .collect();
 
@@ -128,10 +132,16 @@ pub async fn runner(
         .map_err(Into::into)
         .map_err(ApiError)?;
     let installed = state.installed_registry.is_runner_installed(&manifest.id);
+    let info = if let Ok(record) = state
+        .installed_registry
+        .installed_runner_record(&manifest.id)
+    {
+        manifest.to_runner_info_with_state(true, record.status)
+    } else {
+        manifest.to_runner_info(installed)
+    };
 
-    Ok(Json(RunnerDetailResponse {
-        data: manifest.to_runner_info(installed),
-    }))
+    Ok(Json(RunnerDetailResponse { data: info }))
 }
 
 pub async fn pull_model(
@@ -176,6 +186,28 @@ pub async fn pull_runner(
         .install_runner(&manifest)
         .map_err(Into::into)
         .map_err(ApiError)?;
+
+    Ok(Json(PullModelResponse {
+        id: report.id,
+        installed: report.installed,
+        manifest_path: report.manifest_path,
+        note: report.note,
+    }))
+}
+
+pub async fn install_runner(
+    State(state): State<AppState>,
+    Json(request): Json<PullRunnerRequest>,
+) -> Result<Json<PullModelResponse>, ApiError> {
+    let manifest = state
+        .package_registry
+        .runner(&request.runner)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let report =
+        initialize_runner_runtime(state.store.root(), &state.installed_registry, &manifest)
+            .map_err(Into::into)
+            .map_err(ApiError)?;
 
     Ok(Json(PullModelResponse {
         id: report.id,

@@ -1,5 +1,6 @@
 id = "piper-lessac"
 name = "Piper Lessac"
+family = "piper"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"

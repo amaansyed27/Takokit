@@ -1,5 +1,6 @@
 id = "gpt-sovits"
 name = "GPT-SoVITS"
+family = "gpt-sovits"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

@@ -25,6 +25,7 @@ DELETE /v1/models/:id
 GET    /v1/runners
 GET    /v1/runners/:id
 POST   /v1/runners/pull
+POST   /v1/runners/install
 DELETE /v1/runners/:id
 GET    /v1/library/models
 GET    /v1/library/runners
@@ -51,7 +52,7 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 `GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, and honest execution status.
 
-`GET /v1/models/:id/plan` returns the structured lifecycle plan for a model: required runner, artifact state, runner contract state, runner runtime state, executable today, missing pieces, and next command.
+`GET /v1/models/:id/plan` returns the structured lifecycle plan for a model: required runner, model lifecycle state, artifact state, runner contract state, runner runtime state, executable today, missing pieces, and next command.
 
 `POST /v1/models/pull` installs model metadata and, when a manifest has verified artifact URLs/checksums, installs those artifacts into content-addressed blobs.
 
@@ -80,6 +81,16 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 This does not download or install an execution binary. `DELETE /v1/runners/:id` removes the local installed runner metadata.
 
+`POST /v1/runners/install` performs explicit runner runtime setup:
+
+```json
+{
+  "runner": "takokit-whispercpp"
+}
+```
+
+On Windows x64, `takokit-whispercpp` installs and verifies the whisper.cpp release binary and marks the runner `ready` when `whisper-cli.exe` is present. `takokit-python-managed` initializes the managed directory layout and adapter slots but does not install Python/Torch yet.
+
 `GET /v1/library/models` and `GET /v1/library/runners` return curated discovery metadata. These routes do not imply runtime executability and do not trigger downloads.
 
 `POST /v1/audio/speech` only supports `mock-tts` right now:
@@ -95,7 +106,7 @@ This does not download or install an execution binary. `DELETE /v1/runners/:id` 
 
 Using package models such as `kokoro` for speech runs lifecycle resolution and then runner execution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit builds an execution plan and passes it to the runner layer. The current ONNX runner scaffold then returns `inference_not_implemented` until real ONNX execution exists.
 
-`POST /v1/audio/transcriptions` uses the same planning and execution split for STT. Planning checks model install state before capability support, so an unpulled model returns `model_not_installed`. After `kokoro` metadata is pulled, transcription with `kokoro` returns `capability_unsupported` for STT. `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists, then the executor returns `inference_not_implemented`.
+`POST /v1/audio/transcriptions` uses the same planning and execution split for STT. Planning checks model install state before capability support, so an unpulled model returns `model_not_installed`. After `kokoro` metadata is pulled, transcription with `kokoro` returns `capability_unsupported` for STT. `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists. After the model artifact is pulled and the runner is installed/ready, it invokes whisper.cpp and returns real transcript text.
 
 Typed errors use this shape:
 
@@ -108,7 +119,7 @@ Typed errors use this shape:
 }
 ```
 
-After a model and its runner contract are installed, ONNX and whisper.cpp execution currently return typed `inference_not_implemented` responses. ONNX returns:
+After a model and its runner contract are installed, ONNX execution currently returns typed `inference_not_implemented` responses. ONNX returns:
 
 ```json
 {

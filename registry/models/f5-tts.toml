@@ -1,5 +1,6 @@
 id = "f5-tts"
 name = "F5-TTS"
+family = "f5-tts"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

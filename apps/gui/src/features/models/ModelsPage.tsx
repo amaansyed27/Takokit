@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { getModelPlan, pullModel, pullRunner, removeModel } from "../../lib/api";
+import { getModelPlan, installRunner, pullModel, pullRunner, removeModel } from "../../lib/api";
 import type { ModelCapability, ModelPlan } from "../../lib/types";
 
 export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
@@ -49,7 +49,7 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
     try {
       await action();
       await onRefresh();
-      setNotice("Lifecycle metadata updated. Real inference remains unimplemented except mock-tts.");
+      setNotice("Local runtime state updated.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Takokit API action failed.");
     } finally {
@@ -75,11 +75,11 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
         <div className="capability-strip">
           <div className="capability-chip">
             <strong>TTS</strong>
-            <span>Mock TTS can generate test WAV files. Real TTS runners are not wired yet.</span>
+            <span>Piper artifacts are verified; ONNX phonemizer and session execution remain tracked blockers.</span>
           </div>
           <div className="capability-chip">
             <strong>STT</strong>
-            <span>Whisper manifests exist; runner execution is not wired.</span>
+            <span>Whisper Base can execute through the whisper.cpp runner when model artifacts and runtime are installed.</span>
           </div>
           <div className="capability-chip">
             <strong>Voice Cloning</strong>
@@ -162,6 +162,7 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
                 <span><strong>Execution</strong>{selectedModel.executionStatus}</span>
                 {modelPlan && (
                   <>
+                    <span><strong>Lifecycle</strong>{stateLabel(modelPlan.lifecycle_state)}</span>
                     <span><strong>Artifact state</strong>{stateLabel(modelPlan.artifact_state)}</span>
                     <span><strong>Runner runtime</strong>{stateLabel(modelPlan.runner_runtime_state)}</span>
                     <span><strong>Executable today</strong>{modelPlan.executable ? "yes" : "no"}</span>
@@ -189,6 +190,16 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
                   Pull Required Runner
                 </Button>
               )}
+              {requiredRunner && requiredRunner.installed && requiredRunner.install_state !== "ready" && selectedModel.id !== "mock-tts" && (
+                <Button
+                  type="button"
+                  disabled={apiUnavailable}
+                  loading={busyAction === `install-runner-${requiredRunner.id}`}
+                  onClick={() => runAction(`install-runner-${requiredRunner.id}`, () => installRunner(requiredRunner.id).then(() => undefined))}
+                >
+                  Install Runner Runtime
+                </Button>
+              )}
             </div>
           </div>
           {notice && <p className="notice-line">{notice}</p>}
@@ -202,7 +213,9 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
               <strong>{runner.name}</strong>
               <span>{runner.kind}</span>
               <span>{runner.platforms.join(", ")}</span>
-              <Badge tone={runner.installed ? "success" : "warning"}>{runner.installed ? "installed" : "contract"}</Badge>
+              <Badge tone={runner.install_state === "ready" ? "success" : runner.installed ? "neutral" : "warning"}>
+                {runner.install_state ? stateLabel(runner.install_state) : runner.installed ? "contract installed" : "available"}
+              </Badge>
               <span>{runner.description}</span>
             </TableRow>
           ))}

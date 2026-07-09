@@ -12,6 +12,12 @@ impl LocalStore {
     }
 
     pub fn default_root() -> PathBuf {
+        if let Ok(path) = std::env::var("TAKOKIT_HOME") {
+            if !path.trim().is_empty() {
+                return PathBuf::from(path);
+            }
+        }
+
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".takokit")
@@ -59,6 +65,10 @@ impl LocalStore {
 
     pub fn python_managed_cache_dir(&self) -> PathBuf {
         self.python_managed_runner_dir().join("cache")
+    }
+
+    pub fn python_managed_adapters_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("adapters")
     }
 
     pub fn blobs_dir(&self) -> PathBuf {
@@ -129,6 +139,7 @@ impl LocalStore {
             self.python_managed_logs_dir(),
             self.python_managed_manifests_dir(),
             self.python_managed_cache_dir(),
+            self.python_managed_adapters_dir(),
             self.blobs_dir(),
             self.sha256_blobs_dir(),
             self.manifests_dir(),
@@ -203,6 +214,7 @@ mod tests {
             "logs",
             "manifests",
             "cache",
+            "adapters",
         ] {
             assert!(runner_root.join(child).is_dir(), "missing {child}");
         }

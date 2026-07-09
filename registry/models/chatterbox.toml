@@ -1,5 +1,6 @@
 id = "chatterbox"
 name = "Chatterbox"
+family = "chatterbox"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"

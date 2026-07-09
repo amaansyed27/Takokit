@@ -10,7 +10,7 @@ SpeechToTextEngine
 VoiceCloneEngine
 ```
 
-`mock-tts` is the only executable speech engine today. It writes a deterministic test WAV and is not real inference.
+`mock-tts` is the only executable TTS engine today. It writes a deterministic test WAV and is not real model inference.
 
 Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records, including the installed model record when a package model is pulled. Runner engines consume that plan and either produce output or return a typed execution error.
 
@@ -31,7 +31,15 @@ inference_not_implemented: ONNX runner contract resolved, but real ONNX executio
 
 It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning the not-implemented execution error.
 
-The whisper.cpp runner scaffold is also explicit. `whisper-base` resolves through `takokit-whispercpp` and then returns typed `inference_not_implemented` until real whisper.cpp execution is wired.
+The whisper.cpp runner is the first real STT adapter. `whisper-base` resolves through `takokit-whispercpp`, finds the pulled `ggml-base.bin` artifact, locates the installed `whisper-cli` executable under the runner runtime directory, invokes whisper.cpp, and returns the actual transcript text. Missing audio files, missing artifacts, or missing binaries return typed errors.
+
+Python-managed adapters are initialized as adapter slots under:
+
+```txt
+~/.takokit/runners/python-managed/adapters/<adapter>/adapter.toml
+```
+
+The current slots are `qwen3_tts`, `chatterbox`, `f5_tts`, `cosyvoice2`, `dia`, `fish_speech`, `openvoice`, `gpt_sovits`, and `rvc`. They are marked `not-installed` and do not install Python packages or weights yet.
 
 Takokit model manifests describe the five product surfaces:
 
@@ -46,6 +54,7 @@ Takokit model manifests describe the five product surfaces:
 ```toml
 id = "kokoro"
 name = "Kokoro"
+family = "kokoro"
 version = "0.1.0"
 kind = "tts"
 backend = "onnx"
@@ -136,6 +145,7 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 - task/category
 - required runner
 - artifact lifecycle state
+- overall model lifecycle state
 - runner contract state
 - runner runtime state
 - executable today

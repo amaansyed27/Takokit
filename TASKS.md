@@ -9,8 +9,9 @@
 
 - [ ] Implement Piper ONNX session loading and audio generation.
 - [ ] Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
-- [ ] Initialize the whisper.cpp runtime binary path behind `takokit-whispercpp`.
+- [ ] Implement Whisper Tiny/Small manifests after verifying SHA256 artifacts.
 - [ ] Design the explicit managed Python install flow before installing Python/Torch.
+- [ ] Implement one Python-managed adapter install/run path after dependency lock and license review.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
@@ -18,11 +19,20 @@
 ## Done
 
 - [x] Added shared runtime runner manifests for ONNX, whisper.cpp, managed Python, Transformers audio, and NeMo.
+- [x] Added model `family` fields to runtime manifests and planning.
+- [x] Added `takokit runner install <runner>` and `takokit runner doctor <runner>`.
+- [x] Added `/v1/runners/install`.
+- [x] Added `TAKOKIT_HOME` override for isolated local test roots while preserving `~/.takokit` defaults.
+- [x] Installed and verified whisper.cpp Windows x64 runner runtime under Takokit management.
+- [x] Added verified `whisper-base` ggml artifact URL, byte size, and SHA256.
+- [x] Implemented real `takokit transcribe ./audio.wav --model whisper-base` execution through `whisper-cli`.
+- [x] Added `takokit test <model>` and `takokit test --suite launch`.
+- [x] Added Python-managed adapter slots for Qwen3-TTS, Chatterbox, F5-TTS, CosyVoice2, Dia, Fish Speech, OpenVoice, GPT-SoVITS, and RVC.
 - [x] Added model lifecycle states and `takokit plan <model>`.
 - [x] Added `GET /v1/models/:id/plan`, `GET /v1/library/models`, and `GET /v1/library/runners`.
 - [x] Added runtime model manifests for Piper, Kokoro, Whisper Base, Qwen3-TTS, CosyVoice2, F5-TTS, Fish Speech, Dia, Chatterbox, GPT-SoVITS, OpenVoice, RVC, Qwen Omni, Voxtral, SenseVoice, Parakeet, and Canary.
 - [x] Added Python-managed runner storage layout under `~/.takokit/runners/python-managed/`.
-- [x] Added explicit whisper.cpp transcription runner scaffold with typed `inference_not_implemented`.
+- [x] Added explicit whisper.cpp transcription runner scaffold, then wired Whisper Base real execution.
 - [x] Updated GUI model details to show selected-model plan state.
 - [x] Added curated model and runner library metadata under `registry/library/`.
 - [x] Added typed library manifest parsing for discovery metadata.
@@ -90,6 +100,7 @@
 - `takokit pull kokoro` installs only the local mock manifest for now.
 - `takokit pull piper-lessac` downloads and verifies the Piper Lessac medium ONNX model/config artifacts.
 - `takokit speak "Hello" --model kokoro` must not claim real Kokoro inference until a runner exists.
-- `takokit speak "Hello" --model mock-tts` is the only current speech path and is for CLI/API contract testing.
+- `takokit speak "Hello" --model mock-tts` is the only current TTS path and is for CLI/API contract testing.
+- `takokit transcribe ./audio.wav --model whisper-base` is a real STT path after pulling the model and installing `takokit-whispercpp`.
 - The GUI is a local browser GUI, not a Tauri app.
 - Keep every new task small enough to test immediately with `cargo check`, CLI commands, or GUI build.
