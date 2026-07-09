@@ -8,6 +8,8 @@ authors.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 takokit-audio = { path = "../takokit-audio" }
 takokit-core = { path = "../takokit-core" }
 takokit-package = { path = "../takokit-package" }

@@ -10,6 +10,10 @@ authors.workspace = true
 name = "takokit"
 path = "src/main.rs"
 
+[[bin]]
+name = "tako"
+path = "src/bin/tako.rs"
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

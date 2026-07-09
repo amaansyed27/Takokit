@@ -330,6 +330,7 @@ pub struct ExecutionPlan {
     pub runner: RunnerManifest,
     pub runner_installed: bool,
     pub status: ExecutionStatus,
+    pub installed_model: Option<InstalledModelRecord>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -788,9 +789,13 @@ pub fn resolve_execution_plan(
     capability: CapabilityKind,
 ) -> PackageResult<ExecutionPlan> {
     let model = package_registry.model(model_id)?;
-    if model.id != "mock-tts" && !installed_registry.is_model_installed(&model.id) {
+    let installed_model = if model.id == "mock-tts" {
+        None
+    } else if installed_registry.is_model_installed(&model.id) {
+        Some(installed_registry.installed_model_record(&model.id)?)
+    } else {
         return Err(PackageError::ModelNotInstalled(model.id));
-    }
+    };
 
     if !model.supports(capability) {
         return Err(PackageError::CapabilityUnsupported {
@@ -832,6 +837,7 @@ pub fn resolve_execution_plan(
         runner,
         runner_installed,
         status: ExecutionStatus::Planned,
+        installed_model,
     })
 }
 
@@ -1716,6 +1722,12 @@ role = "config"
         assert_eq!(plan.capability, CapabilityKind::TextToSpeech);
         assert!(plan.runner_installed);
         assert_eq!(plan.status, ExecutionStatus::Planned);
+        assert_eq!(
+            plan.installed_model
+                .as_ref()
+                .map(|record| record.id.as_str()),
+            Some("kokoro")
+        );
     }
 
     fn write_test_registry(root: &Path) {

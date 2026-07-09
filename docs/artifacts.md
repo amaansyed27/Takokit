@@ -25,6 +25,9 @@ Expected artifact failures return typed errors:
 - `artifact_download_failed`
 - `artifact_checksum_mismatch`
 - `artifact_install_failed`
+- `artifact_missing`
+- `artifact_not_downloaded`
+- `artifact_config_invalid`
 
 ## Manifest Shape
 
@@ -56,3 +59,5 @@ Metadata-only installs still write the manifest copy and installed-model record 
 `piper-lessac` now records verified Piper Lessac medium ONNX model/config artifacts. `takokit pull piper-lessac` downloads both files, validates byte sizes and SHA256 values, stores them under `~/.takokit/blobs/sha256/`, and writes installed artifact records with `downloaded = true`.
 
 ONNX execution remains unimplemented. After valid model and runner metadata are installed, Piper/Kokoro-style requests still return typed `inference_not_implemented`.
+
+The Piper ONNX runner scaffold now reads the installed `piper-lessac` artifact records, resolves the local blob paths for `en_US-lessac-medium.onnx` and `en_US-lessac-medium.onnx.json`, and parses the JSON config before stopping at the typed not-implemented runner boundary.

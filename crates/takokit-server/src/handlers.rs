@@ -268,7 +268,10 @@ impl IntoResponse for ApiError {
                 ErrorCode::ArtifactUrlMissing
                 | ErrorCode::ArtifactChecksumMissing
                 | ErrorCode::ArtifactChecksumMismatch
-                | ErrorCode::ArtifactInstallFailed => StatusCode::BAD_REQUEST,
+                | ErrorCode::ArtifactInstallFailed
+                | ErrorCode::ArtifactMissing
+                | ErrorCode::ArtifactNotDownloaded
+                | ErrorCode::ArtifactConfigInvalid => StatusCode::BAD_REQUEST,
                 ErrorCode::ArtifactDownloadFailed => StatusCode::BAD_GATEWAY,
                 ErrorCode::ModelNotFound
                 | ErrorCode::ModelNotInstalled

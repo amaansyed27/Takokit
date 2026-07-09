@@ -13,6 +13,9 @@ pub enum ErrorCode {
     ArtifactDownloadFailed,
     ArtifactChecksumMismatch,
     ArtifactInstallFailed,
+    ArtifactMissing,
+    ArtifactNotDownloaded,
+    ArtifactConfigInvalid,
     InferenceNotImplemented,
 }
 
@@ -30,6 +33,9 @@ impl ErrorCode {
             ErrorCode::ArtifactDownloadFailed => "artifact_download_failed",
             ErrorCode::ArtifactChecksumMismatch => "artifact_checksum_mismatch",
             ErrorCode::ArtifactInstallFailed => "artifact_install_failed",
+            ErrorCode::ArtifactMissing => "artifact_missing",
+            ErrorCode::ArtifactNotDownloaded => "artifact_not_downloaded",
+            ErrorCode::ArtifactConfigInvalid => "artifact_config_invalid",
             ErrorCode::InferenceNotImplemented => "inference_not_implemented",
         }
     }

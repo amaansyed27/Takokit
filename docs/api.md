@@ -133,7 +133,7 @@ Artifact-backed pulls require URL and SHA256 metadata. Expected artifact failure
 }
 ```
 
-Other artifact error codes are `artifact_url_missing`, `artifact_download_failed`, `artifact_checksum_mismatch`, and `artifact_install_failed`.
+Other artifact error codes are `artifact_url_missing`, `artifact_download_failed`, `artifact_checksum_mismatch`, `artifact_install_failed`, `artifact_missing`, `artifact_not_downloaded`, and `artifact_config_invalid`. The last three can surface from runner preparation if an installed model record does not contain usable local artifact paths or a config cannot be parsed.
 
 ## GUI
 

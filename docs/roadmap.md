@@ -4,7 +4,8 @@ This file tracks near-term direction without phase gates. The source of truth fo
 
 ## Next Useful Increments
 
-- Implement the chosen first ONNX model runner: Piper ONNX.
+- Implement Piper ONNX session loading and audio generation.
+- Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
 - Add release packaging.
 - Add actual install script release URLs after artifacts and checksums exist.
 - Add public model library website.
@@ -39,6 +40,8 @@ The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.
 Checksum-backed artifact install exists for explicit pulls. Downloads go through `~/.takokit/cache/downloads/`, are verified with SHA256, and only then move into `~/.takokit/blobs/sha256/<hash>`. Checksum mismatches delete the temporary file.
 
 `piper-lessac` now records verified Lessac medium ONNX model/config artifacts. `takokit pull piper-lessac` downloads and verifies both files. ONNX execution is still unimplemented.
+
+The ONNX runner scaffold now loads the installed Piper artifact paths and parses the JSON config, but it still does not run an ONNX session or synthesize audio.
 
 ## Keep Out For Now
 

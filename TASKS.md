@@ -7,13 +7,17 @@
 
 ## Next Small Tasks
 
-- [ ] Implement the chosen first ONNX model runner: Piper ONNX.
+- [ ] Implement Piper ONNX session loading and audio generation.
+- [ ] Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
 
 ## Done
 
+- [x] Added `tako` as a short command alias for `takokit` while preserving the `~/.takokit` storage root.
+- [x] Added Piper ONNX runner artifact loading scaffold for installed Lessac model/config artifacts.
+- [x] Added typed Piper JSON config parsing in the ONNX runner layer.
 - [x] Added checksum-backed artifact install foundation with temporary downloads and content-addressed blobs.
 - [x] Made artifact-backed model installs atomic so failed artifact verification leaves no final model manifest or installed-model record.
 - [x] Added typed artifact errors for missing URLs, missing checksums, failed downloads, checksum mismatches, and install failures.

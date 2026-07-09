@@ -40,12 +40,14 @@ Model manifests declare these surfaces as typed capabilities. CLI, API, and GUI 
 
 ## Apps
 
-- `apps/cli`: Clap CLI. Bare `takokit` opens a lightweight interactive terminal launcher. Subcommands start the daemon, open the GUI, run doctor checks, and call package/model functionality.
+- `apps/cli`: Clap CLI. Bare `takokit` opens a lightweight interactive terminal launcher. `tako` is a short binary alias for the same entrypoint and storage root. Subcommands start the daemon, open the GUI, run doctor checks, and call package/model functionality.
 - `apps/gui`: Browser GUI. It calls the local API through `src/lib/api.ts`.
 
 ## Local Launcher And Doctor
 
 Running `takokit` without a subcommand opens a simple terminal launcher for common local actions: mock speech generation, model metadata pulls, runner contract pulls, GUI launch, server startup, package listing, and doctor checks. The launcher is honest about current execution limits and does not claim real Kokoro, Whisper, voice cloning, training, or conversion inference works yet.
+
+Running `tako` invokes the same CLI implementation. It intentionally continues to use `~/.takokit/`, not a separate `~/.tako/` tree.
 
 `takokit doctor` checks storage directories, `config.toml`, local registry availability, model and runner manifest parsing, installed model and runner record parsing, server availability, GUI build output, `mock-tts` availability, and the platform identifier. Missing GUI build output and unimplemented real runners are warnings, not fatal errors for current mock/runtime development.
 
@@ -92,7 +94,7 @@ model id
 
 Planning belongs to `takokit-package`. It returns typed planning failures such as `ModelNotFound`, `ModelNotInstalled`, `CapabilityUnsupported`, `RunnerNotFound`, `RunnerNotInstalled`, and `RunnerUnsupportedOnPlatform`.
 
-Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the message:
+Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the message:
 
 ```txt
 ONNX runner contract resolved, but real ONNX execution is not implemented yet.
@@ -117,6 +119,8 @@ Runners must communicate through explicit contracts. UI and API callers should o
 The first real ONNX model target is Piper ONNX, documented in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Piper is the shortest path to one real model artifact manifest, checksum-backed artifact download, and local ONNX execution. Kokoro ONNX remains the next TTS target after the Piper runner path is proven.
 
 `piper-lessac` records verified Piper Lessac medium ONNX model/config artifacts. Pulling it downloads and verifies those files, but ONNX execution still returns `inference_not_implemented`.
+
+The Piper ONNX scaffold resolves the installed `en_US-lessac-medium.onnx` and `en_US-lessac-medium.onnx.json` blob paths, parses the Piper JSON config, and then stops before inference.
 
 ## Installer Scaffolds
 

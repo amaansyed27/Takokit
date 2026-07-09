@@ -12,7 +12,7 @@ VoiceCloneEngine
 
 `mock-tts` is the only executable speech engine today. It writes a deterministic test WAV and is not real inference.
 
-Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records. Runner engines consume that plan and either produce output or return a typed execution error.
+Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records, including the installed model record when a package model is pulled. Runner engines consume that plan and either produce output or return a typed execution error.
 
 Current runner traits:
 
@@ -27,7 +27,7 @@ The ONNX runner scaffold exists in `takokit-models`, but it returns:
 inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet.
 ```
 
-It does not generate Kokoro, Piper, or any other real-model audio yet.
+It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning the not-implemented execution error.
 
 Takokit model manifests describe the five product surfaces:
 
