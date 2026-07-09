@@ -7,14 +7,18 @@ Artifact-backed pulls use this flow:
 ```txt
 artifact manifest
   -> download into ~/.takokit/cache/downloads/
+  -> validate byte size when bytes is present
   -> compute SHA256 before install
   -> compare with manifest checksum
-  -> delete temporary file on mismatch
+  -> delete temporary file on byte/checksum mismatch
   -> move verified file into ~/.takokit/blobs/sha256/<hash>
-  -> write installed artifact record with local_path and downloaded=true
+  -> stage installed model manifest and installed-model record
+  -> move staged manifest and record into final paths
 ```
 
-Unverified files are never placed in the final blob directory. Expected artifact failures return typed errors:
+Unverified files are never placed in the final blob directory. Failed artifact-backed installs must not leave a final model manifest or installed-model record, so `is_model_installed(model)` remains false after a failed first install.
+
+Expected artifact failures return typed errors:
 
 - `artifact_url_missing`
 - `artifact_checksum_missing`
@@ -44,6 +48,8 @@ role = "config"
 ```
 
 If a manifest has artifact URLs but lacks checksums, normal artifact install fails unless the manifest or request is explicitly metadata-only. Takokit does not commit fake SHA256 values.
+
+Metadata-only installs still write the manifest copy and installed-model record because they intentionally skip artifact download and verification.
 
 ## Current State
 

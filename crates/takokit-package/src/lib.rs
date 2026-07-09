@@ -485,15 +485,14 @@ impl InstalledRegistry {
         std::fs::create_dir_all(self.root.join("models"))?;
         std::fs::create_dir_all(self.root.join("installed-models"))?;
         let path = self.model_manifest_path(&manifest.id);
-        std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
-        let record = installed_model_record_with_artifacts(
-            manifest,
-            path.clone(),
-            self.install_artifacts(manifest, options)?,
-        );
-        std::fs::write(
-            self.model_record_path(&manifest.id),
-            toml::to_string_pretty(&record)?,
+        let artifact_set = self.install_artifacts(manifest, options)?;
+        let record = installed_model_record_with_artifacts(manifest, path.clone(), artifact_set);
+
+        write_model_install_files(
+            &path,
+            &self.model_record_path(&manifest.id),
+            &toml::to_string_pretty(manifest)?,
+            &toml::to_string_pretty(&record)?,
         )?;
 
         Ok(PullReport {
@@ -912,6 +911,89 @@ fn installed_artifacts(manifest: &ArtifactManifest) -> Vec<InstalledArtifactReco
         .collect()
 }
 
+fn write_model_install_files(
+    manifest_path: &Path,
+    record_path: &Path,
+    manifest_toml: &str,
+    record_toml: &str,
+) -> PackageResult<()> {
+    let manifest_tmp = sibling_temp_path(manifest_path);
+    let record_tmp = sibling_temp_path(record_path);
+    std::fs::write(&manifest_tmp, manifest_toml)?;
+    std::fs::write(&record_tmp, record_toml).map_err(|error| {
+        let _ = std::fs::remove_file(&manifest_tmp);
+        let _ = std::fs::remove_file(&record_tmp);
+        PackageError::Io(error)
+    })?;
+
+    let manifest_backup = backup_existing_file(manifest_path).map_err(|error| {
+        let _ = std::fs::remove_file(&manifest_tmp);
+        let _ = std::fs::remove_file(&record_tmp);
+        error
+    })?;
+    if let Err(error) = std::fs::rename(&manifest_tmp, manifest_path) {
+        let _ = std::fs::remove_file(&manifest_tmp);
+        let _ = std::fs::remove_file(&record_tmp);
+        restore_backup(manifest_path, manifest_backup);
+        return Err(PackageError::Io(error));
+    }
+
+    let record_backup = match backup_existing_file(record_path) {
+        Ok(backup) => backup,
+        Err(error) => {
+            let _ = std::fs::remove_file(&record_tmp);
+            let _ = std::fs::remove_file(manifest_path);
+            restore_backup(manifest_path, manifest_backup);
+            return Err(error);
+        }
+    };
+    if let Err(error) = std::fs::rename(&record_tmp, record_path) {
+        let _ = std::fs::remove_file(&record_tmp);
+        let _ = std::fs::remove_file(manifest_path);
+        restore_backup(manifest_path, manifest_backup);
+        restore_backup(record_path, record_backup);
+        return Err(PackageError::Io(error));
+    }
+
+    remove_backup(manifest_backup);
+    remove_backup(record_backup);
+    Ok(())
+}
+
+fn sibling_temp_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("install");
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos().to_string())
+        .unwrap_or_else(|_| timestamp_now());
+    path.with_file_name(format!("{file_name}.{suffix}.tmp"))
+}
+
+fn backup_existing_file(path: &Path) -> PackageResult<Option<PathBuf>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let backup_path = sibling_temp_path(path).with_extension("bak");
+    std::fs::rename(path, &backup_path)?;
+    Ok(Some(backup_path))
+}
+
+fn restore_backup(path: &Path, backup: Option<PathBuf>) {
+    if let Some(backup) = backup {
+        let _ = std::fs::rename(backup, path);
+    }
+}
+
+fn remove_backup(backup: Option<PathBuf>) {
+    if let Some(backup) = backup {
+        let _ = std::fs::remove_file(backup);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct InstalledArtifactSet {
     records: Vec<InstalledArtifactRecord>,
@@ -947,6 +1029,25 @@ fn install_artifact(
         timestamp_now()
     ));
     download_to_temp(url, &artifact.name, &temp_path)?;
+
+    if let Some(expected_bytes) = artifact.bytes {
+        let actual_bytes = std::fs::metadata(&temp_path)
+            .map(|metadata| metadata.len())
+            .map_err(|error| {
+                let _ = std::fs::remove_file(&temp_path);
+                PackageError::ArtifactInstallFailed {
+                    artifact: artifact.name.clone(),
+                    reason: error.to_string(),
+                }
+            })?;
+        if actual_bytes != expected_bytes {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: artifact.name.clone(),
+                reason: format!("expected {expected_bytes} bytes, got {actual_bytes}"),
+            });
+        }
+    }
 
     let actual = sha256_file(&temp_path).map_err(|error| PackageError::ArtifactInstallFailed {
         artifact: artifact.name.clone(),
@@ -1323,6 +1424,27 @@ role = "config"
     }
 
     #[test]
+    fn checksum_mismatch_does_not_leave_installed_model_state() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, "0000");
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        let error = installed
+            .install_model_with_options(&manifest, InstallModelOptions::default())
+            .expect_err("checksum mismatch");
+
+        assert!(matches!(
+            error,
+            PackageError::ArtifactChecksumMismatch { artifact, .. } if artifact == "fixture.onnx"
+        ));
+        assert!(!installed.model_manifest_path("piper-lessac").exists());
+        assert!(!installed.model_record_path("piper-lessac").exists());
+        assert!(!installed.is_model_installed("piper-lessac"));
+    }
+
+    #[test]
     fn successful_local_artifact_install_writes_downloaded_record() {
         let temp = tempfile::tempdir().expect("tempdir");
         let source = temp.path().join("fixture.onnx");
@@ -1333,6 +1455,9 @@ role = "config"
         installed
             .install_model_with_options(&manifest, InstallModelOptions::default())
             .expect("install model");
+        assert!(installed.model_manifest_path("piper-lessac").exists());
+        assert!(installed.model_record_path("piper-lessac").exists());
+        assert!(installed.is_model_installed("piper-lessac"));
         let record = installed
             .installed_model_record("piper-lessac")
             .expect("installed record");
@@ -1362,6 +1487,9 @@ role = "config"
                 },
             )
             .expect("metadata install");
+        assert!(installed.model_manifest_path("piper-lessac").exists());
+        assert!(installed.model_record_path("piper-lessac").exists());
+        assert!(installed.is_model_installed("piper-lessac"));
         let record = installed
             .installed_model_record("piper-lessac")
             .expect("installed record");

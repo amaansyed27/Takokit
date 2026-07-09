@@ -16,6 +16,7 @@
 ## Done
 
 - [x] Added checksum-backed artifact install foundation with temporary downloads and content-addressed blobs.
+- [x] Made artifact-backed model installs atomic so failed artifact verification leaves no final model manifest or installed-model record.
 - [x] Added typed artifact errors for missing URLs, missing checksums, failed downloads, checksum mismatches, and install failures.
 - [x] Added model/config artifact roles to manifests and installed records.
 - [x] Updated `piper-lessac` with the Piper Lessac medium ONNX model/config artifact shape while keeping it metadata-only until verified SHA256 values are finalized.
