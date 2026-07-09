@@ -7,7 +7,6 @@
 
 ## Next Small Tasks
 
-- [ ] Finalize verified Piper Lessac SHA256 values and enable artifact-backed `pull piper-lessac`.
 - [ ] Implement the chosen first ONNX model runner: Piper ONNX.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
@@ -19,7 +18,8 @@
 - [x] Made artifact-backed model installs atomic so failed artifact verification leaves no final model manifest or installed-model record.
 - [x] Added typed artifact errors for missing URLs, missing checksums, failed downloads, checksum mismatches, and install failures.
 - [x] Added model/config artifact roles to manifests and installed records.
-- [x] Updated `piper-lessac` with the Piper Lessac medium ONNX model/config artifact shape while keeping it metadata-only until verified SHA256 values are finalized.
+- [x] Finalized verified Piper Lessac SHA256 values and enabled artifact-backed `pull piper-lessac`.
+- [x] Updated `piper-lessac` with the Piper Lessac medium ONNX model/config artifact shape.
 - [x] Added artifact lifecycle docs and Piper source/licensing references.
 - [x] Split execution planning from runner execution.
 - [x] Added a runner execution interface for speech and transcription.
@@ -72,7 +72,7 @@
 ## Notes
 
 - `takokit pull kokoro` installs only the local mock manifest for now.
-- `takokit pull piper-lessac` installs metadata only until verified SHA256 values are finalized.
+- `takokit pull piper-lessac` downloads and verifies the Piper Lessac medium ONNX model/config artifacts.
 - `takokit speak "Hello" --model kokoro` must not claim real Kokoro inference until a runner exists.
 - `takokit speak "Hello" --model mock-tts` is the only current speech path and is for CLI/API contract testing.
 - The GUI is a local browser GUI, not a Tauri app.

@@ -57,7 +57,7 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 }
 ```
 
-`metadata_only` is optional and defaults to `false`. A manifest can also declare itself metadata-only while artifact checksums are still unresolved. `piper-lessac` currently records the real Piper Lessac medium ONNX model/config URLs, but remains metadata-only because final SHA256 values are intentionally blank.
+`metadata_only` is optional and defaults to `false`. A manifest can also declare itself metadata-only while artifact checksums are still unresolved. `piper-lessac` now has verified Piper Lessac medium ONNX model/config URLs, byte sizes, and SHA256 values, so the default pull downloads and verifies both artifacts.
 
 `DELETE /v1/models/:id` removes the local installed model metadata.
 

@@ -5,7 +5,6 @@ This file tracks near-term direction without phase gates. The source of truth fo
 ## Next Useful Increments
 
 - Implement the chosen first ONNX model runner: Piper ONNX.
-- Finalize verified Piper Lessac SHA256 values and enable artifact-backed `pull piper-lessac`.
 - Add release packaging.
 - Add actual install script release URLs after artifacts and checksums exist.
 - Add public model library website.
@@ -39,7 +38,7 @@ The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.
 
 Checksum-backed artifact install exists for explicit pulls. Downloads go through `~/.takokit/cache/downloads/`, are verified with SHA256, and only then move into `~/.takokit/blobs/sha256/<hash>`. Checksum mismatches delete the temporary file.
 
-`piper-lessac` now records the real Lessac medium ONNX model/config artifact shape, but remains metadata-only until verified SHA256 values are added. ONNX execution is still unimplemented.
+`piper-lessac` now records verified Lessac medium ONNX model/config artifacts. `takokit pull piper-lessac` downloads and verifies both files. ONNX execution is still unimplemented.
 
 ## Keep Out For Now
 

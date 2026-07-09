@@ -35,15 +35,15 @@ metadata_only = false
 [[artifacts.weights]]
 name = "en_US-lessac-medium.onnx"
 url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
-sha256 = "<verified sha256>"
-bytes = 63200000
+sha256 = "5efe09e69902187827af646e1a6e9d269dee769f9877d17b16b1b46eeaaf019f"
+bytes = 63201294
 role = "model"
 
 [[artifacts.configs]]
 name = "en_US-lessac-medium.onnx.json"
 url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
-sha256 = "<verified sha256>"
-bytes = 4890
+sha256 = "efe19c417bed055f2d69908248c6ba650fa135bc868b0e6abb3da181dab690a0"
+bytes = 4885
 role = "config"
 ```
 
@@ -53,6 +53,6 @@ Metadata-only installs still write the manifest copy and installed-model record 
 
 ## Current State
 
-`piper-lessac` now records the real Piper Lessac medium ONNX model/config artifact shape, but its checksums are intentionally blank and the manifest is marked `metadata_only = true`. `takokit pull piper-lessac` installs metadata only until those checksums are finalized.
+`piper-lessac` now records verified Piper Lessac medium ONNX model/config artifacts. `takokit pull piper-lessac` downloads both files, validates byte sizes and SHA256 values, stores them under `~/.takokit/blobs/sha256/`, and writes installed artifact records with `downloaded = true`.
 
 ONNX execution remains unimplemented. After valid model and runner metadata are installed, Piper/Kokoro-style requests still return typed `inference_not_implemented`.

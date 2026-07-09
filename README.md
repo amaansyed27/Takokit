@@ -38,7 +38,7 @@ Takokit models declare which local voice surfaces they support:
 - Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
 - Installed model and runner records under `~/.takokit/manifests/`.
 - Checksum-backed artifact install foundation with content-addressed blobs.
-- Piper Lessac medium ONNX artifact metadata shape.
+- Verified Piper Lessac medium ONNX artifact-backed pull.
 - Typed capability taxonomy and execution planning layer.
 - Runner execution interface with an ONNX runner scaffold.
 - Local storage layout under `~/.takokit`.
@@ -72,7 +72,7 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit pull kokoro` currently installs local mock registry metadata into `~/.takokit/manifests/models/` and writes an installed-model record under `~/.takokit/manifests/installed-models/`. It does not download weights or enable real Kokoro inference yet.
 
-`takokit pull piper-lessac` is metadata-only until verified SHA256 values are finalized for the Piper Lessac medium ONNX model/config files. The manifest records real artifact URLs and byte sizes, but intentionally leaves checksums blank. Takokit refuses artifact-backed installs without checksums instead of accepting unverified files. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
+`takokit pull piper-lessac` downloads the Piper Lessac medium ONNX model and config files, validates byte sizes and SHA256 checksums, stores verified blobs under `~/.takokit/blobs/sha256/`, and writes downloaded artifact records. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
 
 `takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
 

@@ -116,7 +116,7 @@ Runners must communicate through explicit contracts. UI and API callers should o
 
 The first real ONNX model target is Piper ONNX, documented in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Piper is the shortest path to one real model artifact manifest, checksum-backed artifact download, and local ONNX execution. Kokoro ONNX remains the next TTS target after the Piper runner path is proven.
 
-`piper-lessac` records the real Piper Lessac medium ONNX model/config artifact shape. Its checksums remain blank and the manifest is marked metadata-only until verified SHA256 values are added.
+`piper-lessac` records verified Piper Lessac medium ONNX model/config artifacts. Pulling it downloads and verifies those files, but ONNX execution still returns `inference_not_implemented`.
 
 ## Installer Scaffolds
 

@@ -47,7 +47,7 @@ Kokoro ONNX currently has a more involved package shape for Takokit's first runn
 
 ## Consequences
 
-- Next implementation work should finalize verified Piper Lessac SHA256 values and enable artifact-backed pull for the existing Piper ONNX artifact manifest shape.
-- The Piper Lessac manifest can carry artifact URLs before execution exists, but it must stay metadata-only until verified source SHA256 values are added.
+- Verified Piper Lessac SHA256 values are now in the manifest, and `takokit pull piper-lessac` downloads and verifies the model/config artifacts.
+- Next implementation work should connect the ONNX runner to the verified Piper voice/config artifacts without vendoring GPL runtime code.
 - The ONNX runner should be implemented against a single Piper voice/config pair first.
 - Kokoro ONNX should remain in the registry as a planned TTS + Live Audio API model, but it should keep returning `inference_not_implemented` until Piper proves the runner path.

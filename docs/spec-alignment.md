@@ -33,8 +33,6 @@
 - Voice cloning
 - Voice training
 - Voice conversion
-- Verified Piper Lessac SHA256 values
-- Real artifact-backed `pull piper-lessac`
 - Signatures
 - Release packaging
 - Actual install script release URLs

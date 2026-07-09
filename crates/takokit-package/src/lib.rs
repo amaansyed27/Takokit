@@ -1472,6 +1472,95 @@ role = "config"
     }
 
     #[test]
+    fn successful_local_artifact_install_writes_model_and_config_records() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let model_source = temp.path().join("fixture.onnx");
+        let config_source = temp.path().join("fixture.onnx.json");
+        std::fs::write(&model_source, b"hello").expect("model fixture");
+        std::fs::write(&config_source, br#"{"audio":{"sample_rate":22050}}"#)
+            .expect("config fixture");
+        let model_sha = sha256_file(&model_source).expect("model sha");
+        let config_sha = sha256_file(&config_source).expect("config sha");
+        let manifest =
+            multi_artifact_test_manifest(&model_source, &model_sha, &config_source, &config_sha);
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        installed
+            .install_model_with_options(&manifest, InstallModelOptions::default())
+            .expect("install model");
+        let record = installed
+            .installed_model_record("piper-lessac")
+            .expect("installed record");
+
+        assert_eq!(record.status, InstalledPackageStatus::Ready);
+        assert_eq!(record.artifacts.len(), 2);
+        assert!(record.artifacts.iter().all(|artifact| artifact.downloaded));
+        assert!(record
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.name == "fixture.onnx"
+                && artifact.role == ArtifactRole::Model
+                && artifact.local_path.as_ref().is_some_and(
+                    |path| path.ends_with(Path::new("blobs").join("sha256").join(&model_sha))
+                )));
+        assert!(record
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.name == "fixture.onnx.json"
+                && artifact.role == ArtifactRole::Config
+                && artifact.local_path.as_ref().is_some_and(
+                    |path| path.ends_with(Path::new("blobs").join("sha256").join(&config_sha))
+                )));
+    }
+
+    #[test]
+    fn bundled_piper_lessac_manifest_has_verified_artifact_fields() {
+        let manifest = PackageRegistry::bundled()
+            .model("piper-lessac")
+            .expect("piper manifest");
+
+        assert!(!manifest.artifacts.metadata_only);
+        assert_eq!(manifest.artifacts.weights.len(), 1);
+        assert_eq!(manifest.artifacts.configs.len(), 1);
+        assert_eq!(
+            manifest.artifacts.weights[0].url.as_deref(),
+            Some("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx")
+        );
+        assert_eq!(manifest.artifacts.weights[0].bytes, Some(63_201_294));
+        assert_eq!(
+            manifest.artifacts.weights[0].sha256,
+            "5efe09e69902187827af646e1a6e9d269dee769f9877d17b16b1b46eeaaf019f"
+        );
+        assert_eq!(
+            manifest.artifacts.configs[0].url.as_deref(),
+            Some("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json")
+        );
+        assert_eq!(manifest.artifacts.configs[0].bytes, Some(4_885));
+        assert_eq!(
+            manifest.artifacts.configs[0].sha256,
+            "efe19c417bed055f2d69908248c6ba650fa135bc868b0e6abb3da181dab690a0"
+        );
+    }
+
+    #[test]
+    fn bundled_placeholder_models_still_install_metadata_only() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::bundled();
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        for model_id in ["kokoro", "whisper-base", "chatterbox", "gpt-sovits"] {
+            let manifest = registry.model(model_id).expect("model manifest");
+            installed.install_model(&manifest).expect("install model");
+            let record = installed
+                .installed_model_record(model_id)
+                .expect("installed record");
+
+            assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
+            assert!(record.artifacts.iter().all(|artifact| !artifact.downloaded));
+        }
+    }
+
+    #[test]
     fn metadata_only_model_install_still_works_with_artifact_placeholders() {
         let temp = tempfile::tempdir().expect("tempdir");
         let source = temp.path().join("fixture.onnx");
@@ -1675,5 +1764,57 @@ role = "model"
         );
 
         toml::from_str(&toml).expect("artifact manifest")
+    }
+
+    fn multi_artifact_test_manifest(
+        model_source: &Path,
+        model_sha256: &str,
+        config_source: &Path,
+        config_sha256: &str,
+    ) -> ModelManifest {
+        let model_source = model_source.to_string_lossy().replace('\\', "/");
+        let config_source = config_source.to_string_lossy().replace('\\', "/");
+        let toml = format!(
+            r#"
+id = "piper-lessac"
+name = "Piper Lessac"
+version = "0.1.0"
+kind = "tts"
+backend = "onnx"
+runner = "takokit-onnx"
+license = "mit"
+description = "Piper Lessac multi-artifact test manifest."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "2gb"
+
+[artifacts]
+
+[[artifacts.weights]]
+name = "fixture.onnx"
+url = "{model_source}"
+sha256 = "{model_sha256}"
+bytes = 5
+role = "model"
+
+[[artifacts.configs]]
+name = "fixture.onnx.json"
+url = "{config_source}"
+sha256 = "{config_sha256}"
+bytes = 31
+role = "config"
+"#
+        );
+
+        toml::from_str(&toml).expect("multi artifact manifest")
     }
 }

@@ -71,20 +71,20 @@ Artifact-backed manifests can declare typed model/config files:
 
 ```toml
 [artifacts]
-metadata_only = true
+metadata_only = false
 
 [[artifacts.weights]]
 name = "en_US-lessac-medium.onnx"
 url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
-sha256 = ""
-bytes = 63200000
+sha256 = "5efe09e69902187827af646e1a6e9d269dee769f9877d17b16b1b46eeaaf019f"
+bytes = 63201294
 role = "model"
 
 [[artifacts.configs]]
 name = "en_US-lessac-medium.onnx.json"
 url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
-sha256 = ""
-bytes = 4890
+sha256 = "efe19c417bed055f2d69908248c6ba650fa135bc868b0e6abb3da181dab690a0"
+bytes = 4885
 role = "config"
 ```
 
@@ -103,13 +103,13 @@ description = "Native ONNX runner for CPU-friendly models."
 
 ## Installed Records
 
-Pulling a model writes a metadata-only installed record:
+Pulling a metadata-only model writes an installed record:
 
 ```txt
 ~/.takokit/manifests/installed-models/<model>.toml
 ```
 
-The record stores model id, version, source registry, manifest path, required runner, installed timestamp, artifact URL/checksum/role/local path, downloaded state, and status. Verified artifact installs store files under `~/.takokit/blobs/sha256/<hash>`.
+The record stores model id, version, source registry, manifest path, required runner, installed timestamp, artifact URL/checksum/role/local path, downloaded state, and status. Verified artifact installs store files under `~/.takokit/blobs/sha256/<hash>` and set `downloaded = true` for each installed artifact.
 
 Pulling a runner writes:
 

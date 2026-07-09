@@ -283,7 +283,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pull_model_route_supports_metadata_only_artifact_manifest() {
+    async fn pull_model_route_supports_metadata_only_option_for_artifact_manifest() {
         let root = std::env::temp_dir().join(format!(
             "takokit-server-piper-pull-test-{}",
             std::time::SystemTime::now()
@@ -300,7 +300,9 @@ mod tests {
                     .method("POST")
                     .uri("/v1/models/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"model":"piper-lessac"}"#))
+                    .body(Body::from(
+                        r#"{"model":"piper-lessac","metadata_only":true}"#,
+                    ))
                     .unwrap(),
             )
             .await
