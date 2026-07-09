@@ -5,8 +5,7 @@ This file tracks near-term direction without phase gates. The source of truth fo
 ## Next Useful Increments
 
 - Implement the chosen first ONNX model runner: Piper ONNX.
-- Add checksum-backed artifact download before any real model downloads.
-- Add a real Piper ONNX artifact manifest.
+- Finalize verified Piper Lessac SHA256 values and enable artifact-backed `pull piper-lessac`.
 - Add release packaging.
 - Add actual install script release URLs after artifacts and checksums exist.
 - Add public model library website.
@@ -35,6 +34,12 @@ Takokit's first-class surfaces are TTS, STT, Voice Cloning, Live Transcription L
 Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. Runner execution is separate. The current ONNX runner scaffold returns typed `inference_not_implemented` until real Piper ONNX execution is implemented.
 
 The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md).
+
+## Artifact Contract
+
+Checksum-backed artifact install exists for explicit pulls. Downloads go through `~/.takokit/cache/downloads/`, are verified with SHA256, and only then move into `~/.takokit/blobs/sha256/<hash>`. Checksum mismatches delete the temporary file.
+
+`piper-lessac` now records the real Lessac medium ONNX model/config artifact shape, but remains metadata-only until verified SHA256 values are added. ONNX execution is still unimplemented.
 
 ## Keep Out For Now
 

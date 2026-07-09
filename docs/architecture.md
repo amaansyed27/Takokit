@@ -57,16 +57,22 @@ Takokit should eventually own model and runner installation:
 model manifest -> runner manifest -> content-addressed blobs -> installed registry -> adapter dispatch
 ```
 
-The current implementation installs local mock metadata only. It writes:
+The current implementation installs local mock metadata for models without verified artifacts. For artifact-backed manifests, pull is explicit and the package layer downloads to `cache/downloads`, verifies SHA256, then installs into `blobs/sha256/<hash>` before writing installed artifact records.
+
+It writes:
 
 ```txt
+~/.takokit/cache/downloads/
+~/.takokit/blobs/sha256/<hash>
 ~/.takokit/manifests/models/<model>.toml
 ~/.takokit/manifests/runners/<runner>.toml
 ~/.takokit/manifests/installed-models/<model>.toml
 ~/.takokit/manifests/installed-runners/<runner>.toml
 ```
 
-The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact placeholders, required runner, platforms, and metadata-only status. Takokit still does not download model weights, install Python packages, or execute real runners.
+The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact URL/checksum/role/local path, required runner, platforms, and status. Takokit still does not install Python packages or execute real runners.
+
+Artifact install refuses missing URLs or checksums unless the manifest or request is explicitly metadata-only. Checksum mismatches delete the temporary download and return a typed error. See [artifacts.md](artifacts.md).
 
 ## Execution Planning And Runner Execution
 
@@ -109,6 +115,8 @@ Runners must communicate through explicit contracts. UI and API callers should o
 ## First ONNX Target
 
 The first real ONNX model target is Piper ONNX, documented in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Piper is the shortest path to one real model artifact manifest, checksum-backed artifact download, and local ONNX execution. Kokoro ONNX remains the next TTS target after the Piper runner path is proven.
+
+`piper-lessac` records the real Piper Lessac medium ONNX model/config artifact shape. Its checksums remain blank and the manifest is marked metadata-only until verified SHA256 values are added.
 
 ## Installer Scaffolds
 

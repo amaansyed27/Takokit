@@ -25,6 +25,10 @@ Piper is described upstream as a fast local neural TTS system, and the public Pi
 - https://github.com/rhasspy/piper
 - https://huggingface.co/rhasspy/piper-voices
 
+The old `rhasspy/piper` repository is archived and points development to `OHF-Voice/piper1-gpl`. The current OHF runtime repository is GPL-3.0, so Takokit should use Piper voices as downloadable artifacts only until there is an explicit licensing decision about runtime code:
+
+- https://github.com/OHF-Voice/piper1-gpl
+
 Kokoro is a strong follow-up target. The upstream Kokoro project describes an 82M parameter open-weight TTS model with Apache-licensed weights, and kokoro-onnx provides an ONNX Runtime package with MIT code and Apache model licensing:
 
 - https://github.com/hexgrad/kokoro
@@ -43,6 +47,7 @@ Kokoro ONNX currently has a more involved package shape for Takokit's first runn
 
 ## Consequences
 
-- Next implementation work should rename the current placeholder from metadata-only to a real Piper ONNX artifact manifest once checksum-backed downloads exist.
+- Next implementation work should finalize verified Piper Lessac SHA256 values and enable artifact-backed pull for the existing Piper ONNX artifact manifest shape.
+- The Piper Lessac manifest can carry artifact URLs before execution exists, but it must stay metadata-only until verified source SHA256 values are added.
 - The ONNX runner should be implemented against a single Piper voice/config pair first.
 - Kokoro ONNX should remain in the registry as a planned TTS + Live Audio API model, but it should keep returning `inference_not_implemented` until Piper proves the runner path.

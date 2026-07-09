@@ -48,7 +48,16 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 `GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, and honest execution status.
 
-`POST /v1/models/pull` installs local mock metadata only. It writes an installed-model record and a manifest copy; it does not download model weights.
+`POST /v1/models/pull` installs model metadata and, when a manifest has verified artifact URLs/checksums, installs those artifacts into content-addressed blobs.
+
+```json
+{
+  "model": "piper-lessac",
+  "metadata_only": false
+}
+```
+
+`metadata_only` is optional and defaults to `false`. A manifest can also declare itself metadata-only while artifact checksums are still unresolved. `piper-lessac` currently records the real Piper Lessac medium ONNX model/config URLs, but remains metadata-only because final SHA256 values are intentionally blank.
 
 `DELETE /v1/models/:id` removes the local installed model metadata.
 
@@ -111,7 +120,20 @@ After a model and its runner contract are installed, ONNX execution currently re
 }
 ```
 
-The current pull flow installs metadata from the local mock registry. It does not download weights.
+Metadata-only models install records from the local mock registry without downloads.
+
+Artifact-backed pulls require URL and SHA256 metadata. Expected artifact failures return typed JSON errors:
+
+```json
+{
+  "error": {
+    "code": "artifact_checksum_missing",
+    "message": "artifact checksum missing for piper-lessac: en_US-lessac-medium.onnx"
+  }
+}
+```
+
+Other artifact error codes are `artifact_url_missing`, `artifact_download_failed`, `artifact_checksum_mismatch`, and `artifact_install_failed`.
 
 ## GUI
 

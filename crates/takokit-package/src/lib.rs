@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
+    fs::File,
+    io::Read,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -30,6 +33,25 @@ pub enum PackageError {
 
     #[error("runner is not installed: {0}")]
     RunnerPackageNotInstalled(String),
+
+    #[error("artifact URL missing for {model}: {artifact}")]
+    ArtifactUrlMissing { model: String, artifact: String },
+
+    #[error("artifact checksum missing for {model}: {artifact}")]
+    ArtifactChecksumMissing { model: String, artifact: String },
+
+    #[error("artifact download failed for {artifact}: {reason}")]
+    ArtifactDownloadFailed { artifact: String, reason: String },
+
+    #[error("artifact checksum mismatch for {artifact}: expected {expected}, got {actual}")]
+    ArtifactChecksumMismatch {
+        artifact: String,
+        expected: String,
+        actual: String,
+    },
+
+    #[error("artifact install failed for {artifact}: {reason}")]
+    ArtifactInstallFailed { artifact: String, reason: String },
 
     #[error("{model} does not support {capability_label}.")]
     CapabilityUnsupported {
@@ -76,6 +98,26 @@ impl From<PackageError> for TakokitError {
             PackageError::RunnerPackageNotInstalled(id) => TakokitError::Resolution {
                 code: ErrorCode::RunnerNotInstalled,
                 message: format!("runner is not installed: {id}"),
+            },
+            error @ PackageError::ArtifactUrlMissing { .. } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactUrlMissing,
+                message: error.to_string(),
+            },
+            error @ PackageError::ArtifactChecksumMissing { .. } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactChecksumMissing,
+                message: error.to_string(),
+            },
+            error @ PackageError::ArtifactDownloadFailed { .. } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactDownloadFailed,
+                message: error.to_string(),
+            },
+            error @ PackageError::ArtifactChecksumMismatch { .. } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactChecksumMismatch,
+                message: error.to_string(),
+            },
+            error @ PackageError::ArtifactInstallFailed { .. } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactInstallFailed,
+                message: error.to_string(),
             },
             error @ PackageError::CapabilityUnsupported { .. } => TakokitError::Resolution {
                 code: ErrorCode::CapabilityUnsupported,
@@ -155,9 +197,15 @@ pub struct HardwareManifest {
     pub min_ram: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArtifactManifest {
+    #[serde(default)]
+    pub metadata_only: bool,
+    #[serde(default)]
     pub weights: Vec<ArtifactEntry>,
+    #[serde(default)]
+    pub configs: Vec<ArtifactEntry>,
+    #[serde(default)]
     pub voices: Vec<ArtifactEntry>,
 }
 
@@ -167,6 +215,23 @@ pub struct ArtifactEntry {
     pub sha256: String,
     pub bytes: Option<u64>,
     pub url: Option<String>,
+    #[serde(default)]
+    pub role: ArtifactRole,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactRole {
+    Model,
+    Config,
+    Voice,
+    Other,
+}
+
+impl Default for ArtifactRole {
+    fn default() -> Self {
+        Self::Model
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -208,6 +273,11 @@ pub struct PullReport {
     pub note: String,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InstallModelOptions {
+    pub metadata_only: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstalledModelRecord {
     pub id: String,
@@ -238,6 +308,10 @@ pub struct InstalledArtifactRecord {
     pub name: String,
     pub sha256: String,
     pub bytes: Option<u64>,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub role: ArtifactRole,
     pub local_path: Option<PathBuf>,
     pub downloaded: bool,
 }
@@ -400,11 +474,23 @@ impl InstalledRegistry {
     }
 
     pub fn install_model(&self, manifest: &ModelManifest) -> PackageResult<PullReport> {
+        self.install_model_with_options(manifest, InstallModelOptions::default())
+    }
+
+    pub fn install_model_with_options(
+        &self,
+        manifest: &ModelManifest,
+        options: InstallModelOptions,
+    ) -> PackageResult<PullReport> {
         std::fs::create_dir_all(self.root.join("models"))?;
         std::fs::create_dir_all(self.root.join("installed-models"))?;
         let path = self.model_manifest_path(&manifest.id);
         std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
-        let record = installed_model_record(manifest, path.clone());
+        let record = installed_model_record_with_artifacts(
+            manifest,
+            path.clone(),
+            self.install_artifacts(manifest, options)?,
+        );
         std::fs::write(
             self.model_record_path(&manifest.id),
             toml::to_string_pretty(&record)?,
@@ -480,6 +566,63 @@ impl InstalledRegistry {
             .join("installed-runners")
             .join(format!("{id}.toml"))
     }
+
+    fn storage_root(&self) -> PathBuf {
+        self.root
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.root.clone())
+    }
+
+    fn install_artifacts(
+        &self,
+        manifest: &ModelManifest,
+        options: InstallModelOptions,
+    ) -> PackageResult<InstalledArtifactSet> {
+        let artifacts = manifest.artifacts.all().collect::<Vec<_>>();
+        let metadata_only = options.metadata_only || manifest.artifacts.metadata_only;
+
+        if artifacts.is_empty() || metadata_only {
+            return Ok(InstalledArtifactSet {
+                records: installed_artifacts(&manifest.artifacts),
+                status: InstalledPackageStatus::MetadataOnly,
+                note: if artifacts.is_empty() {
+                    "Installed model metadata from local mock registry. No model weights were downloaded."
+                        .to_string()
+                } else {
+                    "Installed model metadata from local mock registry. Artifact URLs are recorded, but downloads were skipped because this manifest is metadata-only."
+                        .to_string()
+                },
+            });
+        }
+
+        let root = self.storage_root();
+        let downloads_dir = root.join("cache").join("downloads");
+        let blob_dir = root.join("blobs").join("sha256");
+        std::fs::create_dir_all(&downloads_dir)?;
+        std::fs::create_dir_all(&blob_dir)?;
+
+        let mut records = Vec::new();
+        for artifact in artifacts {
+            let local_path = install_artifact(manifest, artifact, &downloads_dir, &blob_dir)?;
+            records.push(InstalledArtifactRecord {
+                name: artifact.name.clone(),
+                sha256: artifact.sha256.clone(),
+                bytes: artifact.bytes,
+                url: artifact.url.clone(),
+                role: artifact.role,
+                local_path: Some(local_path),
+                downloaded: true,
+            });
+        }
+
+        Ok(InstalledArtifactSet {
+            records,
+            status: InstalledPackageStatus::Ready,
+            note: "Installed model metadata and verified artifacts into content-addressed blobs."
+                .to_string(),
+        })
+    }
 }
 
 impl ModelManifest {
@@ -498,7 +641,7 @@ impl ModelManifest {
             backend: self.backend.as_str().to_string(),
             runner: self.runner.clone(),
             hardware_notes: self.hardware.notes(),
-            artifact_count: self.artifacts.weights.len() + self.artifacts.voices.len(),
+            artifact_count: self.artifacts.all().count(),
             capabilities: self.capabilities.to_model_capabilities(),
             installed,
             runner_installed,
@@ -568,6 +711,15 @@ impl CapabilityManifest {
             capabilities.push(CapabilityKind::LiveAudio);
         }
         capabilities
+    }
+}
+
+impl ArtifactManifest {
+    pub fn all(&self) -> impl Iterator<Item = &ArtifactEntry> {
+        self.weights
+            .iter()
+            .chain(self.configs.iter())
+            .chain(self.voices.iter())
     }
 }
 
@@ -697,6 +849,24 @@ fn installed_model_record(
     manifest: &ModelManifest,
     manifest_path: PathBuf,
 ) -> InstalledModelRecord {
+    installed_model_record_with_artifacts(
+        manifest,
+        manifest_path,
+        InstalledArtifactSet {
+            records: installed_artifacts(&manifest.artifacts),
+            status: InstalledPackageStatus::MetadataOnly,
+            note:
+                "Installed model metadata from local mock registry. No model weights were downloaded."
+                    .to_string(),
+        },
+    )
+}
+
+fn installed_model_record_with_artifacts(
+    manifest: &ModelManifest,
+    manifest_path: PathBuf,
+    artifacts: InstalledArtifactSet,
+) -> InstalledModelRecord {
     InstalledModelRecord {
         id: manifest.id.clone(),
         version: manifest.version.clone(),
@@ -704,11 +874,9 @@ fn installed_model_record(
         manifest_path,
         runner: manifest.runner.clone(),
         installed_at: timestamp_now(),
-        artifacts: installed_artifacts(&manifest.artifacts),
-        status: InstalledPackageStatus::MetadataOnly,
-        note:
-            "Installed model metadata from local mock registry. No model weights were downloaded."
-                .to_string(),
+        artifacts: artifacts.records,
+        status: artifacts.status,
+        note: artifacts.note,
     }
 }
 
@@ -731,15 +899,146 @@ fn installed_runner_record(
 
 fn installed_artifacts(manifest: &ArtifactManifest) -> Vec<InstalledArtifactRecord> {
     manifest
-        .weights
-        .iter()
-        .chain(manifest.voices.iter())
+        .all()
         .map(|artifact| InstalledArtifactRecord {
             name: artifact.name.clone(),
             sha256: artifact.sha256.clone(),
             bytes: artifact.bytes,
+            url: artifact.url.clone(),
+            role: artifact.role,
             local_path: None,
             downloaded: false,
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InstalledArtifactSet {
+    records: Vec<InstalledArtifactRecord>,
+    status: InstalledPackageStatus,
+    note: String,
+}
+
+fn install_artifact(
+    manifest: &ModelManifest,
+    artifact: &ArtifactEntry,
+    downloads_dir: &Path,
+    blob_dir: &Path,
+) -> PackageResult<PathBuf> {
+    let url = artifact
+        .url
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| PackageError::ArtifactUrlMissing {
+            model: manifest.id.clone(),
+            artifact: artifact.name.clone(),
+        })?;
+    let expected = artifact.sha256.trim().to_ascii_lowercase();
+    if expected.is_empty() || expected == "todo" {
+        return Err(PackageError::ArtifactChecksumMissing {
+            model: manifest.id.clone(),
+            artifact: artifact.name.clone(),
+        });
+    }
+
+    let temp_path = downloads_dir.join(format!(
+        "{}.{}.part",
+        sanitize_file_name(&artifact.name),
+        timestamp_now()
+    ));
+    download_to_temp(url, &artifact.name, &temp_path)?;
+
+    let actual = sha256_file(&temp_path).map_err(|error| PackageError::ArtifactInstallFailed {
+        artifact: artifact.name.clone(),
+        reason: error.to_string(),
+    })?;
+    if actual != expected {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(PackageError::ArtifactChecksumMismatch {
+            artifact: artifact.name.clone(),
+            expected,
+            actual,
+        });
+    }
+
+    let final_path = blob_dir.join(&expected);
+    if final_path.exists() {
+        let _ = std::fs::remove_file(&temp_path);
+    } else {
+        std::fs::rename(&temp_path, &final_path).map_err(|error| {
+            let _ = std::fs::remove_file(&temp_path);
+            PackageError::ArtifactInstallFailed {
+                artifact: artifact.name.clone(),
+                reason: error.to_string(),
+            }
+        })?;
+    }
+
+    Ok(final_path)
+}
+
+fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<()> {
+    if url.starts_with("http://") || url.starts_with("https://") {
+        let response =
+            ureq::get(url)
+                .call()
+                .map_err(|error| PackageError::ArtifactDownloadFailed {
+                    artifact: artifact.to_string(),
+                    reason: error.to_string(),
+                })?;
+        let mut reader = response.into_reader();
+        let mut file = File::create(temp_path)?;
+        std::io::copy(&mut reader, &mut file).map_err(|error| {
+            let _ = std::fs::remove_file(temp_path);
+            PackageError::ArtifactDownloadFailed {
+                artifact: artifact.to_string(),
+                reason: error.to_string(),
+            }
+        })?;
+        return Ok(());
+    }
+
+    let local_path = if let Some(path) = url.strip_prefix("file://") {
+        PathBuf::from(path)
+    } else {
+        PathBuf::from(url)
+    };
+
+    let mut input =
+        File::open(&local_path).map_err(|error| PackageError::ArtifactDownloadFailed {
+            artifact: artifact.to_string(),
+            reason: error.to_string(),
+        })?;
+    let mut output = File::create(temp_path)?;
+    std::io::copy(&mut input, &mut output).map_err(|error| {
+        let _ = std::fs::remove_file(temp_path);
+        PackageError::ArtifactDownloadFailed {
+            artifact: artifact.to_string(),
+            reason: error.to_string(),
+        }
+    })?;
+    Ok(())
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn sanitize_file_name(name: &str) -> String {
+    name.chars()
+        .map(|ch| match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-' | '_' => ch,
+            _ => '_',
         })
         .collect()
 }
@@ -821,6 +1120,8 @@ platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 description = "Native ONNX runner for CPU-friendly models."
 "#;
 
+    const HELLO_SHA256: &str = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+
     #[test]
     fn parses_model_manifest() {
         let manifest: ModelManifest = toml::from_str(MODEL_TOML).expect("model manifest");
@@ -858,6 +1159,35 @@ description = "Native ONNX runner for CPU-friendly models."
             manifest.platforms,
             vec!["windows-x64", "linux-x64", "macos-arm64"]
         );
+    }
+
+    #[test]
+    fn parses_artifact_manifest_with_model_and_config_roles() {
+        let source = format!(
+            r#"
+{MODEL_TOML}
+
+[[artifacts.weights]]
+name = "en_US-lessac-medium.onnx"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
+sha256 = "{HELLO_SHA256}"
+bytes = 63200000
+role = "model"
+
+[[artifacts.configs]]
+name = "en_US-lessac-medium.onnx.json"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
+sha256 = "{HELLO_SHA256}"
+bytes = 4890
+role = "config"
+"#
+        )
+        .replace("[artifacts]\nweights = []\nvoices = []", "[artifacts]");
+        let manifest: ModelManifest = toml::from_str(&source).expect("model manifest");
+
+        assert_eq!(manifest.artifacts.weights[0].role, ArtifactRole::Model);
+        assert_eq!(manifest.artifacts.configs[0].role, ArtifactRole::Config);
+        assert_eq!(manifest.artifacts.all().count(), 2);
     }
 
     #[test]
@@ -947,6 +1277,99 @@ description = "Native ONNX runner for CPU-friendly models."
         assert_eq!(record.source, "local-mock-registry");
         assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
         assert!(record.manifest_path.ends_with("models/kokoro.toml"));
+    }
+
+    #[test]
+    fn install_model_missing_artifact_checksum_returns_typed_error() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, "");
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        let error = installed
+            .install_model_with_options(&manifest, InstallModelOptions::default())
+            .expect_err("missing checksum");
+
+        assert!(matches!(
+            error,
+            PackageError::ArtifactChecksumMissing { model, artifact }
+                if model == "piper-lessac" && artifact == "fixture.onnx"
+        ));
+    }
+
+    #[test]
+    fn checksum_mismatch_deletes_temporary_download() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, "0000");
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        let error = installed
+            .install_model_with_options(&manifest, InstallModelOptions::default())
+            .expect_err("checksum mismatch");
+
+        assert!(matches!(
+            error,
+            PackageError::ArtifactChecksumMismatch { artifact, .. } if artifact == "fixture.onnx"
+        ));
+
+        let downloads = temp.path().join("cache").join("downloads");
+        let leftovers = std::fs::read_dir(downloads)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
+        assert_eq!(leftovers, 0);
+    }
+
+    #[test]
+    fn successful_local_artifact_install_writes_downloaded_record() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, HELLO_SHA256);
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        installed
+            .install_model_with_options(&manifest, InstallModelOptions::default())
+            .expect("install model");
+        let record = installed
+            .installed_model_record("piper-lessac")
+            .expect("installed record");
+
+        assert_eq!(record.status, InstalledPackageStatus::Ready);
+        assert_eq!(record.artifacts.len(), 1);
+        assert_eq!(record.artifacts[0].role, ArtifactRole::Model);
+        assert!(record.artifacts[0].downloaded);
+        let local_path = record.artifacts[0].local_path.as_ref().expect("local path");
+        assert!(local_path.ends_with(Path::new("blobs").join("sha256").join(HELLO_SHA256)));
+        assert_eq!(std::fs::read(local_path).expect("blob"), b"hello");
+    }
+
+    #[test]
+    fn metadata_only_model_install_still_works_with_artifact_placeholders() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, "");
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        installed
+            .install_model_with_options(
+                &manifest,
+                InstallModelOptions {
+                    metadata_only: true,
+                },
+            )
+            .expect("metadata install");
+        let record = installed
+            .installed_model_record("piper-lessac")
+            .expect("installed record");
+
+        assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
+        assert_eq!(record.artifacts.len(), 1);
+        assert!(!record.artifacts[0].downloaded);
+        assert!(record.artifacts[0].local_path.is_none());
     }
 
     #[test]
@@ -1085,5 +1508,44 @@ description = "Native ONNX runner for CPU-friendly models."
         std::fs::create_dir_all(&runners).expect("runners dir");
         std::fs::write(models.join("kokoro.toml"), MODEL_TOML).expect("model toml");
         std::fs::write(runners.join("takokit-onnx.toml"), RUNNER_TOML).expect("runner toml");
+    }
+
+    fn artifact_test_manifest(source: &Path, sha256: &str) -> ModelManifest {
+        let source = source.to_string_lossy().replace('\\', "/");
+        let toml = format!(
+            r#"
+id = "piper-lessac"
+name = "Piper Lessac"
+version = "0.1.0"
+kind = "tts"
+backend = "onnx"
+runner = "takokit-onnx"
+license = "mit"
+description = "Piper Lessac test manifest."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "2gb"
+
+[artifacts]
+
+[[artifacts.weights]]
+name = "fixture.onnx"
+url = "{source}"
+sha256 = "{sha256}"
+bytes = 5
+role = "model"
+"#
+        );
+
+        toml::from_str(&toml).expect("artifact manifest")
     }
 }

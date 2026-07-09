@@ -63,8 +63,32 @@ min_ram = "4gb"
 
 [artifacts]
 weights = []
+configs = []
 voices = []
 ```
+
+Artifact-backed manifests can declare typed model/config files:
+
+```toml
+[artifacts]
+metadata_only = true
+
+[[artifacts.weights]]
+name = "en_US-lessac-medium.onnx"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
+sha256 = ""
+bytes = 63200000
+role = "model"
+
+[[artifacts.configs]]
+name = "en_US-lessac-medium.onnx.json"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
+sha256 = ""
+bytes = 4890
+role = "config"
+```
+
+Blank checksums are not valid for artifact install. They are allowed only when a manifest or pull request is explicitly metadata-only.
 
 ## Runner Manifest
 
@@ -85,7 +109,7 @@ Pulling a model writes a metadata-only installed record:
 ~/.takokit/manifests/installed-models/<model>.toml
 ```
 
-The record stores model id, version, source registry, manifest path, required runner, installed timestamp, artifact placeholders, and status. Artifact placeholders are not downloaded yet.
+The record stores model id, version, source registry, manifest path, required runner, installed timestamp, artifact URL/checksum/role/local path, downloaded state, and status. Verified artifact installs store files under `~/.takokit/blobs/sha256/<hash>`.
 
 Pulling a runner writes:
 
@@ -100,6 +124,8 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 - Do not hardcode model-specific behavior inside CLI handlers or React components.
 - Do not require users to manually install Python, Torch, CUDA, FFmpeg, clone repos, or run model-specific Gradio apps.
 - Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
+- Require SHA256 before artifact-backed downloads.
+- Delete temporary downloads on checksum mismatch.
 - Return typed unsupported/not-installed planning errors before execution.
 - Return typed `inference_not_implemented` from runner execution scaffolds until real runners are implemented.
 - Route execution requests through execution planning before any runner engine is called.
@@ -109,3 +135,5 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 ## First ONNX Target
 
 Piper ONNX is the first real ONNX target. The decision is recorded in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Kokoro ONNX remains the next target after Piper proves the artifact and runner path.
+
+The old `rhasspy/piper` runtime repository is archived and points to `OHF-Voice/piper1-gpl`, which is GPL-3.0. Takokit may reference Piper voice artifacts, but must not vendor GPL runtime code without an explicit licensing decision. See [references.md](references.md).

@@ -8,6 +8,11 @@ pub enum ErrorCode {
     RunnerNotFound,
     RunnerNotInstalled,
     RunnerUnsupportedOnPlatform,
+    ArtifactUrlMissing,
+    ArtifactChecksumMissing,
+    ArtifactDownloadFailed,
+    ArtifactChecksumMismatch,
+    ArtifactInstallFailed,
     InferenceNotImplemented,
 }
 
@@ -20,6 +25,11 @@ impl ErrorCode {
             ErrorCode::RunnerNotFound => "runner_not_found",
             ErrorCode::RunnerNotInstalled => "runner_not_installed",
             ErrorCode::RunnerUnsupportedOnPlatform => "runner_unsupported_on_platform",
+            ErrorCode::ArtifactUrlMissing => "artifact_url_missing",
+            ErrorCode::ArtifactChecksumMissing => "artifact_checksum_missing",
+            ErrorCode::ArtifactDownloadFailed => "artifact_download_failed",
+            ErrorCode::ArtifactChecksumMismatch => "artifact_checksum_mismatch",
+            ErrorCode::ArtifactInstallFailed => "artifact_install_failed",
             ErrorCode::InferenceNotImplemented => "inference_not_implemented",
         }
     }

@@ -11,7 +11,7 @@ use takokit_core::{
     TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
-use takokit_package::{resolve_execution_plan, RunnerInfo};
+use takokit_package::{resolve_execution_plan, InstallModelOptions, RunnerInfo};
 
 use crate::AppState;
 
@@ -115,7 +115,12 @@ pub async fn pull_model(
         .map_err(ApiError)?;
     let report = state
         .installed_registry
-        .install_model(&manifest)
+        .install_model_with_options(
+            &manifest,
+            InstallModelOptions {
+                metadata_only: request.metadata_only,
+            },
+        )
         .map_err(Into::into)
         .map_err(ApiError)?;
 
@@ -260,6 +265,11 @@ impl IntoResponse for ApiError {
         let status = match self.0 {
             TakokitError::Resolution { code, .. } => match code {
                 ErrorCode::CapabilityUnsupported => StatusCode::BAD_REQUEST,
+                ErrorCode::ArtifactUrlMissing
+                | ErrorCode::ArtifactChecksumMissing
+                | ErrorCode::ArtifactChecksumMismatch
+                | ErrorCode::ArtifactInstallFailed => StatusCode::BAD_REQUEST,
+                ErrorCode::ArtifactDownloadFailed => StatusCode::BAD_GATEWAY,
                 ErrorCode::ModelNotFound
                 | ErrorCode::ModelNotInstalled
                 | ErrorCode::RunnerNotFound => StatusCode::NOT_FOUND,

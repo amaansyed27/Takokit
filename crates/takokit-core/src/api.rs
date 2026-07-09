@@ -47,6 +47,8 @@ pub struct RunnerDetailResponse<T> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PullModelRequest {
     pub model: String,
+    #[serde(default)]
+    pub metadata_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -130,5 +132,14 @@ mod tests {
         assert_eq!(json["input"], "Hello from Takokit");
         assert_eq!(json["voice"], "default");
         assert_eq!(json["response_format"], "wav");
+    }
+
+    #[test]
+    fn pull_model_request_keeps_metadata_only_optional() {
+        let request: PullModelRequest =
+            serde_json::from_str(r#"{"model":"piper-lessac"}"#).expect("pull request");
+
+        assert_eq!(request.model, "piper-lessac");
+        assert!(!request.metadata_only);
     }
 }

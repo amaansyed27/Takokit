@@ -9,7 +9,9 @@ use takokit_models::{
     execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
     TextToSpeechEngine,
 };
-use takokit_package::{resolve_execution_plan, InstalledRegistry, PackageError, PackageRegistry};
+use takokit_package::{
+    resolve_execution_plan, InstallModelOptions, InstalledRegistry, PackageError, PackageRegistry,
+};
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
 
@@ -30,9 +32,7 @@ enum Command {
     Models,
     Runners,
     Speak(SpeakArgs),
-    Pull {
-        model: String,
-    },
+    Pull(PullArgs),
     Show {
         model: String,
     },
@@ -63,6 +63,13 @@ struct SpeakArgs {
     model: String,
     #[arg(long, default_value = "default")]
     voice: String,
+}
+
+#[derive(Debug, Args)]
+struct PullArgs {
+    model: String,
+    #[arg(long)]
+    metadata_only: bool,
 }
 
 #[derive(Debug, Args)]
@@ -170,10 +177,15 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             println!("{}", serde_json::to_string_pretty(&response)?);
         }
-        Some(Command::Pull { model }) => {
-            let manifest = package_registry.model(&model).map_err(cli_error)?;
+        Some(Command::Pull(args)) => {
+            let manifest = package_registry.model(&args.model).map_err(cli_error)?;
             let report = installed_registry
-                .install_model(&manifest)
+                .install_model_with_options(
+                    &manifest,
+                    InstallModelOptions {
+                        metadata_only: args.metadata_only,
+                    },
+                )
                 .map_err(cli_error)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
@@ -198,10 +210,7 @@ async fn main() -> anyhow::Result<()> {
                 println!("artifacts: {}", record.artifacts.len());
             } else {
                 println!("installed status: not installed");
-                println!(
-                    "artifacts: {}",
-                    manifest.artifacts.weights.len() + manifest.artifacts.voices.len()
-                );
+                println!("artifacts: {}", manifest.artifacts.all().count());
             }
             println!("license: {}", manifest.license);
             println!(
@@ -415,6 +424,17 @@ mod tests {
 
         assert!(matches!(models.command, Some(Command::Models)));
         assert!(matches!(runners.command, Some(Command::Runners)));
+    }
+
+    #[test]
+    fn cli_parses_metadata_only_model_pull() {
+        let cli = Cli::try_parse_from(["takokit", "pull", "piper-lessac", "--metadata-only"])
+            .expect("metadata-only pull");
+
+        assert!(matches!(
+            cli.command,
+            Some(Command::Pull(PullArgs { model, metadata_only: true })) if model == "piper-lessac"
+        ));
     }
 
     #[test]

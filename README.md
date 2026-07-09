@@ -37,6 +37,8 @@ Takokit models declare which local voice surfaces they support:
 - Local mock model and runner registry under `registry/`.
 - Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
 - Installed model and runner records under `~/.takokit/manifests/`.
+- Checksum-backed artifact install foundation with content-addressed blobs.
+- Piper Lessac medium ONNX artifact metadata shape.
 - Typed capability taxonomy and execution planning layer.
 - Runner execution interface with an ONNX runner scaffold.
 - Local storage layout under `~/.takokit`.
@@ -51,6 +53,8 @@ cargo run -p takokit-cli -- gui
 cargo run -p takokit-cli -- doctor
 cargo run -p takokit-cli -- capabilities
 cargo run -p takokit-cli -- pull kokoro
+cargo run -p takokit-cli -- pull piper-lessac
+cargo run -p takokit-cli -- pull piper-lessac --metadata-only
 cargo run -p takokit-cli -- show kokoro
 cargo run -p takokit-cli -- runner pull takokit-onnx
 cargo run -p takokit-cli -- runner show takokit-onnx
@@ -67,6 +71,8 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 `takokit doctor` prints readable `[ok]`, `[warn]`, and `[fail]` checks for the local storage layout, mock registry parsing, installed record parsing, server availability, GUI build output, mock TTS availability, and platform identifier. Warnings such as missing GUI build output or real runners not being implemented do not fail the current mock/runtime development path.
 
 `takokit pull kokoro` currently installs local mock registry metadata into `~/.takokit/manifests/models/` and writes an installed-model record under `~/.takokit/manifests/installed-models/`. It does not download weights or enable real Kokoro inference yet.
+
+`takokit pull piper-lessac` is metadata-only until verified SHA256 values are finalized for the Piper Lessac medium ONNX model/config files. The manifest records real artifact URLs and byte sizes, but intentionally leaves checksums blank. Takokit refuses artifact-backed installs without checksums instead of accepting unverified files. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
 
 `takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
 
@@ -128,6 +134,8 @@ ExecutionPlan + runner engine -> output or typed execution error
 
 The first real ONNX target decision is documented in [docs/decisions/0001-first-onnx-model.md](docs/decisions/0001-first-onnx-model.md). Takokit will implement Piper ONNX first, then Kokoro ONNX after the artifact and runner path is proven.
 
+Artifact behavior is documented in [docs/artifacts.md](docs/artifacts.md). Source and licensing notes for Piper are tracked in [docs/references.md](docs/references.md). The old `rhasspy/piper` repo is archived and the current `OHF-Voice/piper1-gpl` runtime is GPL-3.0; Takokit must not vendor GPL runtime code without an explicit licensing decision.
+
 ## Installer Scaffolds
 
 Future release distribution is planned to support:
@@ -149,6 +157,7 @@ Today, `scripts/install.sh` and `scripts/install.ps1` are safe scaffolds only. T
   models/
   runners/
   blobs/
+    sha256/
   manifests/
     models/
     runners/
@@ -158,6 +167,7 @@ Today, `scripts/install.sh` and `scripts/install.ps1` are safe scaffolds only. T
   datasets/
   outputs/
   cache/
+    downloads/
   logs/
   config.toml
 ```

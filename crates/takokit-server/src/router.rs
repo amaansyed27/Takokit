@@ -283,6 +283,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pull_model_route_supports_metadata_only_artifact_manifest() {
+        let root = std::env::temp_dir().join(format!(
+            "takokit-server-piper-pull-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/models/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"model":"piper-lessac"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["id"], "piper-lessac");
+        assert_eq!(json["installed"], true);
+        assert!(json["note"].as_str().unwrap().contains("metadata-only"));
+    }
+
+    #[tokio::test]
     async fn transcription_route_returns_unsupported_capability_error() {
         let root = std::env::temp_dir().join("takokit-server-transcription-resolution-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));

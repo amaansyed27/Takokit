@@ -33,6 +33,10 @@ impl LocalStore {
         self.root.join("blobs")
     }
 
+    pub fn sha256_blobs_dir(&self) -> PathBuf {
+        self.blobs_dir().join("sha256")
+    }
+
     pub fn manifests_dir(&self) -> PathBuf {
         self.root.join("manifests")
     }
@@ -69,6 +73,10 @@ impl LocalStore {
         self.root.join("cache")
     }
 
+    pub fn downloads_cache_dir(&self) -> PathBuf {
+        self.cache_dir().join("downloads")
+    }
+
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")
     }
@@ -82,6 +90,7 @@ impl LocalStore {
             self.models_dir(),
             self.runners_dir(),
             self.blobs_dir(),
+            self.sha256_blobs_dir(),
             self.manifests_dir(),
             self.model_manifests_dir(),
             self.runner_manifests_dir(),
@@ -91,6 +100,7 @@ impl LocalStore {
             self.datasets_dir(),
             self.outputs_dir(),
             self.cache_dir(),
+            self.downloads_cache_dir(),
             self.logs_dir(),
         ] {
             std::fs::create_dir_all(path)
@@ -120,6 +130,7 @@ mod tests {
         assert!(root.join("models").is_dir());
         assert!(root.join("runners").is_dir());
         assert!(root.join("blobs").is_dir());
+        assert!(root.join("blobs").join("sha256").is_dir());
         assert!(root.join("manifests").is_dir());
         assert!(root.join("manifests").join("models").is_dir());
         assert!(root.join("manifests").join("runners").is_dir());
@@ -129,6 +140,7 @@ mod tests {
         assert!(root.join("datasets").is_dir());
         assert!(root.join("outputs").is_dir());
         assert!(root.join("cache").is_dir());
+        assert!(root.join("cache").join("downloads").is_dir());
         assert!(root.join("logs").is_dir());
         assert!(root.join("config.toml").is_file());
 

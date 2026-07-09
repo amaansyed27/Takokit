@@ -7,15 +7,19 @@
 
 ## Next Small Tasks
 
+- [ ] Finalize verified Piper Lessac SHA256 values and enable artifact-backed `pull piper-lessac`.
 - [ ] Implement the chosen first ONNX model runner: Piper ONNX.
-- [ ] Add checksum-backed artifact download before any real model downloads.
-- [ ] Add real model artifact manifest for Piper ONNX.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
 
 ## Done
 
+- [x] Added checksum-backed artifact install foundation with temporary downloads and content-addressed blobs.
+- [x] Added typed artifact errors for missing URLs, missing checksums, failed downloads, checksum mismatches, and install failures.
+- [x] Added model/config artifact roles to manifests and installed records.
+- [x] Updated `piper-lessac` with the Piper Lessac medium ONNX model/config artifact shape while keeping it metadata-only until verified SHA256 values are finalized.
+- [x] Added artifact lifecycle docs and Piper source/licensing references.
 - [x] Split execution planning from runner execution.
 - [x] Added a runner execution interface for speech and transcription.
 - [x] Added an ONNX runner scaffold that returns typed `inference_not_implemented`.
@@ -59,15 +63,15 @@
 
 ## Blocked / Needs Decision
 
-- First real runner target: Kokoro ONNX vs Piper ONNX.
-- Artifact hosting source: GitHub Releases, Hugging Face, Takokit registry service, or static CDN.
-- Checksum/signature policy before real downloads.
+- Artifact hosting source beyond the initial Hugging Face Piper voice source: GitHub Releases, Takokit registry service, or static CDN.
+- Signature policy after checksum-backed downloads.
 - Whether managed Python runners are allowed in v0.1, or whether v0.1 should stay native/ONNX/whisper.cpp only.
 - Public library website structure and domain deployment target.
 
 ## Notes
 
 - `takokit pull kokoro` installs only the local mock manifest for now.
+- `takokit pull piper-lessac` installs metadata only until verified SHA256 values are finalized.
 - `takokit speak "Hello" --model kokoro` must not claim real Kokoro inference until a runner exists.
 - `takokit speak "Hello" --model mock-tts` is the only current speech path and is for CLI/API contract testing.
 - The GUI is a local browser GUI, not a Tauri app.

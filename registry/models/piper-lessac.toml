@@ -5,7 +5,7 @@ kind = "tts"
 backend = "onnx"
 runner = "takokit-onnx"
 license = "mit"
-description = "Piper English Lessac voice placeholder for package-manager flow testing."
+description = "Piper English Lessac medium ONNX voice package. Artifact URLs are recorded, but downloads remain metadata-only until source checksums are finalized."
 
 [capabilities]
 tts = true
@@ -20,5 +20,22 @@ gpu = false
 min_ram = "2gb"
 
 [artifacts]
-weights = []
+# Keep this metadata-only until source SHA256 values are finalized.
+metadata_only = true
 voices = []
+
+[[artifacts.weights]]
+name = "en_US-lessac-medium.onnx"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
+# TODO: Fill from a verified source checksum. Do not invent this value.
+sha256 = ""
+bytes = 63200000
+role = "model"
+
+[[artifacts.configs]]
+name = "en_US-lessac-medium.onnx.json"
+url = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
+# TODO: Fill from a verified source checksum. Do not invent this value.
+sha256 = ""
+bytes = 4890
+role = "config"
