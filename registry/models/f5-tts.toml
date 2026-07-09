@@ -1,11 +1,11 @@
-id = "gpt-sovits"
-name = "GPT-SoVITS"
+id = "f5-tts"
+name = "F5-TTS"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+license = "license-check-required"
+description = "F5-TTS voice generation family. Metadata-only; execution requires a managed Python adapter and verified artifacts."
 
 [capabilities]
 tts = true
@@ -17,7 +17,7 @@ live_audio = true
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "12gb"
 
 [artifacts]
 metadata_only = true

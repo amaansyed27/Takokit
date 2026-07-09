@@ -1,11 +1,11 @@
-id = "gpt-sovits"
-name = "GPT-SoVITS"
+id = "openvoice"
+name = "OpenVoice"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+license = "license-check-required"
+description = "OpenVoice voice cloning and conversion family. Metadata-only; runtime dependency and license risk must be reviewed before execution support."
 
 [capabilities]
 tts = true

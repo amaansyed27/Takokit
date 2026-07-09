@@ -1,0 +1,8 @@
+id = "takokit-nemo"
+name = "Takokit NeMo Runner"
+kind = "nemo"
+upstream_url = "https://github.com/NVIDIA/NeMo"
+github_url = "https://github.com/NVIDIA/NeMo"
+runtime_status = "planned"
+supported_platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+notes = "Planned managed NeMo runner for ASR families such as Parakeet and Canary. Not executable in Takokit yet."

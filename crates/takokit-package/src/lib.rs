@@ -164,6 +164,7 @@ pub enum ModelKind {
     VoiceCloning,
     VoiceTrain,
     VoiceConvert,
+    OmniAudio,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -173,6 +174,8 @@ pub enum ModelBackend {
     Onnx,
     Whispercpp,
     PythonManaged,
+    TransformersAudio,
+    Nemo,
     External,
 }
 
@@ -241,6 +244,16 @@ pub struct RunnerManifest {
     pub version: String,
     pub kind: RunnerKind,
     pub platforms: Vec<String>,
+    #[serde(default)]
+    pub supported_model_families: Vec<String>,
+    #[serde(default)]
+    pub supported_tasks: Vec<CapabilityKind>,
+    #[serde(default)]
+    pub dependency_strategy: RunnerDependencyStrategy,
+    #[serde(default)]
+    pub install_state: RunnerLifecycleState,
+    #[serde(default)]
+    pub notes: String,
     pub description: String,
 }
 
@@ -251,7 +264,51 @@ pub enum RunnerKind {
     Onnx,
     Whispercpp,
     PythonManaged,
+    TransformersAudio,
+    Nemo,
     External,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RunnerDependencyStrategy {
+    BundledNative,
+    Managed,
+    ExternalToolchain,
+    NotImplemented,
+}
+
+impl Default for RunnerDependencyStrategy {
+    fn default() -> Self {
+        Self::NotImplemented
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RunnerLifecycleState {
+    RuntimeMissing,
+    #[serde(alias = "metadata_only")]
+    ContractInstalled,
+    RuntimeInstalled,
+    Ready,
+    Failed,
+}
+
+impl Default for RunnerLifecycleState {
+    fn default() -> Self {
+        Self::RuntimeMissing
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModelLifecycleState {
+    MetadataOnly,
+    ArtifactsReady,
+    RunnerReady,
+    Executable,
+    Failed,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -347,6 +404,11 @@ pub struct RunnerInfo {
     pub version: String,
     pub kind: RunnerKind,
     pub platforms: Vec<String>,
+    pub supported_model_families: Vec<String>,
+    pub supported_tasks: Vec<CapabilityKind>,
+    pub dependency_strategy: RunnerDependencyStrategy,
+    pub install_state: RunnerLifecycleState,
+    pub notes: String,
     pub description: String,
     pub installed: bool,
 }
@@ -385,7 +447,7 @@ pub struct InstalledRunnerRecord {
     pub manifest_path: PathBuf,
     pub installed_at: String,
     pub platforms: Vec<String>,
-    pub status: InstalledPackageStatus,
+    pub status: RunnerLifecycleState,
     pub note: String,
 }
 
@@ -423,6 +485,33 @@ pub struct ExecutionPlan {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
     Planned,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelPlan {
+    pub model_id: String,
+    pub model_name: String,
+    pub family: String,
+    pub task: String,
+    pub required_runner: String,
+    pub artifact_state: ModelLifecycleState,
+    pub runner_contract_state: RunnerLifecycleState,
+    pub runner_runtime_state: RunnerLifecycleState,
+    pub executable: bool,
+    pub missing: Vec<String>,
+    pub next_command: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PythonManagedRunnerLayout {
+    pub root: PathBuf,
+    pub runtime: PathBuf,
+    pub env: PathBuf,
+    pub packages: PathBuf,
+    pub wheels: PathBuf,
+    pub logs: PathBuf,
+    pub manifests: PathBuf,
+    pub cache: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -758,6 +847,15 @@ impl RunnerManifest {
             version: self.version.clone(),
             kind: self.kind.clone(),
             platforms: self.platforms.clone(),
+            supported_model_families: self.supported_model_families.clone(),
+            supported_tasks: self.supported_tasks.clone(),
+            dependency_strategy: self.dependency_strategy,
+            install_state: if installed {
+                RunnerLifecycleState::ContractInstalled
+            } else {
+                self.install_state
+            },
+            notes: self.notes.clone(),
             description: self.description.clone(),
             installed,
         }
@@ -771,6 +869,8 @@ impl RunnerKind {
             RunnerKind::Onnx => "onnx",
             RunnerKind::Whispercpp => "whispercpp",
             RunnerKind::PythonManaged => "python-managed",
+            RunnerKind::TransformersAudio => "transformers-audio",
+            RunnerKind::Nemo => "nemo",
             RunnerKind::External => "external",
         }
     }
@@ -839,6 +939,8 @@ impl ModelBackend {
             ModelBackend::Onnx => "onnx",
             ModelBackend::Whispercpp => "whispercpp",
             ModelBackend::PythonManaged => "python-managed",
+            ModelBackend::TransformersAudio => "transformers-audio",
+            ModelBackend::Nemo => "nemo",
             ModelBackend::External => "external",
         }
     }
@@ -849,6 +951,8 @@ impl ModelBackend {
             ModelBackend::Onnx => ModelRuntime::Onnx,
             ModelBackend::Whispercpp => ModelRuntime::WhisperCpp,
             ModelBackend::PythonManaged => ModelRuntime::Python,
+            ModelBackend::TransformersAudio => ModelRuntime::External,
+            ModelBackend::Nemo => ModelRuntime::External,
             ModelBackend::External => ModelRuntime::External,
         }
     }
@@ -944,6 +1048,137 @@ pub fn resolve_runner(
     resolve_execution_plan(package_registry, installed_registry, model_id, capability)
 }
 
+pub fn plan_model(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    model_id: &str,
+) -> PackageResult<ModelPlan> {
+    let model = package_registry.model(model_id)?;
+    let runner = package_registry.runner(&model.runner)?;
+    let installed_model = installed_registry.installed_model_record(&model.id).ok();
+    let installed_runner = installed_registry.installed_runner_record(&runner.id).ok();
+
+    let artifact_state = model_artifact_state(&model, installed_model.as_ref());
+    let runner_contract_state = if installed_runner.is_some() {
+        RunnerLifecycleState::ContractInstalled
+    } else {
+        RunnerLifecycleState::RuntimeMissing
+    };
+    let runner_runtime_state = installed_runner
+        .as_ref()
+        .map(|record| record.status)
+        .unwrap_or(RunnerLifecycleState::RuntimeMissing);
+    let executable = artifact_state == ModelLifecycleState::Executable
+        && runner_runtime_state == RunnerLifecycleState::Ready;
+    let mut missing = Vec::new();
+
+    if matches!(artifact_state, ModelLifecycleState::MetadataOnly) {
+        missing.push("verified artifacts".to_string());
+    }
+    if runner_contract_state == RunnerLifecycleState::RuntimeMissing {
+        missing.push(format!("runner contract: {}", runner.id));
+    }
+    if runner_runtime_state != RunnerLifecycleState::Ready {
+        missing.push(runner_missing_component(&runner));
+    }
+    if executable {
+        missing.clear();
+    }
+
+    Ok(ModelPlan {
+        model_id: model.id.clone(),
+        model_name: model.name.clone(),
+        family: model.name.clone(),
+        task: model_task_label(&model),
+        required_runner: runner.id.clone(),
+        artifact_state,
+        runner_contract_state,
+        runner_runtime_state,
+        executable,
+        missing,
+        next_command: next_plan_command(
+            &model,
+            installed_model.is_some(),
+            installed_runner.is_some(),
+        ),
+    })
+}
+
+pub fn python_managed_runner_layout(takokit_root: &Path) -> PythonManagedRunnerLayout {
+    let root = takokit_root.join("runners").join("python-managed");
+    PythonManagedRunnerLayout {
+        runtime: root.join("runtime"),
+        env: root.join("env"),
+        packages: root.join("packages"),
+        wheels: root.join("wheels"),
+        logs: root.join("logs"),
+        manifests: root.join("manifests"),
+        cache: root.join("cache"),
+        root,
+    }
+}
+
+fn model_artifact_state(
+    model: &ModelManifest,
+    installed_model: Option<&InstalledModelRecord>,
+) -> ModelLifecycleState {
+    let Some(record) = installed_model else {
+        return ModelLifecycleState::MetadataOnly;
+    };
+
+    if record.status == InstalledPackageStatus::Ready
+        && !model.artifacts.metadata_only
+        && model.artifacts.all().next().is_some()
+        && record.artifacts.iter().all(|artifact| artifact.downloaded)
+    {
+        ModelLifecycleState::ArtifactsReady
+    } else {
+        ModelLifecycleState::MetadataOnly
+    }
+}
+
+fn model_task_label(model: &ModelManifest) -> String {
+    capability_labels(&model.capabilities.to_model_capabilities())
+}
+
+fn runner_missing_component(runner: &RunnerManifest) -> String {
+    match runner.kind {
+        RunnerKind::Onnx => "ONNX inference implementation".to_string(),
+        RunnerKind::Whispercpp => "whisper.cpp transcription implementation".to_string(),
+        RunnerKind::PythonManaged => "verified artifacts and managed runtime adapter".to_string(),
+        RunnerKind::TransformersAudio => "Transformers audio runtime adapter".to_string(),
+        RunnerKind::Nemo => "NeMo runtime adapter".to_string(),
+        RunnerKind::External => "external runner adapter".to_string(),
+        RunnerKind::Native => "native runner implementation".to_string(),
+    }
+}
+
+fn next_plan_command(
+    model: &ModelManifest,
+    model_installed: bool,
+    runner_installed: bool,
+) -> String {
+    if !model_installed {
+        format!("takokit pull {}", model.id)
+    } else if !runner_installed {
+        format!("takokit runner pull {}", model.runner)
+    } else {
+        "wait for runner execution implementation".to_string()
+    }
+}
+
+fn capability_labels(capabilities: &[CapabilityKind]) -> String {
+    if capabilities.is_empty() {
+        return "none".to_string();
+    }
+
+    capabilities
+        .iter()
+        .map(|capability| capability.label())
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
 fn installed_model_record(
     manifest: &ModelManifest,
     manifest_path: PathBuf,
@@ -990,7 +1225,7 @@ fn installed_runner_record(
         manifest_path,
         installed_at: timestamp_now(),
         platforms: manifest.platforms.clone(),
-        status: InstalledPackageStatus::MetadataOnly,
+        status: RunnerLifecycleState::ContractInstalled,
         note: "Installed runner contract from local mock registry. Execution binary is not implemented."
             .to_string(),
     }
@@ -1706,7 +1941,7 @@ role = "config"
         assert_eq!(record.id, "takokit-onnx");
         assert_eq!(record.version, "0.1.0");
         assert_eq!(record.kind, "onnx");
-        assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
+        assert_eq!(record.status, RunnerLifecycleState::ContractInstalled);
         assert!(record.manifest_path.ends_with("runners/takokit-onnx.toml"));
     }
 
@@ -1850,10 +2085,254 @@ role = "config"
         assert!(runners.iter().any(|runner| runner.id == "takokit-onnx"));
         assert!(runners
             .iter()
-            .any(|runner| runner.id == "external-transformers"));
+            .any(|runner| runner.id == "takokit-transformers-audio"));
+        assert!(runners
+            .iter()
+            .any(|runner| runner.id == "takokit-python-managed"));
         assert!(runners
             .iter()
             .all(|runner| !runner.notes.is_empty() && !runner.supported_platforms.is_empty()));
+    }
+
+    #[test]
+    fn bundled_runtime_runner_manifests_cover_shared_runner_families() {
+        let registry = PackageRegistry::bundled();
+        let runners = registry.runners().expect("runtime runners");
+        let ids: Vec<_> = runners.iter().map(|runner| runner.id.as_str()).collect();
+
+        for required in [
+            "takokit-onnx",
+            "takokit-whispercpp",
+            "takokit-python-managed",
+            "takokit-transformers-audio",
+            "takokit-nemo",
+        ] {
+            assert!(ids.contains(&required), "missing runtime runner {required}");
+        }
+
+        let python = registry
+            .runner("takokit-python-managed")
+            .expect("python-managed runner");
+        assert!(python
+            .supported_model_families
+            .iter()
+            .any(|family| family == "Qwen3-TTS"));
+        assert!(python
+            .supported_tasks
+            .contains(&CapabilityKind::TextToSpeech));
+        assert_eq!(
+            python.dependency_strategy,
+            RunnerDependencyStrategy::Managed
+        );
+        assert!(python.notes.contains("Python"));
+    }
+
+    #[test]
+    fn bundled_runtime_model_manifests_cover_launch_families() {
+        let registry = PackageRegistry::bundled();
+        let models = registry.models().expect("runtime models");
+        let ids: Vec<_> = models.iter().map(|model| model.id.as_str()).collect();
+
+        for required in [
+            "piper-lessac",
+            "kokoro",
+            "whisper-base",
+            "qwen3-tts",
+            "cosyvoice2",
+            "f5-tts",
+            "fish-speech",
+            "dia",
+            "chatterbox",
+            "gpt-sovits",
+            "openvoice",
+            "rvc",
+            "qwen3-omni",
+            "qwen2-5-omni",
+            "voxtral",
+            "sensevoice",
+            "parakeet",
+            "canary",
+        ] {
+            assert!(ids.contains(&required), "missing runtime model {required}");
+        }
+
+        let runners: std::collections::HashSet<_> = registry
+            .runners()
+            .expect("runtime runners")
+            .into_iter()
+            .map(|runner| runner.id)
+            .collect();
+        for model in models {
+            assert!(
+                runners.contains(&model.runner),
+                "{} references unknown runner {}",
+                model.id,
+                model.runner
+            );
+            assert!(
+                !model.capabilities.to_model_capabilities().is_empty(),
+                "{} has no capabilities",
+                model.id
+            );
+        }
+    }
+
+    #[test]
+    fn lifecycle_enum_values_parse_from_manifest_strings() {
+        assert_eq!(
+            toml::from_str::<ModelLifecycleFixture>(r#"state = "metadata-only""#)
+                .expect("metadata-only")
+                .state,
+            ModelLifecycleState::MetadataOnly
+        );
+        assert_eq!(
+            toml::from_str::<RunnerLifecycleFixture>(r#"state = "contract-installed""#)
+                .expect("contract-installed")
+                .state,
+            RunnerLifecycleState::ContractInstalled
+        );
+    }
+
+    #[test]
+    fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::bundled();
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+        let piper = registry.model("piper-lessac").expect("piper manifest");
+        let piper_model_path = temp.path().join("en_US-lessac-medium.onnx");
+        let piper_config_path = temp.path().join("en_US-lessac-medium.onnx.json");
+        std::fs::write(&piper_model_path, b"model").expect("piper model fixture");
+        std::fs::write(&piper_config_path, b"config").expect("piper config fixture");
+        std::fs::create_dir_all(temp.path().join("manifests").join("installed-models"))
+            .expect("installed model records dir");
+        let piper_record = InstalledModelRecord {
+            id: piper.id.clone(),
+            version: piper.version.clone(),
+            source: "test".to_string(),
+            manifest_path: PathBuf::from("piper-lessac.toml"),
+            runner: piper.runner.clone(),
+            installed_at: "0".to_string(),
+            artifacts: vec![
+                InstalledArtifactRecord {
+                    name: "en_US-lessac-medium.onnx".to_string(),
+                    sha256: "test".to_string(),
+                    bytes: None,
+                    url: None,
+                    role: ArtifactRole::Model,
+                    local_path: Some(piper_model_path),
+                    downloaded: true,
+                },
+                InstalledArtifactRecord {
+                    name: "en_US-lessac-medium.onnx.json".to_string(),
+                    sha256: "test".to_string(),
+                    bytes: None,
+                    url: None,
+                    role: ArtifactRole::Config,
+                    local_path: Some(piper_config_path),
+                    downloaded: true,
+                },
+            ],
+            status: InstalledPackageStatus::Ready,
+            note: "test".to_string(),
+        };
+        std::fs::write(
+            temp.path()
+                .join("manifests")
+                .join("installed-models")
+                .join("piper-lessac.toml"),
+            toml::to_string_pretty(&piper_record).expect("record toml"),
+        )
+        .expect("write piper record");
+        installed
+            .install_runner(&registry.runner("takokit-onnx").expect("onnx runner"))
+            .expect("install onnx runner contract");
+
+        let piper_plan = plan_model(&registry, &installed, "piper-lessac").expect("piper plan");
+        assert_eq!(piper_plan.model_id, "piper-lessac");
+        assert_eq!(
+            piper_plan.artifact_state,
+            ModelLifecycleState::ArtifactsReady
+        );
+        assert_eq!(
+            piper_plan.runner_contract_state,
+            RunnerLifecycleState::ContractInstalled
+        );
+        assert_eq!(
+            piper_plan.runner_runtime_state,
+            RunnerLifecycleState::ContractInstalled
+        );
+        assert!(!piper_plan.executable);
+        assert!(piper_plan
+            .missing
+            .contains(&"ONNX inference implementation".to_string()));
+
+        let whisper_plan = plan_model(&registry, &installed, "whisper-base").expect("whisper plan");
+        assert_eq!(whisper_plan.required_runner, "takokit-whispercpp");
+        assert_eq!(
+            whisper_plan.artifact_state,
+            ModelLifecycleState::MetadataOnly
+        );
+        assert_eq!(
+            whisper_plan.runner_runtime_state,
+            RunnerLifecycleState::RuntimeMissing
+        );
+        assert!(!whisper_plan.executable);
+
+        let qwen_plan = plan_model(&registry, &installed, "qwen3-tts").expect("qwen plan");
+        assert_eq!(qwen_plan.required_runner, "takokit-python-managed");
+        assert_eq!(qwen_plan.artifact_state, ModelLifecycleState::MetadataOnly);
+        assert!(qwen_plan
+            .missing
+            .iter()
+            .any(|item| item.contains("managed runtime adapter")));
+
+        let missing = plan_model(&registry, &installed, "does-not-exist")
+            .expect_err("missing model should not plan");
+        assert!(matches!(missing, PackageError::ModelNotFound(id) if id == "does-not-exist"));
+    }
+
+    #[test]
+    fn python_managed_runner_layout_resolves_under_takokit_root() {
+        let root = PathBuf::from("/tmp/takokit-test-root");
+        let layout = python_managed_runner_layout(&root);
+
+        assert_eq!(layout.root, root.join("runners").join("python-managed"));
+        assert_eq!(layout.runtime, layout.root.join("runtime"));
+        assert_eq!(layout.env, layout.root.join("env"));
+        assert_eq!(layout.packages, layout.root.join("packages"));
+        assert_eq!(layout.wheels, layout.root.join("wheels"));
+        assert_eq!(layout.logs, layout.root.join("logs"));
+        assert_eq!(layout.manifests, layout.root.join("manifests"));
+        assert_eq!(layout.cache, layout.root.join("cache"));
+    }
+
+    #[test]
+    fn bundled_runtime_models_are_not_marked_executable_without_ready_runners() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = PackageRegistry::bundled();
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        for model in registry.models().expect("runtime models") {
+            let plan = plan_model(&registry, &installed, &model.id).expect("model plan");
+
+            assert!(!plan.executable, "{} should not be executable", model.id);
+            assert_ne!(
+                plan.artifact_state,
+                ModelLifecycleState::Executable,
+                "{} should not claim executable artifact state",
+                model.id
+            );
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct ModelLifecycleFixture {
+        state: ModelLifecycleState,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct RunnerLifecycleFixture {
+        state: RunnerLifecycleState,
     }
 
     fn write_test_registry(root: &Path) {

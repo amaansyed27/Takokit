@@ -20,7 +20,7 @@ export type ModelSummary = {
   hardwareNotes: string;
   executionStatus: string;
   artifactCount: number;
-  runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp";
+  runtime: "Rust" | "Python" | "ONNX" | "whisper.cpp" | "External";
   status: "installed" | "available" | "planned";
   license: string;
   capabilities: ModelCapability[];
@@ -32,8 +32,27 @@ export type RunnerSummary = {
   version: string;
   kind: string;
   platforms: string[];
+  supported_model_families?: string[];
+  supported_tasks?: string[];
+  dependency_strategy?: string;
+  install_state?: string;
+  notes?: string;
   description: string;
   installed: boolean;
+};
+
+export type ModelPlan = {
+  model_id: string;
+  model_name: string;
+  family: string;
+  task: string;
+  required_runner: string;
+  artifact_state: "metadata-only" | "artifacts-ready" | "runner-ready" | "executable" | "failed";
+  runner_contract_state: "runtime-missing" | "contract-installed" | "runtime-installed" | "ready" | "failed";
+  runner_runtime_state: "runtime-missing" | "contract-installed" | "runtime-installed" | "ready" | "failed";
+  executable: boolean;
+  missing: string[];
+  next_command: string;
 };
 
 export type VoiceSummary = {

@@ -43,7 +43,7 @@ They describe models and runners that should appear in a future Takokit website 
 
 The initial model library includes Piper, Kokoro, Whisper, Qwen TTS/Omni, CosyVoice, F5-TTS, Fish Speech, Dia, Spark-TTS, IndexTTS, Chatterbox, GPT-SoVITS, OpenVoice, RVC, SenseVoice, Parakeet, Canary, and Voxtral.
 
-Runner library entries include the Takokit ONNX and whisper.cpp contracts plus placeholders for Transformers, managed Python, and NeMo-style external ecosystems.
+Runner library entries include the Takokit ONNX, whisper.cpp, managed Python, Transformers-audio, and NeMo shared runner contracts.
 
 ## CLI
 

@@ -1,18 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { pullModel, pullRunner, removeModel } from "../../lib/api";
-import type { ModelCapability } from "../../lib/types";
+import { getModelPlan, pullModel, pullRunner, removeModel } from "../../lib/api";
+import type { ModelCapability, ModelPlan } from "../../lib/types";
 
 export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(runtime.models.find((model) => model.id !== "mock-tts")?.id ?? runtime.models[0]?.id ?? "");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null);
   const models = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return runtime.models;
@@ -23,6 +24,24 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
   const selectedModel = runtime.models.find((model) => model.id === selectedId) ?? models[0] ?? runtime.models[0];
   const requiredRunner = selectedModel ? runtime.runners.find((runner) => runner.id === selectedModel.runner) : undefined;
   const apiUnavailable = runtime.server.status !== "online";
+
+  useEffect(() => {
+    let cancelled = false;
+    setModelPlan(null);
+    if (!selectedModel || selectedModel.id === "mock-tts" || apiUnavailable) return;
+
+    getModelPlan(selectedModel.id)
+      .then((plan) => {
+        if (!cancelled) setModelPlan(plan);
+      })
+      .catch(() => {
+        if (!cancelled) setModelPlan(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUnavailable, selectedModel]);
 
   async function runAction(label: string, action: () => Promise<void>) {
     setBusyAction(label);
@@ -141,7 +160,18 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
                 <span><strong>Artifacts</strong>{selectedModel.artifactCount}</span>
                 <span><strong>Hardware</strong>{selectedModel.hardwareNotes}</span>
                 <span><strong>Execution</strong>{selectedModel.executionStatus}</span>
+                {modelPlan && (
+                  <>
+                    <span><strong>Artifact state</strong>{stateLabel(modelPlan.artifact_state)}</span>
+                    <span><strong>Runner runtime</strong>{stateLabel(modelPlan.runner_runtime_state)}</span>
+                    <span><strong>Executable today</strong>{modelPlan.executable ? "yes" : "no"}</span>
+                    <span><strong>Next command</strong>{modelPlan.next_command}</span>
+                  </>
+                )}
               </div>
+              {modelPlan && modelPlan.missing.length > 0 && (
+                <p className="notice-line">Missing: {modelPlan.missing.join("; ")}</p>
+              )}
             </div>
             <div className="details-panel__side">
               <Badge tone={selectedModel.status === "installed" ? "success" : "neutral"}>{selectedModel.status}</Badge>
@@ -180,6 +210,10 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
       </Section>
     </section>
   );
+}
+
+function stateLabel(value: string): string {
+  return value.replace(/-/g, " ");
 }
 
 function capabilityLabel(capability: ModelCapability): string {

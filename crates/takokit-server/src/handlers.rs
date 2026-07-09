@@ -11,7 +11,10 @@ use takokit_core::{
     TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
-use takokit_package::{resolve_execution_plan, InstallModelOptions, RunnerInfo};
+use takokit_package::{
+    plan_model, resolve_execution_plan, InstallModelOptions, LibraryModelManifest,
+    LibraryRunnerManifest, ModelPlan, RunnerInfo,
+};
 
 use crate::AppState;
 
@@ -74,6 +77,17 @@ pub async fn model(
     }))
 }
 
+pub async fn model_plan(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<RunnerDetailResponse<ModelPlan>>, ApiError> {
+    let plan = plan_model(&state.package_registry, &state.installed_registry, &id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+
+    Ok(Json(RunnerDetailResponse { data: plan }))
+}
+
 pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<RunnerInfo>> {
     let runners = state
         .package_registry
@@ -86,6 +100,22 @@ pub async fn runners(State(state): State<AppState>) -> Json<RunnersResponse<Runn
         .collect();
 
     Json(RunnersResponse { data: runners })
+}
+
+pub async fn library_models(
+    State(state): State<AppState>,
+) -> Json<RunnersResponse<LibraryModelManifest>> {
+    Json(RunnersResponse {
+        data: state.package_registry.library_models().unwrap_or_default(),
+    })
+}
+
+pub async fn library_runners(
+    State(state): State<AppState>,
+) -> Json<RunnersResponse<LibraryRunnerManifest>> {
+    Json(RunnersResponse {
+        data: state.package_registry.library_runners().unwrap_or_default(),
+    })
 }
 
 pub async fn runner(

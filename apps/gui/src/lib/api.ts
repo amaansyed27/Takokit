@@ -1,5 +1,5 @@
 import { mockRuntime } from "./mockData";
-import type { CapabilitySummary, ModelCapability, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, VoiceSummary } from "./types";
+import type { CapabilitySummary, ModelCapability, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, VoiceSummary } from "./types";
 
 const LOCAL_API_BASE_URL = "http://127.0.0.1:5050";
 
@@ -63,6 +63,11 @@ export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechA
 export async function getModel(id: string): Promise<ModelSummary> {
   const response = await getJson<{ data: ApiModel }>(`/v1/models/${encodeURIComponent(id)}`);
   return toModelSummary(response.data);
+}
+
+export async function getModelPlan(id: string): Promise<ModelPlan> {
+  const response = await getJson<{ data: ModelPlan }>(`/v1/models/${encodeURIComponent(id)}/plan`);
+  return response.data;
 }
 
 export async function pullModel(id: string): Promise<PullResponse> {
@@ -249,6 +254,8 @@ function toRuntimeLabel(runtime: ApiModel["runtime"]): ModelSummary["runtime"] {
       return "ONNX";
     case "whisper_cpp":
       return "whisper.cpp";
+    case "external":
+      return "External";
     default:
       return "Python";
   }

@@ -19,12 +19,15 @@ GET    /v1/status
 GET    /v1/capabilities
 GET    /v1/models
 GET    /v1/models/:id
+GET    /v1/models/:id/plan
 POST   /v1/models/pull
 DELETE /v1/models/:id
 GET    /v1/runners
 GET    /v1/runners/:id
 POST   /v1/runners/pull
 DELETE /v1/runners/:id
+GET    /v1/library/models
+GET    /v1/library/runners
 GET    /v1/voices
 POST   /v1/audio/speech
 POST   /v1/audio/transcriptions
@@ -47,6 +50,8 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 ## Models
 
 `GET /v1/models` and `GET /v1/models/:id` include supported capabilities, backend, runner, installed status, runner installed status, hardware notes, artifact count, and honest execution status.
+
+`GET /v1/models/:id/plan` returns the structured lifecycle plan for a model: required runner, artifact state, runner contract state, runner runtime state, executable today, missing pieces, and next command.
 
 `POST /v1/models/pull` installs model metadata and, when a manifest has verified artifact URLs/checksums, installs those artifacts into content-addressed blobs.
 
@@ -75,6 +80,8 @@ These are represented in API JSON using typed capability IDs such as `text_to_sp
 
 This does not download or install an execution binary. `DELETE /v1/runners/:id` removes the local installed runner metadata.
 
+`GET /v1/library/models` and `GET /v1/library/runners` return curated discovery metadata. These routes do not imply runtime executability and do not trigger downloads.
+
 `POST /v1/audio/speech` only supports `mock-tts` right now:
 
 ```json
@@ -101,7 +108,7 @@ Typed errors use this shape:
 }
 ```
 
-After a model and its runner contract are installed, ONNX execution currently returns:
+After a model and its runner contract are installed, ONNX and whisper.cpp execution currently return typed `inference_not_implemented` responses. ONNX returns:
 
 ```json
 {

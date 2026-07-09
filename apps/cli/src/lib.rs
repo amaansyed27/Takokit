@@ -10,7 +10,8 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    resolve_execution_plan, InstallModelOptions, InstalledRegistry, PackageError, PackageRegistry,
+    plan_model, resolve_execution_plan, InstallModelOptions, InstalledRegistry, ModelPlan,
+    PackageError, PackageRegistry,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -38,6 +39,9 @@ enum Command {
     Speak(SpeakArgs),
     Pull(PullArgs),
     Show {
+        model: String,
+    },
+    Plan {
         model: String,
     },
     Rm {
@@ -210,6 +214,7 @@ pub async fn run() -> anyhow::Result<()> {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
             let installed = installed_registry.is_model_installed(&manifest.id);
             let runner_installed = installed_registry.is_runner_installed(&manifest.runner);
+            let plan = plan_model(&package_registry, &installed_registry, &manifest.id).ok();
             let runner = package_registry.runner(&manifest.runner).ok();
             println!("{} ({})", manifest.name, manifest.id);
             println!("version: {}", manifest.version);
@@ -245,7 +250,19 @@ pub async fn run() -> anyhow::Result<()> {
                     .unwrap_or("unspecified")
             );
             println!("status: {}", execution_status(installed, runner_installed));
+            if let Some(plan) = plan {
+                println!("executable today: {}", yes_no(plan.executable));
+                if !plan.missing.is_empty() {
+                    println!("missing: {}", plan.missing.join("; "));
+                }
+                println!("next command: {}", plan.next_command);
+            }
             println!("description: {}", manifest.description);
+        }
+        Some(Command::Plan { model }) => {
+            let plan =
+                plan_model(&package_registry, &installed_registry, &model).map_err(cli_error)?;
+            print_model_plan(&plan);
         }
         Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
@@ -317,6 +334,16 @@ pub async fn run() -> anyhow::Result<()> {
                     println!("version: {}", manifest.version);
                     println!("kind: {:?}", manifest.kind);
                     println!("platforms: {}", manifest.platforms.join(", "));
+                    println!(
+                        "model families: {}",
+                        if manifest.supported_model_families.is_empty() {
+                            "none declared".to_string()
+                        } else {
+                            manifest.supported_model_families.join(", ")
+                        }
+                    );
+                    println!("tasks: {}", capability_labels(&manifest.supported_tasks));
+                    println!("dependency strategy: {:?}", manifest.dependency_strategy);
                     println!("installed: {}", installed);
                     if let Ok(record) = installed_registry.installed_runner_record(&manifest.id) {
                         println!("installed status: {:?}", record.status);
@@ -324,7 +351,19 @@ pub async fn run() -> anyhow::Result<()> {
                     } else {
                         println!("installed status: not installed");
                     }
+                    if manifest.id == "takokit-python-managed" {
+                        println!(
+                            "managed runtime path: {}",
+                            store.python_managed_runner_dir().display()
+                        );
+                        println!(
+                            "user setup: Takokit manages Python, packages, wheels, caches, and logs internally."
+                        );
+                    }
                     println!("status: runner contract installed only; execution binary is not implemented");
+                    if !manifest.notes.is_empty() {
+                        println!("notes: {}", manifest.notes);
+                    }
                     println!("description: {}", manifest.description);
                 }
                 RunnerCommand::Rm { runner } => {
@@ -389,6 +428,30 @@ fn print_library_runners(package_registry: &PackageRegistry) -> anyhow::Result<(
     let runners = package_registry.library_runners().map_err(cli_error)?;
     println!("{}", serde_json::to_string_pretty(&runners)?);
     Ok(())
+}
+
+fn print_model_plan(plan: &ModelPlan) {
+    println!("Model: {} ({})", plan.model_name, plan.model_id);
+    println!("Task: {}", plan.task);
+    println!("Runner: {}", plan.required_runner);
+    println!("Artifacts: {:?}", plan.artifact_state);
+    println!("Runner contract: {:?}", plan.runner_contract_state);
+    println!("Runner runtime: {:?}", plan.runner_runtime_state);
+    println!("Executable today: {}", yes_no(plan.executable));
+    if plan.missing.is_empty() {
+        println!("Missing: none");
+    } else {
+        println!("Missing: {}", plan.missing.join("; "));
+    }
+    println!("Next command: {}", plan.next_command);
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
@@ -501,6 +564,16 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_model_plan_command() {
+        let cli = Cli::try_parse_from(["takokit", "plan", "qwen3-tts"]).expect("plan command");
+
+        assert!(matches!(
+            cli.command,
+            Some(Command::Plan { model }) if model == "qwen3-tts"
+        ));
+    }
+
+    #[test]
     fn launcher_menu_is_available_without_running_it() {
         let labels: Vec<_> = tui::launcher_actions()
             .iter()
@@ -534,6 +607,13 @@ mod tests {
             .checks()
             .iter()
             .any(|check| check.label().contains("installed model records parse") && check.is_ok()));
+        assert!(report
+            .checks()
+            .iter()
+            .any(|check| check.label().contains("python-managed/runtime") && check.is_ok()));
+        assert!(report.checks().iter().any(|check| check
+            .label()
+            .contains("python-managed runtime not initialized")));
     }
 
     #[test]

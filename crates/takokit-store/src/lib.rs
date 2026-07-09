@@ -29,6 +29,38 @@ impl LocalStore {
         self.root.join("runners")
     }
 
+    pub fn python_managed_runner_dir(&self) -> PathBuf {
+        self.runners_dir().join("python-managed")
+    }
+
+    pub fn python_managed_runtime_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("runtime")
+    }
+
+    pub fn python_managed_env_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("env")
+    }
+
+    pub fn python_managed_packages_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("packages")
+    }
+
+    pub fn python_managed_wheels_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("wheels")
+    }
+
+    pub fn python_managed_logs_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("logs")
+    }
+
+    pub fn python_managed_manifests_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("manifests")
+    }
+
+    pub fn python_managed_cache_dir(&self) -> PathBuf {
+        self.python_managed_runner_dir().join("cache")
+    }
+
     pub fn blobs_dir(&self) -> PathBuf {
         self.root.join("blobs")
     }
@@ -89,6 +121,14 @@ impl LocalStore {
         for path in [
             self.models_dir(),
             self.runners_dir(),
+            self.python_managed_runner_dir(),
+            self.python_managed_runtime_dir(),
+            self.python_managed_env_dir(),
+            self.python_managed_packages_dir(),
+            self.python_managed_wheels_dir(),
+            self.python_managed_logs_dir(),
+            self.python_managed_manifests_dir(),
+            self.python_managed_cache_dir(),
             self.blobs_dir(),
             self.sha256_blobs_dir(),
             self.manifests_dir(),
@@ -143,6 +183,29 @@ mod tests {
         assert!(root.join("cache").join("downloads").is_dir());
         assert!(root.join("logs").is_dir());
         assert!(root.join("config.toml").is_file());
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn ensure_layout_creates_python_managed_runner_directories() {
+        let root = std::env::temp_dir().join("takokit-store-python-managed-test");
+        let store = LocalStore::new(root.clone());
+
+        store.ensure_layout().expect("layout");
+
+        let runner_root = root.join("runners").join("python-managed");
+        for child in [
+            "runtime",
+            "env",
+            "packages",
+            "wheels",
+            "logs",
+            "manifests",
+            "cache",
+        ] {
+            assert!(runner_root.join(child).is_dir(), "missing {child}");
+        }
 
         let _ = std::fs::remove_dir_all(root);
     }

@@ -199,7 +199,8 @@ mod tests {
     use takokit_package::{
         ArtifactManifest, ArtifactRole, CapabilityManifest, ExecutionPlan, ExecutionStatus,
         HardwareManifest, InstalledArtifactRecord, InstalledModelRecord, InstalledPackageStatus,
-        ModelBackend, ModelKind, ModelManifest, RunnerKind, RunnerManifest,
+        ModelBackend, ModelKind, ModelManifest, RunnerDependencyStrategy, RunnerKind,
+        RunnerLifecycleState, RunnerManifest,
     };
 
     use super::{load_piper_config, resolve_piper_lessac_artifacts};
@@ -326,6 +327,11 @@ mod tests {
                 version: "0.1.0".to_string(),
                 kind: RunnerKind::Onnx,
                 platforms: vec!["any".to_string()],
+                supported_model_families: vec!["Piper".to_string()],
+                supported_tasks: vec![CapabilityKind::TextToSpeech],
+                dependency_strategy: RunnerDependencyStrategy::BundledNative,
+                install_state: RunnerLifecycleState::ContractInstalled,
+                notes: "test".to_string(),
                 description: "ONNX scaffold.".to_string(),
             },
             runner_installed: true,

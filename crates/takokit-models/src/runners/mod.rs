@@ -1,4 +1,5 @@
 pub mod onnx;
+pub mod whispercpp;
 
 use async_trait::async_trait;
 use std::path::Path;
@@ -9,6 +10,7 @@ use takokit_core::{
 use takokit_package::{ExecutionPlan, RunnerKind};
 
 use self::onnx::OnnxRunner;
+use self::whispercpp::WhisperCppRunner;
 
 #[async_trait]
 pub trait SpeechRunner: Send + Sync {
@@ -49,6 +51,7 @@ pub async fn execute_transcription(
 ) -> TakokitResult<TranscriptionResponse> {
     match plan.runner.kind {
         RunnerKind::Onnx => OnnxRunner.transcribe(plan, request).await,
+        RunnerKind::Whispercpp => WhisperCppRunner.transcribe(plan, request).await,
         _ => Err(runner_not_implemented(format!(
             "Runner {} contract resolved, but transcription execution is not implemented yet.",
             plan.runner.id

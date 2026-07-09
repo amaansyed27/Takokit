@@ -1,11 +1,11 @@
-id = "gpt-sovits"
-name = "GPT-SoVITS"
+id = "cosyvoice2"
+name = "CosyVoice2"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+license = "license-check-required"
+description = "CosyVoice2 TTS and voice cloning family. Metadata-only; no verified artifacts or managed runtime adapter are installed."
 
 [capabilities]
 tts = true
@@ -17,7 +17,7 @@ live_audio = true
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "16gb"
 
 [artifacts]
 metadata_only = true

@@ -1,8 +1,0 @@
-id = "external-nemo"
-name = "External NeMo Runner"
-kind = "external"
-upstream_url = "https://github.com/NVIDIA/NeMo"
-github_url = "https://github.com/NVIDIA/NeMo"
-runtime_status = "external-runner-needed"
-supported_platforms = ["external"]
-notes = "Catalog placeholder for NVIDIA NeMo ASR families such as Parakeet and Canary."

@@ -1,0 +1,25 @@
+id = "qwen2-5-omni"
+name = "Qwen2.5 Omni"
+version = "0.1.0"
+kind = "omni-audio"
+backend = "transformers-audio"
+runner = "takokit-transformers-audio"
+license = "license-check-required"
+description = "Qwen2.5 Omni audio-language model family. Metadata-only; no Transformers audio adapter or verified artifacts are installed."
+
+[capabilities]
+tts = false
+stt = true
+voice_cloning = false
+live_transcription = true
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "24gb"
+
+[artifacts]
+metadata_only = true
+weights = []
+voices = []

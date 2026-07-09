@@ -1,14 +1,14 @@
-id = "gpt-sovits"
-name = "GPT-SoVITS"
+id = "rvc"
+name = "RVC"
 version = "0.1.0"
-kind = "voice-cloning"
+kind = "voice-convert"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+license = "license-check-required"
+description = "Retrieval-based voice conversion family. Metadata-only; GPL/runtime dependency risks must be documented before executable support."
 
 [capabilities]
-tts = true
+tts = false
 stt = false
 voice_cloning = true
 live_transcription = false

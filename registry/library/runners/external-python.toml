@@ -1,7 +1,0 @@
-id = "external-python"
-name = "External Python Runner"
-kind = "python-managed"
-github_url = "https://github.com/amaansyed27/Takokit"
-runtime_status = "planned"
-supported_platforms = ["external"]
-notes = "Future isolated managed Python runner boundary. It is not the main Takokit backend and is not implemented."

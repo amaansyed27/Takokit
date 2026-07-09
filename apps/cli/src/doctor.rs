@@ -71,6 +71,32 @@ pub fn run_doctor(
     for (label, path) in [
         ("models", store.models_dir()),
         ("runners", store.runners_dir()),
+        ("runners/python-managed", store.python_managed_runner_dir()),
+        (
+            "runners/python-managed/runtime",
+            store.python_managed_runtime_dir(),
+        ),
+        ("runners/python-managed/env", store.python_managed_env_dir()),
+        (
+            "runners/python-managed/packages",
+            store.python_managed_packages_dir(),
+        ),
+        (
+            "runners/python-managed/wheels",
+            store.python_managed_wheels_dir(),
+        ),
+        (
+            "runners/python-managed/logs",
+            store.python_managed_logs_dir(),
+        ),
+        (
+            "runners/python-managed/manifests",
+            store.python_managed_manifests_dir(),
+        ),
+        (
+            "runners/python-managed/cache",
+            store.python_managed_cache_dir(),
+        ),
         ("blobs", store.blobs_dir()),
         ("manifests/models", store.model_manifests_dir()),
         ("manifests/runners", store.runner_manifests_dir()),
@@ -150,6 +176,12 @@ pub fn run_doctor(
             error.to_string(),
         )),
     }
+
+    report.push(warn(
+        "Managed runners",
+        "python-managed runtime not initialized",
+        "layout exists under ~/.takokit/runners/python-managed; Python/Torch installation is not implemented",
+    ));
 
     if server_is_available(config) {
         report.push(ok(

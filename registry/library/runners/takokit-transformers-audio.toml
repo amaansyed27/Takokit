@@ -1,0 +1,8 @@
+id = "takokit-transformers-audio"
+name = "Takokit Transformers Audio Runner"
+kind = "transformers-audio"
+upstream_url = "https://github.com/huggingface/transformers"
+github_url = "https://github.com/huggingface/transformers"
+runtime_status = "planned"
+supported_platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+notes = "Planned managed runner for audio-language model families such as Qwen Omni and Voxtral. Not executable in Takokit yet."

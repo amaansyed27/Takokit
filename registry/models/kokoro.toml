@@ -5,7 +5,7 @@ kind = "tts"
 backend = "onnx"
 runner = "takokit-onnx"
 license = "apache-2.0"
-description = "Fast local text-to-speech model. This mock registry entry does not include real weights yet."
+description = "Fast local text-to-speech model family. Runtime entry is metadata-only until Takokit verifies ONNX artifacts."
 
 [capabilities]
 tts = true
@@ -20,5 +20,6 @@ gpu = false
 min_ram = "4gb"
 
 [artifacts]
+metadata_only = true
 weights = []
 voices = []

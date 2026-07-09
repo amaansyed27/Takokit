@@ -6,9 +6,9 @@ This file tracks near-term direction without phase gates. The source of truth fo
 
 - Implement Piper ONNX session loading and audio generation.
 - Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
-- Add release packaging.
-- Add actual install script release URLs after artifacts and checksums exist.
-- Add public model library website.
+- Initialize the whisper.cpp runtime binary path behind `takokit-whispercpp`.
+- Design explicit managed Python installation flow before installing Python/Torch.
+- Add release packaging and actual install script release URLs after artifacts and checksums exist.
 
 ## Current Product Shell
 
@@ -19,6 +19,7 @@ takokit
 takokit doctor
 takokit pull kokoro
 takokit runner pull takokit-onnx
+takokit plan kokoro
 takokit speak "Hello" --model mock-tts
 takokit gui
 ```
@@ -31,7 +32,7 @@ Takokit's first-class surfaces are TTS, STT, Voice Cloning, Live Transcription L
 
 ## Planning And Execution Contract
 
-Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. Runner execution is separate. The current ONNX runner scaffold returns typed `inference_not_implemented` until real Piper ONNX execution is implemented.
+Resolution now produces an `ExecutionPlan` when model and runner metadata are valid. `takokit plan <model>` produces a user-facing lifecycle plan even before the model is installed. Runner execution is separate. The current ONNX and whisper.cpp scaffolds return typed `inference_not_implemented` until real execution is implemented.
 
 The first ONNX model target is Piper ONNX. See [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md).
 

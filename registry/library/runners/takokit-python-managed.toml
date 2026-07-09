@@ -1,0 +1,7 @@
+id = "takokit-python-managed"
+name = "Takokit Managed Python Runner"
+kind = "python-managed"
+github_url = "https://github.com/amaansyed27/Takokit"
+runtime_status = "planned"
+supported_platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+notes = "Planned isolated managed Python/PyTorch runner boundary. Takokit will own Python, Torch, packages, wheels, caches, logs, and model adapters internally."

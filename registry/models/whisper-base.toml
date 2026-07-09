@@ -5,7 +5,7 @@ kind = "stt"
 backend = "whispercpp"
 runner = "takokit-whispercpp"
 license = "mit"
-description = "Base Whisper transcription package placeholder for local registry testing."
+description = "Whisper Base transcription package placeholder. Runtime entry is metadata-only until Takokit verifies ggml artifacts."
 
 [capabilities]
 tts = false
@@ -20,5 +20,6 @@ gpu = false
 min_ram = "4gb"
 
 [artifacts]
+metadata_only = true
 weights = []
 voices = []

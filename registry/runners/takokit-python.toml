@@ -1,6 +1,0 @@
-id = "takokit-python"
-name = "Takokit Managed Python Runner"
-version = "0.1.0"
-kind = "python-managed"
-platforms = ["windows-x64", "linux-x64", "macos-arm64"]
-description = "Managed Python runner contract for future isolated model backends."

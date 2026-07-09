@@ -1,0 +1,11 @@
+id = "takokit-nemo"
+name = "Takokit NeMo Runner"
+version = "0.1.0"
+kind = "nemo"
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+supported_model_families = ["Parakeet", "Canary"]
+supported_tasks = ["speech_to_text", "live_transcription"]
+dependency_strategy = "managed"
+install_state = "runtime-missing"
+notes = "Planned managed NeMo runner for ASR/TTS families. No NeMo runtime adapter is implemented yet."
+description = "Shared runner contract for NVIDIA NeMo-style ASR/TTS models."

@@ -1,11 +1,11 @@
-id = "gpt-sovits"
-name = "GPT-SoVITS"
+id = "qwen3-tts"
+name = "Qwen3-TTS"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+license = "license-check-required"
+description = "Qwen3-TTS voice generation and cloning family. Metadata-only; managed Python runtime adapter and verified artifacts are not implemented."
 
 [capabilities]
 tts = true
@@ -17,7 +17,7 @@ live_audio = true
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "16gb"
 
 [artifacts]
 metadata_only = true

@@ -1,0 +1,11 @@
+id = "takokit-transformers-audio"
+name = "Takokit Transformers Audio Runner"
+version = "0.1.0"
+kind = "transformers-audio"
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+supported_model_families = ["Qwen Omni", "Voxtral"]
+supported_tasks = ["speech_to_text", "live_audio"]
+dependency_strategy = "managed"
+install_state = "runtime-missing"
+notes = "Planned managed runner for audio-language models. No Transformers audio runtime adapter is implemented yet."
+description = "Shared runner contract for audio-language and omni audio models such as Qwen Omni and Voxtral."

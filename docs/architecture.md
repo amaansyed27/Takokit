@@ -76,6 +76,8 @@ It writes:
 
 The `models/` and `runners/` manifest copies preserve the existing behavior. The `installed-*` records track lifecycle metadata such as source, installed time, artifact URL/checksum/role/local path, required runner, platforms, and status. Takokit still does not install Python packages or execute real runners.
 
+The managed runner layout exists at `~/.takokit/runners/python-managed/` with `runtime`, `env`, `packages`, `wheels`, `logs`, `manifests`, and `cache` directories so future Python/PyTorch models can be isolated behind Takokit-managed setup.
+
 Artifact install refuses missing URLs or checksums unless the manifest or request is explicitly metadata-only. Checksum mismatches delete the temporary download and return a typed error. See [artifacts.md](artifacts.md).
 
 ## Execution Planning And Runner Execution
@@ -106,15 +108,17 @@ ONNX runner contract resolved, but real ONNX execution is not implemented yet.
 
 ## Runner Isolation
 
-Runner types are modeled now for future backends:
+Runner families are modeled now for shared backends:
 
-- `native`
 - `onnx`
 - `whispercpp`
 - `python-managed`
-- `external`
+- `transformers-audio`
+- `nemo`
 
 Runners must communicate through explicit contracts. UI and API callers should only see model IDs, voice IDs, request contracts, package metadata, and typed errors.
+
+Use `takokit plan <model>` or `GET /v1/models/:id/plan` to inspect whether a runtime model is metadata-only, artifacts-ready, runner-ready, executable, or failed.
 
 ## First ONNX Target
 

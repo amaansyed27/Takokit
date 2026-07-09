@@ -9,14 +9,21 @@
 
 - [ ] Implement Piper ONNX session loading and audio generation.
 - [ ] Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
-- [ ] Wire curated library metadata into the GUI models browser.
-- [ ] Add API routes for curated library metadata.
+- [ ] Initialize the whisper.cpp runtime binary path behind `takokit-whispercpp`.
+- [ ] Design the explicit managed Python install flow before installing Python/Torch.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
 
 ## Done
 
+- [x] Added shared runtime runner manifests for ONNX, whisper.cpp, managed Python, Transformers audio, and NeMo.
+- [x] Added model lifecycle states and `takokit plan <model>`.
+- [x] Added `GET /v1/models/:id/plan`, `GET /v1/library/models`, and `GET /v1/library/runners`.
+- [x] Added runtime model manifests for Piper, Kokoro, Whisper Base, Qwen3-TTS, CosyVoice2, F5-TTS, Fish Speech, Dia, Chatterbox, GPT-SoVITS, OpenVoice, RVC, Qwen Omni, Voxtral, SenseVoice, Parakeet, and Canary.
+- [x] Added Python-managed runner storage layout under `~/.takokit/runners/python-managed/`.
+- [x] Added explicit whisper.cpp transcription runner scaffold with typed `inference_not_implemented`.
+- [x] Updated GUI model details to show selected-model plan state.
 - [x] Added curated model and runner library metadata under `registry/library/`.
 - [x] Added typed library manifest parsing for discovery metadata.
 - [x] Added `takokit library models` and `takokit library runners`.

@@ -1,0 +1,25 @@
+id = "parakeet"
+name = "Parakeet"
+version = "0.1.0"
+kind = "stt"
+backend = "nemo"
+runner = "takokit-nemo"
+license = "license-check-required"
+description = "Parakeet NeMo-style ASR family. Metadata-only; no NeMo runtime adapter or verified artifacts are installed."
+
+[capabilities]
+tts = false
+stt = true
+voice_cloning = false
+live_transcription = true
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "8gb"
+
+[artifacts]
+metadata_only = true
+weights = []
+voices = []

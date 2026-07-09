@@ -31,6 +31,8 @@ inference_not_implemented: ONNX runner contract resolved, but real ONNX executio
 
 It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning the not-implemented execution error.
 
+The whisper.cpp runner scaffold is also explicit. `whisper-base` resolves through `takokit-whispercpp` and then returns typed `inference_not_implemented` until real whisper.cpp execution is wired.
+
 Takokit model manifests describe the five product surfaces:
 
 - TTS
@@ -100,7 +102,12 @@ name = "Takokit ONNX Runner"
 version = "0.1.0"
 kind = "onnx"
 platforms = ["windows-x64", "linux-x64", "macos-arm64"]
-description = "Native ONNX runner for CPU-friendly models."
+supported_model_families = ["Piper", "Kokoro ONNX", "future ONNX voice/audio exports"]
+supported_tasks = ["text_to_speech", "live_audio"]
+dependency_strategy = "bundled-native"
+install_state = "runtime-missing"
+notes = "Shared ONNX runner contract. Piper artifact/config loading exists, but ONNX session execution is not implemented yet."
+description = "Shared native ONNX runner contract for Piper, Kokoro ONNX, and future ONNX voice/audio exports."
 ```
 
 ## Installed Records
@@ -119,7 +126,21 @@ Pulling a runner writes:
 ~/.takokit/manifests/installed-runners/<runner>.toml
 ```
 
-The runner record stores runner id, version, kind, platforms, manifest path, installed timestamp, and metadata-only status. It is a contract install, not an execution binary install.
+The runner record stores runner id, version, kind, platforms, manifest path, installed timestamp, and lifecycle status such as `contract-installed`. It is a contract install, not an execution binary install.
+
+## Planning Output
+
+`takokit plan <model>` and `GET /v1/models/:id/plan` expose the same model lifecycle plan:
+
+- model id and name
+- task/category
+- required runner
+- artifact lifecycle state
+- runner contract state
+- runner runtime state
+- executable today
+- missing components
+- next command
 
 ## Rules
 

@@ -14,6 +14,9 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/status", get(handlers::status))
         .route("/v1/capabilities", get(handlers::capabilities))
         .route("/v1/models", get(handlers::models))
+        .route("/v1/library/models", get(handlers::library_models))
+        .route("/v1/library/runners", get(handlers::library_runners))
+        .route("/v1/models/:id/plan", get(handlers::model_plan))
         .route(
             "/v1/models/:id",
             get(handlers::model).delete(handlers::remove_model),
@@ -280,6 +283,70 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(remove_response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn library_routes_return_curated_model_and_runner_manifests() {
+        let root = std::env::temp_dir().join("takokit-server-library-routes-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let app = server_router(state);
+
+        let models_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/library/models")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(models_response.status(), StatusCode::OK);
+        let body = to_bytes(models_response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|model| model["id"] == "qwen3-tts"));
+
+        let runners_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/library/runners")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(runners_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn model_plan_route_returns_honest_state_for_metadata_only_model() {
+        let root = std::env::temp_dir().join("takokit-server-model-plan-route-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let response = server_router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/models/qwen3-tts/plan")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json["data"]["model_id"], "qwen3-tts");
+        assert_eq!(json["data"]["required_runner"], "takokit-python-managed");
+        assert_eq!(json["data"]["artifact_state"], "metadata-only");
+        assert_eq!(json["data"]["runner_runtime_state"], "runtime-missing");
+        assert_eq!(json["data"]["executable"], false);
     }
 
     #[tokio::test]
