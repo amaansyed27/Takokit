@@ -99,11 +99,11 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit plan <model>` prints the model family, task, required runner, artifact state, runner contract/runtime state, whether it is executable today, missing pieces, and the next command to run.
 
-`takokit models`, `GET /v1/models`, and the GUI Models page use the same lifecycle planning state. After `whisper-base` is pulled and `takokit-whispercpp` is ready, it is shown as executable. `piper-lessac` is shown as artifacts-ready but blocked on ONNX TTS execution. `qwen3-tts` is shown as metadata-only or adapter-blocked until a managed Python adapter exists.
+`takokit models`, `GET /v1/models`, and the GUI Models page use the same lifecycle planning state. After `whisper-base` is pulled and `takokit-whispercpp` is ready, it is shown as executable. `piper-lessac` is shown as artifacts-ready but blocked on the Piper text frontend (`piper_text_frontend_not_implemented`). `qwen3-tts` is shown as metadata-only or adapter-blocked until a managed Python adapter exists.
 
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 
-`takokit speak "Hello" --model mock-tts` is the only current speech path that writes audio. Package models such as `kokoro` and `piper-lessac` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner returns typed `inference_not_implemented` with the missing Piper components instead of pretending to run a real model.
+`takokit speak "Hello" --model mock-tts` is the only current speech path that writes audio. Package models such as `kokoro` and `piper-lessac` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. Piper now resolves verified artifacts/config and fails at typed `piper_text_frontend_not_implemented` instead of pretending to run a real model. Kokoro remains metadata-only and generic ONNX-planned.
 
 `takokit transcribe ./audio.wav --model whisper-base` can produce a real transcript after:
 
@@ -131,6 +131,7 @@ target/release/takokit.exe runner install takokit-whispercpp
 target/release/takokit.exe pull whisper-base
 target/release/takokit.exe transcribe ./sample.wav --model whisper-base
 target/release/takokit.exe test --suite launch
+target/release/takokit.exe test --suite launch --json
 target/release/tako.exe doctor
 ```
 

@@ -150,7 +150,7 @@ On Windows x64, `takokit-whispercpp` installs and verifies the whisper.cpp relea
 }
 ```
 
-Using package models such as `kokoro` for speech runs lifecycle resolution and then runner execution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit builds an execution plan and passes it to the runner layer. The current ONNX runner scaffold then returns `inference_not_implemented` until real ONNX execution exists.
+Using package models such as `kokoro` or `piper-lessac` for speech runs lifecycle resolution and then runner execution. If the model is not pulled, Takokit returns `model_not_installed`. If the model is pulled but the required runner is missing, Takokit returns `runner_not_installed`. If both metadata records exist, Takokit builds an execution plan and passes it to the runner layer. `piper-lessac` resolves verified artifacts/config and then returns `piper_text_frontend_not_implemented` until Takokit has a verified non-GPL text-to-phoneme frontend. Other ONNX models still return generic `inference_not_implemented` until real execution exists.
 
 `POST /v1/audio/transcriptions` uses the same planning and execution split for STT. Planning checks model install state before capability support, so an unpulled model returns `model_not_installed`. After `kokoro` metadata is pulled, transcription with `kokoro` returns `capability_unsupported` for STT. `whisper-base` returns `runner_not_installed` until `takokit-whispercpp` exists. After the model artifact is pulled and the runner is installed/ready, it invokes whisper.cpp and returns real transcript text.
 
@@ -165,13 +165,13 @@ Typed errors use this shape:
 }
 ```
 
-After a model and its runner contract are installed, ONNX execution currently returns typed `inference_not_implemented` responses. ONNX returns:
+After a Piper model and its runner contract are installed, Piper execution currently returns:
 
 ```json
 {
   "error": {
-    "code": "inference_not_implemented",
-    "message": "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
+    "code": "piper_text_frontend_not_implemented",
+    "message": "Piper artifacts and config resolved, but phonemizer/token preparation is not implemented yet..."
   }
 }
 ```

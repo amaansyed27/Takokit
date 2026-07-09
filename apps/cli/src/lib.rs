@@ -3,8 +3,9 @@ mod gui;
 mod tui;
 
 use clap::{Args, Parser, Subcommand};
+use serde::Serialize;
 use std::path::PathBuf;
-use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
+use takokit_core::{CapabilityKind, ModelInfo, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{
     execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
     TextToSpeechEngine,
@@ -259,52 +260,10 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Show { model }) => {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
-            let installed = installed_registry.is_model_installed(&manifest.id);
-            let runner_installed = installed_registry.is_runner_installed(&manifest.runner);
-            let plan = plan_model(&package_registry, &installed_registry, &manifest.id).ok();
-            let runner = package_registry.runner(&manifest.runner).ok();
-            println!("{} ({})", manifest.name, manifest.id);
-            println!("version: {}", manifest.version);
-            println!("backend: {:?}", manifest.backend);
-            println!("runner: {}", manifest.runner);
-            if let Some(runner) = runner {
-                println!("runner kind: {:?}", runner.kind);
-                println!("runner installed: {}", runner_installed);
-            }
-            println!("installed: {}", installed);
-            if let Ok(record) = installed_registry.installed_model_record(&manifest.id) {
-                println!("installed status: {:?}", record.status);
-                println!("installed at: {}", record.installed_at);
-                println!("source: {}", record.source);
-                println!("artifacts: {}", record.artifacts.len());
-            } else {
-                println!("installed status: not installed");
-                println!("artifacts: {}", manifest.artifacts.all().count());
-            }
-            println!("license: {}", manifest.license);
-            println!(
-                "capabilities: {}",
-                capability_labels(&manifest.capabilities.to_model_capabilities())
-            );
-            println!(
-                "hardware: cpu={}, gpu={}, min_ram={}",
-                manifest.hardware.cpu,
-                manifest.hardware.gpu,
-                manifest
-                    .hardware
-                    .min_ram
-                    .as_deref()
-                    .unwrap_or("unspecified")
-            );
-            println!("status: {}", execution_status(installed, runner_installed));
-            if let Some(plan) = plan {
-                println!("executable today: {}", yes_no(plan.executable));
-                if !plan.missing.is_empty() {
-                    println!("missing: {}", plan.missing.join("; "));
-                }
-                println!("next command: {}", plan.next_command);
-            }
-            println!("description: {}", manifest.description);
+            let info = model_info_from_plan(&package_registry, &installed_registry, &manifest.id)
+                .map_err(cli_error)?;
+            let installed_record = installed_registry.installed_model_record(&manifest.id).ok();
+            println!("{}", format_model_show(&info, installed_record.as_ref()));
         }
         Some(Command::Plan(args)) => {
             let plan = plan_model(&package_registry, &installed_registry, &args.model)
@@ -369,83 +328,60 @@ pub async fn run() -> anyhow::Result<()> {
                 "training jobs and dataset preparation are planned for a later phase",
             );
         }
-        Some(Command::Runner { command }) => {
-            match command {
-                RunnerCommand::Pull { runner } => {
-                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                    let report = installed_registry
-                        .install_runner(&manifest)
+        Some(Command::Runner { command }) => match command {
+            RunnerCommand::Pull { runner } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                let report = installed_registry
+                    .install_runner(&manifest)
+                    .map_err(cli_error)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            RunnerCommand::Install { runner } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                let report =
+                    initialize_runner_runtime(store.root(), &installed_registry, &manifest)
                         .map_err(cli_error)?;
-                    println!("{}", serde_json::to_string_pretty(&report)?);
-                }
-                RunnerCommand::Install { runner } => {
-                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                    let report =
-                        initialize_runner_runtime(store.root(), &installed_registry, &manifest)
-                            .map_err(cli_error)?;
-                    println!("{}", serde_json::to_string_pretty(&report)?);
-                }
-                RunnerCommand::Doctor { runner, json } => {
-                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                    if json {
-                        print_runner_doctor_json(&store, &installed_registry, &manifest)?;
-                    } else {
-                        print_runner_doctor(&store, &installed_registry, &manifest);
-                    }
-                }
-                RunnerCommand::Show { runner } => {
-                    let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                    let installed = installed_registry.is_runner_installed(&manifest.id);
-                    println!("{} ({})", manifest.name, manifest.id);
-                    println!("version: {}", manifest.version);
-                    println!("kind: {:?}", manifest.kind);
-                    println!("platforms: {}", manifest.platforms.join(", "));
-                    println!(
-                        "model families: {}",
-                        if manifest.supported_model_families.is_empty() {
-                            "none declared".to_string()
-                        } else {
-                            manifest.supported_model_families.join(", ")
-                        }
-                    );
-                    println!("tasks: {}", capability_labels(&manifest.supported_tasks));
-                    println!("dependency strategy: {:?}", manifest.dependency_strategy);
-                    println!("installed: {}", installed);
-                    if let Ok(record) = installed_registry.installed_runner_record(&manifest.id) {
-                        println!("installed status: {:?}", record.status);
-                        println!("installed at: {}", record.installed_at);
-                    } else {
-                        println!("installed status: not installed");
-                    }
-                    if manifest.id == "takokit-python-managed" {
-                        println!(
-                            "managed runtime path: {}",
-                            store.python_managed_runner_dir().display()
-                        );
-                        println!(
-                            "user setup: Takokit manages Python, packages, wheels, caches, and logs internally."
-                        );
-                    }
-                    println!("status: runner contract installed only; execution binary is not implemented");
-                    if !manifest.notes.is_empty() {
-                        println!("notes: {}", manifest.notes);
-                    }
-                    println!("description: {}", manifest.description);
-                }
-                RunnerCommand::Rm { runner } => {
-                    let removed = installed_registry
-                        .remove_runner(&runner)
-                        .map_err(cli_error)?;
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&serde_json::json!({
-                            "id": runner,
-                            "removed": removed
-                        }))?
-                    );
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            RunnerCommand::Doctor { runner, json } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                if json {
+                    print_runner_doctor_json(&store, &installed_registry, &manifest)?;
+                } else {
+                    print_runner_doctor(&store, &installed_registry, &manifest);
                 }
             }
-        }
+            RunnerCommand::Show { runner } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                let installed = installed_registry.is_runner_installed(&manifest.id);
+                let record = installed_registry
+                    .installed_runner_record(&manifest.id)
+                    .ok();
+                let layout = runner_runtime_layout(store.root(), &manifest);
+                println!(
+                    "{}",
+                    format_runner_show(
+                        &manifest,
+                        installed,
+                        record.as_ref().map(|record| record.status),
+                        record.as_ref().map(|record| record.note.clone()),
+                        layout.root,
+                    )
+                );
+            }
+            RunnerCommand::Rm { runner } => {
+                let removed = installed_registry
+                    .remove_runner(&runner)
+                    .map_err(cli_error)?;
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "id": runner,
+                        "removed": removed
+                    }))?
+                );
+            }
+        },
         Some(Command::Test(args)) => {
             run_test_command(&package_registry, &installed_registry, args).await?
         }
@@ -516,7 +452,7 @@ async fn run_test_command(
 fn print_launch_suite(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
-    _json: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
     let ids = [
         "piper-lessac",
@@ -535,25 +471,77 @@ fn print_launch_suite(
     let mut rows = Vec::new();
     for id in ids {
         match plan_model(package_registry, installed_registry, id) {
-            Ok(plan) => rows.push(serde_json::json!({
-                "model": plan.model_id,
-                "task": plan.task,
-                "runner": plan.required_runner,
-                "lifecycle": plan.lifecycle_state,
-                "artifacts": plan.artifact_state,
-                "runner_runtime": plan.runner_runtime_state,
-                "executable": plan.executable,
-                "missing": plan.missing,
-                "next_command": plan.next_command,
-            })),
-            Err(error) => rows.push(serde_json::json!({
-                "model": id,
-                "error": error.to_string(),
-            })),
+            Ok(plan) => rows.push(LaunchSuiteRow {
+                model: plan.model_id,
+                task: Some(plan.task),
+                runner: Some(plan.required_runner),
+                lifecycle: Some(plan.lifecycle_state.to_string()),
+                artifacts: Some(plan.artifact_state.to_string()),
+                runner_runtime: Some(plan.runner_runtime_state.to_string()),
+                executable: Some(plan.executable),
+                missing: plan.missing,
+                next_command: Some(plan.next_command),
+                error: None,
+            }),
+            Err(error) => rows.push(LaunchSuiteRow {
+                model: id.to_string(),
+                task: None,
+                runner: None,
+                lifecycle: None,
+                artifacts: None,
+                runner_runtime: None,
+                executable: None,
+                missing: Vec::new(),
+                next_command: None,
+                error: Some(error.to_string()),
+            }),
         }
     }
-    println!("{}", serde_json::to_string_pretty(&rows)?);
+    println!("{}", format_launch_suite(&rows, json)?);
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct LaunchSuiteRow {
+    model: String,
+    task: Option<String>,
+    runner: Option<String>,
+    lifecycle: Option<String>,
+    artifacts: Option<String>,
+    runner_runtime: Option<String>,
+    executable: Option<bool>,
+    missing: Vec<String>,
+    next_command: Option<String>,
+    error: Option<String>,
+}
+
+fn format_launch_suite(rows: &[LaunchSuiteRow], json: bool) -> anyhow::Result<String> {
+    if json {
+        return Ok(serde_json::to_string_pretty(rows)?);
+    }
+
+    let mut output = String::from("Launch test suite\n");
+    for row in rows {
+        if let Some(error) = &row.error {
+            output.push_str(&format!("- {}: error: {error}\n", row.model));
+            continue;
+        }
+
+        output.push_str(&format!(
+            "- {}: lifecycle={}, runner={}, executable={}\n",
+            row.model,
+            row.lifecycle.as_deref().unwrap_or("unknown"),
+            row.runner.as_deref().unwrap_or("unknown"),
+            yes_no(row.executable.unwrap_or(false))
+        ));
+        if !row.missing.is_empty() {
+            output.push_str(&format!("  missing: {}\n", row.missing.join("; ")));
+        }
+        if let Some(next) = &row.next_command {
+            output.push_str(&format!("  next: {next}\n"));
+        }
+    }
+    Ok(output.trim_end().to_string())
 }
 
 fn print_or_json_plan(plan: &ModelPlan, json: bool) -> anyhow::Result<()> {
@@ -655,6 +643,11 @@ fn print_runner_doctor(
     let layout = runner_runtime_layout(store.root(), manifest);
     println!("runtime path: {}", layout.root.display());
     println!("logs path: {}", layout.logs.display());
+    if manifest.id == "takokit-onnx" {
+        println!("ONNX session capability: not verified in Takokit yet");
+        println!("Piper frontend status: piper_text_frontend_not_implemented");
+        println!("executable models: none");
+    }
 }
 
 fn print_runner_doctor_json(
@@ -696,6 +689,9 @@ fn print_runner_doctor_json(
             "runtime_path": layout.root,
             "logs_path": layout.logs,
             "adapters": adapters,
+            "onnx_session_capability": if manifest.id == "takokit-onnx" { Some("not-verified") } else { None },
+            "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None },
+            "executable_models": if manifest.id == "takokit-onnx" { Vec::<String>::new() } else { Vec::<String>::new() },
         }))?
     );
     Ok(())
@@ -738,11 +734,118 @@ fn capability_labels(capabilities: &[CapabilityKind]) -> String {
         .join(", ")
 }
 
-fn execution_status(installed: bool, runner_installed: bool) -> &'static str {
-    match (installed, runner_installed) {
-        (false, _) => "model manifest is available, but the model is not installed",
-        (true, false) => "model installed; required runner is not installed or not implemented yet",
-        (true, true) => "runner installed; real inference is not implemented yet",
+fn format_model_show(
+    info: &ModelInfo,
+    installed_record: Option<&takokit_package::InstalledModelRecord>,
+) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!("{} ({})", info.name, info.id));
+    lines.push(format!("family: {}", info.family));
+    lines.push(format!("version: {}", info.version));
+    lines.push(format!("backend: {}", info.backend));
+    lines.push(format!("runner: {}", info.runner));
+    lines.push(format!("installed: {}", info.installed));
+    lines.push(format!("runner installed: {}", info.runner_installed));
+    lines.push(format!("runner runtime: {}", info.runner_runtime_state));
+    lines.push(format!("lifecycle: {}", info.lifecycle_state));
+    lines.push(format!("status: {}", info.execution_status));
+    lines.push(format!("executable today: {}", yes_no(info.executable)));
+    lines.push(format!("license: {}", info.license));
+    if let Some(warning) = &info.license_warning {
+        lines.push(format!("license warning: {warning}"));
+    }
+    lines.push(format!(
+        "capabilities: {}",
+        capability_labels(&info.capabilities)
+    ));
+    lines.push(format!("hardware: {}", info.hardware_notes));
+    lines.push(format!("artifacts: {}", info.artifact_count));
+    if let Some(record) = installed_record {
+        lines.push(format!("installed status: {:?}", record.status));
+        lines.push(format!("installed at: {}", record.installed_at));
+        lines.push(format!("source: {}", record.source));
+        lines.push(format!("installed artifacts: {}", record.artifacts.len()));
+    } else {
+        lines.push("installed status: not installed".to_string());
+    }
+    if info.missing.is_empty() {
+        lines.push("missing: none".to_string());
+    } else {
+        lines.push(format!("missing: {}", info.missing.join("; ")));
+    }
+    lines.push(format!("next command: {}", info.next_command));
+    lines.push(format!("description: {}", info.summary));
+    lines.join("\n")
+}
+
+fn format_runner_show(
+    manifest: &RunnerManifest,
+    installed: bool,
+    runtime_state: Option<takokit_package::RunnerLifecycleState>,
+    note: Option<String>,
+    runtime_path: PathBuf,
+) -> String {
+    let runtime_state_label = runtime_state
+        .map(|state| state.to_string())
+        .unwrap_or_else(|| "runtime-missing".to_string());
+    let mut lines = Vec::new();
+    lines.push(format!("{} ({})", manifest.name, manifest.id));
+    lines.push(format!("version: {}", manifest.version));
+    lines.push(format!("kind: {:?}", manifest.kind));
+    lines.push(format!("platforms: {}", manifest.platforms.join(", ")));
+    lines.push(format!(
+        "model families: {}",
+        if manifest.supported_model_families.is_empty() {
+            "none declared".to_string()
+        } else {
+            manifest.supported_model_families.join(", ")
+        }
+    ));
+    lines.push(format!(
+        "tasks: {}",
+        capability_labels(&manifest.supported_tasks)
+    ));
+    lines.push(format!(
+        "dependency strategy: {:?}",
+        manifest.dependency_strategy
+    ));
+    lines.push(format!("installed: {}", installed));
+    lines.push(format!("runtime state: {runtime_state_label}"));
+    lines.push(format!("runtime path: {}", runtime_path.display()));
+    lines.push(format!(
+        "status: {}",
+        runner_status_text(manifest, runtime_state)
+    ));
+    if manifest.id == "takokit-python-managed" {
+        lines.push(
+            "user setup: Takokit manages Python, packages, wheels, caches, and logs internally."
+                .to_string(),
+        );
+    }
+    if let Some(note) = note {
+        lines.push(format!("installed note: {note}"));
+    }
+    if !manifest.notes.is_empty() {
+        lines.push(format!("notes: {}", manifest.notes));
+    }
+    lines.push(format!("description: {}", manifest.description));
+    lines.join("\n")
+}
+
+fn runner_status_text(
+    manifest: &RunnerManifest,
+    runtime_state: Option<takokit_package::RunnerLifecycleState>,
+) -> String {
+    match runtime_state {
+        Some(takokit_package::RunnerLifecycleState::Ready) => "ready".to_string(),
+        Some(takokit_package::RunnerLifecycleState::RuntimeInstalled)
+            if manifest.id == "takokit-onnx" =>
+        {
+            "runtime installed; missing Piper text frontend and ONNX TTS execution verification"
+                .to_string()
+        }
+        Some(state) => state.to_string(),
+        None => "runtime missing".to_string(),
     }
 }
 
@@ -921,6 +1024,83 @@ mod tests {
             suite.command,
             Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None })) if suite == "launch"
         ));
+    }
+
+    #[test]
+    fn model_show_output_uses_canonical_planner_status() {
+        let info = takokit_core::ModelInfo {
+            id: "whisper-base".to_string(),
+            name: "Whisper Base".to_string(),
+            family: "whisper".to_string(),
+            version: "0.1.0".to_string(),
+            summary: "Local STT".to_string(),
+            license: "mit".to_string(),
+            license_warning: None,
+            runtime: takokit_core::ModelRuntime::WhisperCpp,
+            backend: "whispercpp".to_string(),
+            runner: "takokit-whispercpp".to_string(),
+            hardware_notes: "CPU".to_string(),
+            artifact_count: 1,
+            capabilities: vec![CapabilityKind::SpeechToText],
+            installed: true,
+            runner_installed: true,
+            runner_runtime_state: "ready".to_string(),
+            lifecycle_state: "executable".to_string(),
+            executable: true,
+            missing: Vec::new(),
+            next_command: "takokit test whisper-base".to_string(),
+            execution_status: "executable".to_string(),
+        };
+
+        let output = format_model_show(&info, None);
+
+        assert!(output.contains("lifecycle: executable"));
+        assert!(output.contains("status: executable"));
+        assert!(output.contains("runner runtime: ready"));
+        assert!(!output.contains("real inference is not implemented"));
+    }
+
+    #[test]
+    fn runner_show_output_uses_persisted_runtime_state() {
+        let registry = PackageRegistry::bundled();
+        let manifest = registry
+            .runner("takokit-whispercpp")
+            .expect("whisper runner");
+        let output = format_runner_show(
+            &manifest,
+            true,
+            Some(takokit_package::RunnerLifecycleState::Ready),
+            Some("whisper.cpp runtime installed".to_string()),
+            PathBuf::from("C:/takokit/runners/whispercpp"),
+        );
+
+        assert!(output.contains("runtime state: ready"));
+        assert!(output.contains("status: ready"));
+        assert!(!output.contains("runner contract installed only"));
+    }
+
+    #[test]
+    fn launch_suite_default_is_human_readable_and_json_flag_is_json() {
+        let rows = vec![LaunchSuiteRow {
+            model: "whisper-base".to_string(),
+            task: Some("STT / Live Transcription API".to_string()),
+            runner: Some("takokit-whispercpp".to_string()),
+            lifecycle: Some("executable".to_string()),
+            artifacts: Some("artifacts-ready".to_string()),
+            runner_runtime: Some("ready".to_string()),
+            executable: Some(true),
+            missing: Vec::new(),
+            next_command: Some("takokit test whisper-base".to_string()),
+            error: None,
+        }];
+
+        let human = format_launch_suite(&rows, false).expect("human output");
+        let json = format_launch_suite(&rows, true).expect("json output");
+
+        assert!(human.contains("Launch test suite"));
+        assert!(human.contains("whisper-base"));
+        assert!(!human.trim_start().starts_with('['));
+        assert!(json.trim_start().starts_with('['));
     }
 
     #[test]

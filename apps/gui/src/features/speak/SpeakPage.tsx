@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Download, MoreVertical, Play, Volume2, Waves } from "lucide-react";
+import { ChevronDown, Download, Waves } from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -9,6 +9,7 @@ import { Table, TableRow } from "../../components/ui/Table";
 import { TextArea } from "../../components/ui/TextArea";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useMockGeneration } from "../../hooks/useMockGeneration";
+import { installRunner, pullModel, pullRunner } from "../../lib/api";
 
 export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   const ttsModels = useMemo(() => runtime.models.filter((model) => model.capabilities.includes("tts")), [runtime.models]);
@@ -19,13 +20,29 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   const selectedModel = ttsModels.find((item) => item.id === model) ?? ttsModels[0];
   const selectedVoice = runtime.voices.find((item) => item.id === voice) ?? runtime.voices[0];
   const { error, generate, isGenerating, result } = useMockGeneration();
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const apiUnavailable = runtime.server.status !== "online";
+  const requiredRunner = selectedModel ? runtime.runners.find((runner) => runner.id === selectedModel.runner) : undefined;
   const canGenerate = Boolean(selectedModel?.executable && !apiUnavailable);
   const blocker = apiUnavailable
     ? "Start takokit serve or takokit gui to use the local API."
     : selectedModel?.executable
       ? null
       : selectedModel?.missing.join("; ") || "This TTS model is not executable today.";
+
+  async function runAction(label: string, action: () => Promise<void>) {
+    setBusyAction(label);
+    setNotice(null);
+    try {
+      await action();
+      setNotice("Local runtime state updated. Refreshing the page data may change executable state.");
+    } catch (caught) {
+      setNotice(caught instanceof Error ? caught.message : "Takokit API action failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
   return (
     <section className="page">
@@ -87,11 +104,35 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
             <Button variant="primary" type="submit" loading={isGenerating} disabled={!canGenerate}>
               <Waves size={16} /> Generate Speech
             </Button>
-            <Tooltip content="Preview is disabled until real audio playback is wired.">
-              <Button disabled type="button">
-                <Play size={16} /> Preview (5s)
+            <span className="action-cluster">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={apiUnavailable || !selectedModel || selectedModel.status === "installed"}
+                loading={busyAction === "pull-model"}
+                onClick={() => selectedModel && runAction("pull-model", () => pullModel(selectedModel.id).then(() => undefined))}
+              >
+                Pull model
               </Button>
-            </Tooltip>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={apiUnavailable || !requiredRunner || requiredRunner.installed}
+                loading={busyAction === "pull-runner"}
+                onClick={() => requiredRunner && runAction("pull-runner", () => pullRunner(requiredRunner.id).then(() => undefined))}
+              >
+                Pull runner
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={apiUnavailable || !requiredRunner?.installed || requiredRunner.install_state === "ready"}
+                loading={busyAction === "install-runner"}
+                onClick={() => requiredRunner && runAction("install-runner", () => installRunner(requiredRunner.id).then(() => undefined))}
+              >
+                Install runner
+              </Button>
+            </span>
             <button className="button button--secondary" type="button" onClick={() => setAdvancedOpen((open) => !open)}>
               <span>Advanced Options</span>
               <ChevronDown size={16} aria-hidden="true" />
@@ -113,15 +154,22 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
 
       <Section title="Output">
         <div className={result ? "audio-output surface revealed" : "audio-output surface"}>
-          <div className="audio-player">
-            <Play size={18} fill="currentColor" />
-            <span>00:00 / 00:00</span>
-            <div className="audio-track"><span /></div>
-            <Volume2 size={18} />
-            <MoreVertical size={18} />
-          </div>
+          {result ? (
+            <div className="detail-grid output-detail">
+              <span><strong>Model</strong>{result.model}</span>
+              <span><strong>Engine</strong>{result.engine}</span>
+              <span><strong>Content type</strong>{result.content_type}</span>
+              <span><strong>Bytes</strong>{result.bytes}</span>
+              <span><strong>Output path</strong>{result.output_path}</span>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <strong>No speech output yet</strong>
+              <p>Audio saved locally will appear here after a successful API response.</p>
+            </div>
+          )}
           <div className="audio-output__footer">
-            <span className={result ? "reveal-note" : ""}>{result ?? "Audio will appear here after generation."}</span>
+            <span className={result ? "reveal-note" : ""}>{result ? "Audio saved locally." : "No output path yet."}</span>
             <Button type="button" disabled={!result}>
               <Download size={15} /> Download Audio
             </Button>
@@ -146,6 +194,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
             </TableRow>
           ))}
         </Table>
+        {notice && <p className="notice-line">{notice}</p>}
         {blocker && <p className="notice-line">Selected blocker: {blocker} Next: {selectedModel?.nextCommand}</p>}
         <Button className="align-start" variant="ghost" type="button" onClick={() => onNavigate("models")}>
           View all models

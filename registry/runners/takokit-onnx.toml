@@ -7,5 +7,5 @@ supported_model_families = ["Piper", "Kokoro ONNX", "future ONNX voice/audio exp
 supported_tasks = ["text_to_speech", "live_audio"]
 dependency_strategy = "bundled-native"
 install_state = "runtime-missing"
-notes = "Shared ONNX runner contract. Piper artifact/config loading exists, but ONNX session execution is not implemented yet."
+notes = "Shared ONNX runner contract. Piper artifact/config loading exists, but Piper text frontend and ONNX TTS execution verification are still blocked."
 description = "Shared native ONNX runner contract for Piper, Kokoro ONNX, and future ONNX voice/audio exports."

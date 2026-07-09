@@ -795,6 +795,10 @@ textarea:focus,
   box-shadow: var(--shadow-lift);
 }
 
+.output-detail {
+  padding: var(--space-4);
+}
+
 .audio-player {
   display: grid;
   grid-template-columns: auto 120px minmax(120px, 1fr) auto auto;

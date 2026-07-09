@@ -31,7 +31,7 @@ Result: real whisper.cpp transcription returned `Hello from Taco Kid.` for a gen
 
 | Model | Category | Runner | Artifact status | Runner status | Executable | Command tested | Result | Blocker | License/commercial status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `piper-lessac` | TTS | `takokit-onnx` | Verified ONNX/config artifacts available | Runtime-installed scaffold | No | `takokit speak "Hello" --model piper-lessac` | Typed failure after artifact/config prep | phonemizer/token preparation and ONNX session execution | Piper voice artifacts usable; current upstream runtime licensing needs GPL boundary review |
+| `piper-lessac` | TTS | `takokit-onnx` | Verified ONNX/config artifacts available | Runtime-installed scaffold | No | `takokit speak "Hello" --model piper-lessac` | Typed `piper_text_frontend_not_implemented` after artifact/config prep | text normalization, phonemizer/token preparation, then ONNX session execution | Piper voice artifacts usable; current upstream runtime licensing needs GPL boundary review |
 | `kokoro` | TTS | `takokit-onnx` | Metadata-only | Runtime scaffold | No | `takokit plan kokoro` | Planned | verified ONNX artifacts and ONNX execution | Apache-style metadata in registry; artifact source not verified |
 | `whisper-base` | STT | `takokit-whispercpp` | Verified ggml artifact | Ready on Windows x64 | Yes | `takokit transcribe <sample.wav> --model whisper-base` | Real transcript | None on verified Windows x64 path | MIT |
 | `qwen3-tts` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan qwen3-tts` | Planned | verified artifacts and managed adapter install/run | Apache 2.0 upstream; heavy Python runtime not installed |
@@ -49,6 +49,6 @@ Result: real whisper.cpp transcription returned `Hello from Taco Kid.` for a gen
 
 ## Next Verification Targets
 
-- Piper ONNX: implement phonemizer/token preparation, ONNX Runtime session loading, tensor execution, and WAV output.
+- Piper ONNX: validate a non-GPL text frontend, then implement ONNX Runtime session loading, tensor execution, and WAV output.
 - Whisper Tiny/Small: add manifests only after verified artifact SHA256 values are computed.
 - Python-managed: implement one adapter end-to-end after dependency lock, license review, consent policy, and reproducible install plan.

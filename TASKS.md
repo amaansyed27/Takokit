@@ -8,7 +8,8 @@
 ## Next Small Tasks
 
 - [ ] Implement Piper ONNX session loading and audio generation.
-- [ ] Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
+- [ ] Validate a non-GPL Piper text frontend, likely `piper-plus-g2p`, against Lessac `phoneme_id_map`.
+- [ ] Add Piper text normalization/tokenization execution without vendoring GPL runtime code.
 - [ ] Implement Whisper Tiny/Small manifests after verifying SHA256 artifacts.
 - [ ] Design the explicit managed Python install flow before installing Python/Torch.
 - [ ] Implement one Python-managed adapter install/run path after dependency lock and license review.
@@ -31,6 +32,10 @@
 - [x] Added model lifecycle states and `takokit plan <model>`.
 - [x] Centralized `ModelInfo.execution_status` and GUI/API model summaries on lifecycle planning state.
 - [x] Added JSON output for doctor, plan, and runner doctor commands.
+- [x] Replaced stale `takokit show` and `takokit runner show` wording with planner/persisted runner state.
+- [x] Changed `takokit test --suite launch` to human-readable default with `--json` for JSON.
+- [x] Added typed `piper_text_frontend_not_implemented` after Piper artifact/config preparation.
+- [x] Added ONNX TTS runner decision record documenting the safe frontend boundary.
 - [x] Added API diagnostics endpoints for `/v1/doctor`, `/v1/test/launch`, and `/v1/runners/:id/doctor`.
 - [x] Added GUI Runners, Library, Transcribe, and Diagnostics flows backed by local API data.
 - [x] Hardened runner install failure recording so failed whisper.cpp installs persist `failed` state.

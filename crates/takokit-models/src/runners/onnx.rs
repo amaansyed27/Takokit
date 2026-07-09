@@ -204,7 +204,8 @@ mod tests {
         RunnerLifecycleState, RunnerManifest,
     };
 
-    use super::{load_piper_config, resolve_piper_lessac_artifacts};
+    use super::{load_piper_config, resolve_piper_lessac_artifacts, OnnxRunner};
+    use crate::runners::SpeechRunner;
 
     #[test]
     fn resolves_piper_lessac_model_and_config_artifact_paths_from_installed_record() {
@@ -278,6 +279,57 @@ mod tests {
         );
         assert_eq!(config.num_speakers, 1);
         assert_eq!(config.phoneme_type.as_deref(), Some("espeak"));
+    }
+
+    #[tokio::test]
+    async fn piper_speech_reports_typed_text_frontend_blocker_after_artifact_prep() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let model_path = temp.path().join("en_US-lessac-medium.onnx");
+        let config_path = temp.path().join("en_US-lessac-medium.onnx.json");
+        std::fs::write(&model_path, b"model").expect("model fixture");
+        std::fs::write(
+            &config_path,
+            r#"{
+  "audio": { "sample_rate": 22050, "quality": "medium" },
+  "espeak": { "voice": "en-us" },
+  "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 },
+  "phoneme_type": "espeak",
+  "num_symbols": 256,
+  "num_speakers": 1,
+  "speaker_id_map": {}
+}"#,
+        )
+        .expect("config fixture");
+        let plan = piper_plan(vec![
+            artifact_record("en_US-lessac-medium.onnx", ArtifactRole::Model, &model_path),
+            artifact_record(
+                "en_US-lessac-medium.onnx.json",
+                ArtifactRole::Config,
+                &config_path,
+            ),
+        ]);
+
+        let error = OnnxRunner
+            .speak(
+                &plan,
+                takokit_core::SpeechRequest {
+                    model: "piper-lessac".to_string(),
+                    input: "Hello from Takokit".to_string(),
+                    voice: None,
+                    response_format: Some("wav".to_string()),
+                },
+                temp.path(),
+            )
+            .await
+            .expect_err("piper frontend is intentionally blocked");
+
+        assert!(matches!(
+            error,
+            TakokitError::Resolution {
+                code: ErrorCode::PiperTextFrontendNotImplemented,
+                message
+            } if message.contains("phonemizer/token preparation")
+        ));
     }
 
     fn artifact_record(

@@ -17,6 +17,7 @@ pub enum ErrorCode {
     ArtifactNotDownloaded,
     ArtifactConfigInvalid,
     InferenceNotImplemented,
+    PiperTextFrontendNotImplemented,
 }
 
 impl ErrorCode {
@@ -37,6 +38,7 @@ impl ErrorCode {
             ErrorCode::ArtifactNotDownloaded => "artifact_not_downloaded",
             ErrorCode::ArtifactConfigInvalid => "artifact_config_invalid",
             ErrorCode::InferenceNotImplemented => "inference_not_implemented",
+            ErrorCode::PiperTextFrontendNotImplemented => "piper_text_frontend_not_implemented",
         }
     }
 }

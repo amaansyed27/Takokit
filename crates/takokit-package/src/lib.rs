@@ -1246,10 +1246,10 @@ pub fn plan_model(
         missing.push(format!("runner contract: {}", runner.id));
     }
     if runner_runtime_state != RunnerLifecycleState::Ready {
-        missing.push(runner_missing_component(&runner));
+        missing.push(runner_missing_component(&model, &runner));
     }
     if lifecycle_state == ModelLifecycleState::RunnerReady {
-        missing.push(runner_missing_component(&runner));
+        missing.push(runner_missing_component(&model, &runner));
     }
     if executable {
         missing.clear();
@@ -1346,7 +1346,7 @@ pub fn initialize_runner_runtime(
             manifest,
             RunnerLifecycleState::RuntimeInstalled,
             format!(
-                "ONNX runner runtime directory initialized at {}. Missing component: phonemizer/token preparation and ONNX session execution.",
+                "ONNX runner runtime directory initialized at {}. Missing component: Piper text frontend (phonemizer/token preparation) and ONNX TTS execution verification.",
                 layout.root.display()
             ),
         ),
@@ -1516,7 +1516,11 @@ fn model_task_label(model: &ModelManifest) -> String {
     capability_labels(&model.capabilities.to_model_capabilities())
 }
 
-fn runner_missing_component(runner: &RunnerManifest) -> String {
+fn runner_missing_component(model: &ModelManifest, runner: &RunnerManifest) -> String {
+    if runner.kind == RunnerKind::Onnx && model.id == "piper-lessac" {
+        return "Piper text frontend (phonemizer/token preparation)".to_string();
+    }
+
     match runner.kind {
         RunnerKind::Onnx => "ONNX inference implementation".to_string(),
         RunnerKind::Whispercpp => "whisper.cpp transcription implementation".to_string(),
@@ -1643,8 +1647,33 @@ fn installed_runner_record(
         installed_at: timestamp_now(),
         platforms: manifest.platforms.clone(),
         status: RunnerLifecycleState::ContractInstalled,
-        note: "Installed runner contract from local mock registry. Execution binary is not implemented."
-            .to_string(),
+        note: runner_contract_note(manifest).to_string(),
+    }
+}
+
+fn runner_contract_note(manifest: &RunnerManifest) -> &'static str {
+    match manifest.kind {
+        RunnerKind::Whispercpp => {
+            "Installed runner contract from local registry. Run `takokit runner install takokit-whispercpp` to install or verify the whisper.cpp runtime."
+        }
+        RunnerKind::Onnx => {
+            "Installed runner contract from local registry. Run `takokit runner install takokit-onnx` to initialize the ONNX runner; Piper remains blocked on a verified text frontend."
+        }
+        RunnerKind::PythonManaged => {
+            "Installed runner contract from local registry. Run `takokit runner install takokit-python-managed` to initialize the managed Python layout and adapter slots."
+        }
+        RunnerKind::TransformersAudio => {
+            "Installed runner contract from local registry. Runtime adapter is planned and not installable yet."
+        }
+        RunnerKind::Nemo => {
+            "Installed runner contract from local registry. NeMo runtime adapter is planned and not installable yet."
+        }
+        RunnerKind::Native => {
+            "Installed native runner contract from local registry. Run runner doctor for current runtime readiness."
+        }
+        RunnerKind::External => {
+            "Installed external runner contract from local registry. Run runner doctor for current runtime readiness."
+        }
     }
 }
 
@@ -2793,7 +2822,7 @@ role = "config"
         assert!(!piper_plan.executable);
         assert!(piper_plan
             .missing
-            .contains(&"ONNX inference implementation".to_string()));
+            .contains(&"Piper text frontend (phonemizer/token preparation)".to_string()));
 
         let whisper_plan = plan_model(&registry, &installed, "whisper-base").expect("whisper plan");
         assert_eq!(whisper_plan.required_runner, "takokit-whispercpp");

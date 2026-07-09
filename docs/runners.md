@@ -71,6 +71,7 @@ Pulling a runner installs the contract record only. Installing a runner performs
 
 - `takokit-whispercpp`: on Windows x64, downloads the official whisper.cpp v1.9.1 `whisper-bin-x64.zip`, verifies SHA256 `7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539`, extracts it under `~/.takokit/runners/whispercpp/runtime/`, and marks the runner `ready` only if `whisper-cli.exe` is present.
 - `takokit-python-managed`: creates the managed runtime layout and planned adapter slots. Python/Torch and model adapters are not installed yet.
-- `takokit-onnx`, `takokit-transformers-audio`, and `takokit-nemo`: create runtime directories and record the exact missing implementation component.
+- `takokit-onnx`: creates the runtime directory and records `runtime-installed`, not `ready`. `runner doctor` reports ONNX session capability as not verified and Piper frontend status as `piper_text_frontend_not_implemented`.
+- `takokit-transformers-audio` and `takokit-nemo`: create runtime directories and record the exact missing implementation component.
 
 Failed runtime installs persist `failed` state in the installed runner record with a note and log path. Re-running `takokit runner install <runner>` is safe and attempts to repair the runtime state.

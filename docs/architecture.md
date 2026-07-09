@@ -104,7 +104,7 @@ Planning belongs to `takokit-package`. It returns typed planning failures such a
 
 `plan_model(...)` is the canonical lifecycle source for model summaries. `ModelInfo.execution_status`, `/v1/models`, `/v1/models/:id/plan`, `takokit models`, `takokit show`, `takokit plan`, and the GUI model cards are expected to agree on lifecycle state, runner runtime state, executable yes/no, missing pieces, and next command.
 
-Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. The current ONNX runner scaffold returns typed `InferenceNotImplemented` with the missing ONNX component.
+Execution belongs to the model/runner layer. `takokit-models` exposes `SpeechRunner` and `TranscriptionRunner` traits plus dispatcher helpers. Execution plans include the installed model record so runner code can inspect verified artifact paths without doing storage discovery itself. Generic ONNX models return typed `InferenceNotImplemented`; Piper returns typed `PiperTextFrontendNotImplemented` after verified artifact/config preparation.
 
 The whisper.cpp runner executes `whisper-cli` for `whisper-base` after the model artifact and runner runtime are installed. It returns real transcript text and typed errors for missing files, artifacts, binaries, or whisper.cpp process failures.
 
@@ -128,9 +128,9 @@ Use `takokit plan <model>` or `GET /v1/models/:id/plan` to inspect whether a run
 
 The first real ONNX model target is Piper ONNX, documented in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Piper is the shortest path to one real model artifact manifest, checksum-backed artifact download, and local ONNX execution. Kokoro ONNX remains the next TTS target after the Piper runner path is proven.
 
-`piper-lessac` records verified Piper Lessac medium ONNX model/config artifacts. Pulling it downloads and verifies those files, but ONNX execution still returns `inference_not_implemented`.
+`piper-lessac` records verified Piper Lessac medium ONNX model/config artifacts. Pulling it downloads and verifies those files, but speech execution still returns `piper_text_frontend_not_implemented`.
 
-The Piper ONNX scaffold resolves the installed `en_US-lessac-medium.onnx` and `en_US-lessac-medium.onnx.json` blob paths, parses the Piper JSON config, and then stops before inference.
+The Piper ONNX scaffold resolves the installed `en_US-lessac-medium.onnx` and `en_US-lessac-medium.onnx.json` blob paths, parses the Piper JSON config, and then stops before phonemizer/token preparation.
 
 ## Installer Scaffolds
 

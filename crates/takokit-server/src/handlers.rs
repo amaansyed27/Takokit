@@ -310,6 +310,9 @@ pub async fn runner_doctor(
             "runtime_path": layout.root,
             "logs_path": layout.logs,
             "adapters": adapters,
+            "onnx_session_capability": if manifest.id == "takokit-onnx" { Some("not-verified") } else { None::<&str> },
+            "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None::<&str> },
+            "executable_models": if manifest.id == "takokit-onnx" { Vec::<String>::new() } else { Vec::<String>::new() },
         }),
     }))
 }
@@ -599,7 +602,8 @@ impl IntoResponse for ApiError {
                 | ErrorCode::RunnerNotFound => StatusCode::NOT_FOUND,
                 ErrorCode::RunnerNotInstalled
                 | ErrorCode::RunnerUnsupportedOnPlatform
-                | ErrorCode::InferenceNotImplemented => StatusCode::NOT_IMPLEMENTED,
+                | ErrorCode::InferenceNotImplemented
+                | ErrorCode::PiperTextFrontendNotImplemented => StatusCode::NOT_IMPLEMENTED,
             },
             TakokitError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
             TakokitError::NotImplemented { .. } => StatusCode::NOT_IMPLEMENTED,

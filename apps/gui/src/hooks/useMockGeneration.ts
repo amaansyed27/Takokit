@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { generateSpeech } from "../lib/api";
+import type { SpeechApiResponse } from "../lib/types";
 
 type GenerateInput = {
   model: string;
@@ -9,7 +10,7 @@ type GenerateInput = {
 
 export function useMockGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<SpeechApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function generate(input: GenerateInput) {
@@ -28,7 +29,7 @@ export function useMockGeneration() {
         input: input.input,
         response_format: "wav"
       });
-      setResult(response?.output_path ?? "Local output prepared.");
+      setResult(response);
     } catch (caught) {
       setResult(null);
       setError(caught instanceof Error ? caught.message : "Speech generation failed.");

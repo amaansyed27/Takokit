@@ -66,9 +66,10 @@ pub(crate) fn onnx_not_implemented() -> TakokitError {
 }
 
 pub(crate) fn piper_not_implemented() -> TakokitError {
-    runner_not_implemented(
-        "Piper artifacts and config resolved, but phonemizer/token preparation and ONNX session execution are not implemented yet.",
-    )
+    TakokitError::Resolution {
+        code: ErrorCode::PiperTextFrontendNotImplemented,
+        message: "Piper artifacts and config resolved, but phonemizer/token preparation is not implemented yet. Takokit will not vendor GPL/eSpeak runtime code; the next implementation step is a verified, Takokit-managed text frontend that maps text to Piper phoneme IDs.".to_string(),
+    }
 }
 
 fn runner_not_implemented(message: impl Into<String>) -> TakokitError {

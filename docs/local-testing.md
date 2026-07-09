@@ -58,7 +58,7 @@ target/release/takokit.exe plan piper-lessac
 target/release/takokit.exe speak "Hello" --model piper-lessac
 ```
 
-Piper has verified model/config artifacts, but real TTS is still blocked on phonemizer/token preparation and ONNX session execution. The final command must return a typed missing-implementation error, not a fake WAV.
+Piper has verified model/config artifacts, but real TTS is still blocked at the text frontend. The final command must return typed `piper_text_frontend_not_implemented`, not a fake WAV. The next implementation step is a verified non-GPL path for text normalization, phonemization, and Piper phoneme ID preparation before ONNX session execution.
 
 ## Python-Managed
 
@@ -108,6 +108,7 @@ The GUI opens `/gui` and should show:
 
 ```bash
 target/release/takokit.exe test --suite launch
+target/release/takokit.exe test --suite launch --json
 ```
 
 The launch suite is non-destructive. It reports manifest/planning status and only runs real smoke execution where a model is executable and the required local input is provided.

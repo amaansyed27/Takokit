@@ -25,13 +25,13 @@ SpeechRunner
 TranscriptionRunner
 ```
 
-The ONNX runner scaffold exists in `takokit-models`, but it returns:
+The ONNX runner scaffold exists in `takokit-models`. Generic ONNX speech models still return:
 
 ```txt
 inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet.
 ```
 
-It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning the not-implemented execution error.
+It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning typed `piper_text_frontend_not_implemented`. The blocker is specifically text normalization plus phonemizer/token preparation; Takokit does not vendor GPL/eSpeak runtime logic.
 
 The whisper.cpp runner is the first real STT adapter. `whisper-base` resolves through `takokit-whispercpp`, finds the pulled `ggml-base.bin` artifact, locates the installed `whisper-cli` executable under the runner runtime directory, invokes whisper.cpp, and returns the actual transcript text. Missing audio files, missing artifacts, or missing binaries return typed errors.
 
