@@ -1,0 +1,16 @@
+id = "piper-lessac"
+name = "Piper Lessac Medium"
+family = "piper"
+source_kind = "voice-pack"
+upstream_url = "https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/lessac/medium"
+huggingface_url = "https://huggingface.co/rhasspy/piper-voices"
+license = "mit"
+commercial_use = "yes"
+tasks = ["tts", "live-audio"]
+runner = "takokit-onnx"
+runtime_status = "supported"
+quality_tier = "balanced"
+hardware_notes = "CPU-friendly ONNX voice package; artifact pull is supported, inference is not implemented yet."
+languages = ["en-US"]
+notes = "Runtime manifest exists and `takokit pull piper-lessac` downloads verified model/config artifacts."
+safety_notes = "Voice use should respect consent and disclosure rules for generated speech."

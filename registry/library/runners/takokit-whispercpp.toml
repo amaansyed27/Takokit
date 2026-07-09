@@ -1,0 +1,8 @@
+id = "takokit-whispercpp"
+name = "Takokit whisper.cpp Runner"
+kind = "whispercpp"
+upstream_url = "https://github.com/ggerganov/whisper.cpp"
+github_url = "https://github.com/ggerganov/whisper.cpp"
+runtime_status = "planned"
+supported_platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+notes = "Planned local STT runner contract for Whisper-style models."

@@ -38,6 +38,7 @@ Takokit models declare which local voice surfaces they support:
 - React + TypeScript + Vite browser GUI in `apps/gui`.
 - Static GUI serving from `apps/gui/dist` at `/gui`.
 - Local mock model and runner registry under `registry/`.
+- Curated model library metadata under `registry/library/` for future GUI and website discovery.
 - Manifest-backed `pull`, `show`, `list models`, and `list runners` command flow.
 - Installed model and runner records under `~/.takokit/manifests/`.
 - Checksum-backed artifact install foundation with content-addressed blobs.
@@ -63,6 +64,8 @@ cargo run -p takokit-cli -- runner pull takokit-onnx
 cargo run -p takokit-cli -- runner show takokit-onnx
 cargo run -p takokit-cli -- models
 cargo run -p takokit-cli -- runners
+cargo run -p takokit-cli -- library models
+cargo run -p takokit-cli -- library runners
 cargo run -p takokit-cli -- list models
 cargo run -p takokit-cli -- list runners
 cargo run -p takokit-cli -- speak "Hello from Takokit" --model mock-tts
@@ -81,6 +84,8 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 `takokit pull piper-lessac` downloads the Piper Lessac medium ONNX model and config files, validates byte sizes and SHA256 checksums, stores verified blobs under `~/.takokit/blobs/sha256/`, and writes downloaded artifact records. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
 
 `takokit runner pull takokit-onnx` installs a runner contract record under `~/.takokit/manifests/installed-runners/`. It does not download or install an execution binary yet.
+
+`takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 
 `takokit speak "Hello" --model mock-tts` is the only execution path that writes audio. Package models such as `kokoro`, `piper-lessac`, and `whisper-base` first resolve an execution plan from installed model and runner metadata, then pass that plan into the runner execution layer. The current ONNX runner scaffold returns typed `inference_not_implemented` instead of pretending to run a real model.
 
@@ -143,6 +148,8 @@ The first real ONNX target decision is documented in [docs/decisions/0001-first-
 The ONNX runner now has a Piper planning scaffold: it resolves the installed Lessac model/config artifact paths from the installed model record and parses the Piper JSON config into typed Rust structs. Actual ONNX inference is still not implemented.
 
 Artifact behavior is documented in [docs/artifacts.md](docs/artifacts.md). Source and licensing notes for Piper are tracked in [docs/references.md](docs/references.md). The old `rhasspy/piper` repo is archived and the current `OHF-Voice/piper1-gpl` runtime is GPL-3.0; Takokit must not vendor GPL runtime code without an explicit licensing decision.
+
+Curated discovery metadata is documented in [docs/library.md](docs/library.md). It is intentionally separate from executable runtime manifests.
 
 ## Installer Scaffolds
 

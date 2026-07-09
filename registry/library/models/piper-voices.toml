@@ -1,0 +1,17 @@
+id = "piper-voices"
+name = "Piper Voices"
+family = "piper"
+source_kind = "voice-pack"
+upstream_url = "https://huggingface.co/rhasspy/piper-voices"
+huggingface_url = "https://huggingface.co/rhasspy/piper-voices"
+github_url = "https://github.com/rhasspy/piper"
+license = "mit"
+commercial_use = "yes"
+tasks = ["tts", "live-audio"]
+runner = "takokit-onnx"
+runtime_status = "metadata-only"
+quality_tier = "lightweight"
+hardware_notes = "Large collection of small ONNX voices suitable for CPU-first local TTS."
+languages = ["multilingual"]
+notes = "Curated source for future Piper voice-pack entries. Individual voices need runtime manifests and checksums before install support."
+safety_notes = "Voice-pack metadata must preserve per-voice attribution and license notes."

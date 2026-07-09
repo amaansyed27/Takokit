@@ -1,0 +1,17 @@
+id = "whisper"
+name = "OpenAI Whisper"
+family = "whisper"
+source_kind = "original"
+upstream_url = "https://github.com/openai/whisper"
+github_url = "https://github.com/openai/whisper"
+paper_url = "https://arxiv.org/abs/2212.04356"
+license = "mit"
+commercial_use = "yes"
+tasks = ["stt", "live-transcription"]
+runner = "takokit-whispercpp"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Multiple model sizes; local CPU/GPU needs depend heavily on size and backend."
+languages = ["multilingual"]
+notes = "Runtime manifest exists for whisper-base metadata, but whisper.cpp execution is not implemented."
+safety_notes = "Transcription can expose sensitive speech; local processing should preserve user privacy."

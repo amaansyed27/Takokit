@@ -1,0 +1,17 @@
+id = "dia"
+name = "Dia"
+family = "dia"
+source_kind = "original"
+upstream_url = "https://github.com/nari-labs/dia"
+huggingface_url = "https://huggingface.co/nari-labs/Dia-1.6B"
+github_url = "https://github.com/nari-labs/dia"
+license = "apache-2.0"
+commercial_use = "yes"
+tasks = ["tts", "voice-cloning", "live-audio"]
+runner = "external-transformers"
+runtime_status = "external-runner-needed"
+quality_tier = "research"
+hardware_notes = "Large dialogue TTS model; requires a separate model adapter path."
+languages = ["en"]
+notes = "Tracked as a high-quality dialogue TTS family, not executable in Takokit today."
+safety_notes = "Reference-audio conditioning needs consent boundaries."

@@ -1,0 +1,16 @@
+id = "chatterbox"
+name = "Chatterbox"
+family = "chatterbox"
+source_kind = "original"
+upstream_url = "https://github.com/resemble-ai/chatterbox"
+github_url = "https://github.com/resemble-ai/chatterbox"
+license = "mit"
+commercial_use = "yes"
+tasks = ["tts", "voice-cloning", "live-audio"]
+runner = "external-transformers"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Python model stack; runtime manifest exists as metadata but execution is not wired."
+languages = ["multilingual"]
+notes = "Future candidate after core ONNX and voice-cloning safety boundaries mature."
+safety_notes = "Voice cloning and emotion controls need consent and generated-speech disclosure."

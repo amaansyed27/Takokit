@@ -1,0 +1,8 @@
+id = "external-transformers"
+name = "External Transformers Runner"
+kind = "external"
+upstream_url = "https://github.com/huggingface/transformers"
+github_url = "https://github.com/huggingface/transformers"
+runtime_status = "external-runner-needed"
+supported_platforms = ["external"]
+notes = "Catalog placeholder for model families that require a managed Transformers-style runner. Not installed by Takokit today."

@@ -1,0 +1,16 @@
+id = "canary"
+name = "NVIDIA Canary"
+family = "canary"
+source_kind = "original"
+upstream_url = "https://huggingface.co/nvidia/canary-1b-v2"
+huggingface_url = "https://huggingface.co/nvidia/canary-1b-v2"
+license = "cc-by-4.0"
+commercial_use = "yes"
+tasks = ["stt", "live-transcription", "omni-audio"]
+runner = "external-nemo"
+runtime_status = "external-runner-needed"
+quality_tier = "sota"
+hardware_notes = "NeMo ASR/translation family; heavier than first Takokit STT targets."
+languages = ["multilingual"]
+notes = "Tracked for future multilingual transcription/translation evaluation."
+safety_notes = "Speech translation/transcription should preserve local privacy boundaries."

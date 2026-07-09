@@ -1,0 +1,17 @@
+id = "kokoro-82m"
+name = "Kokoro 82M"
+family = "kokoro"
+source_kind = "original"
+upstream_url = "https://huggingface.co/hexgrad/Kokoro-82M"
+huggingface_url = "https://huggingface.co/hexgrad/Kokoro-82M"
+github_url = "https://github.com/hexgrad/kokoro"
+license = "apache-2.0"
+commercial_use = "yes"
+tasks = ["tts", "live-audio"]
+runner = "takokit-onnx"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Small open-weight TTS model; ONNX/runtime packaging still needs Takokit implementation."
+languages = ["en"]
+notes = "Runtime manifest exists for metadata planning, but no real Kokoro inference is wired."
+safety_notes = "Generated voices should not impersonate people without consent."

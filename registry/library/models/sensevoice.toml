@@ -1,0 +1,17 @@
+id = "sensevoice"
+name = "SenseVoice"
+family = "sensevoice"
+source_kind = "original"
+upstream_url = "https://github.com/FunAudioLLM/SenseVoice"
+huggingface_url = "https://huggingface.co/FunAudioLLM/SenseVoiceSmall"
+github_url = "https://github.com/FunAudioLLM/SenseVoice"
+license = "unknown"
+commercial_use = "unknown"
+tasks = ["stt", "live-transcription", "omni-audio"]
+runner = "external-transformers"
+runtime_status = "metadata-only"
+quality_tier = "balanced"
+hardware_notes = "Speech understanding family with ASR, language ID, emotion, and audio event detection."
+languages = ["multilingual"]
+notes = "License/commercial terms need review before any executable Takokit manifest."
+safety_notes = "Speech emotion and event detection metadata can be sensitive; keep local and consent-aware."

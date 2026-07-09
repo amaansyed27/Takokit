@@ -1,0 +1,17 @@
+id = "kokoro-82m-onnx-community"
+name = "Kokoro 82M ONNX Community Exports"
+family = "kokoro"
+source_kind = "optimized-export"
+base_model = "kokoro-82m"
+upstream_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.1-zh-ONNX"
+huggingface_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.1-zh-ONNX"
+license = "apache-2.0"
+commercial_use = "yes"
+tasks = ["tts", "live-audio"]
+runner = "takokit-onnx"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Community ONNX exports may be good future packaging targets after Piper proves the ONNX runner path."
+languages = ["en", "zh"]
+notes = "Relationship entry for optimized exports; Takokit has not selected a specific Kokoro artifact set yet."
+safety_notes = "Verify voice provenance and export checksums before making an executable runtime manifest."

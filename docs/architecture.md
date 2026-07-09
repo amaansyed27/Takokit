@@ -61,6 +61,8 @@ model manifest -> runner manifest -> content-addressed blobs -> installed regist
 
 The current implementation installs local mock metadata for models without verified artifacts. For artifact-backed manifests, pull is explicit and the package layer downloads to `cache/downloads`, verifies SHA256, then installs into `blobs/sha256/<hash>` before writing installed artifact records.
 
+Curated library metadata is stored separately under `registry/library/`. It powers future browsing/discovery surfaces and is intentionally not treated as executable runtime packaging.
+
 It writes:
 
 ```txt

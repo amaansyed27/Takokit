@@ -1,0 +1,17 @@
+id = "cosyvoice2"
+name = "CosyVoice 2"
+family = "cosyvoice"
+source_kind = "original"
+upstream_url = "https://github.com/FunAudioLLM/CosyVoice"
+github_url = "https://github.com/FunAudioLLM/CosyVoice"
+paper_url = "https://arxiv.org/abs/2412.10117"
+license = "apache-2.0"
+commercial_use = "unknown"
+tasks = ["tts", "voice-cloning", "live-audio"]
+runner = "external-transformers"
+runtime_status = "external-runner-needed"
+quality_tier = "sota"
+hardware_notes = "Large Python/Transformers-style stack; not suitable for current native ONNX runner without adapter work."
+languages = ["multilingual"]
+notes = "Commercial-use status needs explicit review because project docs and issues discuss academic/commercial ambiguity."
+safety_notes = "Zero-shot voice cloning needs explicit consent, watermarking/disclosure discussion, and license review."

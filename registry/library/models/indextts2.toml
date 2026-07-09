@@ -1,0 +1,17 @@
+id = "indextts2"
+name = "IndexTTS2"
+family = "indextts"
+source_kind = "original"
+upstream_url = "https://github.com/index-tts/index-tts"
+github_url = "https://github.com/index-tts/index-tts"
+paper_url = "https://arxiv.org/abs/2601.03888"
+license = "custom-indextts2"
+commercial_use = "unknown"
+tasks = ["tts", "voice-cloning", "live-audio"]
+runner = "external-transformers"
+runtime_status = "metadata-only"
+quality_tier = "sota"
+hardware_notes = "Large controllable TTS stack; not an initial local runner target."
+languages = ["zh", "en"]
+notes = "Project asks users to contact authors for commercial use/cooperation; keep metadata-only."
+safety_notes = "Review custom license and voice consent policy before any runtime integration."

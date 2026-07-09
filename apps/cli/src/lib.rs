@@ -31,6 +31,10 @@ enum Command {
     Capabilities,
     Models,
     Runners,
+    Library {
+        #[command(subcommand)]
+        target: LibraryTarget,
+    },
     Speak(SpeakArgs),
     Pull(PullArgs),
     Show {
@@ -94,6 +98,12 @@ enum ListTarget {
 }
 
 #[derive(Debug, Subcommand)]
+enum LibraryTarget {
+    Models,
+    Runners,
+}
+
+#[derive(Debug, Subcommand)]
 enum RunnerCommand {
     Pull { runner: String },
     Show { runner: String },
@@ -141,6 +151,10 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Models) => print_models(&package_registry, &installed_registry)?,
         Some(Command::Runners) => print_runners(&package_registry, &installed_registry)?,
+        Some(Command::Library { target }) => match target {
+            LibraryTarget::Models => print_library_models(&package_registry)?,
+            LibraryTarget::Runners => print_library_runners(&package_registry)?,
+        },
         Some(Command::Speak(args)) => {
             if args.model != "mock-tts" {
                 let plan = resolve_execution_plan(
@@ -365,6 +379,18 @@ fn print_runners(
     Ok(())
 }
 
+fn print_library_models(package_registry: &PackageRegistry) -> anyhow::Result<()> {
+    let models = package_registry.library_models().map_err(cli_error)?;
+    println!("{}", serde_json::to_string_pretty(&models)?);
+    Ok(())
+}
+
+fn print_library_runners(package_registry: &PackageRegistry) -> anyhow::Result<()> {
+    let runners = package_registry.library_runners().map_err(cli_error)?;
+    println!("{}", serde_json::to_string_pretty(&runners)?);
+    Ok(())
+}
+
 fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
     Err(TakokitError::NotImplemented { feature, reason }.into())
 }
@@ -440,6 +466,27 @@ mod tests {
 
         assert!(matches!(models.command, Some(Command::Models)));
         assert!(matches!(runners.command, Some(Command::Runners)));
+    }
+
+    #[test]
+    fn cli_parses_library_model_and_runner_commands() {
+        let models =
+            Cli::try_parse_from(["takokit", "library", "models"]).expect("library models command");
+        let runners = Cli::try_parse_from(["takokit", "library", "runners"])
+            .expect("library runners command");
+
+        assert!(matches!(
+            models.command,
+            Some(Command::Library {
+                target: LibraryTarget::Models
+            })
+        ));
+        assert!(matches!(
+            runners.command,
+            Some(Command::Library {
+                target: LibraryTarget::Runners
+            })
+        ));
     }
 
     #[test]

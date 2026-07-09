@@ -1,0 +1,7 @@
+id = "takokit-onnx"
+name = "Takokit ONNX Runner"
+kind = "onnx"
+github_url = "https://github.com/amaansyed27/Takokit"
+runtime_status = "experimental"
+supported_platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+notes = "Runner contract and Piper artifact/config loading scaffold exist. Real ONNX inference is not implemented yet."

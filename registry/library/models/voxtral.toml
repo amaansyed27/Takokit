@@ -1,0 +1,17 @@
+id = "voxtral"
+name = "Mistral Voxtral"
+family = "voxtral"
+source_kind = "original"
+upstream_url = "https://mistral.ai/news/voxtral/"
+huggingface_url = "https://huggingface.co/mistralai/Voxtral-Small-24B-2507"
+paper_url = "https://arxiv.org/abs/2507.13264"
+license = "apache-2.0"
+commercial_use = "yes"
+tasks = ["stt", "live-transcription", "omni-audio"]
+runner = "external-transformers"
+runtime_status = "external-runner-needed"
+quality_tier = "sota"
+hardware_notes = "Audio understanding/transcription models are large; separate runner work would be required."
+languages = ["multilingual"]
+notes = "Catalog entry is for audio understanding/transcription models, not the separate non-commercial Voxtral TTS weights."
+safety_notes = "Audio understanding over long files should stay local and make transcript retention explicit."

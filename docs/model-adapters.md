@@ -14,6 +14,8 @@ VoiceCloneEngine
 
 Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records, including the installed model record when a package model is pulled. Runner engines consume that plan and either produce output or return a typed execution error.
 
+Curated library manifests are separate from runtime manifests. Files in `registry/library/models/` and `registry/library/runners/` are for browsing and discovery in future GUI/site surfaces. They can describe original projects, forks, optimized exports, quantized variants, community models, or voice packs without making those entries executable.
+
 Current runner traits:
 
 ```rust
@@ -125,6 +127,7 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 - Do not require users to manually install Python, Torch, CUDA, FFmpeg, clone repos, or run model-specific Gradio apps.
 - Store model metadata, license metadata, hardware metadata, and artifact checksums in manifests.
 - Require SHA256 before artifact-backed downloads.
+- Keep library commercial-use labels conservative; use `unknown` or `blocked-license` rather than guessing.
 - Delete temporary downloads on checksum mismatch.
 - Return typed unsupported/not-installed planning errors before execution.
 - Return typed `inference_not_implemented` from runner execution scaffolds until real runners are implemented.

@@ -1,0 +1,17 @@
+id = "gpt-sovits"
+name = "GPT-SoVITS"
+family = "gpt-sovits"
+source_kind = "original"
+upstream_url = "https://github.com/RVC-Boss/GPT-SoVITS"
+huggingface_url = "https://huggingface.co/lj1995/GPT-SoVITS"
+github_url = "https://github.com/RVC-Boss/GPT-SoVITS"
+license = "mit"
+commercial_use = "yes"
+tasks = ["tts", "voice-cloning", "voice-conversion", "live-audio"]
+runner = "external-python"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Python WebUI-style stack; not part of the current native runtime."
+languages = ["multilingual"]
+notes = "Runtime manifest exists as metadata only. Needs adapter and safety review before execution."
+safety_notes = "Few-shot voice cloning requires consent and clear generated-audio disclosure."

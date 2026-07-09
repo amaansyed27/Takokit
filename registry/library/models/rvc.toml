@@ -1,0 +1,16 @@
+id = "rvc"
+name = "Retrieval-based Voice Conversion"
+family = "rvc"
+source_kind = "original"
+upstream_url = "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion"
+github_url = "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion"
+license = "mit"
+commercial_use = "yes"
+tasks = ["voice-conversion"]
+runner = "external-python"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Voice conversion stack with Python dependencies; outside current ONNX runner scope."
+languages = ["multilingual"]
+notes = "Tracked for Takokit voice conversion goals, not executable today."
+safety_notes = "Voice conversion can impersonate people; consent, disclosure, and abuse prevention are required."

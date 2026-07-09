@@ -9,12 +9,17 @@
 
 - [ ] Implement Piper ONNX session loading and audio generation.
 - [ ] Add Piper text normalization/tokenization planning without vendoring GPL runtime code.
+- [ ] Wire curated library metadata into the GUI models browser.
+- [ ] Add API routes for curated library metadata.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
 
 ## Done
 
+- [x] Added curated model and runner library metadata under `registry/library/`.
+- [x] Added typed library manifest parsing for discovery metadata.
+- [x] Added `takokit library models` and `takokit library runners`.
 - [x] Added `tako` as a short command alias for `takokit` while preserving the `~/.takokit` storage root.
 - [x] Added Piper ONNX runner artifact loading scaffold for installed Lessac model/config artifacts.
 - [x] Added typed Piper JSON config parsing in the ONNX runner layer.

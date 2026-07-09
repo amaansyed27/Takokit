@@ -1,0 +1,17 @@
+id = "openvoice"
+name = "OpenVoice"
+family = "openvoice"
+source_kind = "original"
+upstream_url = "https://github.com/myshell-ai/OpenVoice"
+github_url = "https://github.com/myshell-ai/OpenVoice"
+paper_url = "https://arxiv.org/abs/2312.01479"
+license = "mit"
+commercial_use = "yes"
+tasks = ["voice-cloning", "tts", "voice-conversion"]
+runner = "external-python"
+runtime_status = "planned"
+quality_tier = "balanced"
+hardware_notes = "Python voice-cloning stack; not executable through Takokit yet."
+languages = ["multilingual"]
+notes = "Useful reference family for local ElevenLabs-style cloning goals."
+safety_notes = "Requires explicit consent flows before cloning or tone-color transfer."

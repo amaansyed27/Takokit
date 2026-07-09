@@ -1,0 +1,16 @@
+id = "parakeet"
+name = "NVIDIA Parakeet"
+family = "parakeet"
+source_kind = "original"
+upstream_url = "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+huggingface_url = "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+license = "cc-by-4.0"
+commercial_use = "yes"
+tasks = ["stt", "live-transcription"]
+runner = "external-nemo"
+runtime_status = "external-runner-needed"
+quality_tier = "sota"
+hardware_notes = "NVIDIA NeMo ASR family; likely needs a NeMo/ONNX export path before local Takokit support."
+languages = ["multilingual"]
+notes = "Strong ASR candidate for future local transcription work."
+safety_notes = "Transcription can expose sensitive speech and should remain local by default."

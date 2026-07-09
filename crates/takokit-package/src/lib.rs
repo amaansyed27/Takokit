@@ -255,6 +255,92 @@ pub enum RunnerKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LibraryModelManifest {
+    pub id: String,
+    pub name: String,
+    pub family: String,
+    pub source_kind: LibrarySourceKind,
+    pub base_model: Option<String>,
+    pub upstream_url: String,
+    pub huggingface_url: Option<String>,
+    pub github_url: Option<String>,
+    pub paper_url: Option<String>,
+    pub license: String,
+    pub commercial_use: CommercialUse,
+    pub tasks: Vec<LibraryTask>,
+    pub runner: String,
+    pub runtime_status: LibraryRuntimeStatus,
+    pub quality_tier: QualityTier,
+    pub hardware_notes: String,
+    pub languages: Vec<String>,
+    pub notes: String,
+    pub safety_notes: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LibraryRunnerManifest {
+    pub id: String,
+    pub name: String,
+    pub kind: RunnerKind,
+    pub upstream_url: Option<String>,
+    pub github_url: Option<String>,
+    pub runtime_status: LibraryRuntimeStatus,
+    pub supported_platforms: Vec<String>,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LibrarySourceKind {
+    Original,
+    Fork,
+    OptimizedExport,
+    Quantized,
+    Community,
+    VoicePack,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CommercialUse {
+    Yes,
+    No,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LibraryTask {
+    Tts,
+    Stt,
+    VoiceCloning,
+    VoiceConversion,
+    LiveTranscription,
+    LiveAudio,
+    OmniAudio,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LibraryRuntimeStatus {
+    Supported,
+    Experimental,
+    Planned,
+    MetadataOnly,
+    BlockedLicense,
+    ExternalRunnerNeeded,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum QualityTier {
+    Lightweight,
+    Balanced,
+    Sota,
+    Research,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RunnerInfo {
     pub id: String,
     pub name: String,
@@ -383,6 +469,14 @@ impl PackageRegistry {
 
     pub fn runners(&self) -> PackageResult<Vec<RunnerManifest>> {
         read_manifest_dir(&self.root.join("runners"))
+    }
+
+    pub fn library_models(&self) -> PackageResult<Vec<LibraryModelManifest>> {
+        read_manifest_dir(&self.root.join("library").join("models"))
+    }
+
+    pub fn library_runners(&self) -> PackageResult<Vec<LibraryRunnerManifest>> {
+        read_manifest_dir(&self.root.join("library").join("runners"))
     }
 
     fn read_model(&self, id: &str) -> std::io::Result<String> {
@@ -1728,6 +1822,38 @@ role = "config"
                 .map(|record| record.id.as_str()),
             Some("kokoro")
         );
+    }
+
+    #[test]
+    fn bundled_library_model_manifests_parse_with_allowed_enums() {
+        let registry = PackageRegistry::bundled();
+        let models = registry.library_models().expect("library models");
+
+        assert!(models.iter().any(|model| model.id == "piper-lessac"));
+        assert!(models.iter().any(|model| model.id == "whisper"));
+        assert!(models.iter().any(|model| model.id == "qwen3-tts"));
+        assert!(models.iter().any(|model| model.id == "voxtral"));
+        assert!(models
+            .iter()
+            .all(|model| !model.tasks.is_empty() && !model.languages.is_empty()));
+        assert!(models
+            .iter()
+            .filter(|model| model.runtime_status == LibraryRuntimeStatus::Supported)
+            .all(|model| model.id == "piper-lessac"));
+    }
+
+    #[test]
+    fn bundled_library_runner_manifests_parse_with_allowed_enums() {
+        let registry = PackageRegistry::bundled();
+        let runners = registry.library_runners().expect("library runners");
+
+        assert!(runners.iter().any(|runner| runner.id == "takokit-onnx"));
+        assert!(runners
+            .iter()
+            .any(|runner| runner.id == "external-transformers"));
+        assert!(runners
+            .iter()
+            .all(|runner| !runner.notes.is_empty() && !runner.supported_platforms.is_empty()));
     }
 
     fn write_test_registry(root: &Path) {
