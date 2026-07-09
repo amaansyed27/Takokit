@@ -10,7 +10,7 @@ SpeechToTextEngine
 VoiceCloneEngine
 ```
 
-`mock-tts` is the only executable TTS engine today. It writes a deterministic test WAV and is not real model inference.
+`mock-tts` remains available for API-contract testing, but it is not a real model. Real local execution is available for Kokoro ONNX TTS, Qwen3-TTS CustomVoice TTS, and Whisper Base STT on the verified Windows x64 path.
 
 Package resolution and runner execution are separate. `takokit-package` builds an `ExecutionPlan` from manifests and installed records, including the installed model record when a package model is pulled. Runner engines consume that plan and either produce output or return a typed execution error.
 
@@ -25,23 +25,25 @@ SpeechRunner
 TranscriptionRunner
 ```
 
-The ONNX runner scaffold exists in `takokit-models`. Generic ONNX speech models still return:
+The ONNX runner installs an isolated Python 3.12 environment through `uv`, then installs the MIT-licensed `kokoro-onnx==0.5.0` package and copies a stable JSON stdin/stdout adapter under `~/.takokit/runners/onnx/adapters/kokoro.py`. Its upstream phonemization dependencies remain wholly inside that separate adapter process; Takokit does not vendor their runtime code into Rust. `takokit pull kokoro` verifies the pinned INT8 model and voices bundle; `takokit speak ... --model kokoro` returns a real WAV response with the output path, byte count, and sample rate.
+
+Generic ONNX speech models still return:
 
 ```txt
 inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet.
 ```
 
-It does not generate Kokoro, Piper, or any other real-model audio yet. For `piper-lessac`, the ONNX scaffold now resolves installed model/config artifact paths and parses the Piper JSON config before returning typed `piper_text_frontend_not_implemented`. The blocker is specifically text normalization plus phonemizer/token preparation; Takokit does not vendor GPL/eSpeak runtime logic.
+Piper remains blocked. Its installed model/config artifacts are resolved and its JSON config is parsed before Takokit returns `piper_text_frontend_not_implemented`. `piper-plus` is not compatible with upstream Piper voice phoneme maps, and Takokit does not vendor GPL/eSpeak runtime logic.
 
 The whisper.cpp runner is the first real STT adapter. `whisper-base` resolves through `takokit-whispercpp`, finds the pulled `ggml-base.bin` artifact, locates the installed `whisper-cli` executable under the runner runtime directory, invokes whisper.cpp, and returns the actual transcript text. Missing audio files, missing artifacts, or missing binaries return typed errors.
 
-Python-managed adapters are initialized as adapter slots under:
+Python-managed adapters are initialized as stateful records under:
 
 ```txt
 ~/.takokit/runners/python-managed/adapters/<adapter>/adapter.toml
 ```
 
-The current slots are `qwen3_tts`, `chatterbox`, `f5_tts`, `cosyvoice2`, `dia`, `fish_speech`, `openvoice`, `gpt_sovits`, and `rvc`. They are marked `not-installed` and do not install Python packages or weights yet.
+The current slots are `qwen3_tts`, `chatterbox`, `f5_tts`, `cosyvoice2`, `dia`, `fish_speech`, `openvoice`, `gpt_sovits`, and `rvc`. Each has a persisted `not-installed`, `installing`, `ready`, or `failed` state and an install log. `takokit runner install takokit-python-managed` creates Takokit's Python 3.12 environment. `takokit adapter install qwen3-tts` installs `qwen-tts==0.1.1` and its JSON adapter only through that environment. `takokit pull qwen3-tts` verifies the pinned official artifact set and materializes it at `~/.takokit/models/qwen3-tts`; `takokit speak ... --model qwen3-tts` runs locally through that directory.
 
 Takokit model manifests describe the five product surfaces:
 
@@ -168,8 +170,8 @@ The runner record stores runner id, version, kind, platforms, manifest path, ins
 - Check installed model records before checking runner install state for non-mock models.
 - Keep `takokit-package` responsible for manifests, installed state, and planning only. Keep execution in model/runner crates.
 
-## First ONNX Target
+## ONNX Target Status
 
-Piper ONNX is the first real ONNX target. The decision is recorded in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md). Kokoro ONNX remains the next target after Piper proves the artifact and runner path.
+Kokoro ONNX is the first real ONNX TTS target. Piper remains a tracked target with an explicit safe-frontend blocker. The original selection decision is recorded in [decisions/0001-first-onnx-model.md](decisions/0001-first-onnx-model.md).
 
 The old `rhasspy/piper` runtime repository is archived and points to `OHF-Voice/piper1-gpl`, which is GPL-3.0. Takokit may reference Piper voice artifacts, but must not vendor GPL runtime code without an explicit licensing decision. See [references.md](references.md).

@@ -5,8 +5,8 @@ version = "0.1.0"
 kind = "tts"
 backend = "onnx"
 runner = "takokit-onnx"
-license = "apache-2.0"
-description = "Fast local text-to-speech model family. Runtime entry is metadata-only until Takokit verifies ONNX artifacts."
+license = "apache-2.0; gpl-runtime-adapter-boundary"
+description = "Kokoro v1.0 INT8 ONNX text-to-speech package, executed locally through Takokit's managed MIT-licensed ONNX adapter."
 
 [capabilities]
 tts = true
@@ -21,6 +21,18 @@ gpu = false
 min_ram = "4gb"
 
 [artifacts]
-metadata_only = true
-weights = []
-voices = []
+metadata_only = false
+
+[[artifacts.weights]]
+name = "kokoro-v1.0.int8.onnx"
+url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx"
+sha256 = "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb"
+bytes = 92361271
+role = "model"
+
+[[artifacts.voices]]
+name = "voices-v1.0.bin"
+url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+sha256 = "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+bytes = 28214398
+role = "voice"

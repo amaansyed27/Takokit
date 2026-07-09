@@ -1189,6 +1189,7 @@ dependencies = [
  "open",
  "serde",
  "serde_json",
+ "takokit-audio",
  "takokit-core",
  "takokit-models",
  "takokit-package",

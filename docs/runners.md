@@ -30,7 +30,7 @@ Model lifecycle states:
 - `executable`: Takokit can actually run the model.
 - `failed`: install or execution setup failed.
 
-Today, `whisper-base` can become executable when its verified artifact is pulled and `takokit-whispercpp` is installed on Windows x64. `mock-tts` remains the only TTS path that writes audio, and it is an internal contract-test model rather than a real model family.
+Today, `whisper-base` and `whisper-tiny` can become executable when their verified artifacts are pulled and `takokit-whispercpp` is installed on Windows x64. Kokoro and Qwen3-TTS have real local TTS paths after their explicit runner/adapter lifecycle. `mock-tts` is only an internal contract-test model.
 
 ## Python-Managed Layout
 
@@ -50,7 +50,7 @@ The managed Python runner layout is created under:
 
 Users should not manually install Python, Torch, CUDA packages, FFmpeg, clone model repositories, run Gradio apps, or patch requirements files. When this runner becomes executable, Takokit must own that setup behind `takokit runner pull` and model-specific adapters.
 
-`takokit runner install takokit-python-managed` initializes this layout and writes adapter slots for `qwen3_tts`, `chatterbox`, `f5_tts`, `cosyvoice2`, `dia`, `fish_speech`, `openvoice`, `gpt_sovits`, and `rvc`. Each adapter slot is marked `not-installed`; Takokit does not install Python/Torch or model dependencies yet.
+`takokit runner install takokit-python-managed` creates a Takokit-owned Python 3.12 environment and writes slots for `qwen3_tts`, `chatterbox`, `f5_tts`, `cosyvoice2`, `dia`, `fish_speech`, `openvoice`, `gpt_sovits`, and `rvc`. `takokit adapter install qwen3-tts` installs the official package and a stable JSON adapter there. Every slot records `not-installed`, `installing`, `ready`, or `failed` plus logs.
 
 `takokit doctor` checks that this layout exists and reports the runtime state without failing the current development path.
 
@@ -70,8 +70,8 @@ takokit plan whisper-base
 Pulling a runner installs the contract record only. Installing a runner performs explicit runtime setup:
 
 - `takokit-whispercpp`: on Windows x64, downloads the official whisper.cpp v1.9.1 `whisper-bin-x64.zip`, verifies SHA256 `7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539`, extracts it under `~/.takokit/runners/whispercpp/runtime/`, and marks the runner `ready` only if `whisper-cli.exe` is present.
-- `takokit-python-managed`: creates the managed runtime layout and planned adapter slots. Python/Torch and model adapters are not installed yet.
-- `takokit-onnx`: creates the runtime directory and records `runtime-installed`, not `ready`. `runner doctor` reports ONNX session capability as not verified and Piper frontend status as `piper_text_frontend_not_implemented`.
+- `takokit-python-managed`: creates the managed Python runtime. Qwen3-TTS's package is installed only through `takokit adapter install qwen3-tts`; the adapter becomes `ready` only after that succeeds.
+- `takokit-onnx`: installs the managed Kokoro ONNX runtime and records `ready` only after the adapter is available. `runner doctor` reports `kokoro-onnx-ready` and the independent Piper frontend blocker.
 - `takokit-transformers-audio` and `takokit-nemo`: create runtime directories and record the exact missing implementation component.
 
 Failed runtime installs persist `failed` state in the installed runner record with a note and log path. Re-running `takokit runner install <runner>` is safe and attempts to repair the runtime state.

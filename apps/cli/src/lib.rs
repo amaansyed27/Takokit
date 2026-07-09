@@ -5,15 +5,17 @@ mod tui;
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
 use std::path::PathBuf;
+use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, ModelInfo, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{
     execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
     TextToSpeechEngine,
 };
 use takokit_package::{
-    initialize_runner_runtime, model_info_from_plan, plan_model, resolve_execution_plan,
-    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
-    PackageRegistry, RunnerManifest,
+    initialize_runner_runtime, install_python_adapter, model_info_from_plan, plan_model,
+    python_adapter_record, python_adapter_records, resolve_execution_plan, runner_runtime_layout,
+    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
+    RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -55,6 +57,10 @@ enum Command {
     Runner {
         #[command(subcommand)]
         command: RunnerCommand,
+    },
+    Adapter {
+        #[command(subcommand)]
+        command: AdapterCommand,
     },
     Test(TestArgs),
     Transcribe {
@@ -104,6 +110,8 @@ struct TestArgs {
     json: bool,
     #[arg(long)]
     file: Option<PathBuf>,
+    #[arg(long)]
+    run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -151,6 +159,19 @@ enum RunnerCommand {
     },
     Rm {
         runner: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum AdapterCommand {
+    List,
+    Install {
+        adapter: String,
+    },
+    Doctor {
+        adapter: String,
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -382,11 +403,75 @@ pub async fn run() -> anyhow::Result<()> {
                 );
             }
         },
+        Some(Command::Adapter { command }) => match command {
+            AdapterCommand::List => {
+                let records = python_adapter_records(store.root()).map_err(cli_error)?;
+                println!("{}", serde_json::to_string_pretty(&records)?);
+            }
+            AdapterCommand::Install { adapter } => {
+                let adapter = normalize_adapter_id(&adapter);
+                let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
+                println!("{}", serde_json::to_string_pretty(&record)?);
+            }
+            AdapterCommand::Doctor { adapter, json } => {
+                let adapter = normalize_adapter_id(&adapter);
+                let record = python_adapter_record(store.root(), &adapter).map_err(cli_error)?;
+                print_adapter_doctor(&store, &record, json)?;
+            }
+        },
         Some(Command::Test(args)) => {
             run_test_command(&package_registry, &installed_registry, args).await?
         }
     }
 
+    Ok(())
+}
+
+fn normalize_adapter_id(adapter: &str) -> String {
+    adapter.trim().replace('-', "_")
+}
+
+fn print_adapter_doctor(
+    store: &LocalStore,
+    record: &takokit_package::AdapterRecord,
+    json: bool,
+) -> anyhow::Result<()> {
+    let adapter_dir = store.python_managed_adapters_dir().join(&record.id);
+    let python = if cfg!(windows) {
+        store
+            .python_managed_env_dir()
+            .join("venv")
+            .join("Scripts")
+            .join("python.exe")
+    } else {
+        store
+            .python_managed_env_dir()
+            .join("venv")
+            .join("bin")
+            .join("python3")
+    };
+    let payload = serde_json::json!({
+        "id": record.id,
+        "model_family": record.model_family,
+        "state": record.state,
+        "notes": record.notes,
+        "adapter_path": adapter_dir,
+        "adapter_script": adapter_dir.join("qwen3_tts.py"),
+        "python": python,
+        "python_present": python.is_file(),
+        "log_path": adapter_dir.join("install.log"),
+    });
+    if json {
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+    } else {
+        println!("Adapter Doctor: {} ({})", record.id, record.model_family);
+        println!("state: {}", record.state);
+        println!("python: {}", python.display());
+        println!("python present: {}", yes_no(python.is_file()));
+        println!("adapter path: {}", adapter_dir.display());
+        println!("log path: {}", adapter_dir.join("install.log").display());
+        println!("note: {}", record.notes);
+    }
     Ok(())
 }
 
@@ -396,7 +481,7 @@ async fn run_test_command(
     args: TestArgs,
 ) -> anyhow::Result<()> {
     if args.suite.as_deref() == Some("launch") {
-        print_launch_suite(package_registry, installed_registry, args.json)?;
+        print_launch_suite(package_registry, installed_registry, args.json, args.run).await?;
         return Ok(());
     }
 
@@ -449,24 +534,25 @@ async fn run_test_command(
     Ok(())
 }
 
-fn print_launch_suite(
+async fn print_launch_suite(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     json: bool,
+    run: bool,
 ) -> anyhow::Result<()> {
     let ids = [
         "piper-lessac",
         "kokoro",
         "whisper-base",
+        "whisper-tiny",
         "qwen3-tts",
-        "cosyvoice2",
+        "chatterbox",
         "f5-tts",
-        "dia",
-        "fish-speech",
         "sensevoice",
         "parakeet",
         "canary",
         "openvoice",
+        "rvc",
     ];
     let mut rows = Vec::new();
     for id in ids {
@@ -481,6 +567,7 @@ fn print_launch_suite(
                 executable: Some(plan.executable),
                 missing: plan.missing,
                 next_command: Some(plan.next_command),
+                run_result: None,
                 error: None,
             }),
             Err(error) => rows.push(LaunchSuiteRow {
@@ -493,9 +580,13 @@ fn print_launch_suite(
                 executable: None,
                 missing: Vec::new(),
                 next_command: None,
+                run_result: None,
                 error: Some(error.to_string()),
             }),
         }
+    }
+    if run {
+        run_launch_smokes(package_registry, installed_registry, &mut rows).await;
     }
     println!("{}", format_launch_suite(&rows, json)?);
     Ok(())
@@ -512,7 +603,102 @@ struct LaunchSuiteRow {
     executable: Option<bool>,
     missing: Vec<String>,
     next_command: Option<String>,
+    run_result: Option<String>,
     error: Option<String>,
+}
+
+async fn run_launch_smokes(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    rows: &mut [LaunchSuiteRow],
+) {
+    for row in rows {
+        if !row.executable.unwrap_or(false) {
+            row.run_result =
+                Some("skipped: model is blocked by its recorded lifecycle state".to_string());
+            continue;
+        }
+        match row.model.as_str() {
+            "kokoro" | "qwen3-tts" => {
+                let result = match resolve_execution_plan(
+                    package_registry,
+                    installed_registry,
+                    &row.model,
+                    CapabilityKind::TextToSpeech,
+                )
+                .map_err(cli_error)
+                {
+                    Ok(plan) => execute_speech(
+                        &plan,
+                        SpeechRequest {
+                            model: row.model.clone(),
+                            input: "Takokit launch smoke test.".to_string(),
+                            voice: None,
+                            response_format: Some("wav".to_string()),
+                        },
+                        &installed_registry.storage_root().join("outputs"),
+                    )
+                    .await
+                    .map_err(runtime_error),
+                    Err(error) => Err(error),
+                };
+                row.run_result = Some(match result {
+                    Ok(response) => format!(
+                        "passed: {} ({} bytes, {} Hz)",
+                        response.output_path.display(),
+                        response.bytes,
+                        response
+                            .sample_rate
+                            .map(|rate| rate.to_string())
+                            .unwrap_or_else(|| "unknown sample rate".to_string())
+                    ),
+                    Err(error) => format!("failed: {error}"),
+                });
+            }
+            "whisper-base" | "whisper-tiny" => {
+                let output_dir = installed_registry.storage_root().join("outputs");
+                let sample = output_dir.join("launch-whisper-silence.wav");
+                let result = write_silence_wav(&sample, 500, WavSpec::default())
+                    .map_err(anyhow::Error::from)
+                    .and_then(|_| {
+                        resolve_execution_plan(
+                            package_registry,
+                            installed_registry,
+                            &row.model,
+                            CapabilityKind::SpeechToText,
+                        )
+                        .map_err(cli_error)
+                    });
+                let result = match result {
+                    Ok(plan) => execute_transcription(
+                        &plan,
+                        takokit_core::TranscriptionRequest {
+                            file_path: sample,
+                            model: Some(row.model.clone()),
+                        },
+                    )
+                    .await
+                    .map(|response| {
+                        format!(
+                            "passed: whisper.cpp completed; transcript={:?}",
+                            response.text
+                        )
+                    })
+                    .map_err(runtime_error),
+                    Err(error) => Err(error),
+                };
+                row.run_result = Some(match result {
+                    Ok(result) => result,
+                    Err(error) => format!("failed: {error}"),
+                });
+            }
+            _ => {
+                row.run_result = Some(
+                    "skipped: no smoke handler is declared for this executable model".to_string(),
+                );
+            }
+        }
+    }
 }
 
 fn format_launch_suite(rows: &[LaunchSuiteRow], json: bool) -> anyhow::Result<String> {
@@ -539,6 +725,9 @@ fn format_launch_suite(rows: &[LaunchSuiteRow], json: bool) -> anyhow::Result<St
         }
         if let Some(next) = &row.next_command {
             output.push_str(&format!("  next: {next}\n"));
+        }
+        if let Some(result) = &row.run_result {
+            output.push_str(&format!("  run: {result}\n"));
         }
     }
     Ok(output.trim_end().to_string())
@@ -644,9 +833,34 @@ fn print_runner_doctor(
     println!("runtime path: {}", layout.root.display());
     println!("logs path: {}", layout.logs.display());
     if manifest.id == "takokit-onnx" {
-        println!("ONNX session capability: not verified in Takokit yet");
+        let ready = installed_registry
+            .installed_runner_record(&manifest.id)
+            .map(|record| record.status == takokit_package::RunnerLifecycleState::Ready)
+            .unwrap_or(false);
+        println!(
+            "ONNX session capability: {}",
+            if ready {
+                "kokoro-onnx-ready"
+            } else {
+                "not-installed"
+            }
+        );
         println!("Piper frontend status: piper_text_frontend_not_implemented");
-        println!("executable models: none");
+        println!(
+            "executable models: {}",
+            if ready { "kokoro" } else { "none" }
+        );
+    }
+    if manifest.id == "takokit-python-managed" {
+        match python_adapter_records(store.root()) {
+            Ok(records) if !records.is_empty() => {
+                println!("adapters:");
+                for record in records {
+                    println!("- {}: {}", record.id, record.state);
+                }
+            }
+            _ => println!("adapters: run `takokit runner install takokit-python-managed`"),
+        }
     }
 }
 
@@ -660,18 +874,12 @@ fn print_runner_doctor_json(
         .installed_runner_record(&manifest.id)
         .ok();
     let adapters = if manifest.id == "takokit-python-managed" {
-        std::fs::read_dir(store.python_managed_adapters_dir())
-            .ok()
-            .into_iter()
-            .flat_map(|entries| entries.flatten())
-            .filter_map(|entry| {
-                entry
-                    .file_type()
-                    .ok()
-                    .filter(|kind| kind.is_dir())
-                    .and_then(|_| entry.file_name().into_string().ok())
-            })
-            .collect::<Vec<_>>()
+        python_adapter_records(store.root()).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let executable_models = if manifest.id == "takokit-onnx" {
+        vec!["kokoro"]
     } else {
         Vec::new()
     };
@@ -689,9 +897,9 @@ fn print_runner_doctor_json(
             "runtime_path": layout.root,
             "logs_path": layout.logs,
             "adapters": adapters,
-            "onnx_session_capability": if manifest.id == "takokit-onnx" { Some("not-verified") } else { None },
+            "onnx_session_capability": if manifest.id == "takokit-onnx" && record.as_ref().is_some_and(|item| item.status == takokit_package::RunnerLifecycleState::Ready) { Some("kokoro-onnx-ready") } else { None },
             "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None },
-            "executable_models": if manifest.id == "takokit-onnx" { Vec::<String>::new() } else { Vec::<String>::new() },
+            "executable_models": executable_models,
         }))?
     );
     Ok(())
@@ -913,7 +1121,8 @@ mod tests {
                 model: Some(model),
                 suite: None,
                 json: true,
-                file: Some(file)
+                file: Some(file),
+                run: false
             })) if model == "whisper-base" && file == PathBuf::from("sample.wav")
         ));
     }
@@ -1011,6 +1220,25 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_adapter_and_launch_run_commands() {
+        let adapter = Cli::try_parse_from(["takokit", "adapter", "install", "qwen3-tts"])
+            .expect("adapter install");
+        let suite = Cli::try_parse_from(["takokit", "test", "--suite", "launch", "--run"])
+            .expect("launch run");
+
+        assert!(matches!(
+            adapter.command,
+            Some(Command::Adapter {
+                command: AdapterCommand::Install { adapter }
+            }) if adapter == "qwen3-tts"
+        ));
+        assert!(matches!(
+            suite.command,
+            Some(Command::Test(TestArgs { suite: Some(name), run: true, .. })) if name == "launch"
+        ));
+    }
+
+    #[test]
     fn cli_parses_model_and_launch_suite_test_commands() {
         let model = Cli::try_parse_from(["takokit", "test", "whisper-base"]).expect("model test");
         let suite =
@@ -1018,11 +1246,11 @@ mod tests {
 
         assert!(matches!(
             model.command,
-            Some(Command::Test(TestArgs { model: Some(model), suite: None, json: false, file: None })) if model == "whisper-base"
+            Some(Command::Test(TestArgs { model: Some(model), suite: None, json: false, file: None, run: false })) if model == "whisper-base"
         ));
         assert!(matches!(
             suite.command,
-            Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None })) if suite == "launch"
+            Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None, run: false })) if suite == "launch"
         ));
     }
 
@@ -1091,6 +1319,7 @@ mod tests {
             executable: Some(true),
             missing: Vec::new(),
             next_command: Some("takokit test whisper-base".to_string()),
+            run_result: None,
             error: None,
         }];
 

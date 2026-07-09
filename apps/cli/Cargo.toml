@@ -20,6 +20,7 @@ clap.workspace = true
 open.workspace = true
 serde = { workspace = true }
 takokit-core = { path = "../../crates/takokit-core" }
+takokit-audio = { path = "../../crates/takokit-audio" }
 takokit-models = { path = "../../crates/takokit-models" }
 takokit-package = { path = "../../crates/takokit-package" }
 takokit-server = { path = "../../crates/takokit-server" }

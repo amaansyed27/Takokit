@@ -60,6 +60,17 @@ target/release/takokit.exe speak "Hello" --model piper-lessac
 
 Piper has verified model/config artifacts, but real TTS is still blocked at the text frontend. The final command must return typed `piper_text_frontend_not_implemented`, not a fake WAV. The next implementation step is a verified non-GPL path for text normalization, phonemization, and Piper phoneme ID preparation before ONNX session execution.
 
+## Kokoro TTS
+
+```bash
+target/release/takokit.exe runner pull takokit-onnx
+target/release/takokit.exe runner install takokit-onnx
+target/release/takokit.exe pull kokoro
+target/release/takokit.exe speak "Hello from Takokit" --model kokoro
+```
+
+The result is JSON containing the real WAV path, byte count, content type, engine, and sample rate.
+
 ## Python-Managed
 
 ```bash
@@ -69,7 +80,15 @@ target/release/takokit.exe runner doctor takokit-python-managed
 target/release/takokit.exe plan qwen3-tts
 ```
 
-This initializes the managed layout and adapter slots. It does not install Python, Torch, CUDA packages, FFmpeg, or model dependencies yet.
+For the verified Qwen3-TTS path, continue with:
+
+```bash
+target/release/takokit.exe adapter install qwen3-tts
+target/release/takokit.exe pull qwen3-tts
+target/release/takokit.exe speak "Hello from Takokit" --model qwen3-tts --voice Ryan
+```
+
+Takokit owns the Python environment, package install, logs, pinned artifact pull, and local output. It does not expose Qwen reference-audio cloning without a future consent gate.
 
 ## API
 

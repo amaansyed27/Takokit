@@ -1,54 +1,44 @@
 # Launch Test Matrix
 
-This matrix tracks launch-relevant runtime manifests. It is intentionally honest: models are not executable unless Takokit has a verified artifact path, a ready runner runtime, and a real executor.
+This is a runtime matrix, not a catalog. An executable entry has a verified artifact set, a ready runner, and a command that produced a real local result. `planned` and `blocked` entries are intentionally not presented as runnable.
 
-## Commands
+## Verified Windows x64 Run
+
+Integration root: an isolated `TAKOKIT_HOME` under `%TEMP%`. GPU: RTX 5060 Laptop GPU (8 GB). Qwen3-TTS completed on the managed CPU PyTorch fallback in this run; it is real local inference but slower than a CUDA-enabled wheel path.
+
+| Model | Category | Runner | Artifact / runtime state | Command tested | Actual result | Blocker / notes | License and hardware |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `piper-lessac` | TTS | `takokit-onnx` | Lessac model/config pulled and SHA-256 verified | `takokit speak "Hello from Takokit" --model piper-lessac` | Typed `piper_text_frontend_not_implemented` after config/artifact preparation | `piper-plus` is incompatible with upstream Piper phoneme maps; eSpeak-compatible frontend remains behind a GPL boundary | Piper voices MIT; runtime boundary not bundled |
+| `kokoro` | TTS | `takokit-onnx` | INT8 model (92,361,271 bytes) and voices (28,214,398 bytes) pulled, SHA-256 verified; runner ready | `takokit speak "Hello from Takokit" --model kokoro` | Real 24 kHz WAV, 55,340 bytes | None on verified CPU path | Apache-2.0 weights; MIT `kokoro-onnx`; CPU-friendly |
+| `qwen3-tts` | TTS / built-in voice | `takokit-python-managed` | 11 pinned official files (2,493,919,668 bytes total) pulled, SHA-256 verified and materialized; `qwen3_tts` adapter ready | `takokit speak "Hello from Takokit" --model qwen3-tts --voice Ryan` | Real 24 kHz WAV, 165,164 bytes | Reference-audio cloning is intentionally not exposed | Apache-2.0; CPU fallback verified, CUDA wheel not yet selected |
+| `chatterbox` | TTS / cloning | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan chatterbox` | Blocked plan | Exact pinned weight set and consent-gated adapter still required | MIT upstream; model family is large |
+| `f5-tts` | TTS / cloning | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan f5-tts` | Blocked plan | No commercial-safe verified pretrained artifact selected | Code MIT; common weights CC-BY-NC |
+| `whisper-base` | STT | `takokit-whispercpp` | ggml model pulled and SHA-256 verified; whisper.cpp v1.9.1 ready | `takokit transcribe <qwen-wav> --model whisper-base` | Real transcript: `Hello from Togokit.` | None on verified Windows x64 path | MIT; CPU path verified |
+| `whisper-tiny` | STT | `takokit-whispercpp` | 77,691,713-byte ggml model pulled and SHA-256 verified; shared runner ready | `takokit transcribe <qwen-wav> --model whisper-tiny` | Real transcript: `Hello from Togokit.` | None on verified Windows x64 path | MIT; CPU-friendly |
+| `sensevoice` | STT | `takokit-python-managed` | Metadata-only; no managed adapter | `takokit plan sensevoice` | Blocked plan | Exact artifact set and adapter not selected | License/artifacts need verification |
+| `parakeet` | STT | `takokit-nemo` | Metadata-only; NeMo runner scaffold only | `takokit plan parakeet` | Blocked plan | NeMo ASR adapter plus managed audio dependencies not installed | Parakeet weights require per-checkpoint review; hardware varies |
+| `canary` | STT | `takokit-nemo` | Metadata-only; NeMo runner scaffold only | `takokit plan canary` | Blocked plan | NeMo ASR adapter plus managed audio dependencies not installed | Per-checkpoint license/artifact review required |
+| `openvoice` | voice cloning / conversion | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan openvoice` | Blocked plan | Verified artifact set plus explicit consent gate required | License and consent review required |
+| `rvc` | voice conversion | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan rvc` | Blocked plan | Explicit consent gate and GPL/runtime boundary are required before any adapter install | Do not auto-install or treat as commercial-safe |
+
+## Launch Commands
 
 ```bash
+takokit doctor
+takokit models
+takokit runners
 takokit test --suite launch
 takokit test --suite launch --json
-takokit plan <model>
-takokit plan <model> --json
-takokit test <model> --file ./sample.wav
+takokit test --suite launch --run
 ```
 
-The suite is non-destructive. It parses manifests and installed records, then reports lifecycle state, missing pieces, and next command. It does not pull artifacts or install runners.
-
-## Verified In This Run
-
-Integration root: temporary `TAKOKIT_HOME` under `%TEMP%`.
+`--run` runs smoke synthesis for executable TTS models, runs Whisper Base/Tiny against a generated local silence WAV, and skips blocked models with their recorded reason. For a meaningful transcript use an explicit caller-provided audio file:
 
 ```bash
-takokit runner pull takokit-whispercpp
-takokit runner install takokit-whispercpp
-takokit pull whisper-base
-takokit transcribe <generated-sapi-sample.wav> --model whisper-base
+takokit test whisper-base --file ./sample.wav
+takokit test whisper-tiny --file ./sample.wav
 ```
 
-Result: real whisper.cpp transcription returned `Hello from Taco Kid.` for a generated local WAV saying "hello from takokit". The runner installed whisper.cpp v1.9.1 from the official Windows x64 release ZIP and verified SHA256 `7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539`.
+## Deferred Runner Families
 
-## Matrix
-
-| Model | Category | Runner | Artifact status | Runner status | Executable | Command tested | Result | Blocker | License/commercial status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `piper-lessac` | TTS | `takokit-onnx` | Verified ONNX/config artifacts available | Runtime-installed scaffold | No | `takokit speak "Hello" --model piper-lessac` | Typed `piper_text_frontend_not_implemented` after artifact/config prep | text normalization, phonemizer/token preparation, then ONNX session execution | Piper voice artifacts usable; current upstream runtime licensing needs GPL boundary review |
-| `kokoro` | TTS | `takokit-onnx` | Metadata-only | Runtime scaffold | No | `takokit plan kokoro` | Planned | verified ONNX artifacts and ONNX execution | Apache-style metadata in registry; artifact source not verified |
-| `whisper-base` | STT | `takokit-whispercpp` | Verified ggml artifact | Ready on Windows x64 | Yes | `takokit transcribe <sample.wav> --model whisper-base` | Real transcript | None on verified Windows x64 path | MIT |
-| `qwen3-tts` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan qwen3-tts` | Planned | verified artifacts and managed adapter install/run | Apache 2.0 upstream; heavy Python runtime not installed |
-| `cosyvoice2` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan cosyvoice2` | Planned | verified artifacts and managed adapter install/run | Non-commercial risk noted in registry |
-| `f5-tts` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan f5-tts` | Planned | verified artifacts and managed adapter install/run | Code MIT, pretrained weights CC-BY-NC |
-| `dia` | TTS | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan dia` | Planned | verified artifacts and managed adapter install/run | License needs per-artifact verification |
-| `fish-speech` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan fish-speech` | Planned | verified artifacts and managed adapter install/run | License needs per-artifact verification |
-| `sensevoice` | STT | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan sensevoice` | Planned | verified artifacts and managed adapter install/run | License needs per-artifact verification |
-| `parakeet` | STT | `takokit-nemo` | Metadata-only | Runtime scaffold | No | `takokit plan parakeet` | Planned | NeMo adapter and managed dependencies | License needs per-artifact verification |
-| `canary` | STT | `takokit-nemo` | Metadata-only | Runtime scaffold | No | `takokit plan canary` | Planned | NeMo adapter and managed dependencies | License needs per-artifact verification |
-| `openvoice` | voice cloning / conversion | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan openvoice` | Planned | verified artifacts, consent-gated adapter, managed runtime | License and consent restrictions require review |
-| `rvc` | voice conversion | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan rvc` | Planned | verified artifacts, consent-gated adapter, managed runtime | GPL/runtime risk documented; do not auto-install without boundary |
-| `gpt-sovits` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan gpt-sovits` | Planned | verified artifacts, consent-gated adapter, managed runtime | License/runtime risk requires review |
-| `chatterbox` | TTS / cloning | `takokit-python-managed` | Metadata-only | Runtime layout only | No | `takokit plan chatterbox` | Planned | verified artifacts and managed adapter install/run | MIT upstream, adapter not installed |
-
-## Next Verification Targets
-
-- Piper ONNX: validate a non-GPL text frontend, then implement ONNX Runtime session loading, tensor execution, and WAV output.
-- Whisper Tiny/Small: add manifests only after verified artifact SHA256 values are computed.
-- Python-managed: implement one adapter end-to-end after dependency lock, license review, consent policy, and reproducible install plan.
+`takokit-transformers-audio` covers Qwen Omni and Voxtral. Their manifests remain metadata-only because no exact checkpoint/artifact lock and no managed Transformers audio adapter has been verified on this machine. `takokit-nemo` covers Parakeet and Canary; its exact blocker is the missing managed NeMo ASR adapter and its platform audio-runtime dependencies. Both are represented in CLI/API/GUI plans and runner doctor state, but neither claims execution.

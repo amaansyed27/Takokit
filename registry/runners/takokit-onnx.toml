@@ -7,5 +7,5 @@ supported_model_families = ["Piper", "Kokoro ONNX", "future ONNX voice/audio exp
 supported_tasks = ["text_to_speech", "live_audio"]
 dependency_strategy = "bundled-native"
 install_state = "runtime-missing"
-notes = "Shared ONNX runner contract. Piper artifact/config loading exists, but Piper text frontend and ONNX TTS execution verification are still blocked."
-description = "Shared native ONNX runner contract for Piper, Kokoro ONNX, and future ONNX voice/audio exports."
+notes = "Takokit invokes the MIT-licensed kokoro-onnx adapter as a separate managed Python process. Its upstream phonemization dependencies are retained inside that adapter boundary; no GPL runtime code is vendored into Takokit's Rust runtime. Piper artifact/config loading exists, but its eSpeak-compatible frontend remains blocked."
+description = "Shared ONNX runner contract for Piper, Kokoro ONNX, and future ONNX voice/audio exports."

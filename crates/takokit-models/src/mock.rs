@@ -39,6 +39,7 @@ impl TextToSpeechEngine for MockTextToSpeechEngine {
             output_path,
             content_type: "audio/wav".to_string(),
             bytes,
+            sample_rate: Some(WavSpec::default().sample_rate),
         })
     }
 }

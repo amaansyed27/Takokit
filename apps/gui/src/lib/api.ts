@@ -180,7 +180,23 @@ export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
       modeNote: "Local runtime mode: each model shows its real execution state."
     };
   } catch {
-    return mockRuntime;
+    return {
+      ...mockRuntime,
+      models: mockRuntime.models.map((model) => ({
+        ...model,
+        executable: false,
+        lifecycleState: "metadata-only",
+        runnerRuntimeState: "runtime-missing",
+        missing: ["Local Takokit API is unavailable; live state cannot be verified."],
+        executionStatus: "unverified while the local API is offline"
+      })),
+      runners: mockRuntime.runners.map((runner) => ({
+        ...runner,
+        installed: false,
+        install_state: "runtime-missing"
+      })),
+      modeNote: "Local API offline: no model is presented as executable."
+    };
   }
 }
 

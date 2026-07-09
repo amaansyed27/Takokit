@@ -11,6 +11,7 @@ export function RunnersPage({ runtime, onRefresh }: RouteComponentProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<Record<string, unknown> | null>(null);
   const apiUnavailable = runtime.server.status !== "online";
+  const adapterRecords = Array.isArray(doctor?.adapters) ? doctor.adapters.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
 
   async function runAction(label: string, action: () => Promise<void>) {
     setBusyAction(label);
@@ -125,6 +126,15 @@ export function RunnersPage({ runtime, onRefresh }: RouteComponentProps) {
                 <span><strong>Logs</strong>{String(doctor.logs_path ?? "-")}</span>
                 <span><strong>Note</strong>{String(doctor.note ?? "-")}</span>
               </div>
+              {adapterRecords.length > 0 ? (
+                <div className="detail-grid">
+                  {adapterRecords.map((adapter) => (
+                    <span key={String(adapter.id ?? adapter.model_family ?? "adapter")}>
+                      <strong>{String(adapter.id ?? "adapter")}</strong>{String(adapter.state ?? "unknown")}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="details-panel__side">
               <Badge tone={doctor.runtime_state === "ready" ? "success" : "warning"}>{String(doctor.runtime_state ?? "unknown")}</Badge>

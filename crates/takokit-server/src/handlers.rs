@@ -12,9 +12,9 @@ use takokit_core::{
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
-    initialize_runner_runtime, model_info_from_plan, plan_model, resolve_execution_plan,
-    runner_runtime_layout, InstallModelOptions, LibraryModelManifest, LibraryRunnerManifest,
-    ModelPlan, RunnerInfo, RunnerLifecycleState,
+    initialize_runner_runtime, model_info_from_plan, plan_model, python_adapter_records,
+    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, LibraryModelManifest,
+    LibraryRunnerManifest, ModelPlan, RunnerInfo, RunnerLifecycleState,
 };
 
 use crate::AppState;
@@ -281,21 +281,26 @@ pub async fn runner_doctor(
     let layout = runner_runtime_layout(state.store.root(), &manifest);
     let record = state.installed_registry.installed_runner_record(&id).ok();
     let adapters = if id == "takokit-python-managed" {
-        std::fs::read_dir(state.store.python_managed_adapters_dir())
-            .ok()
-            .into_iter()
-            .flat_map(|entries| entries.flatten())
-            .filter_map(|entry| {
-                entry
-                    .file_type()
-                    .ok()
-                    .filter(|kind| kind.is_dir())
-                    .and_then(|_| entry.file_name().into_string().ok())
-            })
-            .collect::<Vec<_>>()
+        python_adapter_records(state.store.root()).unwrap_or_default()
     } else {
         Vec::new()
     };
+    let executable_models = state
+        .package_registry
+        .models()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|model| {
+            plan_model(
+                &state.package_registry,
+                &state.installed_registry,
+                &model.id,
+            )
+            .ok()
+            .filter(|plan| plan.executable && plan.required_runner == id)
+            .map(|plan| plan.model_id)
+        })
+        .collect::<Vec<_>>();
 
     Ok(Json(RunnerDetailResponse {
         data: serde_json::json!({
@@ -310,9 +315,9 @@ pub async fn runner_doctor(
             "runtime_path": layout.root,
             "logs_path": layout.logs,
             "adapters": adapters,
-            "onnx_session_capability": if manifest.id == "takokit-onnx" { Some("not-verified") } else { None::<&str> },
+            "onnx_session_capability": if manifest.id == "takokit-onnx" && record.as_ref().is_some_and(|item| item.status == RunnerLifecycleState::Ready) { Some("kokoro-onnx-ready") } else { None::<&str> },
             "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None::<&str> },
-            "executable_models": if manifest.id == "takokit-onnx" { Vec::<String>::new() } else { Vec::<String>::new() },
+            "executable_models": executable_models,
         }),
     }))
 }
@@ -324,15 +329,15 @@ pub async fn launch_test(
         "piper-lessac",
         "kokoro",
         "whisper-base",
+        "whisper-tiny",
         "qwen3-tts",
-        "cosyvoice2",
+        "chatterbox",
         "f5-tts",
-        "dia",
-        "fish-speech",
         "sensevoice",
         "parakeet",
         "canary",
         "openvoice",
+        "rvc",
     ];
     let data = ids
         .into_iter()

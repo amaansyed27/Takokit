@@ -86,6 +86,8 @@ pub struct SpeechResponse {
     pub output_path: PathBuf,
     pub content_type: String,
     pub bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

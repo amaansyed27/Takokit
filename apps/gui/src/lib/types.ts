@@ -102,6 +102,7 @@ export type SpeechApiResponse = {
   output_path: string;
   content_type: string;
   bytes: number;
+  sample_rate?: number;
 };
 
 export type TranscriptionApiRequest = {

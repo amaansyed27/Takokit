@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Download, Waves } from "lucide-react";
+import { ChevronDown, Waves } from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -160,6 +160,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
               <span><strong>Engine</strong>{result.engine}</span>
               <span><strong>Content type</strong>{result.content_type}</span>
               <span><strong>Bytes</strong>{result.bytes}</span>
+              <span><strong>Sample rate</strong>{result.sample_rate ? `${result.sample_rate} Hz` : "not reported"}</span>
               <span><strong>Output path</strong>{result.output_path}</span>
             </div>
           ) : (
@@ -169,10 +170,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
             </div>
           )}
           <div className="audio-output__footer">
-            <span className={result ? "reveal-note" : ""}>{result ? "Audio saved locally." : "No output path yet."}</span>
-            <Button type="button" disabled={!result}>
-              <Download size={15} /> Download Audio
-            </Button>
+            <span className={result ? "reveal-note" : ""}>{result ? "Audio saved locally at the path above." : "No output path yet."}</span>
           </div>
         </div>
       </Section>

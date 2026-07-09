@@ -1,0 +1,33 @@
+id = "whisper-tiny"
+name = "Whisper Tiny"
+family = "whisper"
+version = "0.1.0"
+kind = "stt"
+backend = "whispercpp"
+runner = "takokit-whispercpp"
+license = "mit"
+description = "Whisper Tiny local transcription package using the pinned whisper.cpp ggml artifact."
+
+[capabilities]
+tts = false
+stt = true
+voice_cloning = false
+live_transcription = true
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = false
+min_ram = "2gb"
+
+[artifacts]
+metadata_only = false
+
+[[artifacts.weights]]
+name = "ggml-tiny.bin"
+url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.bin"
+sha256 = "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"
+bytes = 77691713
+role = "model"
+
+voices = []

@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn speech_route_returns_inference_not_implemented_after_model_and_runner_pull() {
+    async fn speech_route_requires_kokoro_artifacts_before_execution() {
         let root = std::env::temp_dir().join("takokit-server-speech-onnx-executor-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
         let app = server_router(state);
@@ -204,7 +204,7 @@ mod tests {
                     .method("POST")
                     .uri("/v1/models/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                     .unwrap(),
             )
             .await
@@ -237,15 +237,15 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(json["error"]["code"], "inference_not_implemented");
-        assert_eq!(
-            json["error"]["message"],
-            "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
-        );
+        assert_eq!(json["error"]["code"], "artifact_not_downloaded");
+        assert!(json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("kokoro-v1.0.int8.onnx"));
     }
 
     #[tokio::test]
@@ -261,7 +261,7 @@ mod tests {
                     .method("POST")
                     .uri("/v1/runners/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .body(Body::from(r#"{"runner":"takokit-transformers-audio"}"#))
                     .unwrap(),
             )
             .await
@@ -272,7 +272,7 @@ mod tests {
             .clone()
             .oneshot(
                 Request::builder()
-                    .uri("/v1/runners/takokit-onnx")
+                    .uri("/v1/runners/takokit-transformers-audio")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -283,7 +283,7 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["data"]["id"], "takokit-onnx");
+        assert_eq!(json["data"]["id"], "takokit-transformers-audio");
         assert_eq!(json["data"]["installed"], true);
 
         let install_response = app
@@ -293,7 +293,7 @@ mod tests {
                     .method("POST")
                     .uri("/v1/runners/install")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .body(Body::from(r#"{"runner":"takokit-transformers-audio"}"#))
                     .unwrap(),
             )
             .await
@@ -304,7 +304,7 @@ mod tests {
             .clone()
             .oneshot(
                 Request::builder()
-                    .uri("/v1/runners/takokit-onnx")
+                    .uri("/v1/runners/takokit-transformers-audio")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -321,7 +321,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("DELETE")
-                    .uri("/v1/runners/takokit-onnx")
+                    .uri("/v1/runners/takokit-transformers-audio")
                     .body(Body::empty())
                     .unwrap(),
             )

@@ -18,7 +18,7 @@ http://127.0.0.1:5050/gui
 - Models: runtime manifests, lifecycle state, executable yes/no, missing blockers, next commands, and model/runner actions.
 - Runners: shared runner contracts, runtime state, install/doctor/remove actions, supported families, and dependency strategy.
 - Library: curated discovery metadata separated from executable runtime manifests.
-- Speak: local speech API flow. Only executable TTS models are enabled; `mock-tts` is clearly labeled as the internal test path. Successful responses show model id, engine, content type, byte count, and local output path.
+- Speak: local speech API flow. Only executable TTS models are enabled; `mock-tts` is clearly labeled as the internal test path. Successful responses show model id, engine, content type, byte count, sample rate, and local output path.
 - Transcribe: local file-path transcription through `/v1/audio/transcriptions`, with Whisper prerequisites visible.
 - Diagnostics: `/v1/doctor` checks, logs paths, runner states, and API routes.
 - Settings: local runtime and storage settings.

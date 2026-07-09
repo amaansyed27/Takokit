@@ -7,12 +7,11 @@
 
 ## Next Small Tasks
 
-- [ ] Implement Piper ONNX session loading and audio generation.
-- [ ] Validate a non-GPL Piper text frontend, likely `piper-plus-g2p`, against Lessac `phoneme_id_map`.
-- [ ] Add Piper text normalization/tokenization execution without vendoring GPL runtime code.
-- [ ] Implement Whisper Tiny/Small manifests after verifying SHA256 artifacts.
-- [ ] Design the explicit managed Python install flow before installing Python/Torch.
-- [ ] Implement one Python-managed adapter install/run path after dependency lock and license review.
+- [ ] Implement a Piper-compatible non-GPL frontend or retain its typed blocker.
+- [ ] Add Whisper Small after a real artifact/execution run.
+- [ ] Add a consent-gated cloning/conversion adapter only after artifact and license review.
+- [ ] Implement a real Transformers-audio adapter after selecting exact Qwen Omni/Voxtral checkpoints.
+- [ ] Implement a managed NeMo ASR adapter after platform audio-runtime packaging is verified.
 - [ ] Add release packaging.
 - [ ] Add actual install script release URLs after artifacts and checksums exist.
 - [ ] Add public model library website.
@@ -25,6 +24,10 @@
 - [x] Added `/v1/runners/install`.
 - [x] Added `TAKOKIT_HOME` override for isolated local test roots while preserving `~/.takokit` defaults.
 - [x] Installed and verified whisper.cpp Windows x64 runner runtime under Takokit management.
+- [x] Added verified Whisper Tiny manifest and real Windows x64 transcription run.
+- [x] Implemented real Kokoro v1.0 INT8 ONNX TTS through a Takokit-managed `uv` environment and JSON adapter.
+- [x] Implemented a real Qwen3-TTS managed adapter lifecycle, pinned official artifact set, local model materialization, and local WAV synthesis.
+- [x] Added `takokit adapter list/install/doctor` with persisted `not-installed`/`installing`/`ready`/`failed` state.
 - [x] Added verified `whisper-base` ggml artifact URL, byte size, and SHA256.
 - [x] Implemented real `takokit transcribe ./audio.wav --model whisper-base` execution through `whisper-cli`.
 - [x] Added `takokit test <model>` and `takokit test --suite launch`.
@@ -95,7 +98,7 @@
 - [x] Added local mock registry manifests for Kokoro, Whisper Base, Piper Lessac, and runner contracts.
 - [x] Added manifest-backed `pull`, `show`, `list models`, `list runners`, and `rm` command flow.
 - [x] Expanded local storage layout for models, runners, blobs, manifests, voices, datasets, outputs, cache, logs, and config.
-- [x] Kept real inference explicitly unimplemented outside `mock-tts`.
+- [x] Kept blocked model execution typed and refused to return fake output.
 - [x] Preserved modular Rust workspace structure with separated CLI, server, core, model, package, audio, store, and safety crates.
 - [x] Preserved local web GUI as React + TypeScript + Vite under `apps/gui`.
 
@@ -103,15 +106,14 @@
 
 - Artifact hosting source beyond the initial Hugging Face Piper voice source: GitHub Releases, Takokit registry service, or static CDN.
 - Signature policy after checksum-backed downloads.
-- Whether managed Python runners are allowed in v0.1, or whether v0.1 should stay native/ONNX/whisper.cpp only.
 - Public library website structure and domain deployment target.
 
 ## Notes
 
-- `takokit pull kokoro` installs only the local mock manifest for now.
+- `takokit pull kokoro` downloads verified ONNX/voice artifacts and `takokit speak ... --model kokoro` produces a real WAV after the ONNX runner is installed.
 - `takokit pull piper-lessac` downloads and verifies the Piper Lessac medium ONNX model/config artifacts.
-- `takokit speak "Hello" --model kokoro` must not claim real Kokoro inference until a runner exists.
-- `takokit speak "Hello" --model mock-tts` is the only current TTS path and is for CLI/API contract testing.
+- `takokit speak "Hello" --model piper-lessac` remains a typed Piper frontend blocker, not a fake WAV.
+- `takokit speak "Hello" --model qwen3-tts --voice Ryan` is a real built-in-voice path after adapter install and model pull; reference-audio cloning remains consent-blocked.
 - `takokit transcribe ./audio.wav --model whisper-base` is a real STT path after pulling the model and installing `takokit-whispercpp`.
 - The GUI is a local browser GUI, not a Tauri app.
 - Keep every new task small enough to test immediately with `cargo check`, CLI commands, or GUI build.

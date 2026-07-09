@@ -4,6 +4,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{
@@ -16,6 +17,10 @@ const WHISPERCPP_WIN_X64_URL: &str =
     "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip";
 const WHISPERCPP_WIN_X64_SHA256: &str =
     "7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539";
+const KOKORO_ONNX_PACKAGE: &str = "kokoro-onnx==0.5.0";
+const KOKORO_ONNX_ADAPTER: &str = include_str!("../../../runners/onnx/kokoro_adapter.py");
+const QWEN3_TTS_PACKAGE: &str = "qwen-tts==0.1.1";
+const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_adapter.py");
 const PYTHON_MANAGED_ADAPTERS: &[(&str, &str)] = &[
     ("qwen3_tts", "qwen3-tts"),
     ("chatterbox", "chatterbox"),
@@ -570,6 +575,38 @@ pub struct PythonManagedRunnerLayout {
     pub adapters: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdapterLifecycleState {
+    NotInstalled,
+    Installing,
+    Ready,
+    Failed,
+}
+
+impl std::fmt::Display for AdapterLifecycleState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::NotInstalled => "not-installed",
+            Self::Installing => "installing",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdapterRecord {
+    pub id: String,
+    pub model_family: String,
+    pub state: AdapterLifecycleState,
+    pub dependency_strategy: String,
+    pub input_contract: String,
+    pub output_contract: String,
+    pub logs: String,
+    pub notes: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunnerRuntimeLayout {
     pub root: PathBuf,
@@ -732,6 +769,7 @@ impl InstalledRegistry {
         std::fs::create_dir_all(self.root.join("installed-models"))?;
         let path = self.model_manifest_path(&manifest.id);
         let artifact_set = self.install_artifacts(manifest, options)?;
+        self.materialize_model_artifacts(manifest, &artifact_set)?;
         let record = installed_model_record_with_artifacts(manifest, path.clone(), artifact_set);
 
         write_model_install_files(
@@ -754,7 +792,18 @@ impl InstalledRegistry {
         std::fs::create_dir_all(self.root.join("installed-runners"))?;
         let path = self.runner_manifest_path(&manifest.id);
         std::fs::write(&path, toml::to_string_pretty(manifest)?)?;
-        let record = installed_runner_record(manifest, path.clone());
+        let record = self
+            .installed_runner_record(&manifest.id)
+            .map(|mut record| {
+                // Pulling a current manifest must never downgrade a ready or
+                // failed runtime record back to a contract-only state.
+                record.version = manifest.version.clone();
+                record.kind = manifest.kind.as_str().to_string();
+                record.manifest_path = path.clone();
+                record.platforms = manifest.platforms.clone();
+                record
+            })
+            .unwrap_or_else(|_| installed_runner_record(manifest, path.clone()));
         std::fs::write(
             self.runner_record_path(&manifest.id),
             toml::to_string_pretty(&record)?,
@@ -843,7 +892,7 @@ impl InstalledRegistry {
             .join(format!("{id}.toml"))
     }
 
-    fn storage_root(&self) -> PathBuf {
+    pub fn storage_root(&self) -> PathBuf {
         self.root
             .parent()
             .map(Path::to_path_buf)
@@ -898,6 +947,55 @@ impl InstalledRegistry {
             note: "Installed model metadata and verified artifacts into content-addressed blobs."
                 .to_string(),
         })
+    }
+
+    fn materialize_model_artifacts(
+        &self,
+        manifest: &ModelManifest,
+        artifact_set: &InstalledArtifactSet,
+    ) -> PackageResult<()> {
+        if artifact_set.status != InstalledPackageStatus::Ready {
+            return Ok(());
+        }
+        let model_dir = self.storage_root().join("models").join(&manifest.id);
+        for artifact in &artifact_set.records {
+            let relative = Path::new(&artifact.name);
+            if relative.components().any(|component| {
+                matches!(
+                    component,
+                    std::path::Component::ParentDir
+                        | std::path::Component::RootDir
+                        | std::path::Component::Prefix(_)
+                )
+            }) {
+                return Err(PackageError::ArtifactInstallFailed {
+                    artifact: artifact.name.clone(),
+                    reason: "artifact name must be a safe relative path".to_string(),
+                });
+            }
+            let source = artifact.local_path.as_ref().ok_or_else(|| {
+                PackageError::ArtifactInstallFailed {
+                    artifact: artifact.name.clone(),
+                    reason: "downloaded artifact is missing its blob path".to_string(),
+                }
+            })?;
+            let destination = model_dir.join(relative);
+            let parent =
+                destination
+                    .parent()
+                    .ok_or_else(|| PackageError::ArtifactInstallFailed {
+                        artifact: artifact.name.clone(),
+                        reason: "artifact path has no parent directory".to_string(),
+                    })?;
+            std::fs::create_dir_all(parent)?;
+            if destination.is_file() {
+                std::fs::remove_file(&destination)?;
+            }
+            if std::fs::hard_link(source, &destination).is_err() {
+                std::fs::copy(source, &destination)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1234,8 +1332,21 @@ pub fn plan_model(
         .as_ref()
         .map(|record| record.status)
         .unwrap_or(RunnerLifecycleState::RuntimeMissing);
-    let lifecycle_state =
-        model_lifecycle_state(&model, &runner, artifact_state, runner_runtime_state);
+    let adapter = adapter_for_model(&model.id).and_then(|id| {
+        python_adapter_record(&installed_registry.storage_root(), id)
+            .ok()
+            .map(|record| (id, record.state))
+    });
+    let adapter_ready = adapter
+        .as_ref()
+        .is_some_and(|(_, state)| *state == AdapterLifecycleState::Ready);
+    let lifecycle_state = model_lifecycle_state(
+        &model,
+        &runner,
+        artifact_state,
+        runner_runtime_state,
+        adapter_ready,
+    );
     let executable = lifecycle_state == ModelLifecycleState::Executable;
     let mut missing = Vec::new();
 
@@ -1247,6 +1358,11 @@ pub fn plan_model(
     }
     if runner_runtime_state != RunnerLifecycleState::Ready {
         missing.push(runner_missing_component(&model, &runner));
+    }
+    if let Some((adapter, state)) = adapter.as_ref() {
+        if *state != AdapterLifecycleState::Ready && model.id == "qwen3-tts" {
+            missing.push(format!("managed adapter {adapter} ({state})"));
+        }
     }
     if lifecycle_state == ModelLifecycleState::RunnerReady {
         missing.push(runner_missing_component(&model, &runner));
@@ -1271,6 +1387,7 @@ pub fn plan_model(
             &model,
             installed_model.is_some(),
             runner_runtime_state,
+            adapter,
             executable,
         ),
     })
@@ -1318,38 +1435,35 @@ pub fn initialize_runner_runtime(
 
     match manifest.kind {
         RunnerKind::PythonManaged => {
-            let managed = python_managed_runner_layout(takokit_root);
-            for path in [
-                &managed.root,
-                &managed.runtime,
-                &managed.env,
-                &managed.packages,
-                &managed.wheels,
-                &managed.logs,
-                &managed.manifests,
-                &managed.cache,
-                &managed.adapters,
-            ] {
-                std::fs::create_dir_all(path)?;
+            match install_python_managed_runtime(takokit_root, installed_registry, manifest) {
+                Ok(report) => Ok(report),
+                Err(error) => {
+                    let _ = installed_registry.install_runner_runtime(
+                        manifest,
+                        RunnerLifecycleState::Failed,
+                        format!(
+                            "Managed Python runtime install failed: {error}. Logs: {}",
+                            layout.logs.display()
+                        ),
+                    );
+                    Err(error)
+                }
             }
-            write_python_adapter_manifests(&managed)?;
-            installed_registry.install_runner_runtime(
-                manifest,
-                RunnerLifecycleState::RuntimeInstalled,
-                format!(
-                    "Managed Python layout initialized at {}. Adapter installation is not ready yet; Takokit will manage Python, wheels, caches, logs, and adapters here.",
-                    managed.root.display()
-                ),
-            )
         }
-        RunnerKind::Onnx => installed_registry.install_runner_runtime(
-            manifest,
-            RunnerLifecycleState::RuntimeInstalled,
-            format!(
-                "ONNX runner runtime directory initialized at {}. Missing component: Piper text frontend (phonemizer/token preparation) and ONNX TTS execution verification.",
-                layout.root.display()
-            ),
-        ),
+        RunnerKind::Onnx => match install_onnx_runtime(installed_registry, manifest, &layout) {
+            Ok(report) => Ok(report),
+            Err(error) => {
+                let _ = installed_registry.install_runner_runtime(
+                    manifest,
+                    RunnerLifecycleState::Failed,
+                    format!(
+                        "ONNX runtime install failed: {error}. Logs: {}",
+                        layout.logs.display()
+                    ),
+                );
+                Err(error)
+            }
+        },
         RunnerKind::Whispercpp => match install_whispercpp_runtime(installed_registry, manifest, &layout) {
             Ok(report) => Ok(report),
             Err(error) => {
@@ -1394,14 +1508,188 @@ fn write_python_adapter_manifests(layout: &PythonManagedRunnerLayout) -> Package
         std::fs::create_dir_all(&adapter_dir)?;
         let manifest = adapter_dir.join("adapter.toml");
         if !manifest.is_file() {
-            std::fs::write(
-                manifest,
-                format!(
-                    "id = \"{adapter}\"\nmodel_family = \"{model_family}\"\nstate = \"not-installed\"\ndependency_strategy = \"takokit-managed-python\"\ninput_contract = \"json request on stdin\"\noutput_contract = \"json response on stdout\"\nlogs = \"../../logs\"\nnotes = \"Adapter slot only. Takokit has not installed Python dependencies or model weights for this adapter.\"\n"
-                ),
+            write_adapter_record(
+                &manifest,
+                &AdapterRecord {
+                    id: (*adapter).to_string(),
+                    model_family: (*model_family).to_string(),
+                    state: AdapterLifecycleState::NotInstalled,
+                    dependency_strategy: "takokit-managed-python".to_string(),
+                    input_contract: "json request on stdin".to_string(),
+                    output_contract: "json response on stdout".to_string(),
+                    logs: "../../logs".to_string(),
+                    notes: "Adapter slot only. Takokit has not installed Python dependencies or model weights for this adapter.".to_string(),
+                },
             )?;
         }
     }
+    Ok(())
+}
+
+pub fn python_adapter_records(takokit_root: &Path) -> PackageResult<Vec<AdapterRecord>> {
+    let layout = python_managed_runner_layout(takokit_root);
+    let mut records = Vec::new();
+    if !layout.adapters.is_dir() {
+        return Ok(records);
+    }
+    let mut entries = std::fs::read_dir(&layout.adapters)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path().join("adapter.toml");
+        if path.is_file() {
+            records.push(toml::from_str(&std::fs::read_to_string(path)?)?);
+        }
+    }
+    Ok(records)
+}
+
+pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+    let path = python_managed_runner_layout(takokit_root)
+        .adapters
+        .join(adapter)
+        .join("adapter.toml");
+    std::fs::read_to_string(&path)
+        .map_err(|error| match error.kind() {
+            std::io::ErrorKind::NotFound => PackageError::ArtifactInstallFailed {
+                artifact: adapter.to_string(),
+                reason: format!("adapter is not available; run `takokit runner install takokit-python-managed`: {}", path.display()),
+            },
+            _ => PackageError::Io(error),
+        })
+        .and_then(|source| Ok(toml::from_str(&source)?))
+}
+
+pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+    let layout = python_managed_runner_layout(takokit_root);
+    write_python_adapter_manifests(&layout)?;
+    let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
+    let mut record = python_adapter_record(takokit_root, adapter)?;
+    record.state = AdapterLifecycleState::Installing;
+    record.notes =
+        "Takokit is installing this adapter in the managed Python environment.".to_string();
+    write_adapter_record(&manifest_path, &record)?;
+
+    let result = match adapter {
+        "qwen3_tts" => install_qwen3_tts_adapter(&layout),
+        _ => Err(PackageError::ArtifactInstallFailed {
+            artifact: adapter.to_string(),
+            reason: "no executable adapter has been verified for this model family yet; Takokit left the adapter in not-installed state.".to_string(),
+        }),
+    };
+    match result {
+        Ok(note) => {
+            record.state = AdapterLifecycleState::Ready;
+            record.notes = note;
+            write_adapter_record(&manifest_path, &record)?;
+            Ok(record)
+        }
+        Err(error) => {
+            record.state = AdapterLifecycleState::Failed;
+            record.notes = format!("Adapter install failed: {error}");
+            write_adapter_record(&manifest_path, &record)?;
+            Err(error)
+        }
+    }
+}
+
+pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
+    PYTHON_MANAGED_ADAPTERS
+        .iter()
+        .find(|(_, family)| *family == model_id)
+        .map(|(adapter, _)| *adapter)
+}
+
+fn install_python_managed_runtime(
+    takokit_root: &Path,
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+) -> PackageResult<PullReport> {
+    let layout = python_managed_runner_layout(takokit_root);
+    for path in [
+        &layout.root,
+        &layout.runtime,
+        &layout.env,
+        &layout.packages,
+        &layout.wheels,
+        &layout.logs,
+        &layout.manifests,
+        &layout.cache,
+        &layout.adapters,
+    ] {
+        std::fs::create_dir_all(path)?;
+    }
+    write_python_adapter_manifests(&layout)?;
+    let venv = layout.env.join("venv");
+    let log = layout.logs.join("runtime-install.log");
+    run_logged_command(
+        &log,
+        "uv",
+        &[
+            "venv".into(),
+            "--python".into(),
+            "3.12".into(),
+            "--allow-existing".into(),
+            venv.clone().into(),
+        ],
+    )?;
+    let python = runner_python_path(&venv).ok_or_else(|| PackageError::ArtifactInstallFailed {
+        artifact: "managed Python runtime".to_string(),
+        reason: format!(
+            "uv created no Python executable below {}; see {}",
+            venv.display(),
+            log.display()
+        ),
+    })?;
+    installed_registry.install_runner_runtime(
+        manifest,
+        RunnerLifecycleState::Ready,
+        format!(
+            "Managed Python runtime is ready at {} using {}. No model adapter is installed yet; use `takokit adapter install qwen3_tts`. Runtime log: {}",
+            layout.root.display(),
+            python.display(),
+            log.display()
+        ),
+    )
+}
+
+fn install_qwen3_tts_adapter(layout: &PythonManagedRunnerLayout) -> PackageResult<String> {
+    let venv = layout.env.join("venv");
+    let python = runner_python_path(&venv).ok_or_else(|| PackageError::ArtifactInstallFailed {
+        artifact: "qwen3_tts adapter".to_string(),
+        reason: format!("managed Python runtime is missing; run `takokit runner install takokit-python-managed` first (expected {})", venv.display()),
+    })?;
+    let adapter_dir = layout.adapters.join("qwen3_tts");
+    std::fs::create_dir_all(&adapter_dir)?;
+    let log = adapter_dir.join("install.log");
+    run_logged_command(
+        &log,
+        "uv",
+        &[
+            "pip".into(),
+            "install".into(),
+            "--python".into(),
+            python.into(),
+            "--no-progress".into(),
+            QWEN3_TTS_PACKAGE.into(),
+            "soundfile".into(),
+        ],
+    )?;
+    std::fs::write(adapter_dir.join("qwen3_tts.py"), QWEN3_TTS_ADAPTER)?;
+    Ok(format!(
+        "Ready. Takokit installed {QWEN3_TTS_PACKAGE} and the JSON adapter. Model artifacts are pulled separately by `takokit pull qwen3-tts`. Install log: {}",
+        log.display()
+    ))
+}
+
+fn write_adapter_record(path: &Path, record: &AdapterRecord) -> PackageResult<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| PackageError::ArtifactInstallFailed {
+            artifact: record.id.clone(),
+            reason: "adapter manifest path has no parent directory".to_string(),
+        })?;
+    std::fs::create_dir_all(parent)?;
+    std::fs::write(path, toml::to_string_pretty(record)?)?;
     Ok(())
 }
 
@@ -1464,6 +1752,154 @@ fn install_whispercpp_runtime(
     )
 }
 
+fn install_onnx_runtime(
+    installed_registry: &InstalledRegistry,
+    manifest: &RunnerManifest,
+    layout: &RunnerRuntimeLayout,
+) -> PackageResult<PullReport> {
+    let runtime_dir = layout.root.join("runtime");
+    let venv_dir = runtime_dir.join("venv");
+    let adapters_dir = layout.root.join("adapters");
+    let log_path = layout.logs.join("install-kokoro-onnx.log");
+    std::fs::create_dir_all(&runtime_dir)?;
+    std::fs::create_dir_all(&adapters_dir)?;
+
+    run_logged_command(
+        &log_path,
+        "uv",
+        &[
+            "venv".into(),
+            "--python".into(),
+            "3.12".into(),
+            "--allow-existing".into(),
+            venv_dir.clone().into(),
+        ],
+    )?;
+    let python =
+        runner_python_path(&venv_dir).ok_or_else(|| PackageError::ArtifactInstallFailed {
+            artifact: "kokoro-onnx runtime".to_string(),
+            reason: format!(
+                "uv created no Python executable below {}; see {}",
+                venv_dir.display(),
+                log_path.display()
+            ),
+        })?;
+    run_logged_command(
+        &log_path,
+        "uv",
+        &[
+            "pip".into(),
+            "install".into(),
+            "--python".into(),
+            python.clone().into(),
+            "--no-progress".into(),
+            KOKORO_ONNX_PACKAGE.into(),
+        ],
+    )?;
+    std::fs::write(adapters_dir.join("kokoro.py"), KOKORO_ONNX_ADAPTER)?;
+
+    installed_registry.install_runner_runtime(
+        manifest,
+        RunnerLifecycleState::Ready,
+        format!(
+            "Kokoro ONNX runtime is ready at {} using Python {} and {}. Piper remains blocked by the typed piper_text_frontend_not_implemented boundary. Install log: {}",
+            layout.root.display(),
+            python.display(),
+            KOKORO_ONNX_PACKAGE,
+            log_path.display()
+        ),
+    )
+}
+
+fn runner_python_path(venv_dir: &Path) -> Option<PathBuf> {
+    let candidates = if cfg!(windows) {
+        vec![venv_dir.join("Scripts").join("python.exe")]
+    } else {
+        vec![
+            venv_dir.join("bin").join("python3"),
+            venv_dir.join("bin").join("python"),
+        ]
+    };
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+fn run_logged_command(log_path: &Path, program: &str, args: &[PathOrArg]) -> PackageResult<()> {
+    let mut command = Command::new(program);
+    for arg in args {
+        command.arg(arg.as_os_str());
+    }
+    let output = command
+        .output()
+        .map_err(|error| PackageError::ArtifactInstallFailed {
+            artifact: "managed runtime command".to_string(),
+            reason: format!(
+                "could not start {program}: {error}; see {}",
+                log_path.display()
+            ),
+        })?;
+    let mut log = String::new();
+    log.push_str(&format!("$ {program}"));
+    for arg in args {
+        log.push(' ');
+        log.push_str(&arg.as_os_str().to_string_lossy());
+    }
+    log.push('\n');
+    log.push_str(&String::from_utf8_lossy(&output.stdout));
+    log.push_str(&String::from_utf8_lossy(&output.stderr));
+    log.push('\n');
+    use std::io::Write as _;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)?
+        .write_all(log.as_bytes())?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(PackageError::ArtifactInstallFailed {
+            artifact: "managed runtime command".to_string(),
+            reason: format!(
+                "{program} exited with {}; see {}",
+                output.status,
+                log_path.display()
+            ),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+enum PathOrArg {
+    Arg(String),
+    Path(PathBuf),
+}
+
+impl From<&str> for PathOrArg {
+    fn from(value: &str) -> Self {
+        Self::Arg(value.to_string())
+    }
+}
+
+impl From<String> for PathOrArg {
+    fn from(value: String) -> Self {
+        Self::Arg(value)
+    }
+}
+
+impl From<PathBuf> for PathOrArg {
+    fn from(value: PathBuf) -> Self {
+        Self::Path(value)
+    }
+}
+
+impl PathOrArg {
+    fn as_os_str(&self) -> &std::ffi::OsStr {
+        match self {
+            Self::Arg(value) => value.as_ref(),
+            Self::Path(value) => value.as_os_str(),
+        }
+    }
+}
+
 fn model_artifact_state(
     model: &ModelManifest,
     installed_model: Option<&InstalledModelRecord>,
@@ -1488,6 +1924,7 @@ fn model_lifecycle_state(
     runner: &RunnerManifest,
     artifact_state: ModelLifecycleState,
     runner_runtime_state: RunnerLifecycleState,
+    adapter_ready: bool,
 ) -> ModelLifecycleState {
     if runner_runtime_state == RunnerLifecycleState::Failed {
         return ModelLifecycleState::Failed;
@@ -1496,7 +1933,7 @@ fn model_lifecycle_state(
         return ModelLifecycleState::MetadataOnly;
     }
     if runner_runtime_state == RunnerLifecycleState::Ready {
-        if has_verified_executor(model, runner) {
+        if has_verified_executor(model, runner, adapter_ready) {
             ModelLifecycleState::Executable
         } else {
             ModelLifecycleState::RunnerReady
@@ -1506,10 +1943,18 @@ fn model_lifecycle_state(
     }
 }
 
-fn has_verified_executor(model: &ModelManifest, runner: &RunnerManifest) -> bool {
-    runner.kind == RunnerKind::Whispercpp
-        && model.capabilities.stt
-        && matches!(model.id.as_str(), "whisper-base")
+fn has_verified_executor(
+    model: &ModelManifest,
+    runner: &RunnerManifest,
+    adapter_ready: bool,
+) -> bool {
+    matches!(
+        (runner.kind.clone(), model.id.as_str()),
+        (RunnerKind::Onnx, "kokoro")
+    ) || (runner.kind == RunnerKind::PythonManaged && model.id == "qwen3-tts" && adapter_ready)
+        || (runner.kind == RunnerKind::Whispercpp
+            && model.family.eq_ignore_ascii_case("whisper")
+            && model.capabilities.stt)
 }
 
 fn model_task_label(model: &ModelManifest) -> String {
@@ -1522,8 +1967,14 @@ fn runner_missing_component(model: &ModelManifest, runner: &RunnerManifest) -> S
     }
 
     match runner.kind {
+        RunnerKind::Onnx if model.id == "kokoro" => {
+            "managed kokoro-onnx runtime (run `takokit runner install takokit-onnx`)".to_string()
+        }
         RunnerKind::Onnx => "ONNX inference implementation".to_string(),
         RunnerKind::Whispercpp => "whisper.cpp transcription implementation".to_string(),
+        RunnerKind::PythonManaged if model.id == "qwen3-tts" => {
+            "qwen3_tts managed adapter (run `takokit adapter install qwen3_tts`)".to_string()
+        }
         RunnerKind::PythonManaged => "verified artifacts and managed runtime adapter".to_string(),
         RunnerKind::TransformersAudio => "Transformers audio runtime adapter".to_string(),
         RunnerKind::Nemo => "NeMo runtime adapter".to_string(),
@@ -1571,6 +2022,7 @@ fn next_plan_command(
     model: &ModelManifest,
     model_installed: bool,
     runner_runtime_state: RunnerLifecycleState,
+    adapter: Option<(&str, AdapterLifecycleState)>,
     executable: bool,
 ) -> String {
     if !model_installed {
@@ -1581,6 +2033,14 @@ fn next_plan_command(
         format!("takokit runner install {}", model.runner)
     } else if runner_runtime_state == RunnerLifecycleState::Failed {
         format!("takokit runner doctor {}", model.runner)
+    } else if let Some((adapter, state)) = adapter {
+        if state != AdapterLifecycleState::Ready && model.id == "qwen3-tts" {
+            format!("takokit adapter install {adapter}")
+        } else if executable {
+            format!("takokit test {}", model.id)
+        } else {
+            format!("takokit runner doctor {}", model.runner)
+        }
     } else if executable {
         format!("takokit test {}", model.id)
     } else {
@@ -1861,6 +2321,13 @@ fn install_artifact(
 
 fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<()> {
     if url.starts_with("http://") || url.starts_with("https://") {
+        // Hugging Face Xet asset redirects are more reliable through the curl
+        // implementation shipped with current Windows/macOS/Linux releases than
+        // the minimal HTTP client used for our small registry assets. This is an
+        // internal transport detail; users still invoke only `takokit pull`.
+        if url.contains("huggingface.co/") && download_with_curl(url, artifact, temp_path)? {
+            return Ok(());
+        }
         let response =
             ureq::get(url)
                 .call()
@@ -1900,6 +2367,45 @@ fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> PackageResul
         }
     })?;
     Ok(())
+}
+
+fn download_with_curl(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<bool> {
+    let output = match Command::new("curl")
+        .args([
+            "--location",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--retry",
+            "3",
+            "--output",
+        ])
+        .arg(temp_path)
+        .arg(url)
+        .output()
+    {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(PackageError::ArtifactDownloadFailed {
+                artifact: artifact.to_string(),
+                reason: format!("could not start managed curl transport: {error}"),
+            })
+        }
+    };
+    if output.status.success() {
+        Ok(true)
+    } else {
+        let _ = std::fs::remove_file(temp_path);
+        Err(PackageError::ArtifactDownloadFailed {
+            artifact: artifact.to_string(),
+            reason: format!(
+                "managed curl transport exited with {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        })
+    }
 }
 
 fn extract_zip_safely(archive_path: &Path, output_dir: &Path, artifact: &str) -> PackageResult<()> {
@@ -2394,12 +2900,12 @@ role = "config"
     }
 
     #[test]
-    fn bundled_placeholder_models_still_install_metadata_only() {
+    fn bundled_metadata_only_models_install_without_artifact_downloads() {
         let temp = tempfile::tempdir().expect("tempdir");
         let registry = PackageRegistry::bundled();
         let installed = InstalledRegistry::new(temp.path().join("manifests"));
 
-        for model_id in ["kokoro", "chatterbox", "gpt-sovits"] {
+        for model_id in ["chatterbox", "gpt-sovits"] {
             let manifest = registry.model(model_id).expect("model manifest");
             installed.install_model(&manifest).expect("install model");
             let record = installed
@@ -2425,6 +2931,24 @@ role = "config"
             manifest.artifacts.weights[0].sha256,
             "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
         );
+    }
+
+    #[test]
+    fn bundled_qwen_manifest_pins_complete_local_runtime_artifacts() {
+        let registry = PackageRegistry::bundled();
+        let manifest = registry.model("qwen3-tts").expect("qwen manifest");
+
+        assert!(!manifest.artifacts.metadata_only);
+        assert_eq!(manifest.license, "apache-2.0");
+        assert_eq!(manifest.artifacts.weights.len(), 2);
+        assert!(manifest
+            .artifacts
+            .all()
+            .any(|artifact| artifact.name == "speech_tokenizer/model.safetensors"));
+        assert!(manifest
+            .artifacts
+            .all()
+            .all(|artifact| !artifact.sha256.trim().is_empty() && artifact.bytes.is_some()));
     }
 
     #[test]
@@ -2500,6 +3024,29 @@ role = "config"
         assert_eq!(report.id, "takokit-onnx");
         assert_eq!(record.status, RunnerLifecycleState::RuntimeInstalled);
         assert!(record.note.contains("ONNX runtime dependency path"));
+    }
+
+    #[test]
+    fn pulling_runner_contract_does_not_downgrade_ready_runtime() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        write_test_registry(temp.path());
+        let registry = PackageRegistry::new(temp.path());
+        let installed = InstalledRegistry::new(temp.path().join("installed"));
+        let manifest = registry.runner("takokit-onnx").expect("runner");
+        installed.install_runner(&manifest).expect("contract");
+        installed
+            .install_runner_runtime(&manifest, RunnerLifecycleState::Ready, "ready runtime")
+            .expect("ready runtime");
+
+        installed
+            .install_runner(&manifest)
+            .expect("refresh contract");
+
+        let record = installed
+            .installed_runner_record("takokit-onnx")
+            .expect("runner record");
+        assert_eq!(record.status, RunnerLifecycleState::Ready);
+        assert_eq!(record.note, "ready runtime");
     }
 
     #[test]
@@ -2844,7 +3391,7 @@ role = "config"
         assert!(qwen_plan
             .missing
             .iter()
-            .any(|item| item.contains("managed runtime adapter")));
+            .any(|item| item.contains("qwen3_tts managed adapter")));
 
         let missing = plan_model(&registry, &installed, "does-not-exist")
             .expect_err("missing model should not plan");

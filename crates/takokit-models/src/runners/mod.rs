@@ -1,4 +1,5 @@
 pub mod onnx;
+pub mod python_managed;
 pub mod whispercpp;
 
 use async_trait::async_trait;
@@ -10,6 +11,7 @@ use takokit_core::{
 use takokit_package::{ExecutionPlan, RunnerKind};
 
 use self::onnx::OnnxRunner;
+use self::python_managed::PythonManagedRunner;
 use self::whispercpp::WhisperCppRunner;
 
 #[async_trait]
@@ -38,6 +40,7 @@ pub async fn execute_speech(
 ) -> TakokitResult<SpeechResponse> {
     match plan.runner.kind {
         RunnerKind::Onnx => OnnxRunner.speak(plan, request, output_dir).await,
+        RunnerKind::PythonManaged => PythonManagedRunner.speak(plan, request, output_dir).await,
         _ => Err(runner_not_implemented(format!(
             "Runner {} contract resolved, but speech execution is not implemented yet.",
             plan.runner.id
@@ -89,7 +92,7 @@ mod tests {
     use super::execute_speech;
 
     #[tokio::test]
-    async fn onnx_speech_executor_returns_inference_not_implemented() {
+    async fn kokoro_executor_requires_verified_model_and_voice_artifacts() {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_registry(temp.path());
         let registry = PackageRegistry::new(temp.path());
@@ -117,14 +120,14 @@ mod tests {
             temp.path(),
         )
         .await
-        .expect_err("onnx scaffold is not implemented");
+        .expect_err("kokoro requires verified artifacts");
 
         assert!(matches!(
             error,
             TakokitError::Resolution {
-                code: ErrorCode::InferenceNotImplemented,
+                code: ErrorCode::ArtifactMissing,
                 message
-            } if message == "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
+            } if message.contains("kokoro-v1.0.int8.onnx")
         ));
     }
 
