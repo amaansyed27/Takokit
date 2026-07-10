@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::{handlers, AppState};
@@ -12,6 +13,9 @@ pub fn server_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(handlers::health))
         .route("/v1/status", get(handlers::status))
+        .route("/v1/daemon/identity", get(handlers::daemon_identity))
+        .route("/v1/daemon/shutdown", post(handlers::daemon_shutdown))
+        .route("/v1/ps", get(handlers::ps))
         .route("/v1/doctor", get(handlers::doctor))
         .route("/v1/test/launch", get(handlers::launch_test))
         .route("/v1/capabilities", get(handlers::capabilities))
@@ -69,7 +73,25 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
         .with_context(|| format!("failed to bind Takokit server at {bind_addr}"))?;
 
     tracing::info!(%bind_addr, "Takokit server listening");
-    axum::serve(listener, server_router(state)).await?;
+    run_server_with_listener(state, listener, None).await?;
+    Ok(())
+}
+
+pub async fn run_server_with_listener(
+    state: AppState,
+    listener: TcpListener,
+    shutdown: Option<oneshot::Receiver<()>>,
+) -> anyhow::Result<()> {
+    let server = axum::serve(listener, server_router(state));
+    if let Some(shutdown) = shutdown {
+        server
+            .with_graceful_shutdown(async {
+                let _ = shutdown.await;
+            })
+            .await?;
+    } else {
+        server.await?;
+    }
     Ok(())
 }
 

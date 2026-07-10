@@ -5,10 +5,11 @@ use axum::{
     Json,
 };
 use takokit_core::{
-    CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, ErrorCode,
-    HealthResponse, ModelDetailResponse, ModelsResponse, PullModelRequest, PullModelResponse,
-    PullRunnerRequest, RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError,
-    TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
+    CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, DaemonIdentity,
+    DaemonMode, DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse,
+    ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
+    RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
+    TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
@@ -29,6 +30,33 @@ pub async fn health() -> Json<HealthResponse> {
 
 pub async fn status(State(state): State<AppState>) -> Json<takokit_core::RuntimeStatus> {
     Json(state.status())
+}
+
+pub async fn daemon_identity(State(state): State<AppState>) -> Json<DaemonIdentity> {
+    Json(state.daemon_identity.clone())
+}
+
+pub async fn daemon_shutdown(
+    State(state): State<AppState>,
+    Json(request): Json<DaemonShutdownRequest>,
+) -> Result<StatusCode, ApiError> {
+    if state.daemon_identity.mode != DaemonMode::Managed
+        || state.daemon_identity.instance_id != Some(request.instance_id)
+    {
+        return Err(ApiError(TakokitError::InvalidRequest(
+            "managed daemon identity does not match".to_string(),
+        )));
+    }
+    if let Some(sender) = state.shutdown.lock().await.take() {
+        let _ = sender.send(());
+    }
+    Ok(StatusCode::ACCEPTED)
+}
+
+pub async fn ps(State(state): State<AppState>) -> Json<RunnersResponse<ProcessInfo>> {
+    Json(RunnersResponse {
+        data: state.executions.lock().await.values().cloned().collect(),
+    })
 }
 
 pub async fn doctor(
@@ -572,6 +600,9 @@ pub async fn speech(
     State(state): State<AppState>,
     Json(request): Json<SpeechRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let _execution = state
+        .register_execution(request.model.clone(), "text_to_speech")
+        .await;
     if request.model != "mock-tts" {
         let plan = resolve_execution_plan(
             &state.package_registry,
@@ -605,6 +636,9 @@ pub async fn transcriptions(
         .model
         .clone()
         .unwrap_or_else(|| "whisper-base".to_string());
+    let _execution = state
+        .register_execution(model.clone(), "speech_to_text")
+        .await;
     let plan = resolve_execution_plan(
         &state.package_registry,
         &state.installed_registry,

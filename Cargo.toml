@@ -24,6 +24,7 @@ async-trait = "0.1"
 axum = "0.7"
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
+fs2 = "0.4"
 http = "1"
 mime = "0.3"
 open = "5"
@@ -37,6 +38,6 @@ tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-ureq = "2"
+ureq = { version = "2", features = ["json"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }

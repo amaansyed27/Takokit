@@ -80,26 +80,25 @@ pub async fn run_launcher(
 
         match action {
             LauncherAction::ChatRunVoiceModel => {
-                println!(
-                    "Real model execution is not implemented yet. Use mock-tts for speech tests or pull metadata."
-                );
+                println!("Use `takokit run <model> <text>` for TTS or `takokit run <model> --file <audio>` for STT. The daemon reports model readiness blockers.");
             }
             LauncherAction::GenerateMockSpeech => {
                 generate_mock_speech(store).await?;
             }
             LauncherAction::TranscribeAudio => {
-                println!(
-                    "STT commands route through runner resolution, but real Whisper execution is not implemented yet."
-                );
+                println!("Use `takokit run whisper-tiny --file <audio>` or `takokit transcribe <audio> --model whisper-tiny`.");
             }
             LauncherAction::PullModel => pull_model_metadata(package_registry, installed_registry)?,
             LauncherAction::PullRunner => {
                 pull_runner_contract(package_registry, installed_registry)?
             }
-            LauncherAction::OpenGui => gui::open_gui(config).await?,
+            LauncherAction::OpenGui => gui::open_gui(store, config).await?,
             LauncherAction::StartServer => {
-                gui::ensure_server(config).await?;
-                println!("Takokit server available at {}", config.local_base_url());
+                gui::ensure_server(store, config).await?;
+                println!(
+                    "Takokit managed daemon available at {}",
+                    config.local_base_url()
+                );
             }
             LauncherAction::ShowInstalledModels => {
                 for model in package_registry.models()? {

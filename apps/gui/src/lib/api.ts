@@ -1,7 +1,8 @@
 import { mockRuntime } from "./mockData";
 import type { CapabilitySummary, DoctorResponse, ModelCapability, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, TranscriptionApiRequest, TranscriptionApiResponse, VoiceSummary } from "./types";
 
-const LOCAL_API_BASE_URL = "http://127.0.0.1:5050";
+const viteApiOverride = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_TAKOKIT_API_URL;
+const LOCAL_API_BASE_URL = viteApiOverride || window.location.origin;
 
 type ApiStatus = {
   server: string;

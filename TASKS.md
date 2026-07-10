@@ -2,6 +2,8 @@
 
 ## Current Focus
 
+- [x] Managed daemon ownership, identity validation, graceful shutdown, daemon-backed CLI dispatch, `run`, plain `list`, `ps`, and explicit `--direct` development mode.
+
 - Make Takokit behave like a real Ollama-style local voice runtime: install once, `takokit pull <model>`, then run/speak/transcribe without manual Python, PyTorch, FFmpeg, repo cloning, or model-specific setup.
 - Keep development incremental and testable. No phase-gated roadmap here; this file tracks the next small pieces to build and verify.
 

@@ -4,6 +4,40 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DaemonIdentity {
+    pub instance_id: Option<Uuid>,
+    pub mode: DaemonMode,
+    pub pid: u32,
+    pub executable: PathBuf,
+    pub storage_root: PathBuf,
+    pub host: String,
+    pub port: u16,
+    pub started_at: u64,
+    pub log_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DaemonMode {
+    Managed,
+    Direct,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DaemonShutdownRequest {
+    pub instance_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProcessInfo {
+    pub execution_id: Uuid,
+    pub model: String,
+    pub task: String,
+    pub started_at: u64,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HealthResponse {
     pub ok: bool,
     pub service: String,

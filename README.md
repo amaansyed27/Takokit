@@ -8,6 +8,8 @@ Takokit is not a Tauri desktop app. It ships a Rust CLI and daemon/API. The GUI 
 takokit gui
 ```
 
+Normal CLI operations are daemon-backed: they start and verify one managed local daemon when needed. Use `takokit --direct <command>` for in-process development; `takokit serve` is the foreground direct-development server and never claims managed ownership.
+
 `tako` is also built as a short command alias for the same CLI. It uses the same `~/.takokit/` storage root and is not a separate product.
 
 Target local GUI URL:
@@ -106,6 +108,10 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 `takokit plan <model>` prints the model family, task, required runner, artifact state, runner contract/runtime state, whether it is executable today, missing pieces, and the next command to run.
 
 `takokit models`, `GET /v1/models`, and the GUI Models page use the same lifecycle planning state. Whisper Base/Tiny, Kokoro, and Qwen3-TTS become executable only after their artifacts, runner, and (where applicable) adapter are ready. `piper-lessac` remains blocked by `piper_text_frontend_not_implemented`.
+
+## Daemon-backed commands
+
+`takokit daemon start|status|stop` manages the owned daemon. `takokit list` is shorthand for the model list; `takokit list models|runners|voices` remains available. `takokit ps` lists active speech/transcription executions (runners are one-shot, so idle is empty). `takokit run <model> "text" [--voice <voice>]` dispatches TTS, while `takokit run <model> --file <audio>` dispatches STT through the same API as `speak` and `transcribe`.
 
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 

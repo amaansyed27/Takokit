@@ -1,4 +1,5 @@
 mod daemon;
+mod daemon_client;
 mod doctor;
 mod gui;
 mod tui;
@@ -24,6 +25,8 @@ use takokit_store::LocalStore;
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 struct Cli {
+    #[arg(long, global = true)]
+    direct: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -33,6 +36,8 @@ enum Command {
     Serve {
         #[arg(long, hide = true)]
         daemon_child: bool,
+        #[arg(long, hide = true)]
+        instance_id: Option<uuid::Uuid>,
     },
     Daemon {
         #[command(subcommand)]
@@ -60,8 +65,10 @@ enum Command {
     },
     List {
         #[command(subcommand)]
-        target: ListTarget,
+        target: Option<ListTarget>,
     },
+    Run(RunArgs),
+    Ps,
     Runner {
         #[command(subcommand)]
         command: RunnerCommand,
@@ -105,6 +112,16 @@ struct SpeakArgs {
     model: String,
     #[arg(long, default_value = "default")]
     voice: String,
+}
+
+#[derive(Debug, Args)]
+struct RunArgs {
+    model: String,
+    text: Option<String>,
+    #[arg(long)]
+    voice: Option<String>,
+    #[arg(long)]
+    file: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -238,10 +255,28 @@ pub async fn run() -> anyhow::Result<()> {
     let package_registry = PackageRegistry::bundled();
     let installed_registry = InstalledRegistry::new(store.manifests_dir());
 
+    if !cli.direct && route_daemon_command(&cli.command, &store, &config).await? {
+        return Ok(());
+    }
+
     match cli.command {
         None => tui::run_launcher(&config, &store, &package_registry, &installed_registry).await?,
-        Some(Command::Serve { daemon_child: _ }) => {
-            run_server(AppState::new(config, store)).await?;
+        Some(Command::Serve {
+            daemon_child,
+            instance_id,
+        }) => {
+            if daemon_child {
+                daemon::child(
+                    store,
+                    config,
+                    instance_id.ok_or_else(|| {
+                        anyhow::anyhow!("managed daemon child requires --instance-id")
+                    })?,
+                )
+                .await?;
+            } else {
+                run_server(AppState::new(config, store)).await?;
+            }
         }
         Some(Command::Daemon { command }) => match command {
             DaemonCommand::Start => println!(
@@ -262,7 +297,7 @@ pub async fn run() -> anyhow::Result<()> {
             },
             DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
         },
-        Some(Command::Gui) => gui::open_gui(&config).await?,
+        Some(Command::Gui) => gui::open_gui(&store, &config).await?,
         Some(Command::Doctor(args)) => {
             let report =
                 doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
@@ -393,11 +428,114 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::List { target }) => {
             let registry = ModelRegistry::default();
             match target {
-                ListTarget::Models => print_models(&package_registry, &installed_registry)?,
-                ListTarget::Runners => print_runners(&package_registry, &installed_registry)?,
-                ListTarget::Voices => {
+                None | Some(ListTarget::Models) => {
+                    print_models(&package_registry, &installed_registry)?
+                }
+                Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
+                Some(ListTarget::Voices) => {
                     println!("{}", serde_json::to_string_pretty(registry.voices())?)
                 }
+            }
+        }
+        Some(Command::Run(args)) => {
+            if args.text.is_some() == args.file.is_some() {
+                return Err(anyhow::anyhow!(
+                    "provide text for TTS or --file for STT, but not both"
+                ));
+            }
+            let manifest = package_registry.model(&args.model).map_err(cli_error)?;
+            if args.text.is_some() && !manifest.capabilities.tts {
+                return Err(anyhow::anyhow!(
+                    "model {} does not support text to speech",
+                    args.model
+                ));
+            }
+            if args.file.is_some() && !manifest.capabilities.stt {
+                return Err(anyhow::anyhow!(
+                    "model {} does not support speech to text",
+                    args.model
+                ));
+            }
+            if let Some(text) = args.text {
+                let response = if cli.direct && args.model != "mock-tts" {
+                    let plan = resolve_execution_plan(
+                        &package_registry,
+                        &installed_registry,
+                        &args.model,
+                        CapabilityKind::TextToSpeech,
+                    )
+                    .map_err(cli_error)?;
+                    execute_speech(
+                        &plan,
+                        SpeechRequest {
+                            model: args.model,
+                            input: text,
+                            voice: args.voice,
+                            response_format: Some("wav".to_string()),
+                        },
+                        &store.outputs_dir(),
+                    )
+                    .await
+                    .map_err(runtime_error)?
+                } else if cli.direct {
+                    MockTextToSpeechEngine
+                        .synthesize(
+                            SpeechRequest {
+                                model: args.model,
+                                input: text,
+                                voice: args.voice,
+                                response_format: Some("wav".to_string()),
+                            },
+                            &store.outputs_dir(),
+                        )
+                        .await?
+                } else {
+                    daemon_client::Client::ensure(&store, &config)?.speech(SpeechRequest {
+                        model: args.model,
+                        input: text,
+                        voice: args.voice,
+                        response_format: Some("wav".to_string()),
+                    })?
+                };
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else if cli.direct {
+                let model = args.model;
+                let plan = resolve_execution_plan(
+                    &package_registry,
+                    &installed_registry,
+                    &model,
+                    CapabilityKind::SpeechToText,
+                )
+                .map_err(cli_error)?;
+                let response = execute_transcription(
+                    &plan,
+                    takokit_core::TranscriptionRequest {
+                        file_path: args.file.unwrap(),
+                        model: Some(model),
+                    },
+                )
+                .await
+                .map_err(runtime_error)?;
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else {
+                let response: takokit_core::TranscriptionResponse =
+                    daemon_client::Client::ensure(&store, &config)?.post(
+                        "/v1/audio/transcriptions",
+                        &takokit_core::TranscriptionRequest {
+                            file_path: args.file.unwrap(),
+                            model: Some(args.model),
+                        },
+                    )?;
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            }
+        }
+        Some(Command::Ps) => {
+            if cli.direct {
+                println!("[]");
+            } else {
+                let value: serde_json::Value =
+                    daemon_client::Client::ensure(&store, &config)?.get("/v1/ps")?;
+                println!("{}", serde_json::to_string_pretty(&value)?);
             }
         }
         Some(Command::Transcribe { audio, model }) => {
@@ -514,6 +652,151 @@ pub async fn run() -> anyhow::Result<()> {
 
 fn normalize_adapter_id(adapter: &str) -> String {
     adapter.trim().replace('-', "_")
+}
+
+async fn route_daemon_command(
+    command: &Option<Command>,
+    store: &LocalStore,
+    config: &RuntimeConfig,
+) -> anyhow::Result<bool> {
+    let Some(command) = command else {
+        return Ok(false);
+    };
+    let client = match command {
+        Command::Models
+        | Command::Runners
+        | Command::Status
+        | Command::Doctor(_)
+        | Command::Capabilities
+        | Command::Speak(_)
+        | Command::Pull(_)
+        | Command::Show { .. }
+        | Command::Plan(_)
+        | Command::Rm { .. }
+        | Command::List { .. }
+        | Command::Run(_)
+        | Command::Ps
+        | Command::Transcribe { .. }
+        | Command::Runner { .. }
+        | Command::Adapter { .. } => daemon_client::Client::ensure(store, config)?,
+        _ => return Ok(false),
+    };
+    let output = match command {
+        Command::Models => client.get::<serde_json::Value>("/v1/models")?,
+        Command::Runners => client.get("/v1/runners")?,
+        Command::Status => client.get("/v1/status")?,
+        Command::Doctor(_) => client.get("/v1/doctor")?,
+        Command::Capabilities => client.get("/v1/capabilities")?,
+        Command::Pull(args) => client.post(
+            "/v1/models/pull",
+            &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
+        )?,
+        Command::Show { model } => client.get(&format!("/v1/models/{model}"))?,
+        Command::Plan(args) => client.get(&format!("/v1/models/{}/plan", args.model))?,
+        Command::Rm { model } => {
+            client.delete(&format!("/v1/models/{model}"))?;
+            serde_json::json!({"id":model,"removed":true})
+        }
+        Command::List { target } => match target {
+            None | Some(ListTarget::Models) => client.get("/v1/models")?,
+            Some(ListTarget::Runners) => client.get("/v1/runners")?,
+            Some(ListTarget::Voices) => client.get("/v1/voices")?,
+        },
+        Command::Speak(args) => client.post(
+            "/v1/audio/speech",
+            &SpeechRequest {
+                model: args.model.clone(),
+                input: args.text.clone(),
+                voice: Some(args.voice.clone()),
+                response_format: Some("wav".to_string()),
+            },
+        )?,
+        Command::Transcribe { audio, model } => client.post(
+            "/v1/audio/transcriptions",
+            &takokit_core::TranscriptionRequest {
+                file_path: audio.clone(),
+                model: Some(model.clone()),
+            },
+        )?,
+        Command::Run(args) => {
+            let model: serde_json::Value = client.get(&format!("/v1/models/{}", args.model))?;
+            let capabilities = model["data"]["capabilities"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            let supports = |capability: &str| {
+                capabilities
+                    .iter()
+                    .any(|item| item.as_str() == Some(capability))
+            };
+            match (&args.text, &args.file) {
+                (Some(text), None) if supports("text_to_speech") => client.post(
+                    "/v1/audio/speech",
+                    &SpeechRequest {
+                        model: args.model.clone(),
+                        input: text.clone(),
+                        voice: args.voice.clone(),
+                        response_format: Some("wav".to_string()),
+                    },
+                )?,
+                (None, Some(file)) if supports("speech_to_text") => client.post(
+                    "/v1/audio/transcriptions",
+                    &takokit_core::TranscriptionRequest {
+                        file_path: file.clone(),
+                        model: Some(args.model.clone()),
+                    },
+                )?,
+                (Some(_), None) => {
+                    return Err(anyhow::anyhow!(
+                        "model {} does not support text to speech",
+                        args.model
+                    ))
+                }
+                (None, Some(_)) => {
+                    return Err(anyhow::anyhow!(
+                        "model {} does not support speech to text",
+                        args.model
+                    ))
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "provide text for TTS or --file for STT, but not both"
+                    ))
+                }
+            }
+        }
+        Command::Ps => client.get("/v1/ps")?,
+        Command::Runner { command } => match command {
+            RunnerCommand::Pull { runner } => {
+                client.post("/v1/runners/pull", &serde_json::json!({"runner":runner}))?
+            }
+            RunnerCommand::Install { runner } => {
+                client.post("/v1/runners/install", &serde_json::json!({"runner":runner}))?
+            }
+            RunnerCommand::Doctor { runner, .. } => {
+                client.get(&format!("/v1/runners/{runner}/doctor"))?
+            }
+            RunnerCommand::Show { runner } => client.get(&format!("/v1/runners/{runner}"))?,
+            RunnerCommand::Rm { runner } => {
+                client.delete(&format!("/v1/runners/{runner}"))?;
+                serde_json::json!({"id":runner,"removed":true})
+            }
+        },
+        Command::Adapter { command } => match command {
+            AdapterCommand::List => client.get("/v1/adapters")?,
+            AdapterCommand::Install { adapter } => client.post(
+                "/v1/adapters/install",
+                &serde_json::json!({"adapter":adapter}),
+            )?,
+            AdapterCommand::Doctor { adapter, .. } => client.get(&format!(
+                "/v1/adapters/{}/doctor",
+                normalize_adapter_id(adapter)
+            ))?,
+        },
+        _ => return Ok(false),
+    };
+    println!("{}", serde_json::to_string_pretty(&output)?);
+    Ok(true)
 }
 
 fn print_adapter_doctor(
@@ -1589,6 +1872,23 @@ mod tests {
 
         assert!(matches!(models.command, Some(Command::Models)));
         assert!(matches!(runners.command, Some(Command::Runners)));
+    }
+
+    #[test]
+    fn cli_parses_direct_list_run_and_ps() {
+        let direct = Cli::try_parse_from(["takokit", "--direct", "list"]).expect("direct list");
+        let run = Cli::try_parse_from(["takokit", "run", "kokoro", "hello", "--voice", "Ryan"])
+            .expect("run");
+        let ps = Cli::try_parse_from(["takokit", "ps"]).expect("ps");
+        assert!(direct.direct);
+        assert!(matches!(
+            direct.command,
+            Some(Command::List { target: None })
+        ));
+        assert!(
+            matches!(run.command, Some(Command::Run(RunArgs { model, text: Some(text), voice: Some(voice), file: None })) if model == "kokoro" && text == "hello" && voice == "Ryan")
+        );
+        assert!(matches!(ps.command, Some(Command::Ps)));
     }
 
     #[test]
