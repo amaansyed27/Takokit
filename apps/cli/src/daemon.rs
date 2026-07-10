@@ -15,6 +15,9 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+const IDENTITY_WAIT: Duration = Duration::from_secs(5);
+const IDENTITY_POLL: Duration = Duration::from_millis(100);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonInfo {
     pub instance_id: Uuid,
@@ -56,6 +59,12 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
     if let Some(info) = verified_status(store, config)? {
         return Ok(info);
     }
+    if daemon_lock_is_held(store)? {
+        return wait_for_verified(store, config)?.ok_or_else(|| anyhow!(
+            "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
+            IDENTITY_WAIT.as_secs(), log_path(store).display()
+        ));
+    }
     if port_responds(config) {
         return Err(anyhow!("port {} is occupied by a direct Takokit server or another process; managed daemon will not take ownership", config.port));
     }
@@ -82,21 +91,20 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
         command.creation_flags(0x0000_0008 | 0x0000_0200);
     }
     command.spawn().context("spawn managed Takokit daemon")?;
-    for _ in 0..50 {
-        if let Some(info) = verified_status(store, config)? {
-            return Ok(info);
-        }
-        thread::sleep(Duration::from_millis(100));
+    if let Some(info) = wait_for_verified(store, config)? {
+        return Ok(info);
     }
     if daemon_lock_is_held(store)? {
         return Err(anyhow!(
-            "Takokit managed child is still starting but did not publish a verified identity within 5 seconds; see {}",
+            "managed child acquired the runtime lock but failed to publish a verified API identity within {} seconds; see {}",
+            IDENTITY_WAIT.as_secs(),
             log_path.display()
         ));
     }
     cleanup_proven_stale(store, config)?;
     Err(anyhow!(
-        "Takokit managed daemon did not publish a verified identity within 5 seconds; see {}",
+        "managed child exited before acquiring ownership or publishing a verified API identity within {} seconds; see {}",
+        IDENTITY_WAIT.as_secs(),
         log_path.display()
     ))
 }
@@ -195,6 +203,22 @@ fn verified_status(
         )
     })?;
     Ok(Some(info))
+}
+
+fn wait_for_verified(
+    store: &LocalStore,
+    config: &RuntimeConfig,
+) -> anyhow::Result<Option<DaemonInfo>> {
+    let deadline = std::time::Instant::now() + IDENTITY_WAIT;
+    loop {
+        if let Some(info) = verified_status(store, config)? {
+            return Ok(Some(info));
+        }
+        if std::time::Instant::now() >= deadline {
+            return Ok(None);
+        }
+        thread::sleep(IDENTITY_POLL);
+    }
 }
 fn cleanup_proven_stale(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
     if port_responds(config) {
@@ -384,6 +408,76 @@ mod tests {
     }
 
     #[test]
+    fn malformed_record_is_preserved_while_ownership_lock_is_held() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        fs::write(store.daemon_info_path(), b"broken legacy record").unwrap();
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(store.daemon_lock_path())
+            .unwrap();
+        lock.lock_exclusive().unwrap();
+        cleanup_proven_stale(&store, &test_config(temp.path())).unwrap();
+        assert!(store.daemon_info_path().exists());
+        lock.unlock().unwrap();
+    }
+
+    #[test]
+    fn held_ownership_lock_does_not_spawn_a_competing_child() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(store.daemon_lock_path())
+            .unwrap();
+        lock.lock_exclusive().unwrap();
+        let error = start(&store, &test_config(temp.path()))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("owns the runtime lock"));
+        assert!(error.contains("daemon.log"));
+        assert!(!store.daemon_info_path().exists());
+        lock.unlock().unwrap();
+    }
+
+    #[test]
+    fn direct_server_on_port_is_rejected_without_adoption() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 1024];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                .unwrap();
+        });
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        let error = start(
+            &store,
+            &RuntimeConfig {
+                host: "127.0.0.1".into(),
+                port,
+                storage_root: temp.path().to_path_buf(),
+            },
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("occupied by a direct Takokit server or another process"));
+        assert!(!store.daemon_info_path().exists());
+        thread.join().unwrap();
+    }
+
+    #[test]
     fn identity_validation_reports_ownership_field_mismatches() {
         let temp = tempfile::tempdir().unwrap();
         let info = test_info(temp.path());
@@ -430,5 +524,12 @@ mod tests {
             .local_addr()
             .unwrap()
             .port()
+    }
+    fn test_config(root: &std::path::Path) -> RuntimeConfig {
+        RuntimeConfig {
+            host: "127.0.0.1".into(),
+            port: unused_port(),
+            storage_root: root.to_path_buf(),
+        }
     }
 }

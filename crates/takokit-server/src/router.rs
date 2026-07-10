@@ -131,7 +131,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let config = RuntimeConfig::local(root.path().to_path_buf());
         let instance_id = Uuid::new_v4();
-        let (shutdown_tx, _shutdown_rx) = oneshot::channel();
+        let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
         let identity = takokit_core::DaemonIdentity {
             instance_id: Some(instance_id),
             mode: takokit_core::DaemonMode::Managed,
@@ -183,6 +183,28 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(denied.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(20), &mut shutdown_rx)
+                .await
+                .is_err()
+        );
+        let accepted = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/daemon/shutdown")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"instance_id":"{}"}}"#,
+                        instance_id
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(accepted.status(), StatusCode::ACCEPTED);
+        assert!(shutdown_rx.await.is_ok());
         drop(guard);
         tokio::task::yield_now().await;
         let ps = app
