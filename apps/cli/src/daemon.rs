@@ -104,8 +104,11 @@ pub fn stop(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> 
         ));
     }
     #[cfg(windows)]
+    // A detached Windows console process has no control channel after the
+    // launching terminal exits.  The executable and PID are both verified
+    // from Takokit's own atomically-created runtime record before this call.
     let outcome = Command::new("taskkill")
-        .args(["/PID", &info.pid.to_string()])
+        .args(["/F", "/PID", &info.pid.to_string()])
         .output()?;
     #[cfg(not(windows))]
     let outcome = Command::new("kill")

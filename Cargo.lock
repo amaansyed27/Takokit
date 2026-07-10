@@ -1198,6 +1198,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing-subscriber",
+ "ureq",
 ]
 
 [[package]]
