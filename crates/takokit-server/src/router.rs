@@ -24,6 +24,10 @@ pub fn server_router(state: AppState) -> Router {
             get(handlers::model).delete(handlers::remove_model),
         )
         .route("/v1/runners", get(handlers::runners))
+        .route("/v1/adapters", get(handlers::adapters))
+        .route("/v1/adapters/install", post(handlers::install_adapter))
+        .route("/v1/adapters/:id/doctor", get(handlers::adapter_doctor))
+        .route("/v1/adapters/:id", get(handlers::adapter))
         .route("/v1/models/pull", post(handlers::pull_model))
         .route("/v1/runners/pull", post(handlers::pull_runner))
         .route("/v1/runners/install", post(handlers::install_runner))
@@ -122,6 +126,26 @@ mod tests {
         assert_eq!(json["data"].as_array().unwrap().len(), 5);
         assert_eq!(json["data"][0]["label"], "TTS");
         assert_eq!(json["data"][3]["label"], "Live Transcription API");
+    }
+
+    #[tokio::test]
+    async fn adapters_route_is_available_without_claiming_adapter_readiness() {
+        let root = std::env::temp_dir().join("takokit-server-adapters-test");
+        let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+        let response = server_router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/adapters")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["data"].as_array().is_some());
     }
 
     #[tokio::test]

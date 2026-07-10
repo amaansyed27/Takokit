@@ -1253,6 +1253,7 @@ dependencies = [
  "anyhow",
  "axum",
  "http",
+ "serde",
  "serde_json",
  "takokit-core",
  "takokit-models",

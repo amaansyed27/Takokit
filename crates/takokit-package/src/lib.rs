@@ -1502,6 +1502,66 @@ pub fn initialize_runner_runtime(
     }
 }
 
+/// Returns the uv executable Takokit will use. A copy placed under
+/// `~/.takokit/tools/uv` takes precedence over a normal PATH installation.
+pub fn find_uv(takokit_root: &Path) -> Option<PathBuf> {
+    let executable = if cfg!(windows) { "uv.exe" } else { "uv" };
+    let managed = takokit_root.join("tools").join("uv").join(executable);
+    if managed.is_file() {
+        return Some(managed);
+    }
+    if let Ok(path) = std::env::var("UV") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    if Command::new(executable).arg("--version").output().is_ok() {
+        return Some(PathBuf::from(executable));
+    }
+    None
+}
+
+/// Attempts a Windows-first uv bootstrap and writes all output to the Takokit
+/// log directory. It deliberately returns an error instead of allowing a
+/// runner to be marked ready when bootstrap cannot complete.
+pub fn bootstrap_uv(takokit_root: &Path) -> PackageResult<PathBuf> {
+    if let Some(uv) = find_uv(takokit_root) {
+        return Ok(uv);
+    }
+    let logs = takokit_root.join("logs");
+    std::fs::create_dir_all(&logs)?;
+    let log = logs.join("uv-bootstrap.log");
+    let (program, args): (&str, Vec<PathOrArg>) = if cfg!(windows) {
+        (
+            "powershell",
+            vec![
+                "-NoProfile".into(),
+                "-ExecutionPolicy".into(),
+                "Bypass".into(),
+                "-Command".into(),
+                "irm https://astral.sh/uv/install.ps1 | iex".into(),
+            ],
+        )
+    } else {
+        (
+            "sh",
+            vec![
+                "-c".into(),
+                "curl -LsSf https://astral.sh/uv/install.sh | sh".into(),
+            ],
+        )
+    };
+    run_logged_command(&log, program, &args)?;
+    find_uv(takokit_root).ok_or_else(|| PackageError::ArtifactInstallFailed {
+        artifact: "uv bootstrap".to_string(),
+        reason: format!(
+            "bootstrap completed but uv was not found. See {}. Manual fallback: https://docs.astral.sh/uv/getting-started/installation/",
+            log.display()
+        ),
+    })
+}
+
 fn write_python_adapter_manifests(layout: &PythonManagedRunnerLayout) -> PackageResult<()> {
     for (adapter, model_family) in PYTHON_MANAGED_ADAPTERS {
         let adapter_dir = layout.adapters.join(adapter);
@@ -1621,9 +1681,10 @@ fn install_python_managed_runtime(
     write_python_adapter_manifests(&layout)?;
     let venv = layout.env.join("venv");
     let log = layout.logs.join("runtime-install.log");
+    let uv = bootstrap_uv(takokit_root)?;
     run_logged_command(
         &log,
-        "uv",
+        &uv,
         &[
             "venv".into(),
             "--python".into(),
@@ -1661,9 +1722,16 @@ fn install_qwen3_tts_adapter(layout: &PythonManagedRunnerLayout) -> PackageResul
     let adapter_dir = layout.adapters.join("qwen3_tts");
     std::fs::create_dir_all(&adapter_dir)?;
     let log = adapter_dir.join("install.log");
+    let takokit_root = layout.root.parent().and_then(Path::parent).ok_or_else(|| {
+        PackageError::ArtifactInstallFailed {
+            artifact: "qwen3_tts adapter".to_string(),
+            reason: "cannot resolve Takokit storage root".to_string(),
+        }
+    })?;
+    let uv = bootstrap_uv(takokit_root)?;
     run_logged_command(
         &log,
-        "uv",
+        &uv,
         &[
             "pip".into(),
             "install".into(),
@@ -1764,9 +1832,16 @@ fn install_onnx_runtime(
     std::fs::create_dir_all(&runtime_dir)?;
     std::fs::create_dir_all(&adapters_dir)?;
 
+    let takokit_root = layout.root.parent().and_then(Path::parent).ok_or_else(|| {
+        PackageError::ArtifactInstallFailed {
+            artifact: "kokoro-onnx runtime".to_string(),
+            reason: "cannot resolve Takokit storage root".to_string(),
+        }
+    })?;
+    let uv = bootstrap_uv(takokit_root)?;
     run_logged_command(
         &log_path,
-        "uv",
+        &uv,
         &[
             "venv".into(),
             "--python".into(),
@@ -1786,7 +1861,7 @@ fn install_onnx_runtime(
         })?;
     run_logged_command(
         &log_path,
-        "uv",
+        &uv,
         &[
             "pip".into(),
             "install".into(),
@@ -1823,7 +1898,12 @@ fn runner_python_path(venv_dir: &Path) -> Option<PathBuf> {
     candidates.into_iter().find(|candidate| candidate.is_file())
 }
 
-fn run_logged_command(log_path: &Path, program: &str, args: &[PathOrArg]) -> PackageResult<()> {
+fn run_logged_command(
+    log_path: &Path,
+    program: impl AsRef<Path>,
+    args: &[PathOrArg],
+) -> PackageResult<()> {
+    let program = program.as_ref();
     let mut command = Command::new(program);
     for arg in args {
         command.arg(arg.as_os_str());
@@ -1833,12 +1913,13 @@ fn run_logged_command(log_path: &Path, program: &str, args: &[PathOrArg]) -> Pac
         .map_err(|error| PackageError::ArtifactInstallFailed {
             artifact: "managed runtime command".to_string(),
             reason: format!(
-                "could not start {program}: {error}; see {}",
+                "could not start {}: {error}; see {}",
+                program.display(),
                 log_path.display()
             ),
         })?;
     let mut log = String::new();
-    log.push_str(&format!("$ {program}"));
+    log.push_str(&format!("$ {}", program.display()));
     for arg in args {
         log.push(' ');
         log.push_str(&arg.as_os_str().to_string_lossy());
@@ -1859,7 +1940,8 @@ fn run_logged_command(log_path: &Path, program: &str, args: &[PathOrArg]) -> Pac
         Err(PackageError::ArtifactInstallFailed {
             artifact: "managed runtime command".to_string(),
             reason: format!(
-                "{program} exited with {}; see {}",
+                "{} exited with {}; see {}",
+                program.display(),
                 output.status,
                 log_path.display()
             ),
@@ -3458,6 +3540,17 @@ role = "config"
         assert_eq!(layout.manifests, layout.root.join("manifests"));
         assert_eq!(layout.cache, layout.root.join("cache"));
         assert_eq!(layout.adapters, layout.root.join("adapters"));
+    }
+
+    #[test]
+    fn finds_managed_uv_before_path_lookup() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let executable = if cfg!(windows) { "uv.exe" } else { "uv" };
+        let uv = temp.path().join("tools").join("uv").join(executable);
+        std::fs::create_dir_all(uv.parent().expect("parent")).expect("tools dir");
+        std::fs::write(&uv, b"fixture").expect("uv fixture");
+
+        assert_eq!(find_uv(temp.path()), Some(uv));
     }
 
     #[test]

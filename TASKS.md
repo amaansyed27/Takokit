@@ -117,3 +117,9 @@
 - `takokit transcribe ./audio.wav --model whisper-base` is a real STT path after pulling the model and installing `takokit-whispercpp`.
 - The GUI is a local browser GUI, not a Tauri app.
 - Keep every new task small enough to test immediately with `cargo check`, CLI commands, or GUI build.
+# Fast local usability pass
+
+- [x] Add `quickstart`, dependency bootstrap/doctor, samples, and fast smoke-suite commands.
+- [x] Add local adapter API endpoints and Qwen adapter install action in the runner GUI detail.
+- [x] Add Windows smoke script and Windows-first local-use documentation.
+- [ ] Verify real runner downloads and execution on a clean Windows storage root.

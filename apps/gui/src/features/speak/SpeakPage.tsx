@@ -14,7 +14,7 @@ import { installRunner, pullModel, pullRunner } from "../../lib/api";
 export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   const ttsModels = useMemo(() => runtime.models.filter((model) => model.capabilities.includes("tts")), [runtime.models]);
   const [text, setText] = useState("");
-  const [model, setModel] = useState(ttsModels[0]?.id ?? "");
+  const [model, setModel] = useState(ttsModels.find((item) => item.id === "kokoro" && item.executable)?.id ?? ttsModels[0]?.id ?? "");
   const [voice, setVoice] = useState(runtime.voices[0]?.id ?? "");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const selectedModel = ttsModels.find((item) => item.id === model) ?? ttsModels[0];

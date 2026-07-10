@@ -10,7 +10,7 @@ import { installRunner, pullModel, pullRunner, transcribeAudio } from "../../lib
 
 export function TranscribePage({ runtime, onRefresh }: RouteComponentProps) {
   const sttModels = useMemo(() => runtime.models.filter((model) => model.capabilities.includes("stt")), [runtime.models]);
-  const [model, setModel] = useState(sttModels.find((item) => item.id === "whisper-base")?.id ?? sttModels[0]?.id ?? "");
+  const [model, setModel] = useState(sttModels.find((item) => item.id === "whisper-tiny" && item.executable)?.id ?? sttModels[0]?.id ?? "");
   const [filePath, setFilePath] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function TranscribePage({ runtime, onRefresh }: RouteComponentProps) {
               onChange={(event) => setFilePath(event.target.value)}
               placeholder="C:\\path\\to\\sample.wav"
             />
-            <small>Takokit does not upload to a cloud service; the local daemon reads this path.</small>
+            <small>Takokit does not upload to a cloud service; the local daemon reads this path. Create one with <code>takokit samples create</code>.</small>
           </div>
           <Button
             type="button"

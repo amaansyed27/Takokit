@@ -151,6 +151,14 @@ export async function removeRunner(id: string): Promise<void> {
   await requestNoContent(`/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+export async function installAdapter(id: string): Promise<void> {
+  await requestJson<{ data: unknown }>("/v1/adapters/install", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adapter: id })
+  });
+}
+
 export const apiConfig = {
   localBaseUrl: LOCAL_API_BASE_URL,
   guiUrl: `${LOCAL_API_BASE_URL}/gui`

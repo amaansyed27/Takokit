@@ -4,7 +4,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
-import { getRunnerDoctor, installRunner, pullRunner, removeRunner } from "../../lib/api";
+import { getRunnerDoctor, installAdapter, installRunner, pullRunner, removeRunner } from "../../lib/api";
 
 export function RunnersPage({ runtime, onRefresh }: RouteComponentProps) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -131,6 +131,18 @@ export function RunnersPage({ runtime, onRefresh }: RouteComponentProps) {
                   {adapterRecords.map((adapter) => (
                     <span key={String(adapter.id ?? adapter.model_family ?? "adapter")}>
                       <strong>{String(adapter.id ?? "adapter")}</strong>{String(adapter.state ?? "unknown")}
+                      {String(adapter.id ?? "") === "qwen3_tts" && String(adapter.state ?? "") !== "ready" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={apiUnavailable || doctor.runtime_state !== "ready"}
+                          loading={busyAction === "install-qwen3_tts"}
+                          onClick={() => runAction("install-qwen3_tts", () => installAdapter("qwen3_tts"))}
+                        >
+                          Install Qwen adapter
+                        </Button>
+                      ) : null}
+                      {String(adapter.notes ?? "") ? <small>{String(adapter.notes)}</small> : null}
                     </span>
                   ))}
                 </div>

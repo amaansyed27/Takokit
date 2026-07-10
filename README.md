@@ -267,3 +267,18 @@ Set `TAKOKIT_HOME` to use a temporary or test storage root. If it is unset, both
 - Model and runner setup belongs in package/runner management.
 - UI and CLI must not hardcode model-specific behavior.
 - Not-yet-built features return typed errors instead of fake inference claims.
+## Fast local use (Windows)
+
+```powershell
+cargo build --release
+target\release\takokit.exe quickstart
+target\release\takokit.exe samples create
+target\release\takokit.exe speak "Hello from Takokit" --model kokoro
+target\release\takokit.exe transcribe "$env:USERPROFILE\.takokit\samples\hello.wav" --model whisper-tiny
+target\release\takokit.exe test --suite fast --run
+target\release\takokit.exe gui
+```
+
+Fast usable models: Kokoro for TTS and Whisper Tiny/Base for STT. Qwen3-TTS is the optional heavy path. See [docs/quickstart.md](docs/quickstart.md) and [docs/local-testing.md](docs/local-testing.md).
+
+Still blocked: Piper Lessac, OpenVoice, RVC, NeMo/Parakeet/Canary, and transformers-audio/Qwen-Omni/Voxtral.

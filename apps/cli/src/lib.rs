@@ -12,10 +12,10 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    initialize_runner_runtime, install_python_adapter, model_info_from_plan, plan_model,
-    python_adapter_record, python_adapter_records, resolve_execution_plan, runner_runtime_layout,
-    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
-    RunnerManifest,
+    bootstrap_uv, find_uv, initialize_runner_runtime, install_python_adapter, model_info_from_plan,
+    plan_model, python_adapter_record, python_adapter_records, resolve_execution_plan,
+    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
+    PackageRegistry, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -61,6 +61,15 @@ enum Command {
     Adapter {
         #[command(subcommand)]
         command: AdapterCommand,
+    },
+    Quickstart(QuickstartArgs),
+    Deps {
+        #[command(subcommand)]
+        command: DepsCommand,
+    },
+    Samples {
+        #[command(subcommand)]
+        command: SamplesCommand,
     },
     Test(TestArgs),
     Transcribe {
@@ -112,6 +121,23 @@ struct TestArgs {
     file: Option<PathBuf>,
     #[arg(long)]
     run: bool,
+}
+
+#[derive(Debug, Args)]
+struct QuickstartArgs {
+    #[arg(long)]
+    full: bool,
+}
+
+#[derive(Debug, Subcommand)]
+enum DepsCommand {
+    Doctor,
+    Bootstrap,
+}
+
+#[derive(Debug, Subcommand)]
+enum SamplesCommand {
+    Create,
 }
 
 #[derive(Debug, Args)]
@@ -208,6 +234,25 @@ pub async fn run() -> anyhow::Result<()> {
             if report.has_failures() {
                 std::process::exit(1);
             }
+        }
+        Some(Command::Quickstart(args)) => {
+            run_quickstart(&store, &package_registry, &installed_registry, args.full).await?;
+        }
+        Some(Command::Deps { command }) => match command {
+            DepsCommand::Doctor => print_deps_doctor(&store),
+            DepsCommand::Bootstrap => {
+                let uv = bootstrap_uv(store.root()).map_err(cli_error)?;
+                println!("uv ready: {}", uv.display());
+                println!(
+                    "log: {}",
+                    store.logs_dir().join("uv-bootstrap.log").display()
+                );
+            }
+        },
+        Some(Command::Samples {
+            command: SamplesCommand::Create,
+        }) => {
+            create_samples(&store, &package_registry, &installed_registry).await?;
         }
         Some(Command::Version) => {
             println!("takokit {}", env!("CARGO_PKG_VERSION"));
@@ -420,7 +465,7 @@ pub async fn run() -> anyhow::Result<()> {
             }
         },
         Some(Command::Test(args)) => {
-            run_test_command(&package_registry, &installed_registry, args).await?
+            run_test_command(&store, &package_registry, &installed_registry, args).await?
         }
     }
 
@@ -475,7 +520,142 @@ fn print_adapter_doctor(
     Ok(())
 }
 
+fn print_deps_doctor(store: &LocalStore) {
+    let uv = find_uv(store.root());
+    println!("Dependency doctor");
+    match uv {
+        Some(path) => println!("uv: ready ({})", path.display()),
+        None => {
+            println!("uv: missing");
+            println!("next: takokit deps bootstrap");
+            println!(
+                "log: {}",
+                store.logs_dir().join("uv-bootstrap.log").display()
+            );
+        }
+    }
+    println!(
+        "managed Python: {}",
+        if store.python_managed_env_dir().join("venv").is_dir() {
+            "present"
+        } else {
+            "missing"
+        }
+    );
+    println!("storage: {}", store.root().display());
+}
+
+async fn run_quickstart(
+    store: &LocalStore,
+    registry: &PackageRegistry,
+    installed: &InstalledRegistry,
+    full: bool,
+) -> anyhow::Result<()> {
+    println!("Takokit fast local setup");
+    let uv = bootstrap_uv(store.root()).map_err(cli_error)?;
+    println!("Dependency bootstrap: ready ({})", uv.display());
+    for runner in ["takokit-onnx", "takokit-whispercpp"] {
+        let manifest = registry.runner(runner).map_err(cli_error)?;
+        installed.install_runner(&manifest).map_err(cli_error)?;
+        initialize_runner_runtime(store.root(), installed, &manifest).map_err(cli_error)?;
+    }
+    for model in ["kokoro", "whisper-tiny"] {
+        let manifest = registry.model(model).map_err(cli_error)?;
+        installed.install_model(&manifest).map_err(cli_error)?;
+    }
+    if full {
+        let manifest = registry
+            .runner("takokit-python-managed")
+            .map_err(cli_error)?;
+        installed.install_runner(&manifest).map_err(cli_error)?;
+        initialize_runner_runtime(store.root(), installed, &manifest).map_err(cli_error)?;
+        let record = install_python_adapter(store.root(), "qwen3_tts").map_err(cli_error)?;
+        println!("Qwen adapter: {}", record.state);
+        let manifest = registry.model("qwen3-tts").map_err(cli_error)?;
+        installed.install_model(&manifest).map_err(cli_error)?;
+    }
+    run_fast_smokes(store, registry, installed, false).await?;
+    for (label, model) in [
+        ("Kokoro TTS", "kokoro"),
+        ("Whisper Tiny STT", "whisper-tiny"),
+    ] {
+        let plan = plan_model(registry, installed, model).map_err(cli_error)?;
+        println!(
+            "{label}: {}",
+            if plan.executable {
+                "ready".to_string()
+            } else {
+                format!("blocked with reason: {}", plan.missing.join("; "))
+            }
+        );
+    }
+    println!(
+        "GUI: {}",
+        if takokit_server::router::gui_dist_path()
+            .join("index.html")
+            .is_file()
+        {
+            "available"
+        } else {
+            "build missing"
+        }
+    );
+    println!("Storage: {}", store.root().display());
+    println!("Next:\n  takokit speak \"Hello from Takokit\" --model kokoro\n  takokit samples create\n  takokit transcribe {} --model whisper-tiny\n  takokit gui", store.root().join("samples").join("hello.wav").display());
+    Ok(())
+}
+
+async fn create_samples(
+    store: &LocalStore,
+    registry: &PackageRegistry,
+    installed: &InstalledRegistry,
+) -> anyhow::Result<()> {
+    let samples = store.root().join("samples");
+    std::fs::create_dir_all(&samples)?;
+    let hello = samples.join("hello.wav");
+    let silence = samples.join("silence.wav");
+    let plan = plan_model(registry, installed, "kokoro").map_err(cli_error)?;
+    if plan.executable {
+        match resolve_execution_plan(registry, installed, "kokoro", CapabilityKind::TextToSpeech)
+            .map_err(cli_error)
+        {
+            Ok(execution) => match execute_speech(
+                &execution,
+                SpeechRequest {
+                    model: "kokoro".to_string(),
+                    input: "Hello from Takokit.".to_string(),
+                    voice: Some("af_heart".to_string()),
+                    response_format: Some("wav".to_string()),
+                },
+                &samples,
+            )
+            .await
+            {
+                Ok(response) => {
+                    std::fs::copy(response.output_path, &hello)?;
+                    println!("hello.wav: Kokoro speech ({})", hello.display());
+                }
+                Err(error) => {
+                    write_silence_wav(&hello, 700, WavSpec::default())?;
+                    println!("hello.wav: synthetic silence because Kokoro failed: {error}");
+                }
+            },
+            Err(error) => {
+                write_silence_wav(&hello, 700, WavSpec::default())?;
+                println!("hello.wav: synthetic silence because Kokoro is unavailable: {error}");
+            }
+        }
+    } else {
+        write_silence_wav(&hello, 700, WavSpec::default())?;
+        println!("hello.wav: synthetic silence (Kokoro not ready)");
+    }
+    write_silence_wav(&silence, 500, WavSpec::default())?;
+    println!("silence.wav: {}", silence.display());
+    Ok(())
+}
+
 async fn run_test_command(
+    store: &LocalStore,
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     args: TestArgs,
@@ -484,10 +664,14 @@ async fn run_test_command(
         print_launch_suite(package_registry, installed_registry, args.json, args.run).await?;
         return Ok(());
     }
+    if args.suite.as_deref() == Some("fast") {
+        run_fast_smokes(store, package_registry, installed_registry, args.run).await?;
+        return Ok(());
+    }
 
     let Some(model) = args.model else {
         return Err(TakokitError::InvalidRequest(
-            "provide a model id or --suite launch".to_string(),
+            "provide a model id or --suite launch|fast".to_string(),
         )
         .into());
     };
@@ -531,6 +715,99 @@ async fn run_test_command(
             }
         );
     }
+    Ok(())
+}
+
+async fn run_fast_smokes(
+    store: &LocalStore,
+    registry: &PackageRegistry,
+    installed: &InstalledRegistry,
+    run: bool,
+) -> anyhow::Result<()> {
+    println!("Fast smoke test");
+    let mock = MockTextToSpeechEngine
+        .synthesize(
+            SpeechRequest {
+                model: "mock-tts".to_string(),
+                input: "Takokit fast smoke test.".to_string(),
+                voice: None,
+                response_format: Some("wav".to_string()),
+            },
+            &store.outputs_dir(),
+        )
+        .await?;
+    println!(
+        "mock-tts      passed  output={}",
+        mock.output_path.display()
+    );
+    for id in ["kokoro", "whisper-tiny", "whisper-base", "qwen3-tts"] {
+        let plan = plan_model(registry, installed, id).map_err(cli_error)?;
+        if !plan.executable {
+            println!(
+                "{id:<13} skipped {}",
+                if plan.missing.is_empty() {
+                    "not installed".to_string()
+                } else {
+                    plan.missing.join("; ")
+                }
+            );
+            continue;
+        }
+        if !run {
+            println!("{id:<13} ready    run with: takokit test --suite fast --run");
+            continue;
+        }
+        match id {
+            "kokoro" | "qwen3-tts" => {
+                let plan =
+                    resolve_execution_plan(registry, installed, id, CapabilityKind::TextToSpeech)
+                        .map_err(cli_error)?;
+                match execute_speech(
+                    &plan,
+                    SpeechRequest {
+                        model: id.to_string(),
+                        input: "Takokit fast smoke test.".to_string(),
+                        voice: None,
+                        response_format: Some("wav".to_string()),
+                    },
+                    &store.outputs_dir(),
+                )
+                .await
+                {
+                    Ok(response) => {
+                        println!("{id:<13} passed  output={}", response.output_path.display())
+                    }
+                    Err(error) => println!("{id:<13} failed  {error}"),
+                }
+            }
+            _ => {
+                let sample = store.root().join("samples").join("silence.wav");
+                let sample = if sample.is_file() {
+                    sample
+                } else {
+                    let path = store.outputs_dir().join("fast-smoke-silence.wav");
+                    write_silence_wav(&path, 500, WavSpec::default())?;
+                    path
+                };
+                let plan =
+                    resolve_execution_plan(registry, installed, id, CapabilityKind::SpeechToText)
+                        .map_err(cli_error)?;
+                match execute_transcription(
+                    &plan,
+                    takokit_core::TranscriptionRequest {
+                        file_path: sample,
+                        model: Some(id.to_string()),
+                    },
+                )
+                .await
+                {
+                    Ok(response) => println!("{id:<13} passed  transcript={:?}", response.text),
+                    Err(error) => println!("{id:<13} failed  {error}"),
+                }
+            }
+        }
+    }
+    println!("\nUsable commands:\ntakokit speak \"Hello\" --model kokoro\ntakokit transcribe <path> --model whisper-tiny\ntakokit gui");
     Ok(())
 }
 
@@ -1236,6 +1513,36 @@ mod tests {
             suite.command,
             Some(Command::Test(TestArgs { suite: Some(name), run: true, .. })) if name == "launch"
         ));
+    }
+
+    #[test]
+    fn cli_parses_quickstart_deps_samples_and_fast_suite() {
+        let quickstart =
+            Cli::try_parse_from(["takokit", "quickstart", "--full"]).expect("quickstart");
+        let deps = Cli::try_parse_from(["takokit", "deps", "bootstrap"]).expect("deps");
+        let samples = Cli::try_parse_from(["takokit", "samples", "create"]).expect("samples");
+        let fast = Cli::try_parse_from(["takokit", "test", "--suite", "fast", "--run"])
+            .expect("fast suite");
+
+        assert!(matches!(
+            quickstart.command,
+            Some(Command::Quickstart(QuickstartArgs { full: true }))
+        ));
+        assert!(matches!(
+            deps.command,
+            Some(Command::Deps {
+                command: DepsCommand::Bootstrap
+            })
+        ));
+        assert!(matches!(
+            samples.command,
+            Some(Command::Samples {
+                command: SamplesCommand::Create
+            })
+        ));
+        assert!(
+            matches!(fast.command, Some(Command::Test(TestArgs { suite: Some(name), run: true, .. })) if name == "fast")
+        );
     }
 
     #[test]

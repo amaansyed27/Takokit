@@ -2,6 +2,18 @@
 
 Takokit should be tested as one local product shell: CLI, `tako` alias, storage, API, GUI, runners, and honest model plans.
 
+## Fast path
+
+```powershell
+target\release\takokit.exe quickstart
+target\release\takokit.exe samples create
+target\release\takokit.exe test --suite fast --run
+```
+
+`quickstart` prepares only Kokoro and Whisper Tiny by default. `takokit deps doctor` reports whether `uv` is available; `takokit deps bootstrap` attempts the Windows-first bootstrap and writes its output to `~/.takokit/logs/uv-bootstrap.log`. The fast suite never downloads model artifacts.
+
+`samples create` writes `hello.wav` and `silence.wav` under `~/.takokit/samples/`. `hello.wav` uses Kokoro when it is executable; otherwise it is explicitly synthetic silence.
+
 ## Isolated Storage
 
 Use `TAKOKIT_HOME` when a test should not touch the normal `~/.takokit` root.
@@ -58,7 +70,7 @@ target/release/takokit.exe plan piper-lessac
 target/release/takokit.exe speak "Hello" --model piper-lessac
 ```
 
-Piper has verified model/config artifacts, but real TTS is still blocked at the text frontend. The final command must return typed `piper_text_frontend_not_implemented`, not a fake WAV. The next implementation step is a verified non-GPL path for text normalization, phonemization, and Piper phoneme ID preparation before ONNX session execution.
+Piper has verified model/config artifacts, but real TTS is still blocked at the text frontend. The final command must return typed `piper_text_frontend_not_implemented`, not a fake WAV.
 
 ## Kokoro TTS
 
@@ -78,11 +90,6 @@ target/release/takokit.exe runner pull takokit-python-managed
 target/release/takokit.exe runner install takokit-python-managed
 target/release/takokit.exe runner doctor takokit-python-managed
 target/release/takokit.exe plan qwen3-tts
-```
-
-For the verified Qwen3-TTS path, continue with:
-
-```bash
 target/release/takokit.exe adapter install qwen3-tts
 target/release/takokit.exe pull qwen3-tts
 target/release/takokit.exe speak "Hello from Takokit" --model qwen3-tts --voice Ryan
@@ -97,16 +104,10 @@ target/release/takokit.exe serve
 curl http://127.0.0.1:5050/v1/models
 curl http://127.0.0.1:5050/v1/models/whisper-base/plan
 curl http://127.0.0.1:5050/v1/doctor
-curl http://127.0.0.1:5050/v1/test/launch
+curl http://127.0.0.1:5050/v1/adapters
 ```
 
-Transcription uses a local file path:
-
-```bash
-curl -X POST http://127.0.0.1:5050/v1/audio/transcriptions \
-  -H "Content-Type: application/json" \
-  -d "{\"model\":\"whisper-base\",\"file_path\":\"C:\\\\path\\\\to\\\\sample.wav\"}"
-```
+Adapter install uses `POST /v1/adapters/install` with `{ "adapter": "qwen3_tts" }`.
 
 ## GUI
 
@@ -114,14 +115,7 @@ curl -X POST http://127.0.0.1:5050/v1/audio/transcriptions \
 target/release/takokit.exe gui
 ```
 
-The GUI opens `/gui` and should show:
-
-- Models with lifecycle state, executable yes/no, blockers, and next command.
-- Runners with contract/runtime state and doctor actions.
-- Library entries clearly separated from runtime models.
-- Transcribe page that calls `/v1/audio/transcriptions`.
-- Speak page that only enables executable TTS models.
-- Diagnostics page backed by `/v1/doctor`.
+The GUI opens `/gui` and shows model lifecycle state, executable blockers, runner diagnostics, and Python adapter state. When Python-managed is ready, the runner detail exposes the real Qwen adapter install action.
 
 ## Launch Matrix
 
@@ -130,4 +124,4 @@ target/release/takokit.exe test --suite launch
 target/release/takokit.exe test --suite launch --json
 ```
 
-The launch suite is non-destructive. It reports manifest/planning status and only runs real smoke execution where a model is executable and the required local input is provided.
+The launch suite is non-destructive. It reports manifest/planning status and only runs real smoke execution where a model is executable. Still blocked: Piper Lessac, OpenVoice, RVC, NeMo/Parakeet/Canary, and transformers-audio/Qwen-Omni/Voxtral.

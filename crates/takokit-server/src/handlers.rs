@@ -12,9 +12,10 @@ use takokit_core::{
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
-    initialize_runner_runtime, model_info_from_plan, plan_model, python_adapter_records,
-    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, LibraryModelManifest,
-    LibraryRunnerManifest, ModelPlan, RunnerInfo, RunnerLifecycleState,
+    initialize_runner_runtime, install_python_adapter, model_info_from_plan, plan_model,
+    python_adapter_record, python_adapter_records, resolve_execution_plan, runner_runtime_layout,
+    InstallModelOptions, LibraryModelManifest, LibraryRunnerManifest, ModelPlan, RunnerInfo,
+    RunnerLifecycleState,
 };
 
 use crate::AppState;
@@ -319,6 +320,57 @@ pub async fn runner_doctor(
             "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None::<&str> },
             "executable_models": executable_models,
         }),
+    }))
+}
+
+#[derive(serde::Deserialize)]
+pub struct AdapterInstallRequest {
+    pub adapter: String,
+}
+
+pub async fn adapters(
+    State(state): State<AppState>,
+) -> Result<Json<RunnersResponse<takokit_package::AdapterRecord>>, ApiError> {
+    Ok(Json(RunnersResponse {
+        data: python_adapter_records(state.store.root())
+            .map_err(Into::into)
+            .map_err(ApiError)?,
+    }))
+}
+
+pub async fn adapter(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<RunnerDetailResponse<takokit_package::AdapterRecord>>, ApiError> {
+    Ok(Json(RunnerDetailResponse {
+        data: python_adapter_record(state.store.root(), &id.replace('-', "_"))
+            .map_err(Into::into)
+            .map_err(ApiError)?,
+    }))
+}
+
+pub async fn install_adapter(
+    State(state): State<AppState>,
+    Json(request): Json<AdapterInstallRequest>,
+) -> Result<Json<RunnerDetailResponse<takokit_package::AdapterRecord>>, ApiError> {
+    let id = request.adapter.replace('-', "_");
+    let record = install_python_adapter(state.store.root(), &id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    Ok(Json(RunnerDetailResponse { data: record }))
+}
+
+pub async fn adapter_doctor(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<RunnerDetailResponse<serde_json::Value>>, ApiError> {
+    let id = id.replace('-', "_");
+    let record = python_adapter_record(state.store.root(), &id)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    let path = state.store.python_managed_adapters_dir().join(&id);
+    Ok(Json(RunnerDetailResponse {
+        data: serde_json::json!({ "id": record.id, "state": record.state, "note": record.notes, "logs_path": path.join("install.log"), "adapter_path": path }),
     }))
 }
 
