@@ -10,9 +10,11 @@ target\release\takokit.exe samples create
 target\release\takokit.exe test --suite fast --run
 ```
 
-`quickstart` prepares only Kokoro and Whisper Tiny by default. `takokit deps doctor` reports whether `uv` is available; `takokit deps bootstrap` attempts the Windows-first bootstrap and writes its output to `~/.takokit/logs/uv-bootstrap.log`. The fast suite never downloads model artifacts.
+`quickstart` prepares only Kokoro and Whisper Tiny by default. `takokit deps bootstrap` copies the pinned `uv 0.11.24` binary into `~/.takokit/tools/uv/`, verifies `uv --version`, and records its source, SHA-256, version, path, and output at `~/.takokit/logs/uv-bootstrap.log`. Runner installation uses that managed path, never PATH. `UV` remains a development bootstrap override only. The fast suite never downloads model artifacts.
 
-`samples create` writes `hello.wav` and `silence.wav` under `~/.takokit/samples/`. `hello.wav` uses Kokoro when it is executable; otherwise it is explicitly synthetic silence.
+`samples create` writes `hello.wav` and `silence.wav` under `~/.takokit/samples/`. `hello.wav` is real Kokoro speech and the command fails if Kokoro cannot create it. `silence.wav` remains a separate deliberate fixture.
+
+`test --suite fast --run --json` emits one JSON row per tested model, including result status, output path, transcript, duration, error, and log path. A `failed` executable model gives a non-zero process exit; lifecycle-blocked models are reported as `skipped`.
 
 ## Isolated Storage
 

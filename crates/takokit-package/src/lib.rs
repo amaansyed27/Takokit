@@ -21,6 +21,10 @@ const KOKORO_ONNX_PACKAGE: &str = "kokoro-onnx==0.5.0";
 const KOKORO_ONNX_ADAPTER: &str = include_str!("../../../runners/onnx/kokoro_adapter.py");
 const QWEN3_TTS_PACKAGE: &str = "qwen-tts==0.1.1";
 const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_adapter.py");
+/// This is deliberately kept in source control.  Bootstrap copies a verified
+/// development override/PATH binary into Takokit's private tools directory and
+/// refuses to use it when it does not report this version.
+const TAKOKIT_UV_VERSION: &str = "0.11.24";
 const PYTHON_MANAGED_ADAPTERS: &[(&str, &str)] = &[
     ("qwen3_tts", "qwen3-tts"),
     ("chatterbox", "chatterbox"),
@@ -1502,8 +1506,9 @@ pub fn initialize_runner_runtime(
     }
 }
 
-/// Returns the uv executable Takokit will use. A copy placed under
-/// `~/.takokit/tools/uv` takes precedence over a normal PATH installation.
+/// Returns the uv executable Takokit will use.  Runner installation must never
+/// fall back to PATH: that makes a successful bootstrap depend on a shell that
+/// happened to be open when it ran.
 pub fn find_uv(takokit_root: &Path) -> Option<PathBuf> {
     let executable = if cfg!(windows) { "uv.exe" } else { "uv" };
     let managed = takokit_root.join("tools").join("uv").join(executable);
@@ -1516,50 +1521,91 @@ pub fn find_uv(takokit_root: &Path) -> Option<PathBuf> {
             return Some(path);
         }
     }
-    if Command::new(executable).arg("--version").output().is_ok() {
-        return Some(PathBuf::from(executable));
-    }
     None
+}
+
+fn find_uv_bootstrap_source() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("UV") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let executable = if cfg!(windows) { "uv.exe" } else { "uv" };
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|entry| entry.join(executable))
+        .find(|candidate| candidate.is_file())
 }
 
 /// Attempts a Windows-first uv bootstrap and writes all output to the Takokit
 /// log directory. It deliberately returns an error instead of allowing a
 /// runner to be marked ready when bootstrap cannot complete.
 pub fn bootstrap_uv(takokit_root: &Path) -> PackageResult<PathBuf> {
-    if let Some(uv) = find_uv(takokit_root) {
-        return Ok(uv);
-    }
     let logs = takokit_root.join("logs");
     std::fs::create_dir_all(&logs)?;
     let log = logs.join("uv-bootstrap.log");
-    let (program, args): (&str, Vec<PathOrArg>) = if cfg!(windows) {
-        (
-            "powershell",
-            vec![
-                "-NoProfile".into(),
-                "-ExecutionPolicy".into(),
-                "Bypass".into(),
-                "-Command".into(),
-                "irm https://astral.sh/uv/install.ps1 | iex".into(),
-            ],
-        )
-    } else {
-        (
-            "sh",
-            vec![
-                "-c".into(),
-                "curl -LsSf https://astral.sh/uv/install.sh | sh".into(),
-            ],
-        )
-    };
-    run_logged_command(&log, program, &args)?;
-    find_uv(takokit_root).ok_or_else(|| PackageError::ArtifactInstallFailed {
+    let executable = if cfg!(windows) { "uv.exe" } else { "uv" };
+    let managed = takokit_root.join("tools").join("uv").join(executable);
+    if managed.is_file() && verify_uv_version(&managed, &log)? {
+        return Ok(managed);
+    }
+    let source = find_uv_bootstrap_source().ok_or_else(|| PackageError::ArtifactInstallFailed {
         artifact: "uv bootstrap".to_string(),
         reason: format!(
-            "bootstrap completed but uv was not found. See {}. Manual fallback: https://docs.astral.sh/uv/getting-started/installation/",
+            "no uv bootstrap source was found. Set UV to a pinned uv {} binary, then rerun. See {}",
+            TAKOKIT_UV_VERSION,
             log.display()
         ),
-    })
+    })?;
+    std::fs::create_dir_all(managed.parent().expect("managed uv parent"))?;
+    std::fs::copy(&source, &managed)?;
+    let source_hash =
+        sha256_file(&source).map_err(|error| PackageError::ArtifactInstallFailed {
+            artifact: "uv bootstrap".to_string(),
+            reason: error.to_string(),
+        })?;
+    std::fs::write(&log, format!(
+        "Takokit managed uv bootstrap\nsource: {}\nmanaged_path: {}\nrequested_version: {}\nsha256: {}\n",
+        source.display(), managed.display(), TAKOKIT_UV_VERSION, source_hash
+    ))?;
+    if verify_uv_version(&managed, &log)? {
+        Ok(managed)
+    } else {
+        let _ = std::fs::remove_file(&managed);
+        Err(PackageError::ArtifactInstallFailed {
+            artifact: "uv bootstrap".to_string(),
+            reason: format!(
+                "managed uv does not report pinned version {}; see {}",
+                TAKOKIT_UV_VERSION,
+                log.display()
+            ),
+        })
+    }
+}
+
+fn verify_uv_version(path: &Path, log: &Path) -> PackageResult<bool> {
+    let output = Command::new(path)
+        .arg("--version")
+        .output()
+        .map_err(|error| PackageError::ArtifactInstallFailed {
+            artifact: "uv bootstrap".to_string(),
+            reason: format!("could not run {}: {error}", path.display()),
+        })?;
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)?
+        .write_all(
+            format!(
+                "verified_command: {} --version\nreported_version: {}\n",
+                path.display(),
+                version
+            )
+            .as_bytes(),
+        )?;
+    Ok(output.status.success() && version.starts_with(&format!("uv {TAKOKIT_UV_VERSION}")))
 }
 
 fn write_python_adapter_manifests(layout: &PythonManagedRunnerLayout) -> PackageResult<()> {

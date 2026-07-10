@@ -4,7 +4,7 @@ mod tui;
 
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, ModelInfo, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{
@@ -121,6 +121,10 @@ struct TestArgs {
     file: Option<PathBuf>,
     #[arg(long)]
     run: bool,
+    #[arg(long)]
+    category: Option<String>,
+    #[arg(long)]
+    include_heavy: bool,
 }
 
 #[derive(Debug, Args)]
@@ -574,7 +578,9 @@ async fn run_quickstart(
         let manifest = registry.model("qwen3-tts").map_err(cli_error)?;
         installed.install_model(&manifest).map_err(cli_error)?;
     }
-    run_fast_smokes(store, registry, installed, false).await?;
+    // This is intentionally an execution test, not a lifecycle check.  It
+    // creates speech with Kokoro and transcribes that exact WAV with Whisper.
+    run_fast_smokes(store, registry, installed, true, false).await?;
     for (label, model) in [
         ("Kokoro TTS", "kokoro"),
         ("Whisper Tiny STT", "whisper-tiny"),
@@ -635,19 +641,14 @@ async fn create_samples(
                     std::fs::copy(response.output_path, &hello)?;
                     println!("hello.wav: Kokoro speech ({})", hello.display());
                 }
-                Err(error) => {
-                    write_silence_wav(&hello, 700, WavSpec::default())?;
-                    println!("hello.wav: synthetic silence because Kokoro failed: {error}");
-                }
+                Err(error) => return Err(runtime_error(error)),
             },
-            Err(error) => {
-                write_silence_wav(&hello, 700, WavSpec::default())?;
-                println!("hello.wav: synthetic silence because Kokoro is unavailable: {error}");
-            }
+            Err(error) => return Err(error),
         }
     } else {
-        write_silence_wav(&hello, 700, WavSpec::default())?;
-        println!("hello.wav: synthetic silence (Kokoro not ready)");
+        return Err(anyhow::anyhow!(
+            "Kokoro is not executable; refusing to create hello.wav from silence"
+        ));
     }
     write_silence_wav(&silence, 500, WavSpec::default())?;
     println!("silence.wav: {}", silence.display());
@@ -665,7 +666,14 @@ async fn run_test_command(
         return Ok(());
     }
     if args.suite.as_deref() == Some("fast") {
-        run_fast_smokes(store, package_registry, installed_registry, args.run).await?;
+        run_fast_smokes(
+            store,
+            package_registry,
+            installed_registry,
+            args.run,
+            args.json,
+        )
+        .await?;
         return Ok(());
     }
 
@@ -723,40 +731,30 @@ async fn run_fast_smokes(
     registry: &PackageRegistry,
     installed: &InstalledRegistry,
     run: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
-    println!("Fast smoke test");
-    let mock = MockTextToSpeechEngine
-        .synthesize(
-            SpeechRequest {
-                model: "mock-tts".to_string(),
-                input: "Takokit fast smoke test.".to_string(),
-                voice: None,
-                response_format: Some("wav".to_string()),
-            },
-            &store.outputs_dir(),
-        )
-        .await?;
-    println!(
-        "mock-tts      passed  output={}",
-        mock.output_path.display()
-    );
+    let mut rows = Vec::new();
+    let phrase = "Hello from Takokit.";
+    let mut spoken_sample: Option<PathBuf> = None;
     for id in ["kokoro", "whisper-tiny", "whisper-base", "qwen3-tts"] {
         let plan = plan_model(registry, installed, id).map_err(cli_error)?;
         if !plan.executable {
-            println!(
-                "{id:<13} skipped {}",
+            rows.push(FastSuiteRow::skipped(
+                id,
                 if plan.missing.is_empty() {
                     "not installed".to_string()
                 } else {
                     plan.missing.join("; ")
-                }
-            );
+                },
+                store,
+            ));
             continue;
         }
         if !run {
-            println!("{id:<13} ready    run with: takokit test --suite fast --run");
+            rows.push(FastSuiteRow::ready(id, store));
             continue;
         }
+        let started = Instant::now();
         match id {
             "kokoro" | "qwen3-tts" => {
                 let plan =
@@ -766,7 +764,7 @@ async fn run_fast_smokes(
                     &plan,
                     SpeechRequest {
                         model: id.to_string(),
-                        input: "Takokit fast smoke test.".to_string(),
+                        input: phrase.to_string(),
                         voice: None,
                         response_format: Some("wav".to_string()),
                     },
@@ -775,19 +773,33 @@ async fn run_fast_smokes(
                 .await
                 {
                     Ok(response) => {
-                        println!("{id:<13} passed  output={}", response.output_path.display())
+                        if id == "kokoro" {
+                            let sample_dir = store.root().join("samples");
+                            std::fs::create_dir_all(&sample_dir)?;
+                            let sample = sample_dir.join("hello.wav");
+                            std::fs::copy(&response.output_path, &sample)?;
+                            spoken_sample = Some(sample);
+                        }
+                        rows.push(FastSuiteRow::passed(
+                            id,
+                            Some(response.output_path),
+                            None,
+                            started.elapsed().as_millis(),
+                            store,
+                        ));
                     }
-                    Err(error) => println!("{id:<13} failed  {error}"),
+                    Err(error) => rows.push(FastSuiteRow::failed(
+                        id,
+                        error.to_string(),
+                        started.elapsed().as_millis(),
+                        store,
+                    )),
                 }
             }
             _ => {
-                let sample = store.root().join("samples").join("silence.wav");
-                let sample = if sample.is_file() {
-                    sample
-                } else {
-                    let path = store.outputs_dir().join("fast-smoke-silence.wav");
-                    write_silence_wav(&path, 500, WavSpec::default())?;
-                    path
+                let Some(sample) = spoken_sample.clone() else {
+                    rows.push(FastSuiteRow::failed(id, "Kokoro did not produce the required spoken hello.wav; refusing to transcribe silence".to_string(), started.elapsed().as_millis(), store));
+                    continue;
                 };
                 let plan =
                     resolve_execution_plan(registry, installed, id, CapabilityKind::SpeechToText)
@@ -795,20 +807,129 @@ async fn run_fast_smokes(
                 match execute_transcription(
                     &plan,
                     takokit_core::TranscriptionRequest {
-                        file_path: sample,
+                        file_path: sample.clone(),
                         model: Some(id.to_string()),
                     },
                 )
                 .await
                 {
-                    Ok(response) => println!("{id:<13} passed  transcript={:?}", response.text),
-                    Err(error) => println!("{id:<13} failed  {error}"),
+                    Ok(response) if response.text.trim().is_empty() => {
+                        rows.push(FastSuiteRow::failed(
+                            id,
+                            "transcript was empty".to_string(),
+                            started.elapsed().as_millis(),
+                            store,
+                        ))
+                    }
+                    Ok(response) => rows.push(FastSuiteRow::passed(
+                        id,
+                        Some(sample),
+                        Some(response.text),
+                        started.elapsed().as_millis(),
+                        store,
+                    )),
+                    Err(error) => rows.push(FastSuiteRow::failed(
+                        id,
+                        error.to_string(),
+                        started.elapsed().as_millis(),
+                        store,
+                    )),
                 }
             }
         }
     }
-    println!("\nUsable commands:\ntakokit speak \"Hello\" --model kokoro\ntakokit transcribe <path> --model whisper-tiny\ntakokit gui");
+    if json {
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+    } else {
+        println!("Fast smoke test");
+        for row in &rows {
+            println!("{:<13} {:<7} {}", row.model, row.status, row.detail());
+        }
+    }
+    if run && rows.iter().any(|row| row.status == "failed") {
+        return Err(anyhow::anyhow!(
+            "fast suite has executable model failures; inspect the JSON rows and logs"
+        ));
+    }
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct FastSuiteRow {
+    model: String,
+    status: String,
+    output_path: Option<PathBuf>,
+    transcript: Option<String>,
+    duration_ms: Option<u128>,
+    log_path: PathBuf,
+    error: Option<String>,
+}
+impl FastSuiteRow {
+    fn skipped(model: &str, reason: String, store: &LocalStore) -> Self {
+        Self {
+            model: model.to_string(),
+            status: "skipped".to_string(),
+            output_path: None,
+            transcript: None,
+            duration_ms: None,
+            log_path: store.logs_dir(),
+            error: Some(reason),
+        }
+    }
+    fn ready(model: &str, store: &LocalStore) -> Self {
+        Self {
+            model: model.to_string(),
+            status: "ready".to_string(),
+            output_path: None,
+            transcript: None,
+            duration_ms: None,
+            log_path: store.logs_dir(),
+            error: None,
+        }
+    }
+    fn passed(
+        model: &str,
+        output_path: Option<PathBuf>,
+        transcript: Option<String>,
+        duration_ms: u128,
+        store: &LocalStore,
+    ) -> Self {
+        Self {
+            model: model.to_string(),
+            status: "passed".to_string(),
+            output_path,
+            transcript,
+            duration_ms: Some(duration_ms),
+            log_path: store.logs_dir(),
+            error: None,
+        }
+    }
+    fn failed(model: &str, error: String, duration_ms: u128, store: &LocalStore) -> Self {
+        Self {
+            model: model.to_string(),
+            status: "failed".to_string(),
+            output_path: None,
+            transcript: None,
+            duration_ms: Some(duration_ms),
+            log_path: store.logs_dir(),
+            error: Some(error),
+        }
+    }
+    fn detail(&self) -> String {
+        self.error
+            .clone()
+            .or_else(|| {
+                self.output_path
+                    .as_ref()
+                    .map(|path| format!("output={}", path.display()))
+            })
+            .or_else(|| {
+                self.transcript
+                    .as_ref()
+                    .map(|text| format!("transcript={text:?}"))
+            })
+            .unwrap_or_default()
+    }
 }
 
 async fn print_launch_suite(
@@ -1399,7 +1520,8 @@ mod tests {
                 suite: None,
                 json: true,
                 file: Some(file),
-                run: false
+                run: false,
+                ..
             })) if model == "whisper-base" && file == PathBuf::from("sample.wav")
         ));
     }
@@ -1553,11 +1675,11 @@ mod tests {
 
         assert!(matches!(
             model.command,
-            Some(Command::Test(TestArgs { model: Some(model), suite: None, json: false, file: None, run: false })) if model == "whisper-base"
+            Some(Command::Test(TestArgs { model: Some(model), suite: None, json: false, file: None, run: false, .. })) if model == "whisper-base"
         ));
         assert!(matches!(
             suite.command,
-            Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None, run: false })) if suite == "launch"
+            Some(Command::Test(TestArgs { model: None, suite: Some(suite), json: false, file: None, run: false, .. })) if suite == "launch"
         ));
     }
 

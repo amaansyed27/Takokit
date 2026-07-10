@@ -12,7 +12,15 @@ target\release\takokit.exe test --suite fast --run
 target\release\takokit.exe gui
 ```
 
-`quickstart` creates the storage layout, bootstraps `uv` when needed, installs the ONNX and whisper.cpp runners, downloads Kokoro and Whisper Tiny, and runs the fast smoke suite. Bootstrap output is logged at `%USERPROFILE%\.takokit\logs\uv-bootstrap.log`.
+`quickstart` creates the storage layout, bootstraps the pinned `uv 0.11.24` binary into `%USERPROFILE%\.takokit\tools\uv\`, installs the ONNX and whisper.cpp runners, downloads Kokoro and Whisper Tiny, and runs a real fast smoke suite. It synthesizes `samples\hello.wav` with Kokoro, then transcribes that exact WAV with Whisper Tiny. It fails rather than substituting silence or accepting an empty transcript. Bootstrap source, SHA-256, managed path, version check, and command output are recorded at `%USERPROFILE%\.takokit\logs\uv-bootstrap.log`.
+
+Use structured output when automating the smoke:
+
+```powershell
+target\release\takokit.exe test --suite fast --run --json
+```
+
+Rows are `passed`, `skipped`, `ready`, or `failed`; executable failures make the command return non-zero.
 
 For the optional Qwen path:
 
