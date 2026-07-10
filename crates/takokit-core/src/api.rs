@@ -91,6 +91,27 @@ pub struct PullRunnerRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstallStep {
+    pub state: String,
+    pub newly_installed: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelInstallReport {
+    pub model_id: String,
+    pub required_runner: String,
+    pub required_adapter: Option<String>,
+    pub artifacts: InstallStep,
+    pub runner_contract: InstallStep,
+    pub runner_runtime: InstallStep,
+    pub adapter: Option<InstallStep>,
+    pub executable: bool,
+    pub missing: Vec<String>,
+    pub logs_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PullModelResponse {
     pub id: String,
     pub installed: bool,

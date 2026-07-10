@@ -113,6 +113,18 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit daemon start|status|stop` manages the owned daemon. `takokit list` is shorthand for the model list; `takokit list models|runners|voices` remains available. `takokit ps` lists active speech/transcription executions (runners are one-shot, so idle is empty). `takokit run <model> "text" [--voice <voice>]` dispatches TTS, while `takokit run <model> --file <audio>` dispatches STT through the same API as `speak` and `transcribe`.
 
+`takokit pull <model>` installs the model artifacts and its required managed runner components. For example:
+
+```bash
+takokit pull kokoro
+takokit run kokoro "Hello from Takokit"
+
+takokit pull whisper-tiny
+takokit run whisper-tiny --file sample.wav
+```
+
+Use `--metadata-only` to record a model declaration without initializing runtimes or downloading weights.
+
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 
 `takokit speak "Hello" --model kokoro` and `takokit speak "Hello" --model qwen3-tts --voice Ryan` write real local WAVs after their explicit install/pull lifecycle. Package models always resolve an execution plan first. Piper resolves verified artifacts/config and fails at typed `piper_text_frontend_not_implemented` instead of pretending to run.

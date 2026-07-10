@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn speech_route_returns_runner_not_installed_after_model_pull() {
+    async fn pull_orchestrates_kokoro_runner_before_speech() {
         let root = std::env::temp_dir().join("takokit-server-speech-runner-resolution-test");
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
         let app = server_router(state);
@@ -327,15 +327,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_ne!(response.status(), StatusCode::NOT_IMPLEMENTED);
         let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(json["error"]["code"], "runner_not_installed");
-        assert!(json["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("kokoro supports TTS"));
+        assert_ne!(json["error"]["code"], "runner_not_installed");
     }
 
     #[tokio::test]
@@ -670,9 +666,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["id"], "piper-lessac");
-        assert_eq!(json["installed"], true);
-        assert!(json["note"].as_str().unwrap().contains("metadata-only"));
+        assert_eq!(json["model_id"], "piper-lessac");
+        assert_eq!(json["artifacts"]["state"], "metadata-only");
+        assert_eq!(json["runner_runtime"]["state"], "not-requested");
+        assert_eq!(json["executable"], false);
     }
 
     #[tokio::test]

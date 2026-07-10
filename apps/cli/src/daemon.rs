@@ -65,7 +65,7 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
             IDENTITY_WAIT.as_secs(), log_path(store).display()
         ));
     }
-    if port_responds(config) {
+    if port_is_occupied(config) {
         return Err(anyhow!("port {} is occupied by a direct Takokit server or another process; managed daemon will not take ownership", config.port));
     }
     cleanup_proven_stale(store, config)?;
@@ -166,7 +166,7 @@ pub fn stop(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> 
         ));
     }
     for _ in 0..50 {
-        if !port_responds(config) {
+        if !port_is_occupied(config) {
             cleanup_proven_stale(store, config)?;
             return Ok(true);
         }
@@ -221,7 +221,7 @@ fn wait_for_verified(
     }
 }
 fn cleanup_proven_stale(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
-    if port_responds(config) {
+    if port_is_occupied(config) {
         return Ok(());
     }
     let lock = OpenOptions::new()
@@ -300,11 +300,20 @@ pub fn write_atomic(path: &std::path::Path, value: &DaemonInfo) -> anyhow::Resul
     fs::rename(temp, path)?;
     Ok(())
 }
-fn port_responds(config: &RuntimeConfig) -> bool {
+fn port_is_occupied(config: &RuntimeConfig) -> bool {
+    let Ok(address) = config.bind_addr().parse::<std::net::SocketAddr>() else {
+        return false;
+    };
+    std::net::TcpStream::connect_timeout(&address, Duration::from_millis(250)).is_ok()
+}
+
+#[allow(dead_code)]
+fn takokit_health_responds(config: &RuntimeConfig) -> bool {
     ureq::get(&format!("{}/health", config.local_base_url()))
         .timeout(Duration::from_millis(200))
         .call()
-        .is_ok()
+        .map(|response| response.status() == 200)
+        .unwrap_or(false)
 }
 fn log_path(store: &LocalStore) -> PathBuf {
     store.logs_dir().join("daemon.log")
@@ -474,6 +483,48 @@ mod tests {
         .to_string();
         assert!(error.contains("occupied by a direct Takokit server or another process"));
         assert!(!store.daemon_info_path().exists());
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn http_404_port_is_occupied_even_when_takokit_health_fails() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 1024];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n")
+                .unwrap();
+        });
+        let temp = tempfile::tempdir().unwrap();
+        let config = RuntimeConfig {
+            host: "127.0.0.1".into(),
+            port,
+            storage_root: temp.path().to_path_buf(),
+        };
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        assert!(port_is_occupied(&config));
+        assert!(!takokit_health_responds(&config));
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn tcp_listener_that_closes_is_still_treated_as_occupied() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let thread = std::thread::spawn(move || {
+            let _ = listener.accept().unwrap();
+        });
+        let config = RuntimeConfig {
+            host: "127.0.0.1".into(),
+            port,
+            storage_root: std::env::temp_dir(),
+        };
+        assert!(port_is_occupied(&config));
         thread.join().unwrap();
     }
 

@@ -51,6 +51,14 @@ type PullResponse = {
   note: string;
 };
 
+type ModelInstallResponse = {
+  model_id: string;
+  required_runner: string;
+  required_adapter?: string;
+  executable: boolean;
+  missing: string[];
+};
+
 type ApiVoice = {
   id: string;
   name: string;
@@ -109,8 +117,8 @@ export async function getModelPlan(id: string): Promise<ModelPlan> {
   return response.data;
 }
 
-export async function pullModel(id: string): Promise<PullResponse> {
-  return requestJson<PullResponse>("/v1/models/pull", {
+export async function pullModel(id: string): Promise<ModelInstallResponse> {
+  return requestJson<ModelInstallResponse>("/v1/models/pull", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

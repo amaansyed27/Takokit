@@ -53,6 +53,8 @@ target/release/tako.exe doctor
 
 ## Whisper STT
 
+The normal local workflow is `takokit pull whisper-tiny` followed by `takokit run whisper-tiny --file sample.wav`. A normal pull orchestrates required managed runner components and verified artifacts; `takokit pull --metadata-only` deliberately does neither.
+
 Whisper Tiny, Base, and Small are catalogued as whisper.cpp-backed models. Tiny/Base have the current runner path; Small stays metadata/artifact status until a verified execution run exists. Normal `run`, `speak`, `transcribe`, package, runner, and adapter commands use the managed daemon. Prefix a development command with `--direct` to retain in-process behavior. `takokit daemon start`, `takokit list`, and `takokit ps` exercise lifecycle without downloading artifacts.
 
 ```bash

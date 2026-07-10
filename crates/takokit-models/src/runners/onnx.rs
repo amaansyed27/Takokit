@@ -562,6 +562,7 @@ mod tests {
                 kind: ModelKind::Tts,
                 backend: ModelBackend::Onnx,
                 runner: "takokit-onnx".to_string(),
+                required_adapter: None,
                 license: "mit".to_string(),
                 description: "Piper Lessac voice.".to_string(),
                 capabilities: CapabilityManifest {

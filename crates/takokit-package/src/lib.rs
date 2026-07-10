@@ -8,7 +8,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{
-    CapabilityKind, ErrorCode, ModelCapability, ModelInfo, ModelRuntime, TakokitError,
+    CapabilityKind, ErrorCode, InstallStep, ModelCapability, ModelInfo, ModelInstallReport,
+    ModelRuntime, TakokitError,
 };
 use thiserror::Error;
 use zip::ZipArchive;
@@ -175,6 +176,8 @@ pub struct ModelManifest {
     pub kind: ModelKind,
     pub backend: ModelBackend,
     pub runner: String,
+    #[serde(default)]
+    pub required_adapter: Option<String>,
     pub license: String,
     pub description: String,
     pub capabilities: CapabilityManifest,
@@ -1336,7 +1339,7 @@ pub fn plan_model(
         .as_ref()
         .map(|record| record.status)
         .unwrap_or(RunnerLifecycleState::RuntimeMissing);
-    let adapter = adapter_for_model(&model.id).and_then(|id| {
+    let adapter = model.required_adapter.as_deref().and_then(|id| {
         python_adapter_record(&installed_registry.storage_root(), id)
             .ok()
             .map(|record| (id, record.state))
@@ -1364,7 +1367,7 @@ pub fn plan_model(
         missing.push(runner_missing_component(&model, &runner));
     }
     if let Some((adapter, state)) = adapter.as_ref() {
-        if *state != AdapterLifecycleState::Ready && model.id == "qwen3-tts" {
+        if *state != AdapterLifecycleState::Ready {
             missing.push(format!("managed adapter {adapter} ({state})"));
         }
     }
@@ -1504,6 +1507,137 @@ pub fn initialize_runner_runtime(
             "No runtime installer is defined for this runner kind.",
         ),
     }
+}
+
+/// Installs every managed component required by a model. CLI and API callers
+/// share this path so a normal `pull` has one lifecycle contract.
+pub fn install_model_complete(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    takokit_root: &Path,
+    model_id: &str,
+    options: InstallModelOptions,
+) -> PackageResult<ModelInstallReport> {
+    let model = package_registry.model(model_id)?;
+    let runner = package_registry.runner(&model.runner)?;
+    let logs_path = takokit_root.join("logs");
+    if options.metadata_only {
+        let report = installed_registry.install_model_with_options(&model, options)?;
+        let plan = plan_model(package_registry, installed_registry, model_id)?;
+        return Ok(ModelInstallReport {
+            model_id: model.id,
+            required_runner: runner.id,
+            required_adapter: model.required_adapter,
+            artifacts: InstallStep {
+                state: "metadata-only".into(),
+                newly_installed: true,
+                detail: report.note,
+            },
+            runner_contract: InstallStep {
+                state: "not-requested".into(),
+                newly_installed: false,
+                detail: "metadata-only pull does not install runner contracts".into(),
+            },
+            runner_runtime: InstallStep {
+                state: "not-requested".into(),
+                newly_installed: false,
+                detail: "metadata-only pull does not initialize runtimes".into(),
+            },
+            adapter: None,
+            executable: plan.executable,
+            missing: plan.missing,
+            logs_path,
+        });
+    }
+    let was_contract = installed_registry.is_runner_installed(&runner.id);
+    if !was_contract {
+        installed_registry.install_runner(&runner)?;
+    }
+    let runner_contract = InstallStep {
+        state: if was_contract {
+            "already-ready"
+        } else {
+            "installed"
+        }
+        .into(),
+        newly_installed: !was_contract,
+        detail: runner.id.clone(),
+    };
+
+    let runtime_ready = installed_registry
+        .installed_runner_record(&runner.id)
+        .ok()
+        .is_some_and(|record| record.status == RunnerLifecycleState::Ready);
+    if !runtime_ready {
+        initialize_runner_runtime(takokit_root, installed_registry, &runner)?;
+    }
+    let runtime_state = installed_registry
+        .installed_runner_record(&runner.id)
+        .map(|record| record.status)
+        .unwrap_or(RunnerLifecycleState::RuntimeMissing);
+    let runner_runtime = InstallStep {
+        state: runtime_state.to_string(),
+        newly_installed: !runtime_ready,
+        detail: runner_runtime_layout(takokit_root, &runner)
+            .logs
+            .display()
+            .to_string(),
+    };
+
+    let adapter = if let Some(adapter_id) = model.required_adapter.as_deref() {
+        let ready = python_adapter_record(takokit_root, adapter_id)
+            .ok()
+            .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
+        if !ready {
+            install_python_adapter(takokit_root, adapter_id)?;
+        }
+        let state = python_adapter_record(takokit_root, adapter_id)?.state;
+        Some(InstallStep {
+            state: state.to_string(),
+            newly_installed: !ready,
+            detail: python_managed_runner_layout(takokit_root)
+                .adapters
+                .join(adapter_id)
+                .join("install.log")
+                .display()
+                .to_string(),
+        })
+    } else {
+        None
+    };
+
+    let artifacts_ready = installed_registry
+        .installed_model_record(&model.id)
+        .ok()
+        .is_some_and(|record| record.status == InstalledPackageStatus::Ready);
+    let artifact_report = installed_registry.install_model_with_options(&model, options)?;
+    let artifacts = InstallStep {
+        state: "ready".into(),
+        newly_installed: !artifacts_ready,
+        detail: artifact_report.note,
+    };
+    let plan = plan_model(package_registry, installed_registry, model_id)?;
+    if !plan.executable {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: model.id,
+            reason: format!(
+                "final execution-plan verification failed: {}",
+                plan.missing.join("; ")
+            ),
+        });
+    }
+    Ok(ModelInstallReport {
+        model_id: model.id,
+        required_runner: runner.id,
+        required_adapter: model.required_adapter,
+        artifacts,
+        runner_contract,
+        runner_runtime,
+        adapter,
+        executable: true,
+        missing: Vec::new(),
+        logs_path,
+    })
 }
 
 /// Returns the uv executable Takokit will use.  Runner installation must never

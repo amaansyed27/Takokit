@@ -14,10 +14,10 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    bootstrap_uv, find_uv, initialize_runner_runtime, install_python_adapter, model_info_from_plan,
-    plan_model, python_adapter_record, python_adapter_records, resolve_execution_plan,
-    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
-    PackageRegistry, RunnerManifest,
+    bootstrap_uv, find_uv, initialize_runner_runtime, install_model_complete,
+    install_python_adapter, model_info_from_plan, plan_model, python_adapter_record,
+    python_adapter_records, resolve_execution_plan, runner_runtime_layout, InstallModelOptions,
+    InstalledRegistry, ModelPlan, PackageError, PackageRegistry, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -388,15 +388,16 @@ pub async fn run() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&response)?);
         }
         Some(Command::Pull(args)) => {
-            let manifest = package_registry.model(&args.model).map_err(cli_error)?;
-            let report = installed_registry
-                .install_model_with_options(
-                    &manifest,
-                    InstallModelOptions {
-                        metadata_only: args.metadata_only,
-                    },
-                )
-                .map_err(cli_error)?;
+            let report = install_model_complete(
+                &package_registry,
+                &installed_registry,
+                store.root(),
+                &args.model,
+                InstallModelOptions {
+                    metadata_only: args.metadata_only,
+                },
+            )
+            .map_err(cli_error)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Some(Command::Show { model }) => {

@@ -5,6 +5,7 @@ version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
+required_adapter = "qwen3_tts"
 license = "apache-2.0"
 description = "Qwen3-TTS 12Hz 0.6B CustomVoice. Takokit pulls the official pinned revision into a local model directory and runs it through the qwen-tts managed adapter."
 

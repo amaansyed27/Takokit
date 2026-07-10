@@ -7,16 +7,16 @@ use axum::{
 use takokit_core::{
     CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, DaemonIdentity,
     DaemonMode, DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse,
-    ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
-    RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
-    TranscriptionRequest, VoicesResponse,
+    ModelInstallReport, ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse,
+    PullRunnerRequest, RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError,
+    TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
-    initialize_runner_runtime, install_python_adapter, model_info_from_plan, plan_model,
-    python_adapter_record, python_adapter_records, resolve_execution_plan, runner_runtime_layout,
-    InstallModelOptions, LibraryModelManifest, LibraryRunnerManifest, ModelPlan, RunnerInfo,
-    RunnerLifecycleState,
+    initialize_runner_runtime, install_model_complete, install_python_adapter,
+    model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
+    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, LibraryModelManifest,
+    LibraryRunnerManifest, ModelPlan, RunnerInfo, RunnerLifecycleState,
 };
 
 use crate::AppState;
@@ -494,29 +494,19 @@ pub async fn runner(
 pub async fn pull_model(
     State(state): State<AppState>,
     Json(request): Json<PullModelRequest>,
-) -> Result<Json<PullModelResponse>, ApiError> {
-    let manifest = state
-        .package_registry
-        .model(&request.model)
-        .map_err(Into::into)
-        .map_err(ApiError)?;
-    let report = state
-        .installed_registry
-        .install_model_with_options(
-            &manifest,
-            InstallModelOptions {
-                metadata_only: request.metadata_only,
-            },
-        )
-        .map_err(Into::into)
-        .map_err(ApiError)?;
-
-    Ok(Json(PullModelResponse {
-        id: report.id,
-        installed: report.installed,
-        manifest_path: report.manifest_path,
-        note: report.note,
-    }))
+) -> Result<Json<ModelInstallReport>, ApiError> {
+    let report = install_model_complete(
+        &state.package_registry,
+        &state.installed_registry,
+        state.store.root(),
+        &request.model,
+        InstallModelOptions {
+            metadata_only: request.metadata_only,
+        },
+    )
+    .map_err(Into::into)
+    .map_err(ApiError)?;
+    Ok(Json(report))
 }
 
 pub async fn pull_runner(
