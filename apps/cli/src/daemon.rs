@@ -44,6 +44,15 @@ impl DaemonInfo {
 }
 
 pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
+    let startup_lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(store.daemon_start_lock_path())
+        .with_context(|| format!("open {}", store.daemon_start_lock_path().display()))?;
+    startup_lock
+        .lock_exclusive()
+        .with_context(|| format!("lock {}", store.daemon_start_lock_path().display()))?;
     if let Some(info) = verified_status(store, config)? {
         return Ok(info);
     }
@@ -79,6 +88,13 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
         }
         thread::sleep(Duration::from_millis(100));
     }
+    if daemon_lock_is_held(store)? {
+        return Err(anyhow!(
+            "Takokit managed child is still starting but did not publish a verified identity within 5 seconds; see {}",
+            log_path.display()
+        ));
+    }
+    cleanup_proven_stale(store, config)?;
     Err(anyhow!(
         "Takokit managed daemon did not publish a verified identity within 5 seconds; see {}",
         log_path.display()
@@ -172,36 +188,87 @@ fn verified_status(
         Err(_) => return Ok(None),
     };
     let identity: DaemonIdentity = response.into_json()?;
-    if identity.mode == DaemonMode::Managed
-        && identity.instance_id == Some(info.instance_id)
-        && identity.pid == info.pid
-        && identity.storage_root == info.storage_root
-        && identity.port == info.port
-    {
-        Ok(Some(info))
-    } else {
-        Err(anyhow!(
+    verify_identity(&info, &identity).with_context(|| {
+        format!(
             "server at {} does not match the managed daemon runtime record",
             config.local_base_url()
-        ))
-    }
+        )
+    })?;
+    Ok(Some(info))
 }
 fn cleanup_proven_stale(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
     if port_responds(config) {
         return Ok(());
     }
-    if read_info(store)?.is_some() {
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(store.daemon_lock_path())?;
+    if lock.try_lock_exclusive().is_err() {
+        return Ok(());
+    }
+    if store.daemon_info_path().is_file() {
         let _ = fs::remove_file(store.daemon_info_path());
     }
+    let _ = lock.unlock();
     Ok(())
 }
 fn read_info(store: &LocalStore) -> anyhow::Result<Option<DaemonInfo>> {
     if !store.daemon_info_path().is_file() {
         return Ok(None);
     }
-    Ok(Some(serde_json::from_slice(&fs::read(
-        store.daemon_info_path(),
-    )?)?))
+    match serde_json::from_slice(&fs::read(store.daemon_info_path())?) {
+        Ok(info) => Ok(Some(info)),
+        Err(_) => Ok(None),
+    }
+}
+
+fn verify_identity(info: &DaemonInfo, identity: &DaemonIdentity) -> anyhow::Result<()> {
+    let expected_executable = canonical_root(&info.executable)?;
+    let expected_root = canonical_root(&info.storage_root)?;
+    let actual_executable = canonical_root(&identity.executable)?;
+    let actual_root = canonical_root(&identity.storage_root)?;
+    if identity.mode != DaemonMode::Managed {
+        return Err(anyhow!(
+            "identity mode mismatch: expected managed, got {:?}",
+            identity.mode
+        ));
+    }
+    if identity.instance_id != Some(info.instance_id) {
+        return Err(anyhow!("identity instance_id mismatch"));
+    }
+    if identity.pid != info.pid {
+        return Err(anyhow!("identity pid mismatch"));
+    }
+    if actual_executable != expected_executable {
+        return Err(anyhow!("identity executable mismatch"));
+    }
+    if actual_root != expected_root {
+        return Err(anyhow!("identity storage_root mismatch"));
+    }
+    if identity.host != info.host {
+        return Err(anyhow!("identity host mismatch"));
+    }
+    if identity.port != info.port {
+        return Err(anyhow!("identity port mismatch"));
+    }
+    Ok(())
+}
+
+fn daemon_lock_is_held(store: &LocalStore) -> anyhow::Result<bool> {
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(store.daemon_lock_path())?;
+    match lock.try_lock_exclusive() {
+        Ok(()) => {
+            let _ = lock.unlock();
+            Ok(false)
+        }
+        Err(_) => Ok(true),
+    }
 }
 pub fn write_atomic(path: &std::path::Path, value: &DaemonInfo) -> anyhow::Result<()> {
     let temp = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
@@ -256,5 +323,112 @@ mod tests {
             info.instance_id
         );
         assert!(!store.runtime_dir().join("daemon.json.tmp").exists());
+    }
+
+    #[test]
+    fn atomic_runtime_record_replaces_previous_value() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        let mut first = test_info(temp.path());
+        first.pid = 1;
+        let mut second = first.clone();
+        second.pid = 2;
+        write_atomic(&store.daemon_info_path(), &first).unwrap();
+        write_atomic(&store.daemon_info_path(), &second).unwrap();
+        assert_eq!(read_info(&store).unwrap().unwrap().pid, 2);
+    }
+
+    #[test]
+    fn malformed_stale_record_is_removed_when_lock_is_free() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        fs::write(store.daemon_info_path(), b"not json").unwrap();
+        cleanup_proven_stale(
+            &store,
+            &RuntimeConfig {
+                host: "127.0.0.1".into(),
+                port: unused_port(),
+                storage_root: temp.path().to_path_buf(),
+            },
+        )
+        .unwrap();
+        assert!(!store.daemon_info_path().exists());
+    }
+
+    #[test]
+    fn stale_record_is_preserved_while_ownership_lock_is_held() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path().to_path_buf());
+        store.ensure_layout().unwrap();
+        write_atomic(&store.daemon_info_path(), &test_info(temp.path())).unwrap();
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(store.daemon_lock_path())
+            .unwrap();
+        lock.lock_exclusive().unwrap();
+        cleanup_proven_stale(
+            &store,
+            &RuntimeConfig {
+                host: "127.0.0.1".into(),
+                port: unused_port(),
+                storage_root: temp.path().to_path_buf(),
+            },
+        )
+        .unwrap();
+        assert!(store.daemon_info_path().exists());
+        lock.unlock().unwrap();
+    }
+
+    #[test]
+    fn identity_validation_reports_ownership_field_mismatches() {
+        let temp = tempfile::tempdir().unwrap();
+        let info = test_info(temp.path());
+        let mut identity = info.identity();
+        identity.executable = temp.path().join("other.exe");
+        fs::write(&identity.executable, b"").unwrap();
+        assert!(verify_identity(&info, &identity)
+            .unwrap_err()
+            .to_string()
+            .contains("executable"));
+        let mut identity = info.identity();
+        let other = tempfile::tempdir().unwrap();
+        identity.storage_root = other.path().to_path_buf();
+        assert!(verify_identity(&info, &identity)
+            .unwrap_err()
+            .to_string()
+            .contains("storage_root"));
+        let mut identity = info.identity();
+        identity.host = "127.0.0.2".into();
+        assert!(verify_identity(&info, &identity)
+            .unwrap_err()
+            .to_string()
+            .contains("host"));
+    }
+
+    fn test_info(root: &std::path::Path) -> DaemonInfo {
+        let executable = root.join("takokit.exe");
+        fs::write(&executable, b"").unwrap();
+        DaemonInfo {
+            instance_id: Uuid::new_v4(),
+            pid: 42,
+            executable,
+            storage_root: root.to_path_buf(),
+            host: "127.0.0.1".into(),
+            port: 5050,
+            started_at: 1,
+            mode: DaemonMode::Managed,
+            log_path: root.join("daemon.log"),
+        }
+    }
+    fn unused_port() -> u16 {
+        std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
     }
 }

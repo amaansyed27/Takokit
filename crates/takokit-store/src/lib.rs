@@ -133,6 +133,9 @@ impl LocalStore {
     pub fn daemon_lock_path(&self) -> PathBuf {
         self.runtime_dir().join("daemon.lock")
     }
+    pub fn daemon_start_lock_path(&self) -> PathBuf {
+        self.runtime_dir().join("daemon-start.lock")
+    }
     pub fn daemon_info_path(&self) -> PathBuf {
         self.runtime_dir().join("daemon.json")
     }

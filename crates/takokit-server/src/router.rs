@@ -102,7 +102,9 @@ mod tests {
     use http::{Request, StatusCode};
     use takokit_core::RuntimeConfig;
     use takokit_store::LocalStore;
+    use tokio::sync::oneshot;
     use tower::ServiceExt;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn health_route_returns_ok() {
@@ -122,6 +124,83 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
+        let root = tempfile::tempdir().unwrap();
+        let config = RuntimeConfig::local(root.path().to_path_buf());
+        let instance_id = Uuid::new_v4();
+        let (shutdown_tx, _shutdown_rx) = oneshot::channel();
+        let identity = takokit_core::DaemonIdentity {
+            instance_id: Some(instance_id),
+            mode: takokit_core::DaemonMode::Managed,
+            pid: 42,
+            executable: root.path().join("takokit"),
+            storage_root: root.path().to_path_buf(),
+            host: config.host.clone(),
+            port: config.port,
+            started_at: 1,
+            log_path: None,
+        };
+        let state = AppState::new(config, LocalStore::new(root.path().to_path_buf()))
+            .managed(identity, shutdown_tx);
+        let guard = state
+            .register_execution("mock-tts".into(), "text_to_speech")
+            .await;
+        let app = server_router(state.clone());
+        let ps = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/ps")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = to_bytes(ps.into_body(), 1024 * 1024).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["data"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        let denied = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/daemon/shutdown")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"instance_id":"{}"}}"#,
+                        Uuid::new_v4()
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(denied.status(), StatusCode::BAD_REQUEST);
+        drop(guard);
+        tokio::task::yield_now().await;
+        let ps = app
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/ps")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = to_bytes(ps.into_body(), 1024 * 1024).await.unwrap();
+        assert!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["data"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]

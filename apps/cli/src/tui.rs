@@ -65,7 +65,7 @@ pub async fn run_launcher(
     installed_registry: &InstalledRegistry,
 ) -> anyhow::Result<()> {
     println!("Takokit");
-    println!("Local voice AI runtime. Real model inference is not implemented yet.");
+    println!("Local voice AI runtime. Supported installed models run locally; unsupported models report explicit readiness blockers.");
 
     loop {
         println!();

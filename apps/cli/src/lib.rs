@@ -438,11 +438,7 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Run(args)) => {
-            if args.text.is_some() == args.file.is_some() {
-                return Err(anyhow::anyhow!(
-                    "provide text for TTS or --file for STT, but not both"
-                ));
-            }
+            validate_run_args(&args)?;
             let manifest = package_registry.model(&args.model).map_err(cli_error)?;
             if args.text.is_some() && !manifest.capabilities.tts {
                 return Err(anyhow::anyhow!(
@@ -719,6 +715,7 @@ async fn route_daemon_command(
             },
         )?,
         Command::Run(args) => {
+            validate_run_args(args)?;
             let model: serde_json::Value = client.get(&format!("/v1/models/{}", args.model))?;
             let capabilities = model["data"]["capabilities"]
                 .as_array()
@@ -797,6 +794,15 @@ async fn route_daemon_command(
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(true)
+}
+
+fn validate_run_args(args: &RunArgs) -> anyhow::Result<()> {
+    if args.text.is_some() == args.file.is_some() {
+        return Err(anyhow::anyhow!(
+            "provide text for TTS or --file for STT, but not both"
+        ));
+    }
+    Ok(())
 }
 
 fn print_adapter_doctor(
@@ -1889,6 +1895,38 @@ mod tests {
             matches!(run.command, Some(Command::Run(RunArgs { model, text: Some(text), voice: Some(voice), file: None })) if model == "kokoro" && text == "hello" && voice == "Ryan")
         );
         assert!(matches!(ps.command, Some(Command::Ps)));
+    }
+
+    #[test]
+    fn run_argument_validation_accepts_tts_or_stt_and_rejects_ambiguous_input() {
+        let tts = RunArgs {
+            model: "kokoro".into(),
+            text: Some("hello".into()),
+            voice: None,
+            file: None,
+        };
+        let stt = RunArgs {
+            model: "whisper-tiny".into(),
+            text: None,
+            voice: None,
+            file: Some(PathBuf::from("sample.wav")),
+        };
+        let missing = RunArgs {
+            model: "kokoro".into(),
+            text: None,
+            voice: None,
+            file: None,
+        };
+        let both = RunArgs {
+            model: "kokoro".into(),
+            text: Some("hello".into()),
+            voice: None,
+            file: Some(PathBuf::from("sample.wav")),
+        };
+        assert!(validate_run_args(&tts).is_ok());
+        assert!(validate_run_args(&stt).is_ok());
+        assert!(validate_run_args(&missing).is_err());
+        assert!(validate_run_args(&both).is_err());
     }
 
     #[test]
