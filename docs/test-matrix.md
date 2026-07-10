@@ -14,7 +14,8 @@ Integration root: an isolated `TAKOKIT_HOME` under `%TEMP%`. GPU: RTX 5060 Lapto
 | `chatterbox` | TTS / cloning | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan chatterbox` | Blocked plan | Exact pinned weight set and consent-gated adapter still required | MIT upstream; model family is large |
 | `f5-tts` | TTS / cloning | `takokit-python-managed` | Metadata-only; adapter slot `not-installed` | `takokit plan f5-tts` | Blocked plan | No commercial-safe verified pretrained artifact selected | Code MIT; common weights CC-BY-NC |
 | `whisper-base` | STT | `takokit-whispercpp` | ggml model pulled and SHA-256 verified; whisper.cpp v1.9.1 ready | `takokit transcribe <qwen-wav> --model whisper-base` | Real transcript: `Hello from Togokit.` | None on verified Windows x64 path | MIT; CPU path verified |
-| `whisper-tiny` | STT | `takokit-whispercpp` | 77,691,713-byte ggml model pulled and SHA-256 verified; shared runner ready | `takokit transcribe <qwen-wav> --model whisper-tiny` | Real transcript: `Hello from Togokit.` | None on verified Windows x64 path | MIT; CPU-friendly |
+| `whisper-tiny` | STT | `takokit-whispercpp` | 77,691,713-byte ggml model pulled and SHA-256 verified; shared runner ready | `takokit transcribe <kokoro-hello.wav> --model whisper-tiny` | Real transcript: `Hello from Tackacit.` in the isolated fast suite | None on verified Windows x64 path | MIT; CPU-friendly |
+| `whisper-small` | STT | `takokit-whispercpp` | 487,601,967-byte ggml model pulled and SHA-256 verified; shared runner ready | `takokit transcribe <kokoro-hello.wav> --model whisper-small` | Real transcript: `Hello from Taka Kit.` (28.4 s pull + execution command wall time) | None on verified Windows x64 path; this closes the prior manifest-only gap | MIT; CPU path verified; 6 GB RAM declared |
 | `sensevoice` | STT | `takokit-python-managed` | Metadata-only; no managed adapter | `takokit plan sensevoice` | Blocked plan | Exact artifact set and adapter not selected | License/artifacts need verification |
 | `parakeet` | STT | `takokit-nemo` | Metadata-only; NeMo runner scaffold only | `takokit plan parakeet` | Blocked plan | NeMo ASR adapter plus managed audio dependencies not installed | Parakeet weights require per-checkpoint review; hardware varies |
 | `canary` | STT | `takokit-nemo` | Metadata-only; NeMo runner scaffold only | `takokit plan canary` | Blocked plan | NeMo ASR adapter plus managed audio dependencies not installed | Per-checkpoint license/artifact review required |
@@ -32,7 +33,7 @@ takokit test --suite launch --json
 takokit test --suite launch --run
 ```
 
-`--run` runs smoke synthesis for executable TTS models, runs Whisper Base/Tiny against a generated local silence WAV, and skips blocked models with their recorded reason. For a meaningful transcript use an explicit caller-provided audio file:
+`--run` executes only real model handlers and reports lifecycle-blocked models as skipped. The fast suite uses a Kokoro-generated spoken WAV for Whisper, never a silence substitute. For a caller-provided transcription:
 
 ```bash
 takokit test whisper-base --file ./sample.wav
