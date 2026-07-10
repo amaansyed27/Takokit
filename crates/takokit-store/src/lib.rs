@@ -123,6 +123,20 @@ impl LocalStore {
         self.root.join("logs")
     }
 
+    pub fn runtime_dir(&self) -> PathBuf {
+        self.root.join("runtime")
+    }
+
+    pub fn daemon_pid_path(&self) -> PathBuf {
+        self.runtime_dir().join("daemon.pid")
+    }
+    pub fn daemon_lock_path(&self) -> PathBuf {
+        self.runtime_dir().join("daemon.lock")
+    }
+    pub fn daemon_info_path(&self) -> PathBuf {
+        self.runtime_dir().join("daemon.json")
+    }
+
     pub fn config_path(&self) -> PathBuf {
         self.root.join("config.toml")
     }
@@ -153,6 +167,7 @@ impl LocalStore {
             self.cache_dir(),
             self.downloads_cache_dir(),
             self.logs_dir(),
+            self.runtime_dir(),
         ] {
             std::fs::create_dir_all(path)
                 .map_err(|error| TakokitError::Storage(error.to_string()))?;

@@ -1,3 +1,4 @@
+mod daemon;
 mod doctor;
 mod gui;
 mod tui;
@@ -29,7 +30,14 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    Serve,
+    Serve {
+        #[arg(long, hide = true)]
+        daemon_child: bool,
+    },
+    Daemon {
+        #[command(subcommand)]
+        command: DaemonCommand,
+    },
     Gui,
     Doctor(DoctorArgs),
     Version,
@@ -79,6 +87,15 @@ enum Command {
     },
     Clone(CloneArgs),
     Train(TrainArgs),
+}
+
+#[derive(Debug, Subcommand)]
+enum DaemonCommand {
+    Start,
+    Stop,
+    Restart,
+    Status,
+    Logs,
 }
 
 #[derive(Debug, Args)]
@@ -223,9 +240,28 @@ pub async fn run() -> anyhow::Result<()> {
 
     match cli.command {
         None => tui::run_launcher(&config, &store, &package_registry, &installed_registry).await?,
-        Some(Command::Serve) => {
+        Some(Command::Serve { daemon_child: _ }) => {
             run_server(AppState::new(config, store)).await?;
         }
+        Some(Command::Daemon { command }) => match command {
+            DaemonCommand::Start => println!(
+                "{}",
+                serde_json::to_string_pretty(&daemon::start(&store, &config)?)?
+            ),
+            DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
+            DaemonCommand::Restart => {
+                let _ = daemon::stop(&store, &config)?;
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&daemon::start(&store, &config)?)?
+                );
+            }
+            DaemonCommand::Status => match daemon::status(&store, &config)? {
+                Some(info) => println!("{}", serde_json::to_string_pretty(&info)?),
+                None => println!("not running"),
+            },
+            DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
+        },
         Some(Command::Gui) => gui::open_gui(&config).await?,
         Some(Command::Doctor(args)) => {
             let report =

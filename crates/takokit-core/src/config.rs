@@ -11,8 +11,14 @@ pub struct RuntimeConfig {
 impl RuntimeConfig {
     pub fn local(storage_root: PathBuf) -> Self {
         Self {
-            host: "127.0.0.1".to_string(),
-            port: 5050,
+            host: std::env::var("TAKOKIT_HOST")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "127.0.0.1".to_string()),
+            port: std::env::var("TAKOKIT_PORT")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(5050),
             storage_root,
         }
     }
