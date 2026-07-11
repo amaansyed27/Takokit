@@ -14,6 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: Repository quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Audit source file sizes
+        run: python scripts/audit_file_sizes.py
+
   rust:
     name: Rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
