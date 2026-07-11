@@ -34,10 +34,7 @@ fn planner_rechecks_local_artifact_bytes() {
     let plan = plan_model(&registry, &installed, "piper-lessac").unwrap();
     assert_eq!(plan.artifact_state, ModelLifecycleState::MetadataOnly);
     assert!(!plan.executable);
-    assert!(plan
-        .missing
-        .iter()
-        .any(|item| item == "verified artifacts"));
+    assert!(plan.missing.iter().any(|item| item == "verified artifacts"));
 }
 
 #[test]
@@ -104,11 +101,7 @@ fn corrupt_ready_artifact_is_classified_for_repair() {
     installed.install_model(&manifest).unwrap();
 
     let record = installed.installed_model_record("piper-lessac").unwrap();
-    std::fs::write(
-        record.artifacts[0].local_path.as_ref().unwrap(),
-        b"broken",
-    )
-    .unwrap();
+    std::fs::write(record.artifacts[0].local_path.as_ref().unwrap(), b"broken").unwrap();
     let record = installed.installed_model_record("piper-lessac").unwrap();
 
     assert_eq!(
