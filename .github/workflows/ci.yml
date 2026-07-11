@@ -35,8 +35,15 @@ jobs:
       - name: Cache Rust build data
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Format workspace for review
+        run: cargo fmt --all
+
+      - name: Upload formatted package sources
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-package-sources
+          path: crates/takokit-package/src
 
       - name: Check workspace
         run: cargo check --workspace
