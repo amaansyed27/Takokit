@@ -1,14 +1,16 @@
 mod daemon;
 mod daemon_client;
+mod display;
 mod doctor;
 mod gui;
 mod tui;
 
 use clap::{Args, Parser, Subcommand};
+use display::format_model_show;
 use serde::Serialize;
 use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
-use takokit_core::{CapabilityKind, ModelInfo, RuntimeConfig, SpeechRequest, TakokitError};
+use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
 use takokit_models::{
     execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
     TextToSpeechEngine,
@@ -1664,50 +1666,6 @@ fn capability_labels(capabilities: &[CapabilityKind]) -> String {
         .map(|capability| capability.label())
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-fn format_model_show(
-    info: &ModelInfo,
-    installed_record: Option<&takokit_package::InstalledModelRecord>,
-) -> String {
-    let mut lines = Vec::new();
-    lines.push(format!("{} ({})", info.name, info.id));
-    lines.push(format!("family: {}", info.family));
-    lines.push(format!("version: {}", info.version));
-    lines.push(format!("backend: {}", info.backend));
-    lines.push(format!("runner: {}", info.runner));
-    lines.push(format!("installed: {}", info.installed));
-    lines.push(format!("runner installed: {}", info.runner_installed));
-    lines.push(format!("runner runtime: {}", info.runner_runtime_state));
-    lines.push(format!("lifecycle: {}", info.lifecycle_state));
-    lines.push(format!("status: {}", info.execution_status));
-    lines.push(format!("executable today: {}", yes_no(info.executable)));
-    lines.push(format!("license: {}", info.license));
-    if let Some(warning) = &info.license_warning {
-        lines.push(format!("license warning: {warning}"));
-    }
-    lines.push(format!(
-        "capabilities: {}",
-        capability_labels(&info.capabilities)
-    ));
-    lines.push(format!("hardware: {}", info.hardware_notes));
-    lines.push(format!("artifacts: {}", info.artifact_count));
-    if let Some(record) = installed_record {
-        lines.push(format!("installed status: {:?}", record.status));
-        lines.push(format!("installed at: {}", record.installed_at));
-        lines.push(format!("source: {}", record.source));
-        lines.push(format!("installed artifacts: {}", record.artifacts.len()));
-    } else {
-        lines.push("installed status: not installed".to_string());
-    }
-    if info.missing.is_empty() {
-        lines.push("missing: none".to_string());
-    } else {
-        lines.push(format!("missing: {}", info.missing.join("; ")));
-    }
-    lines.push(format!("next command: {}", info.next_command));
-    lines.push(format!("description: {}", info.summary));
-    lines.join("\n")
 }
 
 fn format_runner_show(
