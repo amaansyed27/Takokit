@@ -97,7 +97,7 @@ Running bare `takokit` opens a lightweight interactive terminal launcher. It can
 
 `takokit pull kokoro` downloads and verifies the pinned INT8 ONNX model and voices bundle. `takokit runner install takokit-onnx` creates an isolated managed environment and installs the MIT `kokoro-onnx` adapter; `takokit speak "Hello" --model kokoro` writes a real WAV under `~/.takokit/outputs/`.
 
-`takokit pull piper-lessac` downloads the Piper Lessac medium ONNX model and config files, validates byte sizes and SHA256 checksums, stores verified blobs under `~/.takokit/blobs/sha256/`, and writes downloaded artifact records. Use `--metadata-only` when a pull should explicitly skip artifact downloads.
+`takokit pull piper-lessac` downloads the Piper Lessac medium ONNX model and config files, validates byte sizes and SHA256 checksums, stores verified blobs under `~/.takokit/blobs/sha256/`, and writes downloaded artifact records. Repeat pulls re-verify and reuse matching local artifacts without contacting their source. Use `--metadata-only` when a pull should explicitly skip artifact downloads; it never downgrades a ready installation.
 
 `takokit runner pull <runner>` installs a runner contract record under `~/.takokit/manifests/installed-runners/`.
 
@@ -123,7 +123,7 @@ takokit pull whisper-tiny
 takokit run whisper-tiny --file sample.wav
 ```
 
-Use `--metadata-only` to record a model declaration without initializing runtimes or downloading weights.
+Use `--metadata-only` to record a model declaration without initializing runtimes or downloading weights. On an already ready model it is an idempotent no-op that preserves executable state.
 
 `takokit library models` and `takokit library runners` print curated discovery metadata. Library entries are not automatically executable runtime manifests and do not trigger downloads.
 

@@ -55,6 +55,8 @@ target/release/tako.exe doctor
 
 The normal local workflow is `takokit pull whisper-tiny` followed by `takokit run whisper-tiny --file sample.wav`. A normal pull orchestrates required managed runner components and verified artifacts; `takokit pull --metadata-only` deliberately does neither.
 
+Normal `cargo test --workspace` uses local deterministic fixtures and must not download model artifacts, bootstrap Python, invoke curl, or access external network resources. Real-model smoke coverage is opt-in only: `TAKOKIT_REAL_MODEL_TESTS=1 cargo test --test real_models -- --ignored`.
+
 Whisper Tiny, Base, and Small are catalogued as whisper.cpp-backed models. Tiny/Base have the current runner path; Small stays metadata/artifact status until a verified execution run exists. Normal `run`, `speak`, `transcribe`, package, runner, and adapter commands use the managed daemon. Prefix a development command with `--direct` to retain in-process behavior. `takokit daemon start`, `takokit list`, and `takokit ps` exercise lifecycle without downloading artifacts.
 
 ```bash

@@ -63,6 +63,27 @@ export type ModelPlan = {
   next_command: string;
 };
 
+export type InstallStepState = "not-requested" | "already-ready" | "installed" | "repaired" | "metadata-only" | "failed";
+
+export type InstallStep = {
+  state: InstallStepState;
+  newly_installed: boolean;
+  detail: string;
+};
+
+export type ModelInstallResponse = {
+  model_id: string;
+  required_runner: string;
+  required_adapter: string | null;
+  artifacts: InstallStep;
+  runner_contract: InstallStep;
+  runner_runtime: InstallStep;
+  adapter: InstallStep | null;
+  executable: boolean;
+  missing: string[];
+  logs_path: string;
+};
+
 export type VoiceSummary = {
   id: string;
   name: string;

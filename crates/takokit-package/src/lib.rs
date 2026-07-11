@@ -8,8 +8,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{
-    CapabilityKind, ErrorCode, InstallStep, ModelCapability, ModelInfo, ModelInstallReport,
-    ModelRuntime, TakokitError,
+    CapabilityKind, ErrorCode, InstallStep, InstallStepState, ModelCapability, ModelInfo,
+    ModelInstallReport, ModelRuntime, TakokitError,
 };
 use thiserror::Error;
 use zip::ZipArchive;
@@ -40,6 +40,12 @@ const PYTHON_MANAGED_ADAPTERS: &[(&str, &str)] = &[
 
 #[derive(Debug, Error)]
 pub enum PackageError {
+    #[error("model installation failed during {stage:?}: {source}")]
+    InstallStage {
+        stage: InstallFailureStage,
+        #[source]
+        source: Box<PackageError>,
+    },
     #[error("manifest IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -107,9 +113,33 @@ pub enum PackageError {
     },
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstallFailureStage {
+    RunnerContract,
+    RunnerRuntime,
+    Adapter,
+    Artifacts,
+    Materialization,
+    FinalVerification,
+}
+
+impl PackageError {
+    fn at_stage(stage: InstallFailureStage, source: PackageError) -> Self {
+        Self::InstallStage {
+            stage,
+            source: Box::new(source),
+        }
+    }
+}
+
 impl From<PackageError> for TakokitError {
     fn from(value: PackageError) -> Self {
         match value {
+            PackageError::InstallStage { stage, source } => TakokitError::Resolution {
+                code: ErrorCode::ArtifactInstallFailed,
+                message: format!("model installation failed during {stage:?}: {source}"),
+            },
             PackageError::ModelNotFound(id) => TakokitError::Resolution {
                 code: ErrorCode::ModelNotFound,
                 message: format!("model is not available in the local registry: {id}"),
@@ -775,7 +805,33 @@ impl InstalledRegistry {
         std::fs::create_dir_all(self.root.join("models"))?;
         std::fs::create_dir_all(self.root.join("installed-models"))?;
         let path = self.model_manifest_path(&manifest.id);
-        let artifact_set = self.install_artifacts(manifest, options)?;
+        let previous = self.installed_model_record(&manifest.id).ok();
+        if options.metadata_only
+            && previous
+                .as_ref()
+                .is_some_and(|record| record.status == InstalledPackageStatus::Ready)
+        {
+            return Ok(PullReport {
+                id: manifest.id.clone(),
+                installed: false,
+                manifest_path: path,
+                note: "Metadata-only request preserved the existing verified ready installation."
+                    .to_string(),
+            });
+        }
+        if options.metadata_only
+            && previous
+                .as_ref()
+                .is_some_and(|record| record.status == InstalledPackageStatus::MetadataOnly)
+        {
+            return Ok(PullReport {
+                id: manifest.id.clone(),
+                installed: false,
+                manifest_path: path,
+                note: "Metadata-only model record is already present.".to_string(),
+            });
+        }
+        let artifact_set = self.install_artifacts(manifest, options, previous.as_ref())?;
         self.materialize_model_artifacts(manifest, &artifact_set)?;
         let record = installed_model_record_with_artifacts(manifest, path.clone(), artifact_set);
 
@@ -910,6 +966,7 @@ impl InstalledRegistry {
         &self,
         manifest: &ModelManifest,
         options: InstallModelOptions,
+        previous: Option<&InstalledModelRecord>,
     ) -> PackageResult<InstalledArtifactSet> {
         let artifacts = manifest.artifacts.all().collect::<Vec<_>>();
         let metadata_only = options.metadata_only || manifest.artifacts.metadata_only;
@@ -936,7 +993,20 @@ impl InstalledRegistry {
 
         let mut records = Vec::new();
         for artifact in artifacts {
-            let local_path = install_artifact(manifest, artifact, &downloads_dir, &blob_dir)?;
+            let prior = previous.and_then(|record| {
+                record
+                    .artifacts
+                    .iter()
+                    .find(|record| record.name == artifact.name)
+            });
+            let local_path =
+                match prior.filter(|record| artifact_record_is_verified(record, artifact)) {
+                    Some(record) => record
+                        .local_path
+                        .clone()
+                        .expect("verified artifact has path"),
+                    None => install_artifact(manifest, artifact, &downloads_dir, &blob_dir)?,
+                };
             records.push(InstalledArtifactRecord {
                 name: artifact.name.clone(),
                 sha256: artifact.sha256.clone(),
@@ -995,6 +1065,18 @@ impl InstalledRegistry {
                         reason: "artifact path has no parent directory".to_string(),
                     })?;
             std::fs::create_dir_all(parent)?;
+            if destination.is_file()
+                && artifact.bytes.is_none_or(|expected| {
+                    std::fs::metadata(&destination)
+                        .map(|m| m.len() == expected)
+                        .unwrap_or(false)
+                })
+                && sha256_file(&destination)
+                    .map(|checksum| checksum == artifact.sha256)
+                    .unwrap_or(false)
+            {
+                continue;
+            }
             if destination.is_file() {
                 std::fs::remove_file(&destination)?;
             }
@@ -1522,6 +1604,10 @@ pub fn install_model_complete(
     let runner = package_registry.runner(&model.runner)?;
     let logs_path = takokit_root.join("logs");
     if options.metadata_only {
+        let ready_before = installed_registry
+            .installed_model_record(&model.id)
+            .ok()
+            .is_some_and(|record| record.status == InstalledPackageStatus::Ready);
         let report = installed_registry.install_model_with_options(&model, options)?;
         let plan = plan_model(package_registry, installed_registry, model_id)?;
         return Ok(ModelInstallReport {
@@ -1529,17 +1615,21 @@ pub fn install_model_complete(
             required_runner: runner.id,
             required_adapter: model.required_adapter,
             artifacts: InstallStep {
-                state: "metadata-only".into(),
-                newly_installed: true,
+                state: if ready_before {
+                    InstallStepState::AlreadyReady
+                } else {
+                    InstallStepState::MetadataOnly
+                },
+                newly_installed: !ready_before && report.installed,
                 detail: report.note,
             },
             runner_contract: InstallStep {
-                state: "not-requested".into(),
+                state: InstallStepState::NotRequested,
                 newly_installed: false,
                 detail: "metadata-only pull does not install runner contracts".into(),
             },
             runner_runtime: InstallStep {
-                state: "not-requested".into(),
+                state: InstallStepState::NotRequested,
                 newly_installed: false,
                 detail: "metadata-only pull does not initialize runtimes".into(),
             },
@@ -1551,15 +1641,16 @@ pub fn install_model_complete(
     }
     let was_contract = installed_registry.is_runner_installed(&runner.id);
     if !was_contract {
-        installed_registry.install_runner(&runner)?;
+        installed_registry
+            .install_runner(&runner)
+            .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerContract, error))?;
     }
     let runner_contract = InstallStep {
         state: if was_contract {
-            "already-ready"
+            InstallStepState::AlreadyReady
         } else {
-            "installed"
-        }
-        .into(),
+            InstallStepState::Installed
+        },
         newly_installed: !was_contract,
         detail: runner.id.clone(),
     };
@@ -1569,14 +1660,15 @@ pub fn install_model_complete(
         .ok()
         .is_some_and(|record| record.status == RunnerLifecycleState::Ready);
     if !runtime_ready {
-        initialize_runner_runtime(takokit_root, installed_registry, &runner)?;
+        initialize_runner_runtime(takokit_root, installed_registry, &runner)
+            .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerRuntime, error))?;
     }
-    let runtime_state = installed_registry
-        .installed_runner_record(&runner.id)
-        .map(|record| record.status)
-        .unwrap_or(RunnerLifecycleState::RuntimeMissing);
     let runner_runtime = InstallStep {
-        state: runtime_state.to_string(),
+        state: if runtime_ready {
+            InstallStepState::AlreadyReady
+        } else {
+            InstallStepState::Installed
+        },
         newly_installed: !runtime_ready,
         detail: runner_runtime_layout(takokit_root, &runner)
             .logs
@@ -1589,11 +1681,18 @@ pub fn install_model_complete(
             .ok()
             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
         if !ready {
-            install_python_adapter(takokit_root, adapter_id)?;
+            install_python_adapter(takokit_root, adapter_id)
+                .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error))?;
         }
         let state = python_adapter_record(takokit_root, adapter_id)?.state;
         Some(InstallStep {
-            state: state.to_string(),
+            state: if ready {
+                InstallStepState::AlreadyReady
+            } else if state == AdapterLifecycleState::Ready {
+                InstallStepState::Installed
+            } else {
+                InstallStepState::Failed
+            },
             newly_installed: !ready,
             detail: python_managed_runner_layout(takokit_root)
                 .adapters
@@ -1610,21 +1709,30 @@ pub fn install_model_complete(
         .installed_model_record(&model.id)
         .ok()
         .is_some_and(|record| record.status == InstalledPackageStatus::Ready);
-    let artifact_report = installed_registry.install_model_with_options(&model, options)?;
+    let artifact_report = installed_registry
+        .install_model_with_options(&model, options)
+        .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error))?;
     let artifacts = InstallStep {
-        state: "ready".into(),
-        newly_installed: !artifacts_ready,
+        state: if artifacts_ready {
+            InstallStepState::AlreadyReady
+        } else {
+            InstallStepState::Installed
+        },
+        newly_installed: !artifacts_ready && artifact_report.installed,
         detail: artifact_report.note,
     };
     let plan = plan_model(package_registry, installed_registry, model_id)?;
     if !plan.executable {
-        return Err(PackageError::ArtifactInstallFailed {
-            artifact: model.id,
-            reason: format!(
-                "final execution-plan verification failed: {}",
-                plan.missing.join("; ")
-            ),
-        });
+        return Err(PackageError::at_stage(
+            InstallFailureStage::FinalVerification,
+            PackageError::ArtifactInstallFailed {
+                artifact: model.id,
+                reason: format!(
+                    "final execution-plan verification failed: {}",
+                    plan.missing.join("; ")
+                ),
+            },
+        ));
     }
     Ok(ModelInstallReport {
         model_id: model.id,
@@ -2504,6 +2612,37 @@ struct InstalledArtifactSet {
     note: String,
 }
 
+/// A record is reusable only when it describes this exact manifest artifact and
+/// its recorded local file still verifies.  The content-addressed blob name is
+/// deliberately not trusted on its own: interrupted/manual writes can leave a
+/// corrupt file at an otherwise plausible path.
+fn artifact_record_is_verified(record: &InstalledArtifactRecord, artifact: &ArtifactEntry) -> bool {
+    if record.name != artifact.name
+        || !record
+            .sha256
+            .trim()
+            .eq_ignore_ascii_case(artifact.sha256.trim())
+        || record.bytes != artifact.bytes
+        || !record.downloaded
+    {
+        return false;
+    }
+    let Some(path) = record.local_path.as_ref() else {
+        return false;
+    };
+    if !path.is_file() {
+        return false;
+    }
+    if let Some(expected) = artifact.bytes {
+        if std::fs::metadata(path).map(|metadata| metadata.len()).ok() != Some(expected) {
+            return false;
+        }
+    }
+    sha256_file(path)
+        .map(|actual| actual.eq_ignore_ascii_case(artifact.sha256.trim()))
+        .unwrap_or(false)
+}
+
 fn install_artifact(
     manifest: &ModelManifest,
     artifact: &ArtifactEntry,
@@ -2567,7 +2706,30 @@ fn install_artifact(
 
     let final_path = blob_dir.join(&expected);
     if final_path.exists() {
-        let _ = std::fs::remove_file(&temp_path);
+        let valid_existing = artifact.bytes.is_none_or(|expected_bytes| {
+            std::fs::metadata(&final_path)
+                .map(|metadata| metadata.len() == expected_bytes)
+                .unwrap_or(false)
+        }) && sha256_file(&final_path)
+            .map(|actual| actual == expected)
+            .unwrap_or(false);
+        if valid_existing {
+            let _ = std::fs::remove_file(&temp_path);
+        } else {
+            std::fs::remove_file(&final_path).map_err(|error| {
+                PackageError::ArtifactInstallFailed {
+                    artifact: artifact.name.clone(),
+                    reason: error.to_string(),
+                }
+            })?;
+            std::fs::rename(&temp_path, &final_path).map_err(|error| {
+                let _ = std::fs::remove_file(&temp_path);
+                PackageError::ArtifactInstallFailed {
+                    artifact: artifact.name.clone(),
+                    reason: error.to_string(),
+                }
+            })?;
+        }
     } else {
         std::fs::rename(&temp_path, &final_path).map_err(|error| {
             let _ = std::fs::remove_file(&temp_path);
@@ -3088,6 +3250,67 @@ role = "config"
         let local_path = record.artifacts[0].local_path.as_ref().expect("local path");
         assert!(local_path.ends_with(Path::new("blobs").join("sha256").join(HELLO_SHA256)));
         assert_eq!(std::fs::read(local_path).expect("blob"), b"hello");
+    }
+
+    #[test]
+    fn second_local_pull_reuses_verified_artifact_without_reading_source() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("fixture.onnx");
+        std::fs::write(&source, b"hello").expect("fixture");
+        let manifest = artifact_test_manifest(&source, HELLO_SHA256);
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+        installed.install_model(&manifest).expect("first install");
+        std::fs::remove_file(&source).expect("make fixture unavailable");
+        let report = installed.install_model(&manifest).expect("verified reuse");
+
+        assert!(report.installed);
+        assert_eq!(
+            installed
+                .installed_model_record("piper-lessac")
+                .expect("record")
+                .status,
+            InstalledPackageStatus::Ready
+        );
+    }
+
+    #[test]
+    fn corrupt_artifact_repairs_only_corrupt_entry() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let model_source = temp.path().join("fixture.onnx");
+        let config_source = temp.path().join("fixture.onnx.json");
+        std::fs::write(&model_source, b"hello").expect("model fixture");
+        std::fs::write(&config_source, br#"{"audio":{"sample_rate":22050}}"#)
+            .expect("config fixture");
+        let manifest = multi_artifact_test_manifest(
+            &model_source,
+            &sha256_file(&model_source).expect("model sha"),
+            &config_source,
+            &sha256_file(&config_source).expect("config sha"),
+        );
+        let installed = InstalledRegistry::new(temp.path().join("manifests"));
+        installed.install_model(&manifest).expect("first install");
+        let record = installed
+            .installed_model_record("piper-lessac")
+            .expect("record");
+        let corrupt = record
+            .artifacts
+            .iter()
+            .find(|item| item.name == "fixture.onnx.json")
+            .unwrap()
+            .local_path
+            .clone()
+            .unwrap();
+        std::fs::write(&corrupt, b"corrupt").expect("corrupt blob");
+        std::fs::remove_file(&model_source).expect("valid source must not be read");
+
+        installed
+            .install_model(&manifest)
+            .expect("repair corrupt only");
+        assert_eq!(
+            sha256_file(&corrupt).expect("repaired checksum"),
+            manifest.artifacts.configs[0].sha256
+        );
     }
 
     #[test]

@@ -6,7 +6,7 @@ import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { getModelPlan, installRunner, pullModel, pullRunner, removeModel } from "../../lib/api";
-import type { ModelCapability, ModelPlan } from "../../lib/types";
+import type { ModelCapability, ModelInstallResponse, ModelPlan } from "../../lib/types";
 
 export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
   const [query, setQuery] = useState("");
@@ -14,6 +14,7 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null);
+  const [installReport, setInstallReport] = useState<ModelInstallResponse | null>(null);
   const models = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return runtime.models;
@@ -142,7 +143,7 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
                       variant="ghost"
                       disabled={apiUnavailable}
                       loading={busyAction === `pull-model-${model.id}`}
-                      onClick={() => runAction(`pull-model-${model.id}`, () => pullModel(model.id).then(() => undefined))}
+                      onClick={() => runAction(`pull-model-${model.id}`, () => pullModel(model.id).then((report) => { setInstallReport(report); }))}
                     >
                       Pull
                     </Button>
@@ -178,6 +179,9 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
               </div>
               {(modelPlan?.missing.length ?? selectedModel.missing.length) > 0 && (
                 <p className="notice-line">Missing: {(modelPlan?.missing ?? selectedModel.missing).join("; ")}</p>
+              )}
+              {installReport?.model_id === selectedModel.id && (
+                <p className="notice-line">Install: artifacts {installReport.artifacts.state}; runner {installReport.runner_runtime.state}; {installReport.executable ? "executable" : installReport.missing.join("; ")}</p>
               )}
             </div>
             <div className="details-panel__side">

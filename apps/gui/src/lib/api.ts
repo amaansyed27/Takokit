@@ -1,5 +1,5 @@
 import { mockRuntime } from "./mockData";
-import type { CapabilitySummary, DoctorResponse, ModelCapability, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, TranscriptionApiRequest, TranscriptionApiResponse, VoiceSummary } from "./types";
+import type { CapabilitySummary, DoctorResponse, ModelCapability, ModelInstallResponse, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, TranscriptionApiRequest, TranscriptionApiResponse, VoiceSummary } from "./types";
 
 const viteApiOverride = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_TAKOKIT_API_URL;
 const LOCAL_API_BASE_URL = viteApiOverride || window.location.origin;
@@ -49,14 +49,6 @@ type PullResponse = {
   installed: boolean;
   manifest_path: string;
   note: string;
-};
-
-type ModelInstallResponse = {
-  model_id: string;
-  required_runner: string;
-  required_adapter?: string;
-  executable: boolean;
-  missing: string[];
 };
 
 type ApiVoice = {

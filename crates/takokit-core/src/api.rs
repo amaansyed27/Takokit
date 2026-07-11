@@ -91,8 +91,19 @@ pub struct PullRunnerRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstallStepState {
+    NotRequested,
+    AlreadyReady,
+    Installed,
+    Repaired,
+    MetadataOnly,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstallStep {
-    pub state: String,
+    pub state: InstallStepState,
     pub newly_installed: bool,
     pub detail: String,
 }
@@ -198,5 +209,49 @@ mod tests {
 
         assert_eq!(request.model, "piper-lessac");
         assert!(!request.metadata_only);
+    }
+
+    #[test]
+    fn model_install_report_serializes_typed_steps() {
+        let report = ModelInstallReport {
+            model_id: "fixture-model".into(),
+            required_runner: "fixture-runner".into(),
+            required_adapter: None,
+            artifacts: InstallStep {
+                state: InstallStepState::AlreadyReady,
+                newly_installed: false,
+                detail: "verified".into(),
+            },
+            runner_contract: InstallStep {
+                state: InstallStepState::NotRequested,
+                newly_installed: false,
+                detail: "fixture".into(),
+            },
+            runner_runtime: InstallStep {
+                state: InstallStepState::NotRequested,
+                newly_installed: false,
+                detail: "fixture".into(),
+            },
+            adapter: None,
+            executable: false,
+            missing: vec!["runner runtime".into()],
+            logs_path: PathBuf::from("logs"),
+        };
+        let json = serde_json::to_value(report).expect("serialize report");
+        assert_eq!(json["artifacts"]["state"], "already-ready");
+        for key in [
+            "model_id",
+            "required_runner",
+            "required_adapter",
+            "artifacts",
+            "runner_contract",
+            "runner_runtime",
+            "adapter",
+            "executable",
+            "missing",
+            "logs_path",
+        ] {
+            assert!(json.get(key).is_some(), "missing {key}");
+        }
     }
 }

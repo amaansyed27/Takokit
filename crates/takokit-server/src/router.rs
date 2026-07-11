@@ -296,8 +296,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pull_orchestrates_kokoro_runner_before_speech() {
+    async fn metadata_only_pull_and_runner_contract_are_offline_before_speech() {
         let root = std::env::temp_dir().join("takokit-server-speech-runner-resolution-test");
+        let _ = std::fs::remove_dir_all(&root);
         let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
         let app = server_router(state);
 
@@ -308,12 +309,26 @@ mod tests {
                     .method("POST")
                     .uri("/v1/models/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                     .unwrap(),
             )
             .await
             .unwrap();
         assert_eq!(pull_response.status(), StatusCode::OK);
+
+        let runner_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/runners/pull")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(runner_response.status(), StatusCode::OK);
 
         let response = app
             .oneshot(
@@ -327,11 +342,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_ne!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert_ne!(json["error"]["code"], "runner_not_installed");
+        assert_eq!(json["error"]["code"], "artifact_not_downloaded");
     }
 
     #[tokio::test]
@@ -685,7 +700,7 @@ mod tests {
                     .method("POST")
                     .uri("/v1/models/pull")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"model":"kokoro"}"#))
+                    .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                     .unwrap(),
             )
             .await

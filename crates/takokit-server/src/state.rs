@@ -52,6 +52,17 @@ impl AppState {
         self.shutdown = Arc::new(Mutex::new(Some(shutdown)));
         self
     }
+    /// Test-only callers can supply a fixture package registry and installed
+    /// registry, keeping route tests entirely local and deterministic.
+    pub fn with_package_registries(
+        mut self,
+        package_registry: PackageRegistry,
+        installed_registry: InstalledRegistry,
+    ) -> Self {
+        self.package_registry = Arc::new(package_registry);
+        self.installed_registry = Arc::new(installed_registry);
+        self
+    }
     pub async fn register_execution(&self, model: String, task: &str) -> ExecutionGuard {
         let id = Uuid::new_v4();
         self.executions.lock().await.insert(
