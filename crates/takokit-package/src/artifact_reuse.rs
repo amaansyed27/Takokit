@@ -1,6 +1,6 @@
 //! Prior-artifact record verification used by repeat pulls.
 
-use crate::{sha256_file, ArtifactEntry, InstalledArtifactRecord};
+use crate::{artifact_io::sha256_file, ArtifactEntry, InstalledArtifactRecord};
 
 /// Blob-path existence is deliberately insufficient: every field from the
 /// current manifest and the actual local bytes must still match.
