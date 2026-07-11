@@ -41,7 +41,23 @@ jobs:
       - name: Check workspace
         run: cargo check --workspace
 
-      - name: Test workspace
+      - name: Test workspace (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --workspace 2>&1 | tee cargo-test.log
+
+      - name: Upload Rust test log
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-test-${{ matrix.os }}
+          path: cargo-test.log
+          if-no-files-found: ignore
+
+      - name: Test workspace (Windows)
+        if: runner.os == 'Windows'
         run: cargo test --workspace
 
   gui:
