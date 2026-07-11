@@ -59,7 +59,23 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Check workspace
+      - name: Check workspace (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --workspace 2>&1 | tee cargo-check.log
+
+      - name: Upload cargo check log
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-check-${{ matrix.os }}
+          path: cargo-check.log
+          if-no-files-found: ignore
+
+      - name: Check workspace (Windows)
+        if: runner.os == 'Windows'
         run: cargo check --workspace
 
       - name: Test workspace (Linux)
