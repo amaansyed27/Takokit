@@ -35,6 +35,14 @@ jobs:
           path: file-size-audit.txt
           if-no-files-found: error
 
+      - name: Upload stylesheet snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oversized-stylesheet
+          path: apps/gui/src/styles/globals.css
+          if-no-files-found: error
+
   rust:
     name: Rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
