@@ -1,0 +1,215 @@
+.voice-workbench,
+.upload-zone,
+.command-note {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.84), rgba(255, 253, 247, 0.52)),
+    var(--color-surface);
+  padding: var(--space-4);
+}
+
+.voice-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.voice-workbench p {
+  margin-bottom: 6px;
+}
+
+.voice-meta-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: var(--space-4);
+}
+
+.voice-meta {
+  padding: var(--space-3);
+}
+
+.voice-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  border: 1px solid rgba(79, 111, 82, 0.18);
+  border-radius: 10px;
+  background: rgba(111, 143, 114, 0.08);
+}
+
+.voice-wave span {
+  width: 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.voice-wave span:nth-child(1),
+.voice-wave span:nth-child(6) {
+  height: 18px;
+}
+
+.voice-wave span:nth-child(2),
+.voice-wave span:nth-child(5) {
+  height: 36px;
+}
+
+.voice-wave span:nth-child(3),
+.voice-wave span:nth-child(4) {
+  height: 54px;
+}
+
+.upload-zone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  border-style: dashed;
+}
+
+.pipeline-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pipeline-node {
+  min-height: 112px;
+}
+
+.pipeline-node.is-disabled {
+  opacity: 0.7;
+}
+
+.upload-zone__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(79, 111, 82, 0.22);
+  border-radius: 12px;
+  background: rgba(111, 143, 114, 0.1);
+  color: var(--color-accent-dark);
+}
+
+.command-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  border-color: rgba(79, 111, 82, 0.28);
+}
+
+.command-note code {
+  border: 1px solid rgba(79, 111, 82, 0.24);
+  border-radius: 8px;
+  background: rgba(111, 143, 114, 0.1);
+  padding: 6px 10px;
+}
+
+.command-note span {
+  color: var(--color-text-secondary);
+}
+
+.status-matrix {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.status-cell {
+  min-height: 108px;
+}
+
+.runtime-boundary {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.82), rgba(255, 253, 247, 0.52)),
+    var(--color-surface);
+  padding: var(--space-4);
+}
+
+.logs-panel {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.settings-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-group {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.82), rgba(255, 253, 247, 0.5)),
+    var(--color-surface);
+  padding: var(--space-4);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  border-top: 1px solid rgba(216, 204, 186, 0.72);
+  padding-top: var(--space-3);
+}
+
+.settings-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-row span {
+  color: var(--color-text-secondary);
+}
+
+.setting-switch-grid {
+  gap: 0;
+}
+
+.setting-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0;
+  border-width: 1px 0 0;
+  background: transparent;
+  padding: var(--space-3) 0;
+}
+
+.setting-toggle-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.switch {
+  position: relative;
+  width: 42px;
+  height: 22px;
+  border: 1px solid rgba(79, 111, 82, 0.34);
+  border-radius: 999px;
+  background: rgba(111, 143, 114, 0.18);
+}
+
+.switch::after {
+  position: absolute;
+  top: 3px;
+  left: 21px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent-dark);
+  content: "";
+}
+
+.switch.is-off {
+  border-color: var(--color-border);
+  background: rgba(216, 204, 186, 0.34);
+}
+
+.switch.is-off::after {
+  left: 4px;
+  background: var(--color-text-soft);
+}
+

@@ -14,6 +14,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: Repository quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Audit source file sizes
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/audit_file_sizes.py 2>&1 | tee file-size-audit.txt
+
+      - name: Upload file-size audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-size-audit
+          path: file-size-audit.txt
+          if-no-files-found: error
+
   rust:
     name: Rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -38,7 +59,23 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Check workspace
+      - name: Check workspace (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --workspace 2>&1 | tee cargo-check.log
+
+      - name: Upload cargo check log
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-check-${{ matrix.os }}
+          path: cargo-check.log
+          if-no-files-found: ignore
+
+      - name: Check workspace (Windows)
+        if: runner.os == 'Windows'
         run: cargo check --workspace
 
       - name: Test workspace (Linux)

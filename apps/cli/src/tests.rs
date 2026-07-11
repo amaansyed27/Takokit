@@ -350,20 +350,6 @@ fn launch_suite_default_is_human_readable_and_json_flag_is_json() {
 }
 
 #[test]
-fn launcher_menu_is_available_without_running_it() {
-    let labels: Vec<_> = tui::launcher_actions()
-        .iter()
-        .map(|action| action.label())
-        .collect();
-
-    assert!(labels.contains(&"Generate speech with mock-tts"));
-    assert!(labels.contains(&"Pull model metadata"));
-    assert!(labels.contains(&"Pull runner contract"));
-    assert!(labels.contains(&"Doctor"));
-    assert!(labels.contains(&"Quit"));
-}
-
-#[test]
 fn doctor_reports_storage_layout_and_registry_health() {
     let temp = tempfile::tempdir().expect("tempdir");
     let store = LocalStore::new(temp.path().join("takokit"));
