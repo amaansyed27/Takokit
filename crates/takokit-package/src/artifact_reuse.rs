@@ -45,9 +45,7 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
         record
             .artifacts
             .iter()
-            .find(|candidate| {
-                candidate.name == artifact.name && candidate.role == artifact.role
-            })
+            .find(|candidate| candidate.name == artifact.name && candidate.role == artifact.role)
             .is_some_and(|candidate| is_verified(candidate, artifact))
     })
 }
