@@ -26,7 +26,7 @@ pub async fn run_launcher(
     loop {
         let mut state = App::new(config, store, package_registry, installed_registry, status)?;
         let mut selected_action = None;
-        ratatui::run(|mut terminal| {
+        ratatui::run(|mut terminal| -> std::io::Result<()> {
             selected_action = Some(app::run(&mut terminal, &mut state)?);
             Ok(())
         })?;
