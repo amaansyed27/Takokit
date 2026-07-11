@@ -20,11 +20,7 @@ impl ModelInstallSnapshot {
         })
     }
 
-    pub(crate) fn restore(
-        self,
-        registry: &InstalledRegistry,
-        model_id: &str,
-    ) -> PackageResult<()> {
+    pub(crate) fn restore(self, registry: &InstalledRegistry, model_id: &str) -> PackageResult<()> {
         let manifest_path = registry.model_manifest_path(model_id);
         let record_path = registry.model_record_path(model_id);
 
@@ -84,7 +80,10 @@ mod tests {
         std::fs::write(&record_path, "new record").unwrap();
         snapshot.restore(&registry, "fixture").unwrap();
 
-        assert_eq!(std::fs::read_to_string(manifest_path).unwrap(), "old manifest");
+        assert_eq!(
+            std::fs::read_to_string(manifest_path).unwrap(),
+            "old manifest"
+        );
         assert_eq!(std::fs::read_to_string(record_path).unwrap(), "old record");
     }
 
