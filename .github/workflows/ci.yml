@@ -22,7 +22,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Audit source file sizes
-        run: python scripts/audit_file_sizes.py
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/audit_file_sizes.py 2>&1 | tee file-size-audit.txt
+
+      - name: Upload file-size audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-size-audit
+          path: file-size-audit.txt
+          if-no-files-found: error
 
   rust:
     name: Rust (${{ matrix.os }})
@@ -50,6 +61,14 @@ jobs:
 
       - name: Check workspace
         run: cargo check --workspace
+
+      - name: Upload generated Cargo lockfile
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
 
       - name: Test workspace (Linux)
         if: runner.os == 'Linux'
