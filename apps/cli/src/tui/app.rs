@@ -243,7 +243,10 @@ impl App {
             return Some(TuiAction::Quit);
         }
         if self.show_help {
-            if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')) {
+            if matches!(
+                key.code,
+                KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
+            ) {
                 self.show_help = false;
             }
             return None;

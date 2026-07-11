@@ -73,13 +73,7 @@ fn render_body(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .split(area);
 
     match app.tab {
-        TuiTab::Models => render_rows(
-            frame,
-            columns[0],
-            " Models ",
-            &app.models,
-            app.model_index,
-        ),
+        TuiTab::Models => render_rows(frame, columns[0], " Models ", &app.models, app.model_index),
         TuiTab::Runners => render_rows(
             frame,
             columns[0],
@@ -139,7 +133,11 @@ fn render_rows(
 fn render_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let status = Paragraph::new(app.status.as_str())
         .wrap(Wrap { trim: false })
-        .block(Block::default().title(" Last action ").borders(Borders::ALL));
+        .block(
+            Block::default()
+                .title(" Last action ")
+                .borders(Borders::ALL),
+        );
     frame.render_widget(status, area);
 }
 
@@ -158,7 +156,9 @@ fn render_command_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
     frame.render_widget(command, area);
 
     if app.command_mode {
-        let x = area.x.saturating_add(2 + app.command_input.chars().count() as u16);
+        let x = area
+            .x
+            .saturating_add(2 + app.command_input.chars().count() as u16);
         let y = area.y;
         frame.set_cursor_position((x.min(area.right().saturating_sub(1)), y));
     }

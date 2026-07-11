@@ -24,13 +24,7 @@ pub async fn run_launcher(
     );
 
     loop {
-        let mut state = App::new(
-            config,
-            store,
-            package_registry,
-            installed_registry,
-            status,
-        )?;
+        let mut state = App::new(config, store, package_registry, installed_registry, status)?;
         let mut selected_action = None;
         ratatui::run(|mut terminal| {
             selected_action = Some(app::run(&mut terminal, &mut state)?);
@@ -42,14 +36,8 @@ pub async fn run_launcher(
             return Ok(());
         }
 
-        status = match execute_action(
-            action,
-            config,
-            store,
-            package_registry,
-            installed_registry,
-        )
-        .await
+        status = match execute_action(action, config, store, package_registry, installed_registry)
+            .await
         {
             Ok(message) => message,
             Err(error) => format!("Error: {error:#}"),
