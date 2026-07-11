@@ -1,8 +1,9 @@
-use std::time::{Duration, Instant};
+use std::{ffi::OsStr, time::{Duration, Instant}};
 
 pub async fn run() -> anyhow::Result<()> {
     let started = Instant::now();
-    let show_timing = !std::env::args_os().any(|argument| argument == "--daemon-child");
+    let show_timing = !std::env::args_os()
+        .any(|argument| argument == OsStr::new("--daemon-child"));
     let result = takokit_cli::run().await;
 
     if show_timing {
@@ -29,11 +30,11 @@ fn format_duration(duration: Duration) -> String {
             return format!("{total_seconds}s");
         }
 
-        return format!("{total_seconds}.{fractional_millis:03}s")
-            .trim_end_matches('0')
-            .trim_end_matches('s')
-            .to_string()
-            + "s";
+        let mut value = format!("{total_seconds}.{fractional_millis:03}");
+        while value.ends_with('0') {
+            value.pop();
+        }
+        return format!("{value}s");
     }
 
     let seconds = total_seconds % 60;
