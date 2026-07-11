@@ -22,7 +22,10 @@ pub fn install_model_complete(
 
     if options.metadata_only {
         let artifacts_before = artifact_reuse::classify(
-            installed_registry.installed_model_record(&model.id).ok().as_ref(),
+            installed_registry
+                .installed_model_record(&model.id)
+                .ok()
+                .as_ref(),
             &model,
         );
         let report = installed_registry.install_model_with_options(&model, options)?;
@@ -37,7 +40,8 @@ pub fn install_model_complete(
                 } else {
                     InstallStepState::MetadataOnly
                 },
-                newly_installed: artifacts_before == ArtifactReuseState::Missing && report.installed,
+                newly_installed: artifacts_before == ArtifactReuseState::Missing
+                    && report.installed,
                 detail: report.note,
             },
             runner_contract: InstallStep {
