@@ -47,6 +47,7 @@ mod artifact_install;
 mod catalog;
 mod manifest;
 mod package_records;
+mod pull_reliability;
 mod resolution;
 mod runtime;
 
