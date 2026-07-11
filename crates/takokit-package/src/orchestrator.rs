@@ -1,6 +1,11 @@
 //! The single lifecycle for CLI, daemon, and GUI model pulls.
 
-use crate::*;
+use crate::{
+    artifact_reuse::{self, ArtifactReuseState},
+    planning::has_verified_executor,
+    transaction::ModelInstallSnapshot,
+    *,
+};
 use std::path::Path;
 use takokit_core::{InstallStep, InstallStepState, ModelInstallReport};
 
@@ -14,11 +19,15 @@ pub fn install_model_complete(
     let model = package_registry.model(model_id)?;
     let runner = package_registry.runner(&model.runner)?;
     let logs_path = takokit_root.join("logs");
+
     if options.metadata_only {
-        let ready_before = installed_registry
-            .installed_model_record(&model.id)
-            .ok()
-            .is_some_and(|record| record.status == InstalledPackageStatus::Ready);
+        let artifacts_before = artifact_reuse::classify(
+            installed_registry
+                .installed_model_record(&model.id)
+                .ok()
+                .as_ref(),
+            &model,
+        );
         let report = installed_registry.install_model_with_options(&model, options)?;
         let plan = plan_model(package_registry, installed_registry, model_id)?;
         return Ok(ModelInstallReport {
@@ -26,12 +35,13 @@ pub fn install_model_complete(
             required_runner: runner.id,
             required_adapter: model.required_adapter,
             artifacts: InstallStep {
-                state: if ready_before {
+                state: if artifacts_before == ArtifactReuseState::Verified {
                     InstallStepState::AlreadyReady
                 } else {
                     InstallStepState::MetadataOnly
                 },
-                newly_installed: !ready_before && report.installed,
+                newly_installed: artifacts_before == ArtifactReuseState::Missing
+                    && report.installed,
                 detail: report.note,
             },
             runner_contract: InstallStep {
@@ -50,6 +60,7 @@ pub fn install_model_complete(
             logs_path,
         });
     }
+
     let was_contract = installed_registry.is_runner_installed(&runner.id);
     if !was_contract {
         installed_registry
@@ -65,76 +76,136 @@ pub fn install_model_complete(
         newly_installed: !was_contract,
         detail: runner.id.clone(),
     };
-    let runtime_ready = installed_registry
+
+    let runtime_ready_before = installed_registry
         .installed_runner_record(&runner.id)
         .ok()
         .is_some_and(|record| record.status == RunnerLifecycleState::Ready);
-    if !runtime_ready {
+    if !runtime_ready_before {
         initialize_runner_runtime(takokit_root, installed_registry, &runner)
             .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerRuntime, error))?;
     }
+    let runtime_state = installed_registry
+        .installed_runner_record(&runner.id)
+        .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerRuntime, error))?
+        .status;
+    if runtime_state != RunnerLifecycleState::Ready {
+        return Err(PackageError::at_stage(
+            InstallFailureStage::RunnerRuntime,
+            PackageError::ArtifactInstallFailed {
+                artifact: runner.id.clone(),
+                reason: format!(
+                    "runner initialization completed without reaching ready state: {runtime_state}"
+                ),
+            },
+        ));
+    }
     let runner_runtime = InstallStep {
-        state: if runtime_ready {
+        state: if runtime_ready_before {
             InstallStepState::AlreadyReady
         } else {
             InstallStepState::Installed
         },
-        newly_installed: !runtime_ready,
+        newly_installed: !runtime_ready_before,
         detail: runner_runtime_layout(takokit_root, &runner)
             .logs
             .display()
             .to_string(),
     };
-    let adapter = if let Some(adapter_id) = model.required_adapter.as_deref() {
-        let ready = python_adapter_record(takokit_root, adapter_id)
+
+    let (adapter, adapter_ready) = if let Some(adapter_id) = model.required_adapter.as_deref() {
+        let ready_before = python_adapter_record(takokit_root, adapter_id)
             .ok()
             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
-        if !ready {
+        if !ready_before {
             install_python_adapter(takokit_root, adapter_id)
                 .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error))?;
         }
-        let state = python_adapter_record(takokit_root, adapter_id)?.state;
-        Some(InstallStep {
-            state: if ready {
-                InstallStepState::AlreadyReady
-            } else if state == AdapterLifecycleState::Ready {
-                InstallStepState::Installed
-            } else {
-                InstallStepState::Failed
-            },
-            newly_installed: !ready,
-            detail: python_managed_runner_layout(takokit_root)
-                .adapters
-                .join(adapter_id)
-                .join("install.log")
-                .display()
-                .to_string(),
-        })
+        let state = python_adapter_record(takokit_root, adapter_id)
+            .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error))?
+            .state;
+        if state != AdapterLifecycleState::Ready {
+            return Err(PackageError::at_stage(
+                InstallFailureStage::Adapter,
+                PackageError::ArtifactInstallFailed {
+                    artifact: adapter_id.to_string(),
+                    reason: format!(
+                        "adapter installation completed without reaching ready state: {state}"
+                    ),
+                },
+            ));
+        }
+        (
+            Some(InstallStep {
+                state: if ready_before {
+                    InstallStepState::AlreadyReady
+                } else {
+                    InstallStepState::Installed
+                },
+                newly_installed: !ready_before,
+                detail: python_managed_runner_layout(takokit_root)
+                    .adapters
+                    .join(adapter_id)
+                    .join("install.log")
+                    .display()
+                    .to_string(),
+            }),
+            true,
+        )
     } else {
-        None
+        (None, false)
     };
-    let artifacts_ready = installed_registry
-        .installed_model_record(&model.id)
-        .ok()
-        .is_some_and(|record| record.status == InstalledPackageStatus::Ready);
+
+    // Do not download large model artifacts for a runner/model combination that
+    // the current Takokit build cannot execute even after every dependency is ready.
+    if !has_verified_executor(&model, &runner, adapter_ready) {
+        return Err(PackageError::at_stage(
+            InstallFailureStage::FinalVerification,
+            PackageError::ArtifactInstallFailed {
+                artifact: model.id.clone(),
+                reason: format!(
+                    "no verified executor is implemented for model {} on runner {}",
+                    model.id, runner.id
+                ),
+            },
+        ));
+    }
+
+    let previous_record = installed_registry.installed_model_record(&model.id).ok();
+    let reuse_state = artifact_reuse::classify(previous_record.as_ref(), &model);
+    let snapshot = ModelInstallSnapshot::capture(installed_registry, &model.id)
+        .map_err(|error| PackageError::at_stage(InstallFailureStage::Materialization, error))?;
     let artifact_report = installed_registry
         .install_model_with_options(&model, options)
         .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error))?;
     let artifacts = InstallStep {
-        state: if artifacts_ready {
-            InstallStepState::AlreadyReady
-        } else {
-            InstallStepState::Installed
+        state: match reuse_state {
+            ArtifactReuseState::Verified => InstallStepState::AlreadyReady,
+            ArtifactReuseState::RepairRequired => InstallStepState::Repaired,
+            ArtifactReuseState::Missing => InstallStepState::Installed,
         },
-        newly_installed: !artifacts_ready && artifact_report.installed,
+        newly_installed: reuse_state != ArtifactReuseState::Verified && artifact_report.installed,
         detail: artifact_report.note,
     };
-    let plan = plan_model(package_registry, installed_registry, model_id)?;
+
+    let plan = match plan_model(package_registry, installed_registry, model_id) {
+        Ok(plan) => plan,
+        Err(error) => {
+            return Err(rollback_final_verification(
+                snapshot,
+                installed_registry,
+                model_id,
+                error,
+            ))
+        }
+    };
     if !plan.executable {
-        return Err(PackageError::at_stage(
-            InstallFailureStage::FinalVerification,
+        return Err(rollback_final_verification(
+            snapshot,
+            installed_registry,
+            model_id,
             PackageError::ArtifactInstallFailed {
-                artifact: model.id,
+                artifact: model.id.clone(),
                 reason: format!(
                     "final execution-plan verification failed: {}",
                     plan.missing.join("; ")
@@ -142,6 +213,7 @@ pub fn install_model_complete(
             },
         ));
     }
+
     Ok(ModelInstallReport {
         model_id: model.id,
         required_runner: runner.id,
@@ -154,4 +226,22 @@ pub fn install_model_complete(
         missing: Vec::new(),
         logs_path,
     })
+}
+
+fn rollback_final_verification(
+    snapshot: ModelInstallSnapshot,
+    installed_registry: &InstalledRegistry,
+    model_id: &str,
+    source: PackageError,
+) -> PackageError {
+    match snapshot.restore(installed_registry, model_id) {
+        Ok(()) => PackageError::at_stage(InstallFailureStage::FinalVerification, source),
+        Err(rollback_error) => PackageError::at_stage(
+            InstallFailureStage::FinalVerification,
+            PackageError::ArtifactInstallFailed {
+                artifact: model_id.to_string(),
+                reason: format!("{source}; rollback also failed: {rollback_error}"),
+            },
+        ),
+    }
 }

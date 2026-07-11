@@ -17,6 +17,7 @@ mod runtime_onnx;
 mod runtime_python;
 mod runtime_uv;
 mod runtime_whisper;
+mod transaction;
 
 pub use catalog::*;
 pub use error::*;

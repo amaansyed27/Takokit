@@ -157,10 +157,7 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
     let piper_plan = plan_model(&registry, &installed, "piper-lessac").expect("piper plan");
     assert_eq!(piper_plan.model_id, "piper-lessac");
     assert_eq!(piper_plan.family, "piper");
-    assert_eq!(
-        piper_plan.artifact_state,
-        ModelLifecycleState::ArtifactsReady
-    );
+    assert_eq!(piper_plan.artifact_state, ModelLifecycleState::MetadataOnly);
     assert_eq!(
         piper_plan.runner_contract_state,
         RunnerLifecycleState::ContractInstalled
@@ -170,6 +167,10 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
         RunnerLifecycleState::ContractInstalled
     );
     assert!(!piper_plan.executable);
+    assert!(piper_plan
+        .missing
+        .iter()
+        .any(|item| item == "verified artifacts"));
     assert!(piper_plan
         .missing
         .contains(&"Piper text frontend (phonemizer/token preparation)".to_string()));

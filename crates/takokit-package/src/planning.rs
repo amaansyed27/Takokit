@@ -1,25 +1,19 @@
 //! Pure model lifecycle planning and user-facing status text.
 
-use crate::*;
+use crate::{artifact_reuse, *};
 use takokit_core::CapabilityKind;
 
 pub(crate) fn model_artifact_state(
     model: &ModelManifest,
     installed_model: Option<&InstalledModelRecord>,
 ) -> ModelLifecycleState {
-    let Some(record) = installed_model else {
-        return ModelLifecycleState::MetadataOnly;
-    };
-    if record.status == InstalledPackageStatus::Ready
-        && !model.artifacts.metadata_only
-        && model.artifacts.all().next().is_some()
-        && record.artifacts.iter().all(|artifact| artifact.downloaded)
-    {
+    if installed_model.is_some_and(|record| artifact_reuse::all_verified(record, model)) {
         ModelLifecycleState::ArtifactsReady
     } else {
         ModelLifecycleState::MetadataOnly
     }
 }
+
 pub(crate) fn model_lifecycle_state(
     model: &ModelManifest,
     runner: &RunnerManifest,
@@ -43,7 +37,8 @@ pub(crate) fn model_lifecycle_state(
         ModelLifecycleState::ArtifactsReady
     }
 }
-fn has_verified_executor(
+
+pub(crate) fn has_verified_executor(
     model: &ModelManifest,
     runner: &RunnerManifest,
     adapter_ready: bool,
@@ -56,9 +51,11 @@ fn has_verified_executor(
             && model.family.eq_ignore_ascii_case("whisper")
             && model.capabilities.stt)
 }
+
 pub(crate) fn model_task_label(model: &ModelManifest) -> String {
     capability_labels(&model.capabilities.to_model_capabilities())
 }
+
 pub(crate) fn runner_missing_component(model: &ModelManifest, runner: &RunnerManifest) -> String {
     if runner.kind == RunnerKind::Onnx && model.id == "piper-lessac" {
         return "Piper text frontend (phonemizer/token preparation)".to_string();
@@ -69,9 +66,14 @@ pub(crate) fn runner_missing_component(model: &ModelManifest, runner: &RunnerMan
         }
         RunnerKind::Onnx => "ONNX inference implementation".to_string(),
         RunnerKind::Whispercpp => "whisper.cpp transcription implementation".to_string(),
-        RunnerKind::PythonManaged if model.id == "qwen3-tts" => {
-            "qwen3_tts managed adapter (run `takokit adapter install qwen3_tts`)".to_string()
-        }
+        RunnerKind::PythonManaged if model.required_adapter.is_some() => format!(
+            "{} managed adapter (run `takokit adapter install {}`)",
+            model
+                .required_adapter
+                .as_deref()
+                .unwrap_or("required Python"),
+            model.required_adapter.as_deref().unwrap_or("adapter")
+        ),
         RunnerKind::PythonManaged => "verified artifacts and managed runtime adapter".to_string(),
         RunnerKind::TransformersAudio => "Transformers audio runtime adapter".to_string(),
         RunnerKind::Nemo => "NeMo runtime adapter".to_string(),
@@ -79,6 +81,7 @@ pub(crate) fn runner_missing_component(model: &ModelManifest, runner: &RunnerMan
         RunnerKind::Native => "native runner implementation".to_string(),
     }
 }
+
 pub(crate) fn model_execution_status(plan: &ModelPlan) -> String {
     if plan.executable {
         return "executable".to_string();
@@ -97,6 +100,7 @@ pub(crate) fn model_execution_status(plan: &ModelPlan) -> String {
         ModelLifecycleState::Failed => format!("failed; run {}", plan.next_command),
     }
 }
+
 pub(crate) fn license_warning(license: &str) -> Option<String> {
     let value = license.to_ascii_lowercase();
     if value.contains("non-commercial") || value.contains("cc-by-nc") || value.contains("nc") {
@@ -109,6 +113,7 @@ pub(crate) fn license_warning(license: &str) -> Option<String> {
         None
     }
 }
+
 pub(crate) fn next_plan_command(
     model: &ModelManifest,
     model_installed: bool,
@@ -125,7 +130,7 @@ pub(crate) fn next_plan_command(
     } else if runner_runtime_state == RunnerLifecycleState::Failed {
         format!("takokit runner doctor {}", model.runner)
     } else if let Some((adapter, state)) = adapter {
-        if state != AdapterLifecycleState::Ready && model.id == "qwen3-tts" {
+        if state != AdapterLifecycleState::Ready {
             format!("takokit adapter install {adapter}")
         } else if executable {
             format!("takokit test {}", model.id)
@@ -138,6 +143,7 @@ pub(crate) fn next_plan_command(
         format!("takokit runner doctor {}", model.runner)
     }
 }
+
 fn capability_labels(capabilities: &[CapabilityKind]) -> String {
     if capabilities.is_empty() {
         return "none".to_string();
