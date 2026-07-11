@@ -1,3 +1,5 @@
+mod artifact_reuse;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -1000,7 +1002,7 @@ impl InstalledRegistry {
                     .find(|record| record.name == artifact.name)
             });
             let local_path =
-                match prior.filter(|record| artifact_record_is_verified(record, artifact)) {
+                match prior.filter(|record| artifact_reuse::is_verified(record, artifact)) {
                     Some(record) => record
                         .local_path
                         .clone()
@@ -2612,37 +2614,6 @@ struct InstalledArtifactSet {
     note: String,
 }
 
-/// A record is reusable only when it describes this exact manifest artifact and
-/// its recorded local file still verifies.  The content-addressed blob name is
-/// deliberately not trusted on its own: interrupted/manual writes can leave a
-/// corrupt file at an otherwise plausible path.
-fn artifact_record_is_verified(record: &InstalledArtifactRecord, artifact: &ArtifactEntry) -> bool {
-    if record.name != artifact.name
-        || !record
-            .sha256
-            .trim()
-            .eq_ignore_ascii_case(artifact.sha256.trim())
-        || record.bytes != artifact.bytes
-        || !record.downloaded
-    {
-        return false;
-    }
-    let Some(path) = record.local_path.as_ref() else {
-        return false;
-    };
-    if !path.is_file() {
-        return false;
-    }
-    if let Some(expected) = artifact.bytes {
-        if std::fs::metadata(path).map(|metadata| metadata.len()).ok() != Some(expected) {
-            return false;
-        }
-    }
-    sha256_file(path)
-        .map(|actual| actual.eq_ignore_ascii_case(artifact.sha256.trim()))
-        .unwrap_or(false)
-}
-
 fn install_artifact(
     manifest: &ModelManifest,
     artifact: &ArtifactEntry,
@@ -2900,7 +2871,7 @@ fn find_file_named(root: &Path, name: String) -> Option<PathBuf> {
     None
 }
 
-fn sha256_file(path: &Path) -> std::io::Result<String> {
+pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
