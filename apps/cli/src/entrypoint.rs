@@ -1,4 +1,7 @@
-use std::{ffi::OsStr, time::{Duration, Instant}};
+use std::{
+    ffi::OsStr,
+    time::{Duration, Instant},
+};
 
 pub async fn run() -> anyhow::Result<()> {
     let started = Instant::now();
