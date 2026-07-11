@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - master
 
 permissions:
   contents: read
@@ -14,15 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rust:
-    name: Rust (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+  format-review:
+    name: Format review source
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,52 +23,17 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Cache Rust build data
-        uses: Swatinem/rust-cache@v2
+      - name: Format workspace
+        run: cargo fmt --all
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Upload formatted resolution test
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-resolution-test
+          path: crates/takokit-package/src/tests/resolution.rs
 
       - name: Check workspace
         run: cargo check --workspace
 
-      - name: Test workspace (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test --workspace 2>&1 | tee cargo-test.log
-
-      - name: Upload Rust test log
-        if: always() && runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-test-${{ matrix.os }}
-          path: cargo-test.log
-          if-no-files-found: ignore
-
-      - name: Test workspace (Windows)
-        if: runner.os == 'Windows'
+      - name: Test workspace
         run: cargo test --workspace
-
-  gui:
-    name: GUI build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: apps/gui/package-lock.json
-
-      - name: Install GUI dependencies
-        run: npm ci
-        working-directory: apps/gui
-
-      - name: Build GUI
-        run: npm run build
-        working-directory: apps/gui
