@@ -1,0 +1,131 @@
+//! Verified managed-Python adapter definitions.
+
+const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_adapter.py");
+const CHATTERBOX_ADAPTER: &str = include_str!("../../../runners/python/chatterbox_adapter.py");
+const F5_TTS_ADAPTER: &str = include_str!("../../../runners/python/f5_tts_adapter.py");
+const DIA_ADAPTER: &str = include_str!("../../../runners/python/dia_adapter.py");
+const SENSEVOICE_ADAPTER: &str = include_str!("../../../runners/python/sensevoice_adapter.py");
+const VOXTRAL_ADAPTER: &str = include_str!("../../../runners/python/voxtral_adapter.py");
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AdapterSpec {
+    pub id: &'static str,
+    pub model_family: &'static str,
+    pub python: &'static str,
+    pub packages: &'static [&'static str],
+    pub script: Option<&'static str>,
+    pub note: &'static str,
+}
+
+pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
+    AdapterSpec {
+        id: "qwen3_tts",
+        model_family: "qwen3-tts",
+        python: "3.11",
+        packages: &["qwen-tts==0.1.1", "soundfile"],
+        script: Some(QWEN3_TTS_ADAPTER),
+        note: "Qwen3-TTS speech generation using the official qwen-tts package.",
+    },
+    AdapterSpec {
+        id: "chatterbox",
+        model_family: "chatterbox",
+        python: "3.11",
+        packages: &["chatterbox-tts", "torchaudio"],
+        script: Some(CHATTERBOX_ADAPTER),
+        note: "Chatterbox TTS and reference-audio voice cloning through the official Python API.",
+    },
+    AdapterSpec {
+        id: "f5_tts",
+        model_family: "f5-tts",
+        python: "3.11",
+        packages: &["f5-tts"],
+        script: Some(F5_TTS_ADAPTER),
+        note: "F5-TTS inference and reference-audio voice transfer through the official API.",
+    },
+    AdapterSpec {
+        id: "dia",
+        model_family: "dia",
+        python: "3.11",
+        packages: &[
+            "git+https://github.com/huggingface/transformers.git",
+            "torch",
+            "accelerate",
+            "soundfile",
+        ],
+        script: Some(DIA_ADAPTER),
+        note: "Dia text-to-dialogue generation through the official Transformers integration.",
+    },
+    AdapterSpec {
+        id: "sensevoice",
+        model_family: "sensevoice",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "funasr", "modelscope"],
+        script: Some(SENSEVOICE_ADAPTER),
+        note: "SenseVoice multilingual transcription through the official FunASR AutoModel API.",
+    },
+    AdapterSpec {
+        id: "voxtral",
+        model_family: "voxtral",
+        python: "3.11",
+        packages: &[
+            "git+https://github.com/huggingface/transformers.git",
+            "torch",
+            "accelerate",
+            "soundfile",
+            "mistral-common[audio]",
+        ],
+        script: Some(VOXTRAL_ADAPTER),
+        note: "Voxtral multilingual transcription through the official Transformers API.",
+    },
+    AdapterSpec {
+        id: "cosyvoice2",
+        model_family: "cosyvoice2",
+        python: "3.11",
+        packages: &[],
+        script: None,
+        note: "Reserved for the CosyVoice2 official runtime integration.",
+    },
+    AdapterSpec {
+        id: "fish_speech",
+        model_family: "fish-speech",
+        python: "3.11",
+        packages: &[],
+        script: None,
+        note: "Reserved for the Fish Speech official runtime integration.",
+    },
+    AdapterSpec {
+        id: "openvoice",
+        model_family: "openvoice",
+        python: "3.11",
+        packages: &[],
+        script: None,
+        note: "Reserved for the OpenVoice tone-color conversion integration.",
+    },
+    AdapterSpec {
+        id: "gpt_sovits",
+        model_family: "gpt-sovits",
+        python: "3.11",
+        packages: &[],
+        script: None,
+        note: "Reserved for the GPT-SoVITS inference and training integration.",
+    },
+    AdapterSpec {
+        id: "rvc",
+        model_family: "rvc",
+        python: "3.11",
+        packages: &[],
+        script: None,
+        note: "Reserved for the RVC voice-conversion integration.",
+    },
+];
+
+pub(crate) fn adapter_spec(id: &str) -> Option<&'static AdapterSpec> {
+    ADAPTER_SPECS.iter().find(|spec| spec.id == id)
+}
+
+pub(crate) fn adapter_for_model(model_id: &str) -> Option<&'static str> {
+    ADAPTER_SPECS
+        .iter()
+        .find(|spec| spec.model_family == model_id)
+        .map(|spec| spec.id)
+}
