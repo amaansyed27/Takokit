@@ -45,6 +45,16 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
         .route("/v1/voices/clone", post(handlers::clone_voice))
         .route("/v1/voices/train", post(handlers::train_voice))
+        .route("/v1/sessions/open", post(handlers::open_session))
+        .route("/v1/sessions", get(handlers::sessions))
+        .route(
+            "/v1/sessions/:id",
+            get(handlers::session).delete(handlers::remove_session),
+        )
+        .route(
+            "/v1/sessions/:id/outputs/:filename",
+            get(handlers::session_output),
+        )
         .with_state(state)
         .nest_service("/gui", gui_service())
 }
@@ -95,6 +105,5 @@ pub async fn run_server_with_listener(
     Ok(())
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests;
