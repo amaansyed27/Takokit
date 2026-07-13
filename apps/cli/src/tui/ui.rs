@@ -14,7 +14,7 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         .constraints([
             Constraint::Length(4),
             Constraint::Min(10),
-            Constraint::Length(6),
+            Constraint::Length(9),
             Constraint::Length(3),
         ])
         .split(frame.area());
@@ -42,7 +42,7 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw("  local voice model runtime"),
+        Span::raw("  local voice model runtime  ·  CLI / TUI / GUI unified"),
     ]))
     .block(Block::default().borders(Borders::BOTTOM));
     frame.render_widget(title, header[0]);
@@ -72,23 +72,19 @@ fn render_body(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
         .split(area);
 
-    match app.tab {
-        TuiTab::Models => render_rows(frame, columns[0], " Models ", &app.models, app.model_index),
-        TuiTab::Runners => render_rows(
-            frame,
-            columns[0],
-            " Runners ",
-            &app.runners,
-            app.runner_index,
-        ),
-        TuiTab::System => {
-            let navigation = Paragraph::new(
-                "d  doctor\ns  start daemon\ng  open GUI\nr  refresh\n/  command palette\n?  help\nq  quit",
-            )
-            .block(Block::default().title(" Actions ").borders(Borders::ALL));
-            frame.render_widget(navigation, columns[0]);
-        }
-    }
+    let title = match app.tab {
+        TuiTab::Models => " Models ",
+        TuiTab::Runners => " Runners ",
+        TuiTab::Operations => " Operations ",
+        TuiTab::System => " System ",
+    };
+    render_rows(
+        frame,
+        columns[0],
+        title,
+        app.selected_rows(),
+        app.selected_index(),
+    );
 
     let detail = Paragraph::new(app.selected_detail())
         .wrap(Wrap { trim: false })
@@ -135,7 +131,7 @@ fn render_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .wrap(Wrap { trim: false })
         .block(
             Block::default()
-                .title(" Last action ")
+                .title(" Command output ")
                 .borders(Borders::ALL),
         );
     frame.render_widget(status, area);
@@ -148,7 +144,9 @@ fn render_command_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
             Span::raw(app.command_input.as_str()),
         ])
     } else {
-        Line::from("Tab switch  ·  j/k select  ·  Enter inspect  ·  p pull  ·  i install runner  ·  / command  ·  ? help")
+        Line::from(
+            "Tab switch · j/k select · Enter run/inspect · p pull · i install · t test · x remove · / any CLI command · ? help",
+        )
     };
     let command = Paragraph::new(content)
         .alignment(Alignment::Left)
@@ -159,16 +157,15 @@ fn render_command_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
         let x = area
             .x
             .saturating_add(2 + app.command_input.chars().count() as u16);
-        let y = area.y;
-        frame.set_cursor_position((x.min(area.right().saturating_sub(1)), y));
+        frame.set_cursor_position((x.min(area.right().saturating_sub(1)), area.y));
     }
 }
 
 fn render_help(frame: &mut Frame<'_>) {
-    let area = centered_rect(72, 78, frame.area());
+    let area = centered_rect(88, 88, frame.area());
     frame.render_widget(Clear, area);
     let help = Paragraph::new(
-        "Keyboard\n\nTab / h / l      switch section\nj / k / arrows   move selection\nEnter             inspect selected item\np                 pull selected model\ni                 install selected runner\nd                 run doctor\ns                 start managed daemon\ng                 open GUI\nr                 refresh state\n/                 open command palette\nq / Esc / Ctrl+C  quit\n\nPalette commands\n\npull <model>\nplan <model>\nrunner install <runner>\nrunner show <runner>\ndoctor\ngui\nserver\nrefresh\nquit\n\nPress ? or Esc to close this help.",
+        "Keyboard\n\nTab / h / l      switch section\nj / k / arrows   move selection\nEnter             inspect, run, or edit selected command\np                 pull selected model/runner contract\ni                 install selected runner runtime\nt                 edit model test command\nx                 remove selected model/runner\nd                 doctor\ns                 start managed daemon\ng                 open GUI\nr                 refresh shared state\n/                 run any public Takokit CLI command\nq / Esc / Ctrl+C  quit\n\nFull command palette\n\nThe palette accepts the same Clap grammar as direct CLI commands, including:\n\ndaemon start|stop|restart|status|logs\ngui · doctor [--json] · version · status · capabilities · ps\nmodels · runners · library models|runners · list models|runners|voices\npull <model> [--metadata-only] · show <model> · plan <model> [--json] · rm <model>\nspeak <text> [--model ...] [--voice ...]\nrun <model> <text> [--voice ...] OR run <model> --file <audio>\ntranscribe <audio> [--model ...]\nrunner pull|install|show|rm <runner> · runner doctor <runner> [--json]\nadapter list|install|doctor ...\nquickstart [--full] · deps doctor|bootstrap · samples create\ntest [model] [--suite fast|launch] [--run] [--file ...] [--json]\nclone <sample> --name ... · train <samples> --name ...\n\nQuoted text and Windows paths are supported. Foreground `serve` is intentionally blocked; use `daemon start`.\n\nPress ? or Esc to close this help.",
     )
     .wrap(Wrap { trim: false })
     .block(Block::default().title(" Takokit TUI help ").borders(Borders::ALL));
