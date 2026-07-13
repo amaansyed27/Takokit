@@ -21,6 +21,7 @@ impl IntoResponse for ApiError {
                 | ErrorCode::RunnerNotFound => StatusCode::NOT_FOUND,
                 ErrorCode::RunnerNotInstalled
                 | ErrorCode::RunnerUnsupportedOnPlatform
+                | ErrorCode::RuntimeNotReady
                 | ErrorCode::InferenceNotImplemented
                 | ErrorCode::PiperTextFrontendNotImplemented => StatusCode::NOT_IMPLEMENTED,
             },
