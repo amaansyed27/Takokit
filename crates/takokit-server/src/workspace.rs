@@ -16,13 +16,8 @@ pub struct RequestWorkspace {
 
 impl RequestWorkspace {
     pub fn from_headers(headers: &HeaderMap, title: &str) -> Result<Self, TakokitError> {
-        let workspace_root = workspace_root(headers)?;
-        let store = WorkspaceStore::new(workspace_root);
-        store.ensure_layout()?;
-        let session_id = headers
-            .get(SESSION_HEADER)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| Uuid::parse_str(value.trim()).ok());
+        let store = store_from_headers(headers)?;
+        let session_id = session_id_from_headers(headers);
         let session = store.open_session(session_id, Some(title))?;
         Ok(Self { store, session })
     }
@@ -34,6 +29,19 @@ impl RequestWorkspace {
     pub fn outputs_dir(&self) -> PathBuf {
         self.store.session_outputs_dir(self.session_id())
     }
+}
+
+pub fn store_from_headers(headers: &HeaderMap) -> Result<WorkspaceStore, TakokitError> {
+    let store = WorkspaceStore::new(workspace_root(headers)?);
+    store.ensure_layout()?;
+    Ok(store)
+}
+
+pub fn session_id_from_headers(headers: &HeaderMap) -> Option<Uuid> {
+    headers
+        .get(SESSION_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| Uuid::parse_str(value.trim()).ok())
 }
 
 pub fn encoded_workspace_header(path: &str) -> String {
@@ -48,8 +56,7 @@ fn workspace_root(headers: &HeaderMap) -> Result<PathBuf, TakokitError> {
         let decoded = percent_decode_str(encoded)
             .decode_utf8()
             .map_err(|error| TakokitError::Storage(format!("invalid workspace path: {error}")))?;
-        let path = PathBuf::from(decoded.as_ref());
-        return absolute_workspace(path);
+        return absolute_workspace(PathBuf::from(decoded.as_ref()));
     }
     std::env::current_dir()
         .map_err(|error| TakokitError::Storage(format!("cannot resolve working directory: {error}")))
