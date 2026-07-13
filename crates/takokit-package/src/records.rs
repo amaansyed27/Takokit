@@ -87,7 +87,7 @@ pub struct ExecutionPlan {
     pub runner_installed: bool,
     pub status: ExecutionStatus,
     pub installed_model: Option<InstalledModelRecord>,
-    /// Global Takokit storage root containing models, runners, adapters, and caches.
+    /// Global Takokit storage root containing models, runners, adapters, voices, and caches.
     pub storage_root: PathBuf,
 }
 
@@ -126,12 +126,40 @@ pub struct PythonManagedRunnerLayout {
     pub adapters: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdapterLifecycleState {
+    NotInstalled,
+    Installing,
+    Ready,
+    Failed,
+}
+
+impl std::fmt::Display for AdapterLifecycleState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::NotInstalled => "not-installed",
+            Self::Installing => "installing",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdapterRecord {
+    pub id: String,
+    pub model_family: String,
+    pub state: AdapterLifecycleState,
+    pub dependency_strategy: String,
+    pub input_contract: String,
+    pub output_contract: String,
+    pub logs: String,
+    pub notes: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunnerRuntimeLayout {
     pub root: PathBuf,
-    pub bin: PathBuf,
-    pub downloads: PathBuf,
-    pub sources: PathBuf,
     pub logs: PathBuf,
-    pub runtime: PathBuf,
 }
