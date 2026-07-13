@@ -1,0 +1,27 @@
+id = "bark-small"
+name = "Bark Small"
+family = "bark-small"
+version = "1.0.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "hf_audio"
+license = "mit"
+description = "Suno Bark Small expressive local text-to-audio generation through the official Transformers BarkModel API."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "8gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
