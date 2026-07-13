@@ -66,17 +66,22 @@ jobs:
           set -o pipefail
           cargo check --workspace 2>&1 | tee cargo-check.log
 
+      - name: Check workspace (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo check --workspace 2>&1 | Tee-Object -FilePath cargo-check-windows.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Upload cargo check log
-        if: always() && runner.os == 'Linux'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cargo-check-${{ matrix.os }}
-          path: cargo-check.log
+          path: |
+            cargo-check.log
+            cargo-check-windows.log
           if-no-files-found: ignore
-
-      - name: Check workspace (Windows)
-        if: runner.os == 'Windows'
-        run: cargo check --workspace
 
       - name: Test workspace (Linux)
         if: runner.os == 'Linux'
@@ -85,17 +90,22 @@ jobs:
           set -o pipefail
           cargo test --workspace 2>&1 | tee cargo-test.log
 
+      - name: Test workspace (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo test --workspace 2>&1 | Tee-Object -FilePath cargo-test-windows.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Upload Rust test log
-        if: always() && runner.os == 'Linux'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cargo-test-${{ matrix.os }}
-          path: cargo-test.log
+          path: |
+            cargo-test.log
+            cargo-test-windows.log
           if-no-files-found: ignore
-
-      - name: Test workspace (Windows)
-        if: runner.os == 'Windows'
-        run: cargo test --workspace
 
   gui:
     name: GUI build
@@ -116,5 +126,16 @@ jobs:
         working-directory: apps/gui
 
       - name: Build GUI
-        run: npm run build
+        shell: bash
         working-directory: apps/gui
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee gui-build.log
+
+      - name: Upload GUI build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-build-log
+          path: apps/gui/gui-build.log
+          if-no-files-found: ignore

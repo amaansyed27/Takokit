@@ -2094,6 +2094,7 @@ dependencies = [
  "crossterm",
  "fs2",
  "open",
+ "percent-encoding",
  "ratatui",
  "serde",
  "serde_json",
@@ -2130,6 +2131,7 @@ dependencies = [
  "takokit-audio",
  "takokit-core",
  "takokit-package",
+ "takokit-store",
  "tempfile",
  "tokio",
  "uuid",
@@ -2163,6 +2165,7 @@ dependencies = [
  "anyhow",
  "axum",
  "http",
+ "percent-encoding",
  "serde",
  "serde_json",
  "takokit-core",
@@ -2182,7 +2185,11 @@ name = "takokit-store"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "fs2",
+ "serde",
+ "serde_json",
  "takokit-core",
+ "uuid",
 ]
 
 [[package]]

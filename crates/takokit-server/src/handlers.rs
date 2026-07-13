@@ -5,11 +5,11 @@ use axum::{
     Json,
 };
 use takokit_core::{
-    CapabilitiesResponse, CapabilityInfo, CapabilityKind, CloneVoiceRequest, DaemonIdentity,
-    DaemonMode, DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse,
-    ModelInstallReport, ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse,
-    PullRunnerRequest, RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError,
-    TrainVoiceRequest, TranscriptionRequest, VoicesResponse,
+    CapabilitiesResponse, CapabilityInfo, CapabilityKind, DaemonIdentity, DaemonMode,
+    DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse, ModelInstallReport,
+    ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
+    RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
+    TranscriptionRequest, VoicesResponse,
 };
 use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
 use takokit_package::{
@@ -24,9 +24,11 @@ use crate::AppState;
 mod error;
 mod inference;
 mod packages;
+mod sessions;
 mod system;
 
 pub use error::ApiError;
 pub use inference::*;
 pub use packages::*;
+pub use sessions::*;
 pub use system::*;

@@ -1,5 +1,11 @@
+mod voice;
+mod workspace;
+
 use std::path::{Path, PathBuf};
 use takokit_core::{TakokitError, TakokitResult};
+
+pub use voice::VoiceProfileStore;
+pub use workspace::WorkspaceStore;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalStore {
@@ -107,6 +113,8 @@ impl LocalStore {
         self.root.join("datasets")
     }
 
+    /// Legacy/global output directory. User-facing CLI, TUI and GUI inference
+    /// should prefer `WorkspaceStore::session_outputs_dir`.
     pub fn outputs_dir(&self) -> PathBuf {
         self.root.join("outputs")
     }

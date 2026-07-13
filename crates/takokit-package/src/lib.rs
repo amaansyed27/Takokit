@@ -15,6 +15,7 @@ mod runtime;
 mod runtime_command;
 mod runtime_onnx;
 mod runtime_python;
+mod runtime_python_specs;
 mod runtime_uv;
 mod runtime_whisper;
 mod transaction;
@@ -31,9 +32,8 @@ pub use resolution::{
 };
 pub use runner::*;
 pub use runtime::{initialize_runner_runtime, python_managed_runner_layout, runner_runtime_layout};
-pub use runtime_python::{
-    adapter_for_model, install_python_adapter, python_adapter_record, python_adapter_records,
-};
+pub use runtime_python::{install_python_adapter, python_adapter_record, python_adapter_records};
+pub use runtime_python_specs::adapter_for_model;
 pub use runtime_uv::{bootstrap_uv, find_uv};
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { generateSpeech } from "../lib/api";
+import { generateSessionSpeech } from "../lib/sessionInference";
 import type { SpeechApiResponse } from "../lib/types";
 
 type GenerateInput = {
@@ -23,7 +23,7 @@ export function useMockGeneration() {
     setError(null);
 
     try {
-      const response = await generateSpeech({
+      const response = await generateSessionSpeech({
         model: input.model,
         voice: input.voice,
         input: input.input,

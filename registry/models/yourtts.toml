@@ -1,0 +1,27 @@
+id = "yourtts"
+name = "YourTTS"
+family = "yourtts"
+version = "1.0.0"
+kind = "voice-cloning"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "coqui_tts"
+license = "license-check-required"
+description = "Coqui YourTTS zero-shot multilingual voice cloning through the official TTS Python API. Requires a consent-backed voice profile or reference audio."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = true
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "10gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []

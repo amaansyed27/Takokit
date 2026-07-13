@@ -1,0 +1,27 @@
+id = "mms-tts-eng"
+name = "MMS-TTS English"
+family = "mms-tts-eng"
+version = "1.0.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "hf_audio"
+license = "cc-by-nc-4.0"
+description = "Meta MMS English text-to-speech through the official Transformers VitsModel API. Review the non-commercial model license before use."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "6gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []

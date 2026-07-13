@@ -1,10 +1,16 @@
 use takokit_core::RuntimeConfig;
 use takokit_store::LocalStore;
 
-pub async fn open_gui(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
+use crate::workspace::CliWorkspace;
+
+pub async fn open_gui(
+    store: &LocalStore,
+    config: &RuntimeConfig,
+    workspace: &CliWorkspace,
+) -> anyhow::Result<()> {
     ensure_server(store, config).await?;
 
-    let url = config.gui_url();
+    let url = format!("{}?{}", config.gui_url(), workspace.gui_query());
     match open::that(&url) {
         Ok(()) => println!("Opened Takokit local web GUI at {url}"),
         Err(error) => {

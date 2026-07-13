@@ -1,6 +1,14 @@
-use takokit_core::RuntimeConfig;
-use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
-use takokit_store::LocalStore;
+use takokit_core::{RuntimeConfig, SessionSummary};
+use takokit_package::{InstalledRegistry, PackageRegistry};
+use takokit_store::{LocalStore, WorkspaceStore};
+use uuid::Uuid;
+
+use crate::workspace::{CliWorkspace, SESSION_ENV, WORKSPACE_ENV};
+
+use super::catalog::{
+    capability_indexes, find_capability_index, find_model_index, find_runner_index,
+    load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuiAction {
@@ -17,11 +25,18 @@ pub enum TuiAction {
         model: String,
         audio: String,
     },
+    CloneVoice {
+        model: String,
+        name: String,
+        sample: String,
+    },
     PullRunner(String),
     InstallRunner(String),
     RemoveRunner(String),
     DoctorRunner(String),
     RunSystem(SystemAction),
+    OpenSession(Uuid),
+    NewSession,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,15 +44,19 @@ pub enum TuiTab {
     Models,
     Speak,
     Transcribe,
+    Clone,
+    Sessions,
     Runners,
     System,
 }
 
 impl TuiTab {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Models,
         Self::Speak,
         Self::Transcribe,
+        Self::Clone,
+        Self::Sessions,
         Self::Runners,
         Self::System,
     ];
@@ -47,6 +66,8 @@ impl TuiTab {
             Self::Models => "Models",
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
+            Self::Clone => "Clone",
+            Self::Sessions => "Sessions",
             Self::Runners => "Runners",
             Self::System => "System",
         }
@@ -116,54 +137,16 @@ impl TranscribeField {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ModelRow {
-    pub id: String,
-    pub title: String,
-    pub state: String,
-    pub detail: String,
-    pub tts: bool,
-    pub stt: bool,
-    pub executable: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct RunnerRow {
-    pub id: String,
-    pub title: String,
-    pub state: String,
-    pub detail: String,
-    pub installed: bool,
-    pub ready: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SystemAction {
-    Status,
-    Doctor,
-    StartDaemon,
-    StopDaemon,
-    RestartDaemon,
-    Logs,
-    OpenGui,
-}
-
-#[derive(Debug, Clone)]
-pub struct SystemRow {
-    pub title: &'static str,
-    pub state: &'static str,
-    pub detail: &'static str,
-    pub action: SystemAction,
-}
-
 pub struct App {
     pub tab: TuiTab,
     pub models: Vec<ModelRow>,
     pub runners: Vec<RunnerRow>,
     pub system: Vec<SystemRow>,
+    pub sessions: Vec<SessionSummary>,
     pub model_index: usize,
     pub runner_index: usize,
     pub system_index: usize,
+    pub session_index: usize,
     pub tts_models: Vec<usize>,
     pub stt_models: Vec<usize>,
     pub speak_model_index: usize,
@@ -176,6 +159,7 @@ pub struct App {
     pub speak_text_cursor: usize,
     pub transcribe_audio: String,
     pub transcribe_audio_cursor: usize,
+    pub clone_state: super::clone::CloneState,
     pub storage_root: String,
     pub server: String,
     pub status: String,
@@ -184,6 +168,11 @@ pub struct App {
     pub output_scroll: u16,
     pub tick: u64,
     pub show_help: bool,
+    pub slash_open: bool,
+    pub slash_input: String,
+    pub slash_cursor: usize,
+    workspace_store: WorkspaceStore,
+    active_session: Uuid,
 }
 
 impl App {
@@ -192,22 +181,31 @@ impl App {
         store: &LocalStore,
         package_registry: &PackageRegistry,
         installed_registry: &InstalledRegistry,
+        workspace: &CliWorkspace,
     ) -> anyhow::Result<Self> {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
         let (tts_models, stt_models) = capability_indexes(&models);
-        let speak_model_index = find_capability_index(&models, &tts_models, None, "kokoro");
-        let transcribe_model_index =
-            find_capability_index(&models, &stt_models, None, "whisper-tiny");
+        let clone_state = super::clone::CloneState::new(&models);
+        let sessions = workspace.store.list_sessions(None)?;
+        let active_session = workspace.session_id();
+        let session_index = session_position(&sessions, active_session);
         Ok(Self {
             tab: TuiTab::Models,
+            speak_model_index: find_capability_index(&models, &tts_models, None, "kokoro"),
+            transcribe_model_index: find_capability_index(
+                &models,
+                &stt_models,
+                None,
+                "whisper-tiny",
+            ),
             models,
             runners,
             system: system_rows(),
+            sessions,
             model_index: 0,
             runner_index: 0,
             system_index: 0,
-            speak_model_index,
-            transcribe_model_index,
+            session_index,
             tts_models,
             stt_models,
             speak_field: SpeakField::Text,
@@ -218,14 +216,24 @@ impl App {
             speak_text_cursor: 0,
             transcribe_audio: String::new(),
             transcribe_audio_cursor: 0,
+            clone_state,
             storage_root: store.root().display().to_string(),
             server: config.local_base_url(),
-            status: "Ready. Choose a task above; no commands are required.".to_string(),
+            status: format!(
+                "Session {} is active. Outputs are saved under {}.",
+                active_session,
+                workspace.outputs_dir().display()
+            ),
             running_label: None,
             last_label: None,
             output_scroll: 0,
             tick: 0,
             show_help: false,
+            slash_open: false,
+            slash_input: String::new(),
+            slash_cursor: 0,
+            workspace_store: workspace.store.clone(),
+            active_session,
         })
     }
 
@@ -262,9 +270,50 @@ impl App {
             transcribe_model.as_deref(),
             "whisper-tiny",
         );
+        self.clone_state.reload_models(&self.models);
         self.storage_root = store.root().display().to_string();
         self.server = config.local_base_url();
+        self.reload_sessions()?;
         Ok(())
+    }
+
+    pub fn reload_sessions(&mut self) -> anyhow::Result<()> {
+        self.sessions = self.workspace_store.list_sessions(None)?;
+        self.session_index = session_position(&self.sessions, self.active_session);
+        Ok(())
+    }
+
+    pub fn activate_session(&mut self, id: Uuid) -> anyhow::Result<()> {
+        let session = self.workspace_store.read_session(id)?;
+        self.workspace_store.set_active_session(id)?;
+        self.active_session = id;
+        std::env::set_var(WORKSPACE_ENV, self.workspace_store.workspace_root());
+        std::env::set_var(SESSION_ENV, id.to_string());
+        self.reload_sessions()?;
+        self.set_status(format!(
+            "Opened {}. New outputs will be saved in {}.",
+            session.summary.title,
+            self.workspace_store.session_outputs_dir(id).display()
+        ));
+        Ok(())
+    }
+
+    pub fn create_session(&mut self) -> anyhow::Result<()> {
+        let session = self.workspace_store.create_session(None)?;
+        self.activate_session(session.summary.id)
+    }
+
+    pub fn workspace_args(&self) -> Vec<String> {
+        vec![
+            "--workspace".to_string(),
+            self.workspace_store.workspace_root().display().to_string(),
+            "--session".to_string(),
+            self.active_session.to_string(),
+        ]
+    }
+
+    pub fn active_session(&self) -> Uuid {
+        self.active_session
     }
 
     pub fn selected_model(&self) -> Option<&ModelRow> {
@@ -279,9 +328,20 @@ impl App {
         self.system.get(self.system_index)
     }
 
+    pub fn selected_session(&self) -> Option<&SessionSummary> {
+        self.sessions.get(self.session_index)
+    }
+
     pub fn selected_speak_model(&self) -> Option<&ModelRow> {
         self.tts_models
             .get(self.speak_model_index)
+            .and_then(|index| self.models.get(*index))
+    }
+
+    pub fn selected_clone_model(&self) -> Option<&ModelRow> {
+        self.clone_state
+            .model_indexes
+            .get(self.clone_state.model_index)
             .and_then(|index| self.models.get(*index))
     }
 
@@ -307,175 +367,21 @@ impl App {
     }
 }
 
-fn load_runtime_rows(
-    package_registry: &PackageRegistry,
-    installed_registry: &InstalledRegistry,
-) -> anyhow::Result<(Vec<ModelRow>, Vec<RunnerRow>)> {
-    let models = package_registry
-        .models()?
-        .into_iter()
-        .map(|model| {
-            let plan = plan_model(package_registry, installed_registry, &model.id)?;
-            let capabilities = [
-                model.capabilities.tts.then_some("text to speech"),
-                model.capabilities.stt.then_some("speech to text"),
-                model.capabilities.voice_cloning.then_some("voice cloning"),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(", ");
-            Ok(ModelRow {
-                id: model.id,
-                title: model.name,
-                state: if plan.executable {
-                    "ready".to_string()
-                } else {
-                    plan.lifecycle_state.to_string()
-                },
-                detail: format!(
-                    "{}\n\nCapability: {}\nFamily: {}\nRunner: {}\nHardware: {}\n\n{}",
-                    model.description,
-                    if capabilities.is_empty() { "specialized" } else { &capabilities },
-                    model.family,
-                    plan.required_runner,
-                    model.hardware.min_ram.as_deref().unwrap_or("no minimum listed"),
-                    if plan.executable {
-                        "Ready to use. Press Enter to open the matching task screen.".to_string()
-                    } else {
-                        format!(
-                            "Not ready yet. Press Enter to let Takokit install what is missing.\nMissing: {}",
-                            if plan.missing.is_empty() { "setup".to_string() } else { plan.missing.join("; ") }
-                        )
-                    }
-                ),
-                tts: model.capabilities.tts,
-                stt: model.capabilities.stt,
-                executable: plan.executable,
-            })
-        })
-        .collect::<Result<Vec<_>, takokit_package::PackageError>>()?;
-
-    let runners = package_registry
-        .runners()?
-        .into_iter()
-        .map(|runner| {
-            let record = installed_registry.installed_runner_record(&runner.id).ok();
-            let state = record
-                .as_ref()
-                .map(|record| record.status.to_string())
-                .unwrap_or_else(|| "available".to_string());
-            let ready = state == "ready";
-            RunnerRow {
-                id: runner.id,
-                title: runner.name,
-                state: state.clone(),
-                detail: format!(
-                    "{}\n\nVersion: {}\nPlatforms: {}\nModel families: {}\nState: {}\n\n{}",
-                    runner.description,
-                    runner.version,
-                    runner.platforms.join(", "),
-                    runner.supported_model_families.join(", "),
-                    state,
-                    if ready {
-                        "Ready. Press Enter to run its diagnostic check."
-                    } else if record.is_some() {
-                        "The runner contract exists. Press Enter to install its runtime."
-                    } else {
-                        "Press Enter to add this runner."
-                    }
-                ),
-                installed: record.is_some(),
-                ready,
-            }
-        })
-        .collect();
-    Ok((models, runners))
-}
-
-fn capability_indexes(models: &[ModelRow]) -> (Vec<usize>, Vec<usize>) {
-    let tts = models
+fn session_position(sessions: &[SessionSummary], active: Uuid) -> usize {
+    sessions
         .iter()
-        .enumerate()
-        .filter_map(|(index, model)| model.tts.then_some(index))
-        .collect();
-    let stt = models
-        .iter()
-        .enumerate()
-        .filter_map(|(index, model)| model.stt.then_some(index))
-        .collect();
-    (tts, stt)
-}
-
-fn find_model_index(models: &[ModelRow], id: Option<&str>) -> usize {
-    id.and_then(|id| models.iter().position(|model| model.id == id))
+        .position(|session| session.id == active)
         .unwrap_or(0)
 }
 
-fn find_runner_index(runners: &[RunnerRow], id: Option<&str>) -> usize {
-    id.and_then(|id| runners.iter().position(|runner| runner.id == id))
-        .unwrap_or(0)
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn find_capability_index(
-    models: &[ModelRow],
-    indexes: &[usize],
-    selected: Option<&str>,
-    preferred: &str,
-) -> usize {
-    selected
-        .and_then(|id| indexes.iter().position(|index| models[*index].id == id))
-        .or_else(|| {
-            indexes
-                .iter()
-                .position(|index| models[*index].id == preferred)
-        })
-        .unwrap_or(0)
-}
-
-fn system_rows() -> Vec<SystemRow> {
-    vec![
-        SystemRow {
-            title: "Runtime status",
-            state: "read",
-            detail: "Check the daemon, storage, and currently available runtime state.",
-            action: SystemAction::Status,
-        },
-        SystemRow {
-            title: "Doctor",
-            state: "diagnostics",
-            detail: "Run the complete local setup and model readiness check.",
-            action: SystemAction::Doctor,
-        },
-        SystemRow {
-            title: "Start daemon",
-            state: "service",
-            detail: "Start Takokit's managed local API service.",
-            action: SystemAction::StartDaemon,
-        },
-        SystemRow {
-            title: "Stop daemon",
-            state: "service",
-            detail: "Stop the managed local API service.",
-            action: SystemAction::StopDaemon,
-        },
-        SystemRow {
-            title: "Restart daemon",
-            state: "service",
-            detail: "Restart the managed local API service.",
-            action: SystemAction::RestartDaemon,
-        },
-        SystemRow {
-            title: "View logs",
-            state: "diagnostics",
-            detail: "Show the latest daemon log location and output.",
-            action: SystemAction::Logs,
-        },
-        SystemRow {
-            title: "Open GUI",
-            state: "interface",
-            detail: "Open the local browser interface using the same daemon and model state.",
-            action: SystemAction::OpenGui,
-        },
-    ]
+    #[test]
+    fn tab_cycle_includes_clone_and_sessions() {
+        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Clone);
+        assert_eq!(TuiTab::Clone.next(), TuiTab::Sessions);
+        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Clone);
+    }
 }

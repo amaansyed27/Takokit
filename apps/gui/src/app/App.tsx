@@ -4,6 +4,7 @@ import { type PageId } from "./navigation";
 import { routes } from "./routes";
 import { mockRuntime } from "../lib/mockData";
 import { loadRuntimeSnapshot } from "../lib/api";
+import { initializeWorkspaceSession } from "../lib/sessions";
 
 const routeIds = new Set<PageId>(routes.map((route) => route.id));
 
@@ -25,7 +26,18 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void refreshRuntime();
+    let cancelled = false;
+    async function initialize() {
+      try {
+        await initializeWorkspaceSession();
+      } finally {
+        if (!cancelled) await refreshRuntime();
+      }
+    }
+    void initialize();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function refreshRuntime() {
@@ -35,7 +47,9 @@ export function App() {
 
   function navigate(page: PageId) {
     setActivePage(page);
-    window.history.replaceState(null, "", `#${page}`);
+    const url = new URL(window.location.href);
+    url.hash = page;
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   return (

@@ -1,16 +1,19 @@
 mod daemon;
 mod daemon_client;
+mod direct_inference;
 mod display;
 mod doctor;
 mod gui;
+mod session_commands;
 mod tui;
+mod workspace;
 
 use clap::Parser;
 use display::format_model_show;
 use serde::Serialize;
 use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
-use takokit_core::{CapabilityKind, RuntimeConfig, SpeechRequest, TakokitError};
+use takokit_core::{CapabilityKind, RuntimeConfig, TakokitError};
 use takokit_models::{
     execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
     TextToSpeechEngine,
@@ -32,9 +35,12 @@ mod test_commands;
 
 use args::*;
 use daemon_commands::*;
+use direct_inference::*;
 use local_setup::*;
 use output::*;
+use session_commands::*;
 use test_commands::*;
+use workspace::CliWorkspace;
 
 fn cli_storage_root() -> PathBuf {
     LocalStore::default_root()
@@ -45,19 +51,43 @@ pub async fn run() -> anyhow::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let cli = Cli::parse();
+    let Cli {
+        direct,
+        workspace: workspace_arg,
+        session: session_arg,
+        command,
+    } = Cli::parse();
     let store = LocalStore::new(cli_storage_root());
     store.ensure_layout()?;
     let config = RuntimeConfig::local(store.root().to_path_buf());
     let package_registry = PackageRegistry::bundled();
     let installed_registry = InstalledRegistry::new(store.manifests_dir());
+    let workspace = if command_uses_workspace(&command) {
+        Some(CliWorkspace::resolve(
+            workspace_arg.clone(),
+            session_arg,
+            starts_new_session(&command),
+            surface_title(&command),
+        )?)
+    } else {
+        None
+    };
 
-    if !cli.direct && route_daemon_command(&cli.command, &store, &config).await? {
+    if !direct && route_daemon_command(&command, &store, &config).await? {
         return Ok(());
     }
 
-    match cli.command {
-        None => tui::run_launcher(&config, &store, &package_registry, &installed_registry).await?,
+    match command {
+        None => {
+            tui::run_launcher(
+                &config,
+                &store,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref().expect("TUI workspace"),
+            )
+            .await?
+        }
         Some(Command::Serve {
             daemon_child,
             instance_id,
@@ -94,7 +124,9 @@ pub async fn run() -> anyhow::Result<()> {
             },
             DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
         },
-        Some(Command::Gui) => gui::open_gui(&store, &config).await?,
+        Some(Command::Gui) => {
+            gui::open_gui(&store, &config, workspace.as_ref().expect("GUI workspace")).await?
+        }
         Some(Command::Doctor(args)) => {
             let report =
                 doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
@@ -123,9 +155,7 @@ pub async fn run() -> anyhow::Result<()> {
         },
         Some(Command::Samples {
             command: SamplesCommand::Create,
-        }) => {
-            create_samples(&store, &package_registry, &installed_registry).await?;
-        }
+        }) => create_samples(&store, &package_registry, &installed_registry).await?,
         Some(Command::Version) => {
             println!("takokit {}", env!("CARGO_PKG_VERSION"));
             println!("storage: {}", store.root().display());
@@ -146,43 +176,13 @@ pub async fn run() -> anyhow::Result<()> {
             LibraryTarget::Runners => print_library_runners(&package_registry)?,
         },
         Some(Command::Speak(args)) => {
-            if args.model != "mock-tts" {
-                let plan = resolve_execution_plan(
-                    &package_registry,
-                    &installed_registry,
-                    &args.model,
-                    CapabilityKind::TextToSpeech,
-                )
-                .map_err(cli_error)?;
-                let response = execute_speech(
-                    &plan,
-                    SpeechRequest {
-                        model: args.model,
-                        input: args.text,
-                        voice: Some(args.voice),
-                        response_format: Some("wav".to_string()),
-                    },
-                    &store.outputs_dir(),
-                )
-                .await
-                .map_err(runtime_error)?;
-                println!("{}", serde_json::to_string_pretty(&response)?);
-                return Ok(());
-            }
-
-            let engine = MockTextToSpeechEngine;
-            let response = engine
-                .synthesize(
-                    SpeechRequest {
-                        model: args.model,
-                        input: args.text,
-                        voice: Some(args.voice),
-                        response_format: Some("wav".to_string()),
-                    },
-                    &store.outputs_dir(),
-                )
-                .await?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
+            run_speak(
+                args,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref().expect("speech workspace"),
+            )
+            .await?
         }
         Some(Command::Pull(args)) => {
             let report = install_model_complete(
@@ -207,11 +207,7 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Plan(args)) => {
             let plan = plan_model(&package_registry, &installed_registry, &args.model)
                 .map_err(cli_error)?;
-            if args.json {
-                println!("{}", serde_json::to_string_pretty(&plan)?);
-            } else {
-                print_model_plan(&plan);
-            }
+            print_or_json_plan(&plan, args.json)?;
         }
         Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
@@ -236,95 +232,16 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Run(args)) => {
-            validate_run_args(&args)?;
-            let manifest = package_registry.model(&args.model).map_err(cli_error)?;
-            if args.text.is_some() && !manifest.capabilities.tts {
-                return Err(anyhow::anyhow!(
-                    "model {} does not support text to speech",
-                    args.model
-                ));
-            }
-            if args.file.is_some() && !manifest.capabilities.stt {
-                return Err(anyhow::anyhow!(
-                    "model {} does not support speech to text",
-                    args.model
-                ));
-            }
-            if let Some(text) = args.text {
-                let response = if cli.direct && args.model != "mock-tts" {
-                    let plan = resolve_execution_plan(
-                        &package_registry,
-                        &installed_registry,
-                        &args.model,
-                        CapabilityKind::TextToSpeech,
-                    )
-                    .map_err(cli_error)?;
-                    execute_speech(
-                        &plan,
-                        SpeechRequest {
-                            model: args.model,
-                            input: text,
-                            voice: args.voice,
-                            response_format: Some("wav".to_string()),
-                        },
-                        &store.outputs_dir(),
-                    )
-                    .await
-                    .map_err(runtime_error)?
-                } else if cli.direct {
-                    MockTextToSpeechEngine
-                        .synthesize(
-                            SpeechRequest {
-                                model: args.model,
-                                input: text,
-                                voice: args.voice,
-                                response_format: Some("wav".to_string()),
-                            },
-                            &store.outputs_dir(),
-                        )
-                        .await?
-                } else {
-                    daemon_client::Client::ensure(&store, &config)?.speech(SpeechRequest {
-                        model: args.model,
-                        input: text,
-                        voice: args.voice,
-                        response_format: Some("wav".to_string()),
-                    })?
-                };
-                println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if cli.direct {
-                let model = args.model;
-                let plan = resolve_execution_plan(
-                    &package_registry,
-                    &installed_registry,
-                    &model,
-                    CapabilityKind::SpeechToText,
-                )
-                .map_err(cli_error)?;
-                let response = execute_transcription(
-                    &plan,
-                    takokit_core::TranscriptionRequest {
-                        file_path: args.file.unwrap(),
-                        model: Some(model),
-                    },
-                )
-                .await
-                .map_err(runtime_error)?;
-                println!("{}", serde_json::to_string_pretty(&response)?);
-            } else {
-                let response: takokit_core::TranscriptionResponse =
-                    daemon_client::Client::ensure(&store, &config)?.post(
-                        "/v1/audio/transcriptions",
-                        &takokit_core::TranscriptionRequest {
-                            file_path: args.file.unwrap(),
-                            model: Some(args.model),
-                        },
-                    )?;
-                println!("{}", serde_json::to_string_pretty(&response)?);
-            }
+            run_model(
+                args,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref().expect("run workspace"),
+            )
+            .await?
         }
         Some(Command::Ps) => {
-            if cli.direct {
+            if direct {
                 println!("[]");
             } else {
                 let value: serde_json::Value =
@@ -333,39 +250,22 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Transcribe { audio, model }) => {
-            let plan = resolve_execution_plan(
+            run_transcription(
+                audio,
+                model,
                 &package_registry,
                 &installed_registry,
-                &model,
-                CapabilityKind::SpeechToText,
+                workspace.as_ref().expect("transcription workspace"),
             )
-            .map_err(cli_error)?;
-            let response = execute_transcription(
-                &plan,
-                takokit_core::TranscriptionRequest {
-                    file_path: audio,
-                    model: Some(model),
-                },
-            )
-            .await
-            .map_err(runtime_error)?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
-            return Ok(());
+            .await?
         }
         Some(Command::Clone(args)) => {
-            let _ = args;
-            return not_implemented(
-                "voice cloning",
-                "clone adapters require explicit model runner integration",
-            );
+            run_clone(args, workspace.as_ref().expect("clone workspace"))?
         }
         Some(Command::Train(args)) => {
-            let _ = args;
-            return not_implemented(
-                "voice training",
-                "training jobs and dataset preparation are planned for a later phase",
-            );
+            run_train(args, workspace.as_ref().expect("training workspace"))?
         }
+        Some(Command::Sessions { command }) => run_sessions_command(workspace_arg, command)?,
         Some(Command::Runner { command }) => match command {
             RunnerCommand::Pull { runner } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
@@ -442,6 +342,34 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn command_uses_workspace(command: &Option<Command>) -> bool {
+    matches!(
+        command,
+        None | Some(Command::Gui)
+            | Some(Command::Speak(_))
+            | Some(Command::Run(_))
+            | Some(Command::Transcribe { .. })
+            | Some(Command::Clone(_))
+            | Some(Command::Train(_))
+    )
+}
+
+fn starts_new_session(command: &Option<Command>) -> bool {
+    matches!(command, None | Some(Command::Gui))
+}
+
+fn surface_title(command: &Option<Command>) -> &'static str {
+    match command {
+        None => "Takokit TUI",
+        Some(Command::Gui) => "Takokit GUI",
+        Some(Command::Speak(_)) => "CLI speech",
+        Some(Command::Transcribe { .. }) => "CLI transcription",
+        Some(Command::Clone(_)) => "CLI voice cloning",
+        Some(Command::Train(_)) => "CLI voice training",
+        _ => "Takokit CLI",
+    }
 }
 
 #[cfg(test)]

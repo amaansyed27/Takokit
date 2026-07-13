@@ -65,6 +65,7 @@ pub fn resolve_execution_plan(
         runner_installed,
         status: ExecutionStatus::Planned,
         installed_model,
+        storage_root: installed_registry.storage_root(),
     })
 }
 

@@ -5,8 +5,9 @@ version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
+required_adapter = "f5_tts"
 license = "license-check-required"
-description = "F5-TTS voice generation family. Metadata-only; execution requires a managed Python adapter and verified artifacts."
+description = "F5-TTS local speech generation with optional reference-audio voice transfer through the official API in an isolated managed environment."
 
 [capabilities]
 tts = true
@@ -21,6 +22,6 @@ gpu = true
 min_ram = "12gb"
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
 voices = []

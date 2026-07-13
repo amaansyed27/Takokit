@@ -13,6 +13,7 @@ serde_json.workspace = true
 takokit-audio = { path = "../takokit-audio" }
 takokit-core = { path = "../takokit-core" }
 takokit-package = { path = "../takokit-package" }
+takokit-store = { path = "../takokit-store" }
 uuid.workspace = true
 
 [dev-dependencies]

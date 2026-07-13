@@ -5,8 +5,9 @@ version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
+required_adapter = "chatterbox"
 license = "non-commercial-check-required"
-description = "Voice cloning and TTS package placeholder. Metadata-only; users must not run upstream Gradio or Python setup manually through Takokit."
+description = "Chatterbox local TTS with optional reference-audio voice cloning through an isolated official Python adapter. Model weights are downloaded into Takokit's global cache on first use."
 
 [capabilities]
 tts = true
@@ -21,6 +22,6 @@ gpu = true
 min_ram = "8gb"
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
 voices = []
