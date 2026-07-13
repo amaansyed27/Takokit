@@ -114,7 +114,7 @@ pub fn operation_rows() -> Vec<TuiRow> {
         title: title.into(),
         state: state.into(),
         detail: format!(
-            "{}\n\nCommand template\n{}\n\nPress Enter to edit and run this command.",
+            "{}\n\nCommand template\n{}\n\nPress Enter to load this template into the command bar. Edit it, then press Enter again to run.",
             detail, template
         ),
         command: None,
@@ -196,7 +196,7 @@ pub fn system_rows() -> Vec<TuiRow> {
             title: title.into(),
             state: state.into(),
             detail: format!(
-                "Runs the exact direct CLI command:\n\ntakokit {}\n\nThe TUI captures its stdout, stderr and completion timing, then refreshes shared state.",
+                "Command\n\ntakokit {}\n\nPress Enter to load it into the command bar, then press Enter again to run. Output and timing remain visible without leaving the TUI.",
                 args.join(" ")
             ),
             command: Some(args),
