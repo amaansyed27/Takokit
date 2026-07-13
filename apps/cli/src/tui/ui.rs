@@ -106,12 +106,10 @@ fn render_sessions(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .sessions
         .iter()
         .map(|session| {
-            let state = if session.id == active {
-                "active".to_string()
-            } else {
-                format!("{} events", session.event_count)
-            };
-            row_item(&session.title, &state)
+            row_item(
+                &session.title,
+                if session.id == active { "active" } else { "saved" },
+            )
         })
         .collect::<Vec<_>>();
     render_list(frame, columns[0], " Sessions ", items, app.session_index);
@@ -331,9 +329,7 @@ fn render_slash(frame: &mut Frame<'_>, app: &App) {
         Paragraph::new(format!("/{}", app.slash_input))
             .block(
                 Block::default()
-                    .title(
-                        " Go to · sessions, new, models, speak, transcribe, runners, system, help ",
-                    )
+                    .title(" Go to · sessions, new, models, speak, transcribe, runners, system, help ")
                     .borders(Borders::ALL),
             )
             .style(Style::default().fg(Color::White)),
