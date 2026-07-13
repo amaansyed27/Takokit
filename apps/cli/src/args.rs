@@ -179,6 +179,9 @@ pub(crate) struct CloneArgs {
     pub(crate) name: String,
     #[arg(long, default_value = "xtts-v2")]
     pub(crate) model: String,
+    /// Confirm that you own the voice or have explicit permission to clone it.
+    #[arg(long)]
+    pub(crate) consent: bool,
 }
 
 #[derive(Debug, Args)]
