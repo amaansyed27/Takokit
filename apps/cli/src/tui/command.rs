@@ -31,12 +31,11 @@ fn validate_cli(args: &[String]) -> Result<(), String> {
         Some(Command::Serve {
             daemon_child: false,
             ..
-        }) => Err(
-            "Foreground `serve` would block the TUI. Use `daemon start` instead.".to_string(),
-        ),
+        }) => {
+            Err("Foreground `serve` would block the TUI. Use `daemon start` instead.".to_string())
+        }
         Some(Command::Serve {
-            daemon_child: true,
-            ..
+            daemon_child: true, ..
         }) => Err("Internal daemon-child flags cannot be launched from the TUI.".to_string()),
         Some(_) => Ok(()),
     }

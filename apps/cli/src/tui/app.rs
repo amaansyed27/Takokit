@@ -223,7 +223,10 @@ impl App {
 
     fn selected_cli(&self, command: &[&str]) -> Option<TuiAction> {
         let id = self.selected_row()?.id.clone();
-        let mut args = command.iter().map(|part| (*part).to_string()).collect::<Vec<_>>();
+        let mut args = command
+            .iter()
+            .map(|part| (*part).to_string())
+            .collect::<Vec<_>>();
         args.push(id);
         Some(TuiAction::RunCli(args))
     }
@@ -256,7 +259,10 @@ impl App {
             return Some(TuiAction::Quit);
         }
         if self.show_help {
-            if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')) {
+            if matches!(
+                key.code,
+                KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
+            ) {
                 self.show_help = false;
             }
             return None;
@@ -338,27 +344,114 @@ pub fn run(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<TuiActio
 
 fn operation_rows() -> Vec<TuiRow> {
     [
-        ("speech", "Generate speech", "TTS", "speak \"Hello from Takokit\" --model kokoro --voice default", "Generate WAV speech with any executable TTS model."),
-        ("run", "Run a model", "TTS / STT", "run whisper-tiny --file \"C:\\path\\audio.wav\"", "Unified model execution. Supply text for TTS or --file for STT."),
-        ("transcribe", "Transcribe audio", "STT", "transcribe \"C:\\path\\audio.wav\" --model whisper-tiny", "Transcribe a local audio file."),
-        ("clone", "Clone a voice", "planned", "clone \"C:\\path\\sample.wav\" --name my-voice", "Consent-gated voice cloning command. The backend currently reports not implemented."),
-        ("train", "Train a voice", "planned", "train \"C:\\path\\samples\" --name my-voice", "Voice training job command. The backend currently reports not implemented."),
-        ("adapter-install", "Install adapter", "runtime", "adapter install qwen3_tts", "Install a managed Python model adapter."),
-        ("adapter-doctor", "Inspect adapter", "diagnostics", "adapter doctor qwen3_tts", "Inspect adapter state, paths, runtime and logs."),
-        ("test-model", "Test one model", "test", "test whisper-tiny --run --file \"C:\\path\\audio.wav\"", "Run model planning or a real model smoke test."),
-        ("test-fast", "Run fast suite", "test", "test --suite fast --run", "Run the fast executable-model suite."),
-        ("test-launch", "Run launch suite", "test", "test --suite launch --run", "Run the complete launch readiness suite."),
-        ("quickstart", "Quickstart", "setup", "quickstart", "Prepare Kokoro and Whisper Tiny and run smoke tests."),
-        ("quickstart-full", "Full quickstart", "setup", "quickstart --full", "Also prepare managed Python and Qwen3-TTS."),
-        ("deps", "Bootstrap dependencies", "setup", "deps bootstrap", "Prepare Takokit's pinned uv and managed Python tooling."),
-        ("samples", "Create samples", "audio", "samples create", "Create real hello.wav and silence.wav fixtures."),
+        (
+            "speech",
+            "Generate speech",
+            "TTS",
+            "speak \"Hello from Takokit\" --model kokoro --voice default",
+            "Generate WAV speech with any executable TTS model.",
+        ),
+        (
+            "run",
+            "Run a model",
+            "TTS / STT",
+            "run whisper-tiny --file \"C:\\path\\audio.wav\"",
+            "Unified model execution. Supply text for TTS or --file for STT.",
+        ),
+        (
+            "transcribe",
+            "Transcribe audio",
+            "STT",
+            "transcribe \"C:\\path\\audio.wav\" --model whisper-tiny",
+            "Transcribe a local audio file.",
+        ),
+        (
+            "clone",
+            "Clone a voice",
+            "planned",
+            "clone \"C:\\path\\sample.wav\" --name my-voice",
+            "Consent-gated voice cloning command. The backend currently reports not implemented.",
+        ),
+        (
+            "train",
+            "Train a voice",
+            "planned",
+            "train \"C:\\path\\samples\" --name my-voice",
+            "Voice training job command. The backend currently reports not implemented.",
+        ),
+        (
+            "adapter-install",
+            "Install adapter",
+            "runtime",
+            "adapter install qwen3_tts",
+            "Install a managed Python model adapter.",
+        ),
+        (
+            "adapter-doctor",
+            "Inspect adapter",
+            "diagnostics",
+            "adapter doctor qwen3_tts",
+            "Inspect adapter state, paths, runtime and logs.",
+        ),
+        (
+            "test-model",
+            "Test one model",
+            "test",
+            "test whisper-tiny --run --file \"C:\\path\\audio.wav\"",
+            "Run model planning or a real model smoke test.",
+        ),
+        (
+            "test-fast",
+            "Run fast suite",
+            "test",
+            "test --suite fast --run",
+            "Run the fast executable-model suite.",
+        ),
+        (
+            "test-launch",
+            "Run launch suite",
+            "test",
+            "test --suite launch --run",
+            "Run the complete launch readiness suite.",
+        ),
+        (
+            "quickstart",
+            "Quickstart",
+            "setup",
+            "quickstart",
+            "Prepare Kokoro and Whisper Tiny and run smoke tests.",
+        ),
+        (
+            "quickstart-full",
+            "Full quickstart",
+            "setup",
+            "quickstart --full",
+            "Also prepare managed Python and Qwen3-TTS.",
+        ),
+        (
+            "deps",
+            "Bootstrap dependencies",
+            "setup",
+            "deps bootstrap",
+            "Prepare Takokit's pinned uv and managed Python tooling.",
+        ),
+        (
+            "samples",
+            "Create samples",
+            "audio",
+            "samples create",
+            "Create real hello.wav and silence.wav fixtures.",
+        ),
     ]
     .into_iter()
     .map(|(id, title, state, template, detail)| TuiRow {
         id: id.into(),
         title: title.into(),
         state: state.into(),
-        detail: format!("{}\n\nCommand template\n{}\n\nPress Enter to edit and run this command.", detail, template),
+        detail: format!(
+            "{}\n\nCommand template\n{}\n\nPress Enter to edit and run this command.",
+            detail, template
+        ),
         command: None,
         template: Some(template.into()),
     })
@@ -409,7 +502,11 @@ fn shifted_index(current: usize, len: usize, delta: isize) -> usize {
 }
 
 fn yes_no(value: bool) -> &'static str {
-    if value { "yes" } else { "no" }
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 #[cfg(test)]
@@ -427,7 +524,18 @@ mod tests {
     fn operations_cover_execution_setup_and_testing() {
         let rows = operation_rows();
         let ids = rows.iter().map(|row| row.id.as_str()).collect::<Vec<_>>();
-        for expected in ["speech", "run", "transcribe", "clone", "train", "adapter-install", "test-fast", "quickstart", "deps", "samples"] {
+        for expected in [
+            "speech",
+            "run",
+            "transcribe",
+            "clone",
+            "train",
+            "adapter-install",
+            "test-fast",
+            "quickstart",
+            "deps",
+            "samples",
+        ] {
             assert!(ids.contains(&expected), "missing operation {expected}");
         }
     }

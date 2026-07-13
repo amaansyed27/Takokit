@@ -95,7 +95,10 @@ mod tests {
 
     #[test]
     fn combines_cli_streams_without_losing_completion_timing() {
-        assert_eq!(combine_output("json", "Completed in 1.2s"), "json\n\nCompleted in 1.2s");
+        assert_eq!(
+            combine_output("json", "Completed in 1.2s"),
+            "json\n\nCompleted in 1.2s"
+        );
         assert_eq!(combine_output("", "failure"), "failure");
     }
 
