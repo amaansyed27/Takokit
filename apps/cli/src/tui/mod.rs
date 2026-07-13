@@ -1,24 +1,36 @@
 mod app;
+mod catalog;
+mod editor;
 mod input;
 mod job;
 mod ui;
 
 use std::{io, time::Duration};
 
-use app::{App, SystemAction, TuiAction};
+use app::{App, TuiAction};
+use catalog::SystemAction;
 use crossterm::event::{self, Event, KeyEventKind};
 use job::CommandJob;
 use takokit_core::RuntimeConfig;
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
 
+use crate::workspace::CliWorkspace;
+
 pub async fn run_launcher(
     config: &RuntimeConfig,
     store: &LocalStore,
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
+    workspace: &CliWorkspace,
 ) -> anyhow::Result<()> {
-    let mut state = App::new(config, store, package_registry, installed_registry)?;
+    let mut state = App::new(
+        config,
+        store,
+        package_registry,
+        installed_registry,
+        workspace,
+    )?;
     let mut active_job: Option<CommandJob> = None;
 
     ratatui::run(|mut terminal| -> io::Result<()> {
@@ -67,8 +79,24 @@ pub async fn run_launcher(
                 }
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
-                        Ok(()) => state.set_status("Local model and runner state refreshed."),
+                        Ok(()) => state.set_status("Local model, runner, and session state refreshed."),
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
+                    }
+                }
+                TuiAction::OpenSession(id) => {
+                    if active_job.is_some() {
+                        state.set_status("Wait for the current task before switching sessions.");
+                    } else if let Err(error) = state.activate_session(id) {
+                        state.set_status(format!("Could not open session: {error:#}"));
+                    }
+                }
+                TuiAction::NewSession => {
+                    if active_job.is_some() {
+                        state.set_status("Wait for the current task before creating a session.");
+                    } else if let Err(error) = state.create_session() {
+                        state.set_status(format!("Could not create session: {error:#}"));
+                    } else {
+                        state.tab = app::TuiTab::Sessions;
                     }
                 }
                 action => {
@@ -78,7 +106,7 @@ pub async fn run_launcher(
                         );
                         continue;
                     }
-                    let Some((label, args)) = task_for_action(action) else {
+                    let Some((label, args)) = task_for_action(&state, action) else {
                         continue;
                     };
                     let job = CommandJob::start(label.clone(), args);
@@ -92,15 +120,15 @@ pub async fn run_launcher(
     Ok(())
 }
 
-fn task_for_action(action: TuiAction) -> Option<(String, Vec<String>)> {
-    match action {
+fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)> {
+    let (label, command) = match action {
         TuiAction::PullModel(model) => {
-            Some((format!("Preparing {model}"), vec!["pull".into(), model]))
+            (format!("Preparing {model}"), vec!["pull".into(), model])
         }
         TuiAction::RemoveModel(model) => {
-            Some((format!("Removing {model}"), vec!["rm".into(), model]))
+            (format!("Removing {model}"), vec!["rm".into(), model])
         }
-        TuiAction::Speak { model, voice, text } => Some((
+        TuiAction::Speak { model, voice, text } => (
             format!("Generating speech with {model}"),
             vec![
                 "speak".into(),
@@ -114,30 +142,36 @@ fn task_for_action(action: TuiAction) -> Option<(String, Vec<String>)> {
                     voice
                 },
             ],
-        )),
-        TuiAction::Transcribe { model, audio } => Some((
+        ),
+        TuiAction::Transcribe { model, audio } => (
             format!("Transcribing with {model}"),
             vec!["transcribe".into(), audio, "--model".into(), model],
-        )),
-        TuiAction::PullRunner(runner) => Some((
+        ),
+        TuiAction::PullRunner(runner) => (
             format!("Adding {runner}"),
             vec!["runner".into(), "pull".into(), runner],
-        )),
-        TuiAction::InstallRunner(runner) => Some((
+        ),
+        TuiAction::InstallRunner(runner) => (
             format!("Installing {runner}"),
             vec!["runner".into(), "install".into(), runner],
-        )),
-        TuiAction::RemoveRunner(runner) => Some((
+        ),
+        TuiAction::RemoveRunner(runner) => (
             format!("Removing {runner}"),
             vec!["runner".into(), "rm".into(), runner],
-        )),
-        TuiAction::DoctorRunner(runner) => Some((
+        ),
+        TuiAction::DoctorRunner(runner) => (
             format!("Checking {runner}"),
             vec!["runner".into(), "doctor".into(), runner],
-        )),
-        TuiAction::RunSystem(action) => Some(system_task(action)),
-        TuiAction::Quit | TuiAction::Refresh => None,
-    }
+        ),
+        TuiAction::RunSystem(action) => system_task(action),
+        TuiAction::Quit
+        | TuiAction::Refresh
+        | TuiAction::OpenSession(_)
+        | TuiAction::NewSession => return None,
+    };
+    let mut args = app.workspace_args();
+    args.extend(command);
+    Some((label, args))
 }
 
 fn system_task(action: SystemAction) -> (String, Vec<String>) {
@@ -169,15 +203,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn semantic_actions_map_to_the_shared_cli_backend() {
-        let (_, args) = task_for_action(TuiAction::Transcribe {
-            model: "whisper-tiny".into(),
-            audio: "sample.wav".into(),
-        })
-        .unwrap();
-        assert_eq!(
-            args,
-            vec!["transcribe", "sample.wav", "--model", "whisper-tiny"]
-        );
+    fn system_tasks_remain_semantic() {
+        let (label, args) = system_task(SystemAction::Doctor);
+        assert_eq!(label, "Running diagnostics");
+        assert_eq!(args, vec!["doctor"]);
     }
 }
