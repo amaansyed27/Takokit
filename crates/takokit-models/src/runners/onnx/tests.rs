@@ -149,6 +149,7 @@ fn artifact_record(name: &str, role: ArtifactRole, local_path: &Path) -> Install
 }
 
 fn piper_plan(artifacts: Vec<InstalledArtifactRecord>) -> ExecutionPlan {
+    let storage_root = std::env::temp_dir().join("takokit-onnx-test");
     ExecutionPlan {
         model: ModelManifest {
             id: "piper-lessac".to_string(),
@@ -202,5 +203,6 @@ fn piper_plan(artifacts: Vec<InstalledArtifactRecord>) -> ExecutionPlan {
             status: InstalledPackageStatus::Ready,
             note: "test".to_string(),
         }),
+        storage_root,
     }
 }
