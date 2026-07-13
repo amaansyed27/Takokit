@@ -1,0 +1,79 @@
+name: Repair TUI branch state
+
+on:
+  push:
+    branches:
+      - agent/workspaces-sessions-model-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspaces-sessions-model-matrix
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply deterministic repairs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          input_path = Path("apps/cli/src/tui/input.rs")
+          source = input_path.read_text()
+          duplicate = '''            TuiTab::Clone => super::clone::handle_key(self, key),
+            TuiTab::Clone => {
+                super::clone::handle_key(
+                    self,
+                    KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+                )
+            }
+'''
+          replacement = '''            TuiTab::Clone => super::clone::handle_key(self, key),
+'''
+          if duplicate in source:
+              source = source.replace(duplicate, replacement, 1)
+          elif source.count("TuiTab::Clone =>") != 2:
+              raise SystemExit("unexpected Clone dispatch state")
+          input_path.write_text(source)
+
+          app_path = Path("apps/cli/src/tui/app.rs")
+          source = app_path.read_text()
+          old = '''    fn tab_cycle_includes_sessions() {
+        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Sessions);
+        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Transcribe);
+    }
+'''
+          new = '''    fn tab_cycle_includes_clone_and_sessions() {
+        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Clone);
+        assert_eq!(TuiTab::Clone.next(), TuiTab::Sessions);
+        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Clone);
+    }
+'''
+          if old in source:
+              source = source.replace(old, new)
+          elif new not in source:
+              raise SystemExit("stale tab-cycle test anchor missing")
+          app_path.write_text(source)
+
+          mod_path = Path("apps/cli/src/tui/mod.rs")
+          source = mod_path.read_text().replace(
+              "ratatui::run(|mut terminal| -> io::Result<()> {",
+              "ratatui::run(|terminal| -> io::Result<()> {",
+          )
+          mod_path.write_text(source)
+      - run: cargo fmt --all
+      - name: Remove this one-time workflow
+        run: rm .github/workflows/repair-tui-branch.yml
+      - name: Commit repairs
+        shell: bash
+        run: |
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Repair TUI navigation and tab-cycle tests"
+          git push origin HEAD:agent/workspaces-sessions-model-matrix
