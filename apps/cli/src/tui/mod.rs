@@ -2,15 +2,12 @@ mod app;
 mod command;
 mod ui;
 
+use std::process::Command;
+
 use app::{App, TuiAction};
 use takokit_core::RuntimeConfig;
-use takokit_package::{
-    initialize_runner_runtime, install_model_complete, plan_model, InstallModelOptions,
-    InstalledRegistry, PackageRegistry,
-};
+use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
-
-use crate::{doctor, gui};
 
 pub async fn run_launcher(
     config: &RuntimeConfig,
@@ -19,7 +16,7 @@ pub async fn run_launcher(
     installed_registry: &InstalledRegistry,
 ) -> anyhow::Result<()> {
     let mut status = format!(
-        "Ready. Storage: {}. Press ? for keyboard help.",
+        "Ready. All palette commands use the same CLI and daemon backend. Storage: {}",
         store.root().display()
     );
 
@@ -31,125 +28,82 @@ pub async fn run_launcher(
             Ok(())
         })?;
 
-        let action = selected_action.unwrap_or(TuiAction::Quit);
-        if action == TuiAction::Quit {
-            return Ok(());
-        }
-
-        status = match execute_action(action, config, store, package_registry, installed_registry)
-            .await
-        {
-            Ok(message) => message,
-            Err(error) => format!("Error: {error:#}"),
-        };
-    }
-}
-
-async fn execute_action(
-    action: TuiAction,
-    config: &RuntimeConfig,
-    store: &LocalStore,
-    package_registry: &PackageRegistry,
-    installed_registry: &InstalledRegistry,
-) -> anyhow::Result<String> {
-    match action {
-        TuiAction::Quit => Ok("Exiting Takokit.".to_string()),
-        TuiAction::Refresh => Ok("Catalog and runtime state refreshed.".to_string()),
-        TuiAction::PullModel(model_id) => {
-            let report = install_model_complete(
-                package_registry,
-                installed_registry,
-                store.root(),
-                &model_id,
-                InstallModelOptions {
-                    metadata_only: false,
-                },
-            )?;
-            Ok(format!(
-                "Pulled {}. Executable: {}. Missing: {}. Logs: {}",
-                report.model_id,
-                yes_no(report.executable),
-                if report.missing.is_empty() {
-                    "none".to_string()
-                } else {
-                    report.missing.join("; ")
-                },
-                report.logs_path.display()
-            ))
-        }
-        TuiAction::PlanModel(model_id) => {
-            let plan = plan_model(package_registry, installed_registry, &model_id)?;
-            Ok(format!(
-                "{} [{}] · lifecycle={} · runner={} ({}) · executable={} · missing={} · next={}",
-                plan.model_name,
-                plan.model_id,
-                plan.lifecycle_state,
-                plan.required_runner,
-                plan.runner_runtime_state,
-                yes_no(plan.executable),
-                if plan.missing.is_empty() {
-                    "none".to_string()
-                } else {
-                    plan.missing.join("; ")
-                },
-                plan.next_command
-            ))
-        }
-        TuiAction::InstallRunner(runner_id) => {
-            let runner = package_registry.runner(&runner_id)?;
-            if !installed_registry.is_runner_installed(&runner.id) {
-                installed_registry.install_runner(&runner)?;
+        match selected_action.unwrap_or(TuiAction::Quit) {
+            TuiAction::Quit => return Ok(()),
+            TuiAction::Refresh => {
+                status = "Catalog, installed state and daemon-backed data refreshed.".to_string()
             }
-            let report = initialize_runner_runtime(store.root(), installed_registry, &runner)?;
-            Ok(format!(
-                "Runner {} initialized. {} Log/manifest: {}",
-                runner.id,
-                report.note,
-                report.manifest_path.display()
-            ))
-        }
-        TuiAction::ShowRunner(runner_id) => {
-            let runner = package_registry.runner(&runner_id)?;
-            let record = installed_registry.installed_runner_record(&runner.id).ok();
-            Ok(format!(
-                "{} [{}] · version={} · state={} · platforms={} · families={} · {}",
-                runner.name,
-                runner.id,
-                runner.version,
-                record
-                    .as_ref()
-                    .map(|record| record.status.to_string())
-                    .unwrap_or_else(|| "available".to_string()),
-                runner.platforms.join(", "),
-                runner.supported_model_families.join(", "),
-                record
-                    .as_ref()
-                    .map(|record| record.note.as_str())
-                    .unwrap_or(&runner.description)
-            ))
-        }
-        TuiAction::Doctor => {
-            let report = doctor::run_doctor(config, store, package_registry, installed_registry);
-            Ok(serde_json::to_string_pretty(&report)?)
-        }
-        TuiAction::OpenGui => {
-            gui::open_gui(store, config).await?;
-            Ok(format!("GUI opened. Daemon: {}", config.local_base_url()))
-        }
-        TuiAction::StartServer => {
-            gui::ensure_server(store, config).await?;
-            Ok(format!(
-                "Managed daemon is available at {}",
-                config.local_base_url()
-            ))
+            TuiAction::RunCli(args) => {
+                status = execute_cli(&args).unwrap_or_else(|error| format!("Error: {error:#}"));
+            }
         }
     }
 }
 
-fn yes_no(value: bool) -> &'static str {
-    if value {
-        "yes"
+fn execute_cli(args: &[String]) -> anyhow::Result<String> {
+    let executable = std::env::current_exe()?;
+    let output = Command::new(&executable).args(args).output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let rendered = combine_output(&stdout, &stderr);
+
+    if output.status.success() {
+        if rendered.is_empty() {
+            Ok(format!("Completed: takokit {}", display_args(args)))
+        } else {
+            Ok(rendered)
+        }
     } else {
-        "no"
+        anyhow::bail!(
+            "takokit {} exited with {}{}",
+            display_args(args),
+            output.status,
+            if rendered.is_empty() {
+                String::new()
+            } else {
+                format!("\n\n{rendered}")
+            }
+        )
+    }
+}
+
+fn combine_output(stdout: &str, stderr: &str) -> String {
+    match (stdout.is_empty(), stderr.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => stdout.to_string(),
+        (true, false) => stderr.to_string(),
+        (false, false) => format!("{stdout}\n\n{stderr}"),
+    }
+}
+
+fn display_args(args: &[String]) -> String {
+    args.iter()
+        .map(|argument| {
+            if argument.chars().any(char::is_whitespace) {
+                format!("\"{}\"", argument.replace('"', "\\\""))
+            } else {
+                argument.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn combines_cli_streams_without_losing_completion_timing() {
+        assert_eq!(combine_output("json", "Completed in 1.2s"), "json\n\nCompleted in 1.2s");
+        assert_eq!(combine_output("", "failure"), "failure");
+    }
+
+    #[test]
+    fn displays_arguments_with_spaces_as_quoted_values() {
+        assert_eq!(
+            display_args(&["speak".into(), "Hello world".into()]),
+            "speak \"Hello world\""
+        );
     }
 }
