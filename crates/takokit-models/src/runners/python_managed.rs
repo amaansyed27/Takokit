@@ -10,6 +10,7 @@ use takokit_core::{
     TranscriptionResponse,
 };
 use takokit_package::{adapter_for_model, ExecutionPlan};
+use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
 use super::{SpeechRunner, TranscriptionRunner};
@@ -75,17 +76,20 @@ fn speak_with_adapter(
     }
     let adapter = adapter_id(plan)?;
     let layout = adapter_layout(plan, adapter)?;
+    let resolved_voice = resolve_voice(plan, request.voice.as_deref())?;
     std::fs::create_dir_all(output_dir)
         .map_err(|error| TakokitError::Storage(error.to_string()))?;
     let id = Uuid::new_v4();
     let output_path = output_dir.join(format!("speech-{id}.wav"));
+    let model_dir = plan.storage_root.join("models").join(&plan.model.id);
+    let cache_dir = plan.storage_root.join("cache");
     let payload = ManagedAdapterRequest {
         operation: "speech",
         model_id: &plan.model.id,
-        model_dir: &plan.storage_root.join("models").join(&plan.model.id),
-        cache_dir: &plan.storage_root.join("cache"),
+        model_dir: &model_dir,
+        cache_dir: &cache_dir,
         input: Some(&request.input),
-        voice: request.voice.as_deref().filter(|voice| *voice != "default"),
+        voice: resolved_voice.as_deref(),
         output_path: Some(&output_path),
         audio_path: None,
     };
@@ -110,7 +114,7 @@ fn speak_with_adapter(
     Ok(SpeechResponse {
         id,
         model: plan.model.id.clone(),
-        voice: response.voice.or(request.voice),
+        voice: request.voice.or(response.voice),
         engine: adapter.replace('_', "-"),
         output_path,
         content_type: "audio/wav".to_string(),
@@ -131,11 +135,13 @@ fn transcribe_with_adapter(
     }
     let adapter = adapter_id(plan)?;
     let layout = adapter_layout(plan, adapter)?;
+    let model_dir = plan.storage_root.join("models").join(&plan.model.id);
+    let cache_dir = plan.storage_root.join("cache");
     let payload = ManagedAdapterRequest {
         operation: "transcribe",
         model_id: &plan.model.id,
-        model_dir: &plan.storage_root.join("models").join(&plan.model.id),
-        cache_dir: &plan.storage_root.join("cache"),
+        model_dir: &model_dir,
+        cache_dir: &cache_dir,
         input: None,
         voice: None,
         output_path: None,
@@ -186,6 +192,21 @@ fn adapter_id(plan: &ExecutionPlan) -> TakokitResult<&str> {
         .as_deref()
         .or_else(|| adapter_for_model(&plan.model.id))
         .ok_or_else(|| blocked_adapter(&plan.model.id))
+}
+
+fn resolve_voice(plan: &ExecutionPlan, voice: Option<&str>) -> TakokitResult<Option<String>> {
+    let Some(voice) = voice.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if voice == "default" {
+        return Ok(None);
+    }
+    if !plan.model.capabilities.voice_cloning {
+        return Ok(Some(voice.to_string()));
+    }
+    let reference = VoiceProfileStore::new(plan.storage_root.join("voices"))
+        .resolve_reference(voice)?;
+    Ok(Some(reference.display().to_string()))
 }
 
 fn run_adapter(
