@@ -1,0 +1,28 @@
+name: Apply voice profile UI
+
+on:
+  push:
+    branches:
+      - agent/workspaces-sessions-model-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspaces-sessions-model-matrix
+      - name: Replace the old voices page
+        run: mv apps/gui/src/features/voices/VoicesPageV2.tsx apps/gui/src/features/voices/VoicesPage.tsx
+      - name: Commit replacement
+        shell: bash
+        run: |
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/gui/src/features/voices/VoicesPage.tsx apps/gui/src/features/voices/VoicesPageV2.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Add GUI voice profile creation"
+          git push origin HEAD:agent/workspaces-sessions-model-matrix
