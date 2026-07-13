@@ -45,6 +45,7 @@ const HELLO_SHA256: &str = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e7304
 
 mod artifact_install;
 mod catalog;
+mod catalog_invariants;
 mod manifest;
 mod package_records;
 mod pull_reliability;
