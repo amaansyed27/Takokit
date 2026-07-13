@@ -1,0 +1,368 @@
+cargo_check=101
+cargo_test=101
+gui_build=2
+file_size_audit=0
+
+== cargo check ==
+[1m[92m    Checking[0m regex-automata v0.4.15
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/orchestrator.rs:119:51
+    [1m[94m|[0m
+[1m[94m119[0m [1m[94m|[0m             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
+    [1m[94m|[0m                                                   [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m119[0m [91m- [0m            .is_some_and(|record| record.state == [91mAdapterLifecycleState[0m::Ready);
+[1m[94m119[0m [92m+ [0m            .is_some_and(|record| record.state == [92mRunnerLifecycleState[0m::Ready);
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/orchestrator.rs:127:21
+    [1m[94m|[0m
+[1m[94m127[0m [1m[94m|[0m         if state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                     [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m127[0m [91m- [0m        if state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m127[0m [92m+ [0m        if state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/planning.rs:135:21
+    [1m[94m|[0m
+[1m[94m135[0m [1m[94m|[0m         if state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                     [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m135[0m [91m- [0m        if state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m135[0m [92m+ [0m        if state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/resolution.rs:122:45
+    [1m[94m|[0m
+[1m[94m122[0m [1m[94m|[0m         .is_some_and(|(_, state)| *state == AdapterLifecycleState::Ready);
+    [1m[94m|[0m                                             [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m122[0m [91m- [0m        .is_some_and(|(_, state)| *state == [91mAdapterLifecycleState[0m::Ready);
+[1m[94m122[0m [92m+ [0m        .is_some_and(|(_, state)| *state == [92mRunnerLifecycleState[0m::Ready);
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/resolution.rs:143:22
+    [1m[94m|[0m
+[1m[94m143[0m [1m[94m|[0m         if *state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                      [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m143[0m [91m- [0m        if *state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m143[0m [92m+ [0m        if *state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[91merror[E0063][0m[1m: missing fields `bin`, `downloads`, `runtime` and 1 other field in initializer of `records::RunnerRuntimeLayout`[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime.rs:35:5
+   [1m[94m|[0m
+[1m[94m35[0m [1m[94m|[0m     RunnerRuntimeLayout {
+   [1m[94m|[0m     [1m[91m^^^^^^^^^^^^^^^^^^^[0m [1m[91mmissing `bin`, `downloads`, `runtime` and 1 other field[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:24:28
+   [1m[94m|[0m
+[1m[94m24[0m [1m[94m|[0m                     state: AdapterLifecycleState::NotInstalled,
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m24[0m [91m- [0m                    state: [91mAdapterLifecycleState[0m::NotInstalled,
+[1m[94m24[0m [92m+ [0m                    state: [92mRunnerLifecycleState[0m::NotInstalled,
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: this function depends on never type fallback being `()`[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:54:1
+   [1m[94m|[0m
+[1m[94m54[0m [1m[94m|[0m pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: specify the types explicitly
+[1m[92mnote[0m: in edition 2024, the requirement `for<'de> !: Deserialize<'de>` will fail
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:70:31
+   [1m[94m|[0m
+[1m[94m70[0m [1m[94m|[0m         .and_then(|source| Ok(toml::from_str(&source)?))
+   [1m[94m|[0m                               [1m[92m^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m= [0m[1mwarning[0m: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+   [1m[94m= [0m[1mnote[0m: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+   [1m[94m= [0m[1mnote[0m: `#[deny(dependency_on_unit_never_type_fallback)]` (part of `#[deny(rust_2024_compatibility)]`) on by default
+[1m[96mhelp[0m: use `()` annotations to avoid fallback changes
+   [1m[94m|[0m
+[1m[94m70[0m [1m[94m| [0m        .and_then[92m::<(), _>[0m(|source| Ok(toml::from_str(&source)?))
+   [1m[94m|[0m                  [92m+++++++++[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:78:20
+   [1m[94m|[0m
+[1m[94m78[0m [1m[94m|[0m     record.state = AdapterLifecycleState::Installing;
+   [1m[94m|[0m                    [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m78[0m [91m- [0m    record.state = [91mAdapterLifecycleState[0m::Installing;
+[1m[94m78[0m [92m+ [0m    record.state = [92mRunnerLifecycleState[0m::Installing;
+   [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:91:28
+   [1m[94m|[0m
+[1m[94m91[0m [1m[94m|[0m             record.state = AdapterLifecycleState::Ready;
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m91[0m [91m- [0m            record.state = [91mAdapterLifecycleState[0m::Ready;
+[1m[94m91[0m [92m+ [0m            record.state = [92mRunnerLifecycleState[0m::Ready;
+   [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:97:28
+   [1m[94m|[0m
+[1m[94m97[0m [1m[94m|[0m             record.state = AdapterLifecycleState::Failed;
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m97[0m [91m- [0m            record.state = [91mAdapterLifecycleState[0m::Failed;
+[1m[94m97[0m [92m+ [0m            record.state = [92mRunnerLifecycleState[0m::Failed;
+   [1m[94m|[0m
+
+[1m[91merror[E0308][0m[1m: mismatched types[0m
+   [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:210:35
+    [1m[94m|[0m
+[1m[94m210[0m [1m[94m|[0m     run_logged_command(&log, &uv, &arguments)?;
+    [1m[94m|[0m     [1m[94m------------------[0m            [1m[91m^^^^^^^^^^[0m [1m[91mexpected `&[PathOrArg]`, found `&Vec<PathBuf>`[0m
+    [1m[94m|[0m     [1m[94m|[0m
+    [1m[94m|[0m     [1m[94marguments to this function are incorrect[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mnote[0m: expected reference `&[1m[35m[PathOrArg][0m`
+               found reference `&[1m[35mVec<PathBuf>[0m`
+[1m[92mnote[0m: function defined here
+   [1m[94m--> [0mcrates/takokit-package/src/runtime_command.rs:21:15
+    [1m[94m|[0m
+[1m[94m 21[0m [1m[94m|[0m pub(crate) fn run_logged_command(
+    [1m[94m|[0m               [1m[92m^^^^^^^^^^^^^^^^^^[0m
+[1m[94m...[0m
+[1m[94m 24[0m [1m[94m|[0m     args: &[PathOrArg],
+    [1m[94m|[0m     [1m[94m------------------[0m
+
+[1m[92m    Checking[0m axum-core v0.4.5
+[1mSome errors have detailed explanations: E0063, E0308, E0364, E0422, E0425, E0433.[0m
+[1mFor more information about an error, try `rustc --explain E0063`.[0m
+[1m[33mwarning[0m: `takokit-package` (lib) generated 1 warning
+[1m[91merror[0m: could not compile `takokit-package` (lib) due to 20 previous errors; 1 warning emitted
+[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
+
+== cargo test ==
+    [1m[94m|[0m
+[1m[94m119[0m [1m[94m|[0m             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
+    [1m[94m|[0m                                                   [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m119[0m [91m- [0m            .is_some_and(|record| record.state == [91mAdapterLifecycleState[0m::Ready);
+[1m[94m119[0m [92m+ [0m            .is_some_and(|record| record.state == [92mRunnerLifecycleState[0m::Ready);
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/orchestrator.rs:127:21
+    [1m[94m|[0m
+[1m[94m127[0m [1m[94m|[0m         if state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                     [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m127[0m [91m- [0m        if state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m127[0m [92m+ [0m        if state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/planning.rs:135:21
+    [1m[94m|[0m
+[1m[94m135[0m [1m[94m|[0m         if state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                     [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m135[0m [91m- [0m        if state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m135[0m [92m+ [0m        if state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[92m   Compiling[0m either v1.16.0
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/resolution.rs:122:45
+    [1m[94m|[0m
+[1m[94m122[0m [1m[94m|[0m         .is_some_and(|(_, state)| *state == AdapterLifecycleState::Ready);
+    [1m[94m|[0m                                             [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m122[0m [91m- [0m        .is_some_and(|(_, state)| *state == [91mAdapterLifecycleState[0m::Ready);
+[1m[94m122[0m [92m+ [0m        .is_some_and(|(_, state)| *state == [92mRunnerLifecycleState[0m::Ready);
+    [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+   [1m[94m--> [0mcrates/takokit-package/src/resolution.rs:143:22
+    [1m[94m|[0m
+[1m[94m143[0m [1m[94m|[0m         if *state != AdapterLifecycleState::Ready {
+    [1m[94m|[0m                      [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+    [1m[94m|[0m
+[1m[94m143[0m [91m- [0m        if *state != [91mAdapterLifecycleState[0m::Ready {
+[1m[94m143[0m [92m+ [0m        if *state != [92mRunnerLifecycleState[0m::Ready {
+    [1m[94m|[0m
+
+[1m[91merror[E0063][0m[1m: missing fields `bin`, `downloads`, `runtime` and 1 other field in initializer of `records::RunnerRuntimeLayout`[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime.rs:35:5
+   [1m[94m|[0m
+[1m[94m35[0m [1m[94m|[0m     RunnerRuntimeLayout {
+   [1m[94m|[0m     [1m[91m^^^^^^^^^^^^^^^^^^^[0m [1m[91mmissing `bin`, `downloads`, `runtime` and 1 other field[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:24:28
+   [1m[94m|[0m
+[1m[94m24[0m [1m[94m|[0m                     state: AdapterLifecycleState::NotInstalled,
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m24[0m [91m- [0m                    state: [91mAdapterLifecycleState[0m::NotInstalled,
+[1m[94m24[0m [92m+ [0m                    state: [92mRunnerLifecycleState[0m::NotInstalled,
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: this function depends on never type fallback being `()`[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:54:1
+   [1m[94m|[0m
+[1m[94m54[0m [1m[94m|[0m pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: specify the types explicitly
+[1m[92mnote[0m: in edition 2024, the requirement `for<'de> !: Deserialize<'de>` will fail
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:70:31
+   [1m[94m|[0m
+[1m[94m70[0m [1m[94m|[0m         .and_then(|source| Ok(toml::from_str(&source)?))
+   [1m[94m|[0m                               [1m[92m^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m= [0m[1mwarning[0m: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+   [1m[94m= [0m[1mnote[0m: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+   [1m[94m= [0m[1mnote[0m: `#[deny(dependency_on_unit_never_type_fallback)]` (part of `#[deny(rust_2024_compatibility)]`) on by default
+[1m[96mhelp[0m: use `()` annotations to avoid fallback changes
+   [1m[94m|[0m
+[1m[94m70[0m [1m[94m| [0m        .and_then[92m::<(), _>[0m(|source| Ok(toml::from_str(&source)?))
+   [1m[94m|[0m                  [92m+++++++++[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:78:20
+   [1m[94m|[0m
+[1m[94m78[0m [1m[94m|[0m     record.state = AdapterLifecycleState::Installing;
+   [1m[94m|[0m                    [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m78[0m [91m- [0m    record.state = [91mAdapterLifecycleState[0m::Installing;
+[1m[94m78[0m [92m+ [0m    record.state = [92mRunnerLifecycleState[0m::Installing;
+   [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:91:28
+   [1m[94m|[0m
+[1m[94m91[0m [1m[94m|[0m             record.state = AdapterLifecycleState::Ready;
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m91[0m [91m- [0m            record.state = [91mAdapterLifecycleState[0m::Ready;
+[1m[94m91[0m [92m+ [0m            record.state = [92mRunnerLifecycleState[0m::Ready;
+   [1m[94m|[0m
+
+[1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
+  [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:97:28
+   [1m[94m|[0m
+[1m[94m97[0m [1m[94m|[0m             record.state = AdapterLifecycleState::Failed;
+   [1m[94m|[0m                            [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: an enum with a similar name exists
+   [1m[94m|[0m
+[1m[94m97[0m [91m- [0m            record.state = [91mAdapterLifecycleState[0m::Failed;
+[1m[94m97[0m [92m+ [0m            record.state = [92mRunnerLifecycleState[0m::Failed;
+   [1m[94m|[0m
+
+[1m[91merror[E0308][0m[1m: mismatched types[0m
+   [1m[94m--> [0mcrates/takokit-package/src/runtime_python.rs:210:35
+    [1m[94m|[0m
+[1m[94m210[0m [1m[94m|[0m     run_logged_command(&log, &uv, &arguments)?;
+    [1m[94m|[0m     [1m[94m------------------[0m            [1m[91m^^^^^^^^^^[0m [1m[91mexpected `&[PathOrArg]`, found `&Vec<PathBuf>`[0m
+    [1m[94m|[0m     [1m[94m|[0m
+    [1m[94m|[0m     [1m[94marguments to this function are incorrect[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mnote[0m: expected reference `&[1m[35m[PathOrArg][0m`
+               found reference `&[1m[35mVec<PathBuf>[0m`
+[1m[92mnote[0m: function defined here
+   [1m[94m--> [0mcrates/takokit-package/src/runtime_command.rs:21:15
+    [1m[94m|[0m
+[1m[94m 21[0m [1m[94m|[0m pub(crate) fn run_logged_command(
+    [1m[94m|[0m               [1m[92m^^^^^^^^^^^^^^^^^^[0m
+[1m[94m...[0m
+[1m[94m 24[0m [1m[94m|[0m     args: &[PathOrArg],
+    [1m[94m|[0m     [1m[94m------------------[0m
+
+[1m[92m   Compiling[0m mime v0.3.17
+[1m[92m   Compiling[0m unicase v2.9.0
+[1m[92m   Compiling[0m tower-layer v0.3.3
+[1mSome errors have detailed explanations: E0063, E0308, E0364, E0422, E0425, E0433.[0m
+[1mFor more information about an error, try `rustc --explain E0063`.[0m
+[1m[33mwarning[0m: `takokit-package` (lib) generated 1 warning
+[1m[91merror[0m: could not compile `takokit-package` (lib) due to 20 previous errors; 1 warning emitted
+[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
+
+== GUI build ==
+
+> takokit-gui@0.1.0 build
+> tsc && vite build
+
+src/features/voices/VoicesPage.tsx(177,28): error TS2367: This comparison appears to be unintentional because the types '"not required" | "required"' and '"affirmed"' have no overlap.
+
+== file-size audit ==
+Audited 255 tracked source/config/documentation files.
+Hard limit: 500 lines; warning threshold: 400 lines.
+
+No files exceed the hard limit.
+
+Files approaching the limit:
+    489  crates/takokit-package/src/installed.rs
+    479  apps/cli/src/test_commands.rs
+    477  apps/cli/src/doctor.rs
+    464  apps/cli/src/tui/ui.rs
+    445  apps/gui/src/styles/components.css
+    404  crates/takokit-store/src/workspace.rs
+    401  apps/cli/src/tui/input.rs
+    401  crates/takokit-models/src/runners/onnx.rs
+
+Largest audited files:
+    489  crates/takokit-package/src/installed.rs
+    479  apps/cli/src/test_commands.rs
+    477  apps/cli/src/doctor.rs
+    464  apps/cli/src/tui/ui.rs
+    445  apps/gui/src/styles/components.css
+    404  crates/takokit-store/src/workspace.rs
+    401  apps/cli/src/tui/input.rs
+    401  crates/takokit-models/src/runners/onnx.rs
+    395  crates/takokit-package/src/tests/artifact_install.rs
+    393  apps/cli/src/tests.rs
+    392  crates/takokit-server/src/router/tests/models.rs
+    386  apps/cli/src/tui/app.rs
+    376  apps/cli/src/lib.rs
+    348  apps/gui/src/lib/api.ts
+    348  crates/takokit-server/src/handlers/packages.rs
