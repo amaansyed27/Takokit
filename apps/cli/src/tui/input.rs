@@ -1,284 +1,373 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{
-    app::{App, TuiAction, TuiTab},
-    command,
-};
+use super::app::{App, SpeakField, TranscribeField, TuiAction, TuiTab};
 
 impl App {
     pub(super) fn handle_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return Some(TuiAction::Quit);
         }
-
         if self.show_help {
-            if matches!(key.code, KeyCode::Esc | KeyCode::F(1)) {
+            if matches!(key.code, KeyCode::Esc | KeyCode::F(1) | KeyCode::Enter) {
                 self.show_help = false;
             }
             return None;
         }
-
-        if self.command_mode {
-            return self.handle_command_key(key);
-        }
-
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            return self.handle_shortcut(key.code);
-        }
-
-        match key.code {
-            KeyCode::Esc => Some(TuiAction::Quit),
-            KeyCode::F(1) => {
-                self.show_help = true;
-                None
-            }
-            KeyCode::Char('/') => {
-                self.open_template(String::new());
-                None
-            }
-            KeyCode::Tab | KeyCode::Right => {
-                self.tab = self.tab.next();
-                None
-            }
-            KeyCode::BackTab | KeyCode::Left => {
-                self.tab = self.tab.previous();
-                None
-            }
-            KeyCode::Up => {
-                self.move_selection(-1);
-                None
-            }
-            KeyCode::Down => {
-                self.move_selection(1);
-                None
-            }
-            KeyCode::PageUp => {
-                self.output_scroll = self.output_scroll.saturating_sub(5);
-                None
-            }
-            KeyCode::PageDown => {
-                self.output_scroll = self.output_scroll.saturating_add(5);
-                None
-            }
-            KeyCode::Enter => {
-                self.prepare_selected_command();
-                None
-            }
-            KeyCode::Char(character)
-                if !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                self.open_template(character.to_string());
-                None
-            }
-            _ => None,
-        }
-    }
-
-    fn handle_shortcut(&mut self, code: KeyCode) -> Option<TuiAction> {
-        match code {
-            KeyCode::Char('p') if self.tab == TuiTab::Models => self.selected_cli(&["pull"]),
-            KeyCode::Char('p') if self.tab == TuiTab::Runners => {
-                self.selected_cli(&["runner", "pull"])
-            }
-            KeyCode::Char('i') if self.tab == TuiTab::Runners => {
-                self.selected_cli(&["runner", "install"])
-            }
-            KeyCode::Char('x') if self.tab == TuiTab::Models => self.selected_cli(&["rm"]),
-            KeyCode::Char('x') if self.tab == TuiTab::Runners => {
-                self.selected_cli(&["runner", "rm"])
-            }
-            KeyCode::Char('t') if self.tab == TuiTab::Models => {
-                if let Some(row) = self.selected_row() {
-                    self.open_template(format!("test {} --run", row.id));
-                }
-                None
-            }
-            KeyCode::Char('d') => Some(TuiAction::RunCli(vec!["doctor".into()])),
-            KeyCode::Char('g') => Some(TuiAction::RunCli(vec!["gui".into()])),
-            KeyCode::Char('s') => Some(TuiAction::RunCli(vec!["daemon".into(), "start".into()])),
-            KeyCode::Char('r') => Some(TuiAction::Refresh),
-            _ => None,
-        }
-    }
-
-    fn handle_command_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            match key.code {
-                KeyCode::Char('a') => self.command_cursor = 0,
-                KeyCode::Char('e') => self.command_cursor = self.command_len(),
-                KeyCode::Char('u') => {
-                    self.command_input.clear();
-                    self.command_cursor = 0;
-                    self.history_index = None;
-                }
-                _ => {}
-            }
+        if key.code == KeyCode::F(1) {
+            self.show_help = true;
             return None;
         }
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Left => {
+                    self.tab = self.tab.previous();
+                    return None;
+                }
+                KeyCode::Right => {
+                    self.tab = self.tab.next();
+                    return None;
+                }
+                KeyCode::Enter => return self.primary_action(),
+                KeyCode::Char('r') => return Some(TuiAction::Refresh),
+                _ => {}
+            }
+        }
+        if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
+            self.output_scroll = match key.code {
+                KeyCode::PageUp => self.output_scroll.saturating_sub(5),
+                _ => self.output_scroll.saturating_add(5),
+            };
+            return None;
+        }
+        match self.tab {
+            TuiTab::Models => self.handle_models_key(key),
+            TuiTab::Speak => self.handle_speak_key(key),
+            TuiTab::Transcribe => self.handle_transcribe_key(key),
+            TuiTab::Runners => self.handle_runners_key(key),
+            TuiTab::System => self.handle_system_key(key),
+        }
+    }
 
+    fn handle_models_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
         match key.code {
-            KeyCode::Esc => {
-                self.command_mode = false;
-                self.command_input.clear();
-                self.command_cursor = 0;
-                self.history_index = None;
+            KeyCode::Left => self.tab = self.tab.previous(),
+            KeyCode::Right | KeyCode::Tab => self.tab = self.tab.next(),
+            KeyCode::Up => self.model_index = shifted_index(self.model_index, self.models.len(), -1),
+            KeyCode::Down => self.model_index = shifted_index(self.model_index, self.models.len(), 1),
+            KeyCode::Enter => return self.open_or_install_selected_model(),
+            KeyCode::Char('p') => {
+                return self
+                    .selected_model()
+                    .map(|model| TuiAction::PullModel(model.id.clone()))
             }
-            KeyCode::Enter => return self.submit_command(),
-            KeyCode::Left => self.command_cursor = self.command_cursor.saturating_sub(1),
-            KeyCode::Right => {
-                self.command_cursor = (self.command_cursor + 1).min(self.command_len())
+            KeyCode::Char('x') => {
+                return self
+                    .selected_model()
+                    .map(|model| TuiAction::RemoveModel(model.id.clone()))
             }
-            KeyCode::Home => self.command_cursor = 0,
-            KeyCode::End => self.command_cursor = self.command_len(),
-            KeyCode::Backspace => self.delete_backward(),
-            KeyCode::Delete => self.delete_forward(),
-            KeyCode::Up => self.previous_history(),
-            KeyCode::Down => self.next_history(),
-            KeyCode::Char(character)
-                if !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                self.insert_character(character)
-            }
+            KeyCode::Char('r') => return Some(TuiAction::Refresh),
             _ => {}
         }
         None
     }
 
-    fn submit_command(&mut self) -> Option<TuiAction> {
-        if self.running_command.is_some() {
-            self.set_status("A command is already running. You can keep editing this command and run it when the current job finishes.");
+    fn handle_speak_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+            self.speak_field = if key.code == KeyCode::BackTab {
+                self.speak_field.previous()
+            } else {
+                self.speak_field.next()
+            };
             return None;
         }
-
-        match command::parse(&self.command_input) {
-            Ok(action) => {
-                let submitted = self.command_input.trim().to_string();
-                if !submitted.is_empty()
-                    && self.command_history.last().map(String::as_str) != Some(submitted.as_str())
-                {
-                    self.command_history.push(submitted);
+        match self.speak_field {
+            SpeakField::Model => match key.code {
+                KeyCode::Left | KeyCode::Up => {
+                    self.speak_model_index = shifted_index(
+                        self.speak_model_index,
+                        self.tts_models.len(),
+                        -1,
+                    )
                 }
-                self.command_input.clear();
-                self.command_cursor = 0;
-                self.command_mode = false;
-                self.history_index = None;
-                Some(action)
+                KeyCode::Right | KeyCode::Down => {
+                    self.speak_model_index = shifted_index(
+                        self.speak_model_index,
+                        self.tts_models.len(),
+                        1,
+                    )
+                }
+                KeyCode::Enter => self.speak_field = SpeakField::Voice,
+                KeyCode::Esc => self.tab = TuiTab::Models,
+                _ => {}
+            },
+            SpeakField::Voice => {
+                if edit_text(
+                    &mut self.speak_voice,
+                    &mut self.speak_voice_cursor,
+                    key,
+                ) {
+                    return None;
+                }
+                match key.code {
+                    KeyCode::Enter => self.speak_field = SpeakField::Text,
+                    KeyCode::Esc => self.speak_field = SpeakField::Model,
+                    _ => {}
+                }
             }
-            Err(error) => {
-                self.set_status(error);
-                None
+            SpeakField::Text => {
+                if edit_text(
+                    &mut self.speak_text,
+                    &mut self.speak_text_cursor,
+                    key,
+                ) {
+                    return None;
+                }
+                match key.code {
+                    KeyCode::Enter => self.speak_field = SpeakField::Primary,
+                    KeyCode::Esc => self.speak_field = SpeakField::Model,
+                    _ => {}
+                }
             }
+            SpeakField::Primary => match key.code {
+                KeyCode::Enter => return self.primary_action(),
+                KeyCode::Esc => self.speak_field = SpeakField::Text,
+                KeyCode::Left | KeyCode::Up => self.speak_field = SpeakField::Text,
+                _ => {}
+            },
         }
+        None
     }
 
-    fn prepare_selected_command(&mut self) {
-        let Some(row) = self.selected_row().cloned() else {
-            self.set_status("Nothing is selected in this section.");
-            return;
-        };
-        let template = row
-            .template
-            .or_else(|| row.command.map(|args| command::format_args(&args)));
-        match template {
-            Some(value) => {
-                self.open_template(value);
-                self.set_status("Command loaded. Edit it if needed, then press Enter to run.");
+    fn handle_transcribe_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+            self.transcribe_field = if key.code == KeyCode::BackTab {
+                self.transcribe_field.previous()
+            } else {
+                self.transcribe_field.next()
+            };
+            return None;
+        }
+        match self.transcribe_field {
+            TranscribeField::Model => match key.code {
+                KeyCode::Left | KeyCode::Up => {
+                    self.transcribe_model_index = shifted_index(
+                        self.transcribe_model_index,
+                        self.stt_models.len(),
+                        -1,
+                    )
+                }
+                KeyCode::Right | KeyCode::Down => {
+                    self.transcribe_model_index = shifted_index(
+                        self.transcribe_model_index,
+                        self.stt_models.len(),
+                        1,
+                    )
+                }
+                KeyCode::Enter => self.transcribe_field = TranscribeField::Audio,
+                KeyCode::Esc => self.tab = TuiTab::Models,
+                _ => {}
+            },
+            TranscribeField::Audio => {
+                if edit_text(
+                    &mut self.transcribe_audio,
+                    &mut self.transcribe_audio_cursor,
+                    key,
+                ) {
+                    return None;
+                }
+                match key.code {
+                    KeyCode::Enter => self.transcribe_field = TranscribeField::Primary,
+                    KeyCode::Esc => self.transcribe_field = TranscribeField::Model,
+                    _ => {}
+                }
             }
-            None => self.set_status("The selected item has no command attached."),
+            TranscribeField::Primary => match key.code {
+                KeyCode::Enter => return self.primary_action(),
+                KeyCode::Esc => self.transcribe_field = TranscribeField::Audio,
+                KeyCode::Left | KeyCode::Up => self.transcribe_field = TranscribeField::Audio,
+                _ => {}
+            },
         }
+        None
     }
 
-    fn selected_cli(&self, command: &[&str]) -> Option<TuiAction> {
-        let id = self.selected_row()?.id.clone();
-        let mut args = command
-            .iter()
-            .map(|part| (*part).to_string())
-            .collect::<Vec<_>>();
-        args.push(id);
-        Some(TuiAction::RunCli(args))
-    }
-
-    fn move_selection(&mut self, delta: isize) {
-        let len = self.selected_rows().len();
-        match self.tab {
-            TuiTab::Models => self.model_index = shifted_index(self.model_index, len, delta),
-            TuiTab::Runners => self.runner_index = shifted_index(self.runner_index, len, delta),
-            TuiTab::Operations => {
-                self.operation_index = shifted_index(self.operation_index, len, delta)
+    fn handle_runners_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        match key.code {
+            KeyCode::Left => self.tab = self.tab.previous(),
+            KeyCode::Right | KeyCode::Tab => self.tab = self.tab.next(),
+            KeyCode::Up => {
+                self.runner_index = shifted_index(self.runner_index, self.runners.len(), -1)
             }
-            TuiTab::System => self.system_index = shifted_index(self.system_index, len, delta),
+            KeyCode::Down => {
+                self.runner_index = shifted_index(self.runner_index, self.runners.len(), 1)
+            }
+            KeyCode::Enter => return self.runner_primary_action(),
+            KeyCode::Char('p') => {
+                return self
+                    .selected_runner()
+                    .map(|runner| TuiAction::PullRunner(runner.id.clone()))
+            }
+            KeyCode::Char('i') => {
+                return self
+                    .selected_runner()
+                    .map(|runner| TuiAction::InstallRunner(runner.id.clone()))
+            }
+            KeyCode::Char('d') => {
+                return self
+                    .selected_runner()
+                    .map(|runner| TuiAction::DoctorRunner(runner.id.clone()))
+            }
+            KeyCode::Char('x') => {
+                return self
+                    .selected_runner()
+                    .map(|runner| TuiAction::RemoveRunner(runner.id.clone()))
+            }
+            KeyCode::Char('r') => return Some(TuiAction::Refresh),
+            _ => {}
         }
+        None
     }
 
-    fn open_template(&mut self, template: String) {
-        self.command_cursor = template.chars().count();
-        self.command_input = template;
-        self.command_mode = true;
-        self.history_index = None;
-    }
-
-    fn command_len(&self) -> usize {
-        self.command_input.chars().count()
-    }
-
-    fn insert_character(&mut self, character: char) {
-        let mut characters = self.command_input.chars().collect::<Vec<_>>();
-        characters.insert(self.command_cursor.min(characters.len()), character);
-        self.command_input = characters.into_iter().collect();
-        self.command_cursor += 1;
-        self.history_index = None;
-    }
-
-    fn delete_backward(&mut self) {
-        if self.command_cursor == 0 {
-            return;
+    fn handle_system_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        match key.code {
+            KeyCode::Left => self.tab = self.tab.previous(),
+            KeyCode::Right | KeyCode::Tab => self.tab = self.tab.next(),
+            KeyCode::Up => self.system_index = shifted_index(self.system_index, self.system.len(), -1),
+            KeyCode::Down => self.system_index = shifted_index(self.system_index, self.system.len(), 1),
+            KeyCode::Enter => {
+                return self
+                    .selected_system()
+                    .map(|row| TuiAction::RunSystem(row.action))
+            }
+            KeyCode::Char('r') => return Some(TuiAction::Refresh),
+            _ => {}
         }
-        let mut characters = self.command_input.chars().collect::<Vec<_>>();
-        self.command_cursor -= 1;
-        characters.remove(self.command_cursor);
-        self.command_input = characters.into_iter().collect();
-        self.history_index = None;
+        None
     }
 
-    fn delete_forward(&mut self) {
-        let mut characters = self.command_input.chars().collect::<Vec<_>>();
-        if self.command_cursor < characters.len() {
-            characters.remove(self.command_cursor);
-            self.command_input = characters.into_iter().collect();
-            self.history_index = None;
+    fn open_or_install_selected_model(&mut self) -> Option<TuiAction> {
+        let model = self.selected_model()?.clone();
+        if !model.executable {
+            return Some(TuiAction::PullModel(model.id));
         }
-    }
-
-    fn previous_history(&mut self) {
-        if self.command_history.is_empty() {
-            return;
-        }
-        let index = self
-            .history_index
-            .unwrap_or(self.command_history.len())
-            .saturating_sub(1);
-        self.history_index = Some(index);
-        self.command_input = self.command_history[index].clone();
-        self.command_cursor = self.command_len();
-    }
-
-    fn next_history(&mut self) {
-        let Some(index) = self.history_index else {
-            return;
-        };
-        if index + 1 < self.command_history.len() {
-            let next = index + 1;
-            self.history_index = Some(next);
-            self.command_input = self.command_history[next].clone();
+        if model.tts {
+            self.set_speak_model(&model.id);
+            self.tab = TuiTab::Speak;
+            self.speak_field = SpeakField::Text;
+            self.set_status("Model selected. Type the text you want Takokit to speak.");
+        } else if model.stt {
+            self.set_transcribe_model(&model.id);
+            self.tab = TuiTab::Transcribe;
+            self.transcribe_field = TranscribeField::Audio;
+            self.set_status("Model selected. Enter the local audio file path.");
         } else {
-            self.history_index = None;
-            self.command_input.clear();
+            self.set_status("This model is ready, but its interactive task is not available yet.");
         }
-        self.command_cursor = self.command_len();
+        None
+    }
+
+    fn runner_primary_action(&self) -> Option<TuiAction> {
+        let runner = self.selected_runner()?;
+        Some(if runner.ready {
+            TuiAction::DoctorRunner(runner.id.clone())
+        } else if runner.installed {
+            TuiAction::InstallRunner(runner.id.clone())
+        } else {
+            TuiAction::PullRunner(runner.id.clone())
+        })
+    }
+
+    fn primary_action(&mut self) -> Option<TuiAction> {
+        match self.tab {
+            TuiTab::Models => self.open_or_install_selected_model(),
+            TuiTab::Speak => {
+                let model = self.selected_speak_model()?.clone();
+                if !model.executable {
+                    return Some(TuiAction::PullModel(model.id));
+                }
+                let text = self.speak_text.trim().to_string();
+                if text.is_empty() {
+                    self.set_status("Type some text before generating speech.");
+                    self.speak_field = SpeakField::Text;
+                    return None;
+                }
+                Some(TuiAction::Speak {
+                    model: model.id,
+                    voice: self.speak_voice.trim().to_string(),
+                    text,
+                })
+            }
+            TuiTab::Transcribe => {
+                let model = self.selected_transcribe_model()?.clone();
+                if !model.executable {
+                    return Some(TuiAction::PullModel(model.id));
+                }
+                let audio = self.transcribe_audio.trim().to_string();
+                if audio.is_empty() {
+                    self.set_status("Enter the path to a local audio file first.");
+                    self.transcribe_field = TranscribeField::Audio;
+                    return None;
+                }
+                Some(TuiAction::Transcribe {
+                    model: model.id,
+                    audio,
+                })
+            }
+            TuiTab::Runners => self.runner_primary_action(),
+            TuiTab::System => self
+                .selected_system()
+                .map(|row| TuiAction::RunSystem(row.action)),
+        }
+    }
+}
+
+fn edit_text(value: &mut String, cursor: &mut usize, key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Char(character)
+            if !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            let mut characters = value.chars().collect::<Vec<_>>();
+            characters.insert((*cursor).min(characters.len()), character);
+            *value = characters.into_iter().collect();
+            *cursor += 1;
+            true
+        }
+        KeyCode::Left => {
+            *cursor = cursor.saturating_sub(1);
+            true
+        }
+        KeyCode::Right => {
+            *cursor = (*cursor + 1).min(value.chars().count());
+            true
+        }
+        KeyCode::Home => {
+            *cursor = 0;
+            true
+        }
+        KeyCode::End => {
+            *cursor = value.chars().count();
+            true
+        }
+        KeyCode::Backspace => {
+            if *cursor > 0 {
+                let mut characters = value.chars().collect::<Vec<_>>();
+                *cursor -= 1;
+                characters.remove(*cursor);
+                *value = characters.into_iter().collect();
+            }
+            true
+        }
+        KeyCode::Delete => {
+            let mut characters = value.chars().collect::<Vec<_>>();
+            if *cursor < characters.len() {
+                characters.remove(*cursor);
+                *value = characters.into_iter().collect();
+            }
+            true
+        }
+        _ => false,
     }
 }
 
@@ -298,5 +387,23 @@ mod tests {
         assert_eq!(shifted_index(0, 3, -1), 2);
         assert_eq!(shifted_index(2, 3, 1), 0);
         assert_eq!(shifted_index(0, 0, 1), 0);
+    }
+
+    #[test]
+    fn text_editor_inserts_and_deletes_at_cursor() {
+        let mut value = "ac".to_string();
+        let mut cursor = 1;
+        assert!(edit_text(
+            &mut value,
+            &mut cursor,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)
+        ));
+        assert_eq!(value, "abc");
+        assert!(edit_text(
+            &mut value,
+            &mut cursor,
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)
+        ));
+        assert_eq!(value, "ac");
     }
 }
