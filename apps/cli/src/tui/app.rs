@@ -6,7 +6,10 @@ use takokit_core::RuntimeConfig;
 use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
 
-use super::{command, ui};
+use super::{
+    catalog::{operation_rows, system_rows},
+    command, ui,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuiAction {
@@ -340,158 +343,6 @@ pub fn run(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<TuiActio
             return Ok(action);
         }
     }
-}
-
-fn operation_rows() -> Vec<TuiRow> {
-    [
-        (
-            "speech",
-            "Generate speech",
-            "TTS",
-            "speak \"Hello from Takokit\" --model kokoro --voice default",
-            "Generate WAV speech with any executable TTS model.",
-        ),
-        (
-            "run",
-            "Run a model",
-            "TTS / STT",
-            "run whisper-tiny --file \"C:\\path\\audio.wav\"",
-            "Unified model execution. Supply text for TTS or --file for STT.",
-        ),
-        (
-            "transcribe",
-            "Transcribe audio",
-            "STT",
-            "transcribe \"C:\\path\\audio.wav\" --model whisper-tiny",
-            "Transcribe a local audio file.",
-        ),
-        (
-            "clone",
-            "Clone a voice",
-            "planned",
-            "clone \"C:\\path\\sample.wav\" --name my-voice",
-            "Consent-gated voice cloning command. The backend currently reports not implemented.",
-        ),
-        (
-            "train",
-            "Train a voice",
-            "planned",
-            "train \"C:\\path\\samples\" --name my-voice",
-            "Voice training job command. The backend currently reports not implemented.",
-        ),
-        (
-            "adapter-install",
-            "Install adapter",
-            "runtime",
-            "adapter install qwen3_tts",
-            "Install a managed Python model adapter.",
-        ),
-        (
-            "adapter-doctor",
-            "Inspect adapter",
-            "diagnostics",
-            "adapter doctor qwen3_tts",
-            "Inspect adapter state, paths, runtime and logs.",
-        ),
-        (
-            "test-model",
-            "Test one model",
-            "test",
-            "test whisper-tiny --run --file \"C:\\path\\audio.wav\"",
-            "Run model planning or a real model smoke test.",
-        ),
-        (
-            "test-fast",
-            "Run fast suite",
-            "test",
-            "test --suite fast --run",
-            "Run the fast executable-model suite.",
-        ),
-        (
-            "test-launch",
-            "Run launch suite",
-            "test",
-            "test --suite launch --run",
-            "Run the complete launch readiness suite.",
-        ),
-        (
-            "quickstart",
-            "Quickstart",
-            "setup",
-            "quickstart",
-            "Prepare Kokoro and Whisper Tiny and run smoke tests.",
-        ),
-        (
-            "quickstart-full",
-            "Full quickstart",
-            "setup",
-            "quickstart --full",
-            "Also prepare managed Python and Qwen3-TTS.",
-        ),
-        (
-            "deps",
-            "Bootstrap dependencies",
-            "setup",
-            "deps bootstrap",
-            "Prepare Takokit's pinned uv and managed Python tooling.",
-        ),
-        (
-            "samples",
-            "Create samples",
-            "audio",
-            "samples create",
-            "Create real hello.wav and silence.wav fixtures.",
-        ),
-    ]
-    .into_iter()
-    .map(|(id, title, state, template, detail)| TuiRow {
-        id: id.into(),
-        title: title.into(),
-        state: state.into(),
-        detail: format!(
-            "{}\n\nCommand template\n{}\n\nPress Enter to edit and run this command.",
-            detail, template
-        ),
-        command: None,
-        template: Some(template.into()),
-    })
-    .collect()
-}
-
-fn system_rows() -> Vec<TuiRow> {
-    [
-        ("status", "Runtime status", "read", vec!["status"]),
-        ("doctor", "Doctor", "diagnostics", vec!["doctor"]),
-        ("capabilities", "Capabilities", "read", vec!["capabilities"]),
-        ("models", "Model catalog", "read", vec!["models"]),
-        ("runners", "Runner catalog", "read", vec!["runners"]),
-        ("voices", "Voice catalog", "read", vec!["list", "voices"]),
-        ("processes", "Active executions", "read", vec!["ps"]),
-        ("daemon-status", "Daemon status", "daemon", vec!["daemon", "status"]),
-        ("daemon-start", "Start daemon", "daemon", vec!["daemon", "start"]),
-        ("daemon-stop", "Stop daemon", "daemon", vec!["daemon", "stop"]),
-        ("daemon-restart", "Restart daemon", "daemon", vec!["daemon", "restart"]),
-        ("daemon-logs", "Daemon logs", "daemon", vec!["daemon", "logs"]),
-        ("deps-doctor", "Dependency doctor", "diagnostics", vec!["deps", "doctor"]),
-        ("gui", "Open GUI", "surface", vec!["gui"]),
-        ("version", "Version", "read", vec!["version"]),
-    ]
-    .into_iter()
-    .map(|(id, title, state, command)| {
-        let args = command.into_iter().map(str::to_string).collect::<Vec<_>>();
-        TuiRow {
-            id: id.into(),
-            title: title.into(),
-            state: state.into(),
-            detail: format!(
-                "Runs the exact direct CLI command:\n\ntakokit {}\n\nThe TUI captures its stdout, stderr and completion timing, then refreshes shared state.",
-                args.join(" ")
-            ),
-            command: Some(args),
-            template: None,
-        }
-    })
-    .collect()
 }
 
 fn shifted_index(current: usize, len: usize, delta: isize) -> usize {

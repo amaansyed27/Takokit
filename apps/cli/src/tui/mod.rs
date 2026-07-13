@@ -1,4 +1,5 @@
 mod app;
+mod catalog;
 mod command;
 mod ui;
 
