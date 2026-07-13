@@ -4,11 +4,9 @@ use std::{
     thread,
 };
 
-use super::command::format_args;
-
 #[derive(Debug)]
 pub struct CommandResult {
-    pub command: String,
+    pub label: String,
     pub output: String,
     pub success: bool,
 }
@@ -19,8 +17,8 @@ pub struct CommandJob {
 }
 
 impl CommandJob {
-    pub fn start(args: Vec<String>) -> Self {
-        let label = format_args(&args);
+    pub fn start(label: impl Into<String>, args: Vec<String>) -> Self {
+        let label = label.into();
         let worker_label = label.clone();
         let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
@@ -35,8 +33,8 @@ impl CommandJob {
             Ok(result) => Some(result),
             Err(TryRecvError::Empty) => None,
             Err(TryRecvError::Disconnected) => Some(CommandResult {
-                command: self.label.clone(),
-                output: "The command worker stopped before returning a result.".to_string(),
+                label: self.label.clone(),
+                output: "The background task stopped before returning a result.".to_string(),
                 success: false,
             }),
         }
@@ -48,33 +46,30 @@ fn execute_cli(args: &[String], label: String) -> CommandResult {
         Ok(path) => path,
         Err(error) => {
             return CommandResult {
-                command: label,
-                output: format!("Could not locate the current Takokit executable: {error}"),
+                label,
+                output: format!("Takokit could not locate its executable: {error}"),
                 success: false,
             }
         }
     };
-
     let output = match Command::new(executable).args(args).output() {
         Ok(output) => output,
         Err(error) => {
             return CommandResult {
-                command: label,
-                output: format!("Could not start the command: {error}"),
+                label,
+                output: format!("Takokit could not start the task: {error}"),
                 success: false,
             }
         }
     };
-
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     let rendered = combine_output(&stdout, &stderr);
-
     if output.status.success() {
         CommandResult {
-            command: label.clone(),
+            label: label.clone(),
             output: if rendered.is_empty() {
-                format!("Completed: takokit {label}")
+                format!("{label} completed.")
             } else {
                 rendered
             },
@@ -82,10 +77,9 @@ fn execute_cli(args: &[String], label: String) -> CommandResult {
         }
     } else {
         CommandResult {
-            command: label.clone(),
+            label: label.clone(),
             output: format!(
-                "takokit {label} exited with {}{}",
-                output.status,
+                "{label} failed.{}",
                 if rendered.is_empty() {
                     String::new()
                 } else {
@@ -113,8 +107,8 @@ mod tests {
     #[test]
     fn combines_cli_streams_without_losing_completion_timing() {
         assert_eq!(
-            combine_output("json", "Completed in 1.2s"),
-            "json\n\nCompleted in 1.2s"
+            combine_output("result", "Completed in 1.2s"),
+            "result\n\nCompleted in 1.2s"
         );
         assert_eq!(combine_output("", "failure"), "failure");
     }
