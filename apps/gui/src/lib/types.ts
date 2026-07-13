@@ -91,7 +91,7 @@ export type VoiceSummary = {
   source: string;
   model: string;
   description: string;
-  consent: "not required" | "required";
+  consent: "not required" | "required" | "affirmed";
 };
 
 export type RuntimeSnapshot = {
