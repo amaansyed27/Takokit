@@ -178,9 +178,7 @@ impl App {
             }
             SpeakField::Primary => match key.code {
                 KeyCode::Enter => return self.primary_action(),
-                KeyCode::Esc | KeyCode::Left | KeyCode::Up => {
-                    self.speak_field = SpeakField::Text
-                }
+                KeyCode::Esc | KeyCode::Left | KeyCode::Up => self.speak_field = SpeakField::Text,
                 _ => {}
             },
         }

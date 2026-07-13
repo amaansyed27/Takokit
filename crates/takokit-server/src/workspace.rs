@@ -58,8 +58,9 @@ fn workspace_root(headers: &HeaderMap) -> Result<PathBuf, TakokitError> {
             .map_err(|error| TakokitError::Storage(format!("invalid workspace path: {error}")))?;
         return absolute_workspace(PathBuf::from(decoded.as_ref()));
     }
-    std::env::current_dir()
-        .map_err(|error| TakokitError::Storage(format!("cannot resolve working directory: {error}")))
+    std::env::current_dir().map_err(|error| {
+        TakokitError::Storage(format!("cannot resolve working directory: {error}"))
+    })
 }
 
 fn absolute_workspace(path: PathBuf) -> Result<PathBuf, TakokitError> {
@@ -78,7 +79,8 @@ mod tests {
 
     #[test]
     fn request_workspace_decodes_paths_and_resumes_sessions() {
-        let root = std::env::temp_dir().join(format!("takokit-server-workspace-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("takokit-server-workspace-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let store = WorkspaceStore::new(&root);
         let session = store.create_session(Some("test")).unwrap();

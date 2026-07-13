@@ -294,10 +294,7 @@ impl App {
     pub fn workspace_args(&self) -> Vec<String> {
         vec![
             "--workspace".to_string(),
-            self.workspace_store
-                .workspace_root()
-                .display()
-                .to_string(),
+            self.workspace_store.workspace_root().display().to_string(),
             "--session".to_string(),
             self.active_session.to_string(),
         ]

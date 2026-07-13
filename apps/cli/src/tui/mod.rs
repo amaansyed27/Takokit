@@ -79,7 +79,9 @@ pub async fn run_launcher(
                 }
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
-                        Ok(()) => state.set_status("Local model, runner, and session state refreshed."),
+                        Ok(()) => {
+                            state.set_status("Local model, runner, and session state refreshed.")
+                        }
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
                     }
                 }
@@ -122,12 +124,8 @@ pub async fn run_launcher(
 
 fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)> {
     let (label, command) = match action {
-        TuiAction::PullModel(model) => {
-            (format!("Preparing {model}"), vec!["pull".into(), model])
-        }
-        TuiAction::RemoveModel(model) => {
-            (format!("Removing {model}"), vec!["rm".into(), model])
-        }
+        TuiAction::PullModel(model) => (format!("Preparing {model}"), vec!["pull".into(), model]),
+        TuiAction::RemoveModel(model) => (format!("Removing {model}"), vec!["rm".into(), model]),
         TuiAction::Speak { model, voice, text } => (
             format!("Generating speech with {model}"),
             vec![

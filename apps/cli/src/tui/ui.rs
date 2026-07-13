@@ -114,13 +114,7 @@ fn render_sessions(frame: &mut Frame<'_>, area: Rect, app: &App) {
             row_item(&session.title, &state)
         })
         .collect::<Vec<_>>();
-    render_list(
-        frame,
-        columns[0],
-        " Sessions ",
-        items,
-        app.session_index,
-    );
+    render_list(frame, columns[0], " Sessions ", items, app.session_index);
     let detail = app
         .selected_session()
         .map(|session| {
@@ -337,7 +331,9 @@ fn render_slash(frame: &mut Frame<'_>, app: &App) {
         Paragraph::new(format!("/{}", app.slash_input))
             .block(
                 Block::default()
-                    .title(" Go to · sessions, new, models, speak, transcribe, runners, system, help ")
+                    .title(
+                        " Go to · sessions, new, models, speak, transcribe, runners, system, help ",
+                    )
                     .borders(Borders::ALL),
             )
             .style(Style::default().fg(Color::White)),

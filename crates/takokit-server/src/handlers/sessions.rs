@@ -34,9 +34,7 @@ pub async fn sessions(
     Query(query): Query<SessionSearchQuery>,
 ) -> Result<Json<SessionsResponse>, ApiError> {
     let store = store_from_headers(&headers).map_err(ApiError)?;
-    let data = store
-        .list_sessions(query.q.as_deref())
-        .map_err(ApiError)?;
+    let data = store.list_sessions(query.q.as_deref()).map_err(ApiError)?;
     Ok(Json(SessionsResponse { data }))
 }
 

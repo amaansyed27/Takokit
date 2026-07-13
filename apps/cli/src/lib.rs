@@ -125,12 +125,7 @@ pub async fn run() -> anyhow::Result<()> {
             DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
         },
         Some(Command::Gui) => {
-            gui::open_gui(
-                &store,
-                &config,
-                workspace.as_ref().expect("GUI workspace"),
-            )
-            .await?
+            gui::open_gui(&store, &config, workspace.as_ref().expect("GUI workspace")).await?
         }
         Some(Command::Doctor(args)) => {
             let report =
@@ -270,9 +265,7 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Train(args)) => {
             run_train(args, workspace.as_ref().expect("training workspace"))?
         }
-        Some(Command::Sessions { command }) => {
-            run_sessions_command(workspace_arg, command)?
-        }
+        Some(Command::Sessions { command }) => run_sessions_command(workspace_arg, command)?,
         Some(Command::Runner { command }) => match command {
             RunnerCommand::Pull { runner } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;

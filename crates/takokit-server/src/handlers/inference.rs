@@ -22,25 +22,25 @@ pub async fn speech(
         .register_execution(model.clone(), "text_to_speech")
         .await;
 
-    let result: Result<takokit_core::SpeechResponse, TakokitError> =
-        if request.model != "mock-tts" {
-            match resolve_execution_plan(
-                &state.package_registry,
-                &state.installed_registry,
-                &request.model,
-                CapabilityKind::TextToSpeech,
-            )
-            .map_err(TakokitError::from)
-            {
-                Ok(plan) => execute_speech(&plan, request, &workspace.outputs_dir()).await,
-                Err(error) => Err(error),
-            }
-        } else {
-            state
-                .tts
-                .synthesize(request, &workspace.outputs_dir())
-                .await
-        };
+    let result: Result<takokit_core::SpeechResponse, TakokitError> = if request.model != "mock-tts"
+    {
+        match resolve_execution_plan(
+            &state.package_registry,
+            &state.installed_registry,
+            &request.model,
+            CapabilityKind::TextToSpeech,
+        )
+        .map_err(TakokitError::from)
+        {
+            Ok(plan) => execute_speech(&plan, request, &workspace.outputs_dir()).await,
+            Err(error) => Err(error),
+        }
+    } else {
+        state
+            .tts
+            .synthesize(request, &workspace.outputs_dir())
+            .await
+    };
 
     match result {
         Ok(response) => {

@@ -24,9 +24,9 @@ impl Client {
         }
         Ok(Self {
             base: config.local_base_url(),
-            workspace_header: std::env::var(WORKSPACE_ENV).ok().map(|value| {
-                utf8_percent_encode(&value, NON_ALPHANUMERIC).to_string()
-            }),
+            workspace_header: std::env::var(WORKSPACE_ENV)
+                .ok()
+                .map(|value| utf8_percent_encode(&value, NON_ALPHANUMERIC).to_string()),
             session_header: std::env::var(SESSION_ENV).ok(),
         })
     }

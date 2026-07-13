@@ -115,10 +115,7 @@ impl WorkspaceStore {
 
     pub fn set_active_session(&self, id: Uuid) -> TakokitResult<()> {
         self.ensure_layout()?;
-        replace_file(
-            &self.root.join("active-session"),
-            id.to_string().as_bytes(),
-        )
+        replace_file(&self.root.join("active-session"), id.to_string().as_bytes())
     }
 
     pub fn read_session(&self, id: Uuid) -> TakokitResult<SessionRecord> {
