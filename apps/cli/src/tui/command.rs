@@ -7,7 +7,7 @@ use super::app::TuiAction;
 pub fn parse(input: &str) -> Result<TuiAction, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
-        return Err("Type a Takokit command after `/`. Press `?` for help.".to_string());
+        return Err("Type a Takokit command. Press F1 for help.".to_string());
     }
     if matches!(trimmed, "q" | "quit" | "exit") {
         return Ok(TuiAction::Quit);
@@ -16,9 +16,28 @@ pub fn parse(input: &str) -> Result<TuiAction, String> {
         return Ok(TuiAction::Refresh);
     }
 
-    let args = split_command(trimmed)?;
+    let mut args = split_command(trimmed)?;
+    if matches!(args.first().map(String::as_str), Some("takokit" | "tako")) {
+        args.remove(0);
+    }
+    if args.is_empty() {
+        return Err("A command is required after `takokit` or `tako`.".to_string());
+    }
     validate_cli(&args)?;
     Ok(TuiAction::RunCli(args))
+}
+
+pub fn format_args(args: &[String]) -> String {
+    args.iter()
+        .map(|argument| {
+            if argument.is_empty() || argument.chars().any(char::is_whitespace) {
+                format!("\"{}\"", argument.replace('"', "\\\""))
+            } else {
+                argument.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn validate_cli(args: &[String]) -> Result<(), String> {
@@ -27,7 +46,7 @@ fn validate_cli(args: &[String]) -> Result<(), String> {
     let cli = Cli::try_parse_from(argv).map_err(|error| clean_clap_error(error.to_string()))?;
 
     match cli.command {
-        None => Err("A command is required inside the TUI palette.".to_string()),
+        None => Err("A command is required inside the TUI command bar.".to_string()),
         Some(Command::Serve {
             daemon_child: false,
             ..
@@ -82,7 +101,7 @@ fn split_command(input: &str) -> Result<Vec<String>, String> {
         args.push(current);
     }
     if args.is_empty() {
-        Err("A command is required inside the TUI palette.".to_string())
+        Err("A command is required inside the TUI command bar.".to_string())
     } else {
         Ok(args)
     }
@@ -107,6 +126,16 @@ mod tests {
                 "C:\\Users\\Amaan\\test.wav"
             ]
         );
+    }
+
+    #[test]
+    fn formats_editable_commands_and_accepts_binary_prefixes() {
+        assert_eq!(
+            format_args(&["speak".into(), "Hello world".into()]),
+            "speak \"Hello world\""
+        );
+        assert!(parse("takokit plan whisper-tiny").is_ok());
+        assert!(parse("tako doctor").is_ok());
     }
 
     #[test]
