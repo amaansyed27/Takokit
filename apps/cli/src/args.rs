@@ -2,12 +2,19 @@
 
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) direct: bool,
+    /// Project directory whose `.tako` folder stores sessions and outputs.
+    #[arg(long, global = true)]
+    pub(crate) workspace: Option<PathBuf>,
+    /// Resume a specific project session.
+    #[arg(long, global = true)]
+    pub(crate) session: Option<Uuid>,
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
 }
@@ -18,7 +25,7 @@ pub(crate) enum Command {
         #[arg(long, hide = true)]
         daemon_child: bool,
         #[arg(long, hide = true)]
-        instance_id: Option<uuid::Uuid>,
+        instance_id: Option<Uuid>,
     },
     Daemon {
         #[command(subcommand)]
@@ -57,6 +64,10 @@ pub(crate) enum Command {
     Adapter {
         #[command(subcommand)]
         command: AdapterCommand,
+    },
+    Sessions {
+        #[command(subcommand)]
+        command: SessionsCommand,
     },
     Quickstart(QuickstartArgs),
     Deps {
@@ -164,6 +175,8 @@ pub(crate) struct CloneArgs {
     pub(crate) sample: PathBuf,
     #[arg(long)]
     pub(crate) name: String,
+    #[arg(long, default_value = "xtts-v2")]
+    pub(crate) model: String,
 }
 
 #[derive(Debug, Args)]
@@ -171,6 +184,29 @@ pub(crate) struct TrainArgs {
     pub(crate) samples: PathBuf,
     #[arg(long)]
     pub(crate) name: String,
+    #[arg(long, default_value = "gpt-sovits")]
+    pub(crate) model: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum SessionsCommand {
+    List {
+        #[arg(short, long)]
+        query: Option<String>,
+    },
+    New {
+        #[arg(long)]
+        title: Option<String>,
+    },
+    Show {
+        id: Uuid,
+    },
+    Open {
+        id: Uuid,
+    },
+    Rm {
+        id: Uuid,
+    },
 }
 
 #[derive(Debug, Subcommand)]
