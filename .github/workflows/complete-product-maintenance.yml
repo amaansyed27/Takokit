@@ -47,15 +47,15 @@ jobs:
         with:
           name: complete-product-inventory
           path: product-inventory.txt
-      - name: Commit formatting
+      - name: Commit formatting and inventory
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "No formatting changes required."
+            echo "No maintenance changes required."
             exit 0
           fi
           git config user.name "Takokit CI"
           git config user.email "actions@users.noreply.github.com"
-          git add apps crates Cargo.toml Cargo.lock
-          git commit -m "Format workspace and session implementation"
+          git add apps crates Cargo.toml Cargo.lock product-inventory.txt
+          git commit -m "Format branch and export runtime inventory"
           git push origin HEAD:agent/workspaces-sessions-model-matrix
