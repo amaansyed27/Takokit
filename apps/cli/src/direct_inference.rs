@@ -1,6 +1,9 @@
 use super::*;
 use crate::workspace::CliWorkspace;
-use takokit_core::{SessionTask, SpeechRequest, TranscriptionRequest};
+use takokit_core::{
+    NewSessionEvent, SessionEventState, SessionTask, SpeechRequest, TranscriptionRequest,
+};
+use takokit_store::VoiceProfileStore;
 
 pub(crate) async fn run_speak(
     args: SpeakArgs,
@@ -135,18 +138,78 @@ pub(crate) async fn run_transcription(
 }
 
 pub(crate) fn run_clone(args: CloneArgs, workspace: &CliWorkspace) -> anyhow::Result<()> {
-    let error = anyhow::anyhow!(
-        "voice cloning model {} is not executable until its managed adapter is installed",
-        args.model
-    );
-    workspace.record_failure(
-        SessionTask::VoiceCloning,
-        Some(args.model),
-        Some(args.sample),
-        Some(args.name),
-        &error,
-    );
-    Err(error)
+    if !args.consent {
+        let error = anyhow::anyhow!(
+            "voice cloning requires --consent to confirm ownership or explicit permission"
+        );
+        workspace.record_failure(
+            SessionTask::VoiceCloning,
+            Some(args.model),
+            Some(args.sample),
+            Some(args.name),
+            &error,
+        );
+        return Err(error);
+    }
+
+    let store = LocalStore::new(LocalStore::default_root());
+    store.ensure_layout()?;
+    let package_registry = PackageRegistry::bundled();
+    let installed_registry = InstalledRegistry::new(store.manifests_dir());
+    let manifest = package_registry.model(&args.model).map_err(cli_error)?;
+    if !manifest.capabilities.voice_cloning {
+        return Err(anyhow::anyhow!(
+            "model {} does not support voice cloning",
+            args.model
+        ));
+    }
+    let plan = plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
+    if !plan.executable {
+        let error = anyhow::anyhow!(
+            "model {} is not ready: {}. Next: {}",
+            args.model,
+            if plan.missing.is_empty() {
+                "runtime setup is incomplete".to_string()
+            } else {
+                plan.missing.join("; ")
+            },
+            plan.next_command
+        );
+        workspace.record_failure(
+            SessionTask::VoiceCloning,
+            Some(args.model),
+            Some(args.sample),
+            Some(args.name),
+            &error,
+        );
+        return Err(error);
+    }
+
+    let profile = VoiceProfileStore::new(store.voices_dir()).create(
+        &args.name,
+        &args.model,
+        &args.sample,
+        true,
+        Some("Consent affirmed through Takokit CLI.".to_string()),
+    )?;
+    workspace.store.append_event(
+        workspace.session_id(),
+        NewSessionEvent {
+            task: SessionTask::VoiceCloning,
+            state: SessionEventState::Completed,
+            model: Some(profile.model_id.clone()),
+            input: Some(profile.name.clone()),
+            source_path: Some(args.sample),
+            output_path: Some(profile.sample_path.clone()),
+            text: None,
+            message: Some(format!(
+                "Created reusable voice profile {}. Use --voice {} for compatible models.",
+                profile.name, profile.id
+            )),
+        },
+    )?;
+    println!("{}", serde_json::to_string_pretty(&profile)?);
+    Ok(())
 }
 
 pub(crate) fn run_train(args: TrainArgs, workspace: &CliWorkspace) -> anyhow::Result<()> {
