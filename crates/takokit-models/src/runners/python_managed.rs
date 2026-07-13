@@ -71,12 +71,7 @@ pub fn speak_with_qwen3_tts(
             "speech input cannot be empty".to_string(),
         ));
     }
-    let takokit_root = output_dir.parent().ok_or_else(|| {
-        inference_missing(format!(
-            "could not infer Takokit root from output directory {}",
-            output_dir.display()
-        ))
-    })?;
+    let takokit_root = &plan.storage_root;
     let model_dir = takokit_root.join("models").join("qwen3-tts");
     for required in [
         model_dir.join("model.safetensors"),
