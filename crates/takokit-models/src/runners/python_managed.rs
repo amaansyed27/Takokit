@@ -142,9 +142,12 @@ fn transcribe_with_adapter(
         audio_path: Some(&request.file_path),
     };
     let response = run_adapter(adapter, &layout, &payload)?;
-    let text = response.text.filter(|text| !text.trim().is_empty()).ok_or_else(|| {
-        TakokitError::Audio(format!("{adapter} adapter returned no transcript text"))
-    })?;
+    let text = response
+        .text
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| {
+            TakokitError::Audio(format!("{adapter} adapter returned no transcript text"))
+        })?;
     Ok(TranscriptionResponse {
         id: Uuid::new_v4(),
         model: plan.model.id.clone(),
@@ -159,10 +162,7 @@ struct AdapterLayout {
 }
 
 fn adapter_layout(plan: &ExecutionPlan, adapter: &str) -> TakokitResult<AdapterLayout> {
-    let runner_root = plan
-        .storage_root
-        .join("runners")
-        .join("python-managed");
+    let runner_root = plan.storage_root.join("runners").join("python-managed");
     let adapter_dir = runner_root.join("adapters").join(adapter);
     let script = adapter_dir.join(format!("{adapter}.py"));
     if !script.is_file() {
@@ -216,13 +216,14 @@ fn run_adapter(
     let output = child.wait_with_output().map_err(|error| {
         TakokitError::Audio(format!("could not wait for {adapter} adapter: {error}"))
     })?;
-    let response: ManagedAdapterResponse = serde_json::from_slice(&output.stdout).map_err(|error| {
-        TakokitError::Audio(format!(
-            "{adapter} adapter returned invalid JSON ({error}): {}{}",
-            String::from_utf8_lossy(&output.stdout).trim(),
-            stderr_suffix(&output.stderr)
-        ))
-    })?;
+    let response: ManagedAdapterResponse =
+        serde_json::from_slice(&output.stdout).map_err(|error| {
+            TakokitError::Audio(format!(
+                "{adapter} adapter returned invalid JSON ({error}): {}{}",
+                String::from_utf8_lossy(&output.stdout).trim(),
+                stderr_suffix(&output.stderr)
+            ))
+        })?;
     if !output.status.success() || !response.ok {
         return Err(TakokitError::Audio(format!(
             "{adapter} adapter failed: {}{}",
@@ -251,7 +252,10 @@ fn python_candidates(venv: &Path) -> Vec<PathBuf> {
     if cfg!(windows) {
         vec![venv.join("Scripts").join("python.exe")]
     } else {
-        vec![venv.join("bin").join("python3"), venv.join("bin").join("python")]
+        vec![
+            venv.join("bin").join("python3"),
+            venv.join("bin").join("python"),
+        ]
     }
 }
 

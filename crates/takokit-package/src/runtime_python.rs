@@ -170,8 +170,8 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
     let mut record = python_adapter_record(takokit_root, adapter)?;
     record.state = AdapterLifecycleState::Installing;
-    record.notes = "Takokit is installing this adapter in an isolated managed environment."
-        .to_string();
+    record.notes =
+        "Takokit is installing this adapter in an isolated managed environment.".to_string();
     write_adapter_record(&manifest_path, &record)?;
 
     let result = adapter_spec(adapter)
@@ -262,13 +262,15 @@ fn install_adapter_spec(
     layout: &PythonManagedRunnerLayout,
     spec: &AdapterSpec,
 ) -> PackageResult<String> {
-    let script = spec.script.ok_or_else(|| PackageError::ArtifactInstallFailed {
-        artifact: spec.id.to_string(),
-        reason: format!(
-            "{} is catalogued but its official adapter is not implemented yet",
-            spec.model_family
-        ),
-    })?;
+    let script = spec
+        .script
+        .ok_or_else(|| PackageError::ArtifactInstallFailed {
+            artifact: spec.id.to_string(),
+            reason: format!(
+                "{} is catalogued but its official adapter is not implemented yet",
+                spec.model_family
+            ),
+        })?;
     if spec.packages.is_empty() {
         return Err(PackageError::ArtifactInstallFailed {
             artifact: spec.id.to_string(),
@@ -293,7 +295,10 @@ fn install_adapter_spec(
     )?;
     let python = runner_python_path(&venv).ok_or_else(|| PackageError::ArtifactInstallFailed {
         artifact: spec.id.to_string(),
-        reason: format!("adapter environment has no Python executable: {}", venv.display()),
+        reason: format!(
+            "adapter environment has no Python executable: {}",
+            venv.display()
+        ),
     })?;
     let mut arguments = vec![
         "pip".into(),
