@@ -204,8 +204,8 @@ fn resolve_voice(plan: &ExecutionPlan, voice: Option<&str>) -> TakokitResult<Opt
     if !plan.model.capabilities.voice_cloning {
         return Ok(Some(voice.to_string()));
     }
-    let reference = VoiceProfileStore::new(plan.storage_root.join("voices"))
-        .resolve_reference(voice)?;
+    let reference =
+        VoiceProfileStore::new(plan.storage_root.join("voices")).resolve_reference(voice)?;
     Ok(Some(reference.display().to_string()))
 }
 
