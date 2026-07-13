@@ -159,10 +159,19 @@ mod tests {
         std::fs::write(&sample, b"RIFF").unwrap();
         let store = VoiceProfileStore::new(root.join("voices"));
         let profile = store
-            .create("My Voice", "chatterbox", &sample, true, Some("owner".into()))
+            .create(
+                "My Voice",
+                "chatterbox",
+                &sample,
+                true,
+                Some("owner".into()),
+            )
             .unwrap();
         assert_eq!(profile.id, "my-voice");
-        assert_eq!(store.resolve_reference("my-voice").unwrap(), profile.sample_path);
+        assert_eq!(
+            store.resolve_reference("my-voice").unwrap(),
+            profile.sample_path
+        );
         assert_eq!(store.list().unwrap().len(), 1);
         let _ = std::fs::remove_dir_all(root);
     }
