@@ -4,7 +4,6 @@ gui_build=2
 file_size_audit=0
 
 == cargo check ==
-[1m[92m    Checking[0m regex-automata v0.4.15
 [1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
    [1m[94m--> [0mcrates/takokit-package/src/orchestrator.rs:119:51
     [1m[94m|[0m
@@ -158,6 +157,7 @@ file_size_audit=0
 [1m[94m 24[0m [1m[94m|[0m     args: &[PathOrArg],
     [1m[94m|[0m     [1m[94m------------------[0m
 
+[1m[92m    Checking[0m hyper-util v0.1.20
 [1m[92m    Checking[0m axum-core v0.4.5
 [1mSome errors have detailed explanations: E0063, E0308, E0364, E0422, E0425, E0433.[0m
 [1mFor more information about an error, try `rustc --explain E0063`.[0m
@@ -166,8 +166,6 @@ file_size_audit=0
 [1m[33mwarning[0m: build failed, waiting for other jobs to finish...
 
 == cargo test ==
-    [1m[94m|[0m
-[1m[94m119[0m [1m[94m|[0m             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
     [1m[94m|[0m                                                   [1m[91m^^^^^^^^^^^^^^^^^^^^^[0m [1m[91muse of undeclared type `AdapterLifecycleState`[0m
     [1m[94m|[0m
 [1m[96mhelp[0m: an enum with a similar name exists
@@ -200,7 +198,7 @@ file_size_audit=0
 [1m[94m135[0m [92m+ [0m        if state != [92mRunnerLifecycleState[0m::Ready {
     [1m[94m|[0m
 
-[1m[92m   Compiling[0m either v1.16.0
+[1m[92m   Compiling[0m mime v0.3.17
 [1m[91merror[E0433][0m[1m: cannot find type `AdapterLifecycleState` in this scope[0m
    [1m[94m--> [0mcrates/takokit-package/src/resolution.rs:122:45
     [1m[94m|[0m
@@ -318,9 +316,11 @@ file_size_audit=0
 [1m[94m 24[0m [1m[94m|[0m     args: &[PathOrArg],
     [1m[94m|[0m     [1m[94m------------------[0m
 
-[1m[92m   Compiling[0m mime v0.3.17
-[1m[92m   Compiling[0m unicase v2.9.0
 [1m[92m   Compiling[0m tower-layer v0.3.3
+[1m[92m   Compiling[0m unicase v2.9.0
+[1m[92m   Compiling[0m itertools v0.14.0
+[1m[92m   Compiling[0m mime_guess v2.0.5
+[1m[92m   Compiling[0m httparse v1.10.1
 [1mSome errors have detailed explanations: E0063, E0308, E0364, E0422, E0425, E0433.[0m
 [1mFor more information about an error, try `rustc --explain E0063`.[0m
 [1m[33mwarning[0m: `takokit-package` (lib) generated 1 warning
@@ -335,7 +335,7 @@ file_size_audit=0
 src/features/voices/VoicesPage.tsx(177,28): error TS2367: This comparison appears to be unintentional because the types '"not required" | "required"' and '"affirmed"' have no overlap.
 
 == file-size audit ==
-Audited 255 tracked source/config/documentation files.
+Audited 257 tracked source/config/documentation files.
 Hard limit: 500 lines; warning threshold: 400 lines.
 
 No files exceed the hard limit.
