@@ -24,9 +24,11 @@ use crate::AppState;
 mod error;
 mod inference;
 mod packages;
+mod sessions;
 mod system;
 
 pub use error::ApiError;
 pub use inference::*;
 pub use packages::*;
+pub use sessions::*;
 pub use system::*;
