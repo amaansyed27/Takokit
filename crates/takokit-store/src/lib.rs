@@ -1,8 +1,10 @@
+mod voice;
 mod workspace;
 
 use std::path::{Path, PathBuf};
 use takokit_core::{TakokitError, TakokitResult};
 
+pub use voice::VoiceProfileStore;
 pub use workspace::WorkspaceStore;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
