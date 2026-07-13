@@ -1,0 +1,98 @@
+name: Wire expanded model adapter specs
+
+on:
+  push:
+    branches:
+      - agent/workspaces-sessions-model-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspaces-sessions-model-matrix
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Add shared adapter specs
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("crates/takokit-package/src/runtime_python_specs.rs")
+          source = path.read_text()
+          if "HF_AUDIO_ADAPTER" not in source:
+              source = source.replace(
+                  'const NEMO_ASR_ADAPTER: &str = include_str!("../../../runners/python/nemo_asr_adapter.py");\n',
+                  'const NEMO_ASR_ADAPTER: &str = include_str!("../../../runners/python/nemo_asr_adapter.py");\nconst HF_AUDIO_ADAPTER: &str = include_str!("../../../runners/python/hf_audio_adapter.py");\nconst COQUI_TTS_ADAPTER: &str = include_str!("../../../runners/python/coqui_tts_adapter.py");\n',
+              )
+          if 'model_family: "bark-small"' not in source:
+              anchor = '''    AdapterSpec {
+        id: "cosyvoice2",
+'''
+              specs = '''    AdapterSpec {
+        id: "hf_audio",
+        model_family: "bark-small",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "transformers", "accelerate", "soundfile", "scipy"],
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Bark Small generation through the official Transformers BarkModel API.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "mms-tts-eng",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "transformers", "accelerate", "soundfile", "scipy"],
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "MMS-TTS generation through the official Transformers VitsModel API.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "distil-whisper-large-v3",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "transformers", "accelerate", "soundfile", "scipy"],
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Distil-Whisper transcription through the official Transformers ASR pipeline.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "wav2vec2-base-960h",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "transformers", "accelerate", "soundfile", "scipy"],
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Wav2Vec2 transcription through the official Transformers ASR pipeline.",
+    },
+    AdapterSpec {
+        id: "coqui_tts",
+        model_family: "xtts-v2",
+        python: "3.11",
+        packages: &["coqui-tts", "torch", "torchaudio"],
+        script: Some(COQUI_TTS_ADAPTER),
+        note: "XTTS v2 zero-shot voice cloning through the official Coqui TTS API.",
+    },
+    AdapterSpec {
+        id: "coqui_tts",
+        model_family: "yourtts",
+        python: "3.11",
+        packages: &["coqui-tts", "torch", "torchaudio"],
+        script: Some(COQUI_TTS_ADAPTER),
+        note: "YourTTS zero-shot voice cloning through the official Coqui TTS API.",
+    },
+'''
+              if anchor not in source:
+                  raise SystemExit("adapter insertion anchor missing")
+              source = source.replace(anchor, specs + anchor)
+          path.write_text(source)
+      - run: cargo fmt --all
+      - name: Commit shared specs
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add crates/takokit-package/src/runtime_python_specs.rs
+          git commit -m "Add Transformers and Coqui adapter families"
+          git push origin HEAD:agent/workspaces-sessions-model-matrix
