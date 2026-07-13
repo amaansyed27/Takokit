@@ -68,8 +68,9 @@ export async function loadSessionOutput(id: string, outputPath: string): Promise
 }
 
 export function outputFilename(path: string): string {
-  const normalized = path.replaceAll("\\", "/");
-  return normalized.split("/").filter(Boolean).at(-1) ?? "output";
+  const normalized = path.replace(/\\/g, "/");
+  const components = normalized.split("/").filter(Boolean);
+  return components.length > 0 ? components[components.length - 1] : "output";
 }
 
 async function openSession(workspace: string, sessionId?: string, title?: string): Promise<SessionRecord> {
