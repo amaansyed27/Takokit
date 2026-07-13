@@ -1,0 +1,27 @@
+id = "kyutai-tts-1.6b"
+name = "Kyutai TTS 1.6B"
+family = "kyutai-tts-1.6b"
+version = "1.0.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "kyutai_tts"
+license = "weights-license-check-required"
+description = "Kyutai's low-latency English/French text-to-speech model based on Delayed Streams Modeling, using official Moshi inference and precomputed voice embeddings."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = true
+
+[hardware]
+cpu = false
+gpu = true
+min_ram = "16gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
