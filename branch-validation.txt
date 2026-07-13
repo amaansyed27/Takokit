@@ -1,117 +1,117 @@
 cargo_check=0
 cargo_test=101
-gui_build=2
+gui_build=0
 file_size_audit=0
 
 == cargo check ==
-[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m    Checking[0m unicode-width v0.2.2
 [1m[92m   Compiling[0m convert_case v0.10.0
 [1m[92m    Checking[0m futures-util v0.3.32
-[1m[92m    Checking[0m tracing v0.1.44
 [1m[92m    Checking[0m unicode-truncate v2.0.1
-[1m[92m    Checking[0m compact_str v0.9.1
 [1m[92m    Checking[0m kasuari v0.4.12
 [1m[92m    Checking[0m strum v0.28.0
+[1m[92m    Checking[0m compact_str v0.9.1
+[1m[92m    Checking[0m tracing v0.1.44
 [1m[92m   Compiling[0m darling v0.23.0
-[1m[92m    Checking[0m rustls-webpki v0.103.13
-[1m[92m    Checking[0m idna v1.1.0
 [1m[92m    Checking[0m flate2 v1.1.9
+[1m[92m    Checking[0m rustls-webpki v0.103.13
 [1m[92m    Checking[0m serde_spanned v0.6.9
 [1m[92m    Checking[0m toml_datetime v0.6.11
-[1m[92m    Checking[0m crypto-common v0.1.7
+[1m[92m    Checking[0m idna v1.1.0
 [1m[92m    Checking[0m block-buffer v0.10.4
+[1m[92m    Checking[0m crypto-common v0.1.7
 [1m[92m    Checking[0m webpki-roots v1.0.8
 [1m[92m    Checking[0m lru v0.18.1
-[1m[92m    Checking[0m winnow v0.7.15
+[1m[92m    Checking[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m indoc v2.0.7
+[1m[92m    Checking[0m tower-layer v0.3.3
+[1m[92m    Checking[0m bumpalo v3.20.3
+[1m[92m    Checking[0m mime v0.3.17
 [1m[92m    Checking[0m toml_write v0.1.2
-[1m[92m    Checking[0m subtle v2.6.1
+[1m[92m    Checking[0m winnow v0.7.15
+[1m[92m    Checking[0m httpdate v1.0.3
 [1m[92m   Compiling[0m zip v2.4.2
 [1m[92m    Checking[0m critical-section v1.2.0
-[1m[92m    Checking[0m scopeguard v1.2.0
-[1m[92m    Checking[0m mime v0.3.17
-[1m[92m   Compiling[0m rustix v1.1.4
-[1m[92m    Checking[0m bumpalo v3.20.3
-[1m[92m   Compiling[0m indoc v2.0.7
-[1m[92m    Checking[0m httpdate v1.0.3
-[1m[92m    Checking[0m option-ext v0.2.0
 [1m[92m   Compiling[0m unicase v2.9.0
-[1m[92m    Checking[0m tower-layer v0.3.3
+[1m[92m    Checking[0m option-ext v0.2.0
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m    Checking[0m subtle v2.6.1
 [1m[92m   Compiling[0m mime_guess v2.0.5
 [1m[92m    Checking[0m dirs-sys v0.4.1
+[1m[92m    Checking[0m ratatui-core v0.1.2
 [1m[92m    Checking[0m zopfli v0.8.3
 [1m[92m    Checking[0m lock_api v0.4.14
-[1m[92m    Checking[0m ratatui-core v0.1.2
 [1m[92m    Checking[0m webpki-roots v0.26.11
-[1m[92m    Checking[0m digest v0.10.7
 [1m[92m    Checking[0m url v2.5.8
 [1m[92m    Checking[0m toml_edit v0.22.27
+[1m[92m    Checking[0m digest v0.10.7
 [1m[92m   Compiling[0m derive_more-impl v2.1.1
-[1m[92m    Checking[0m http-body-util v0.1.3
 [1m[92m   Compiling[0m async-trait v0.1.89
+[1m[92m    Checking[0m http-body-util v0.1.3
 [1m[92m    Checking[0m futures-channel v0.3.32
+[1m[92m    Checking[0m atomic-waker v1.1.2
+[1m[92m    Checking[0m powerfmt v0.2.0
+[1m[92m    Checking[0m num-conv v0.2.2
+[1m[92m    Checking[0m num_threads v0.1.7
+[1m[92m    Checking[0m utf8parse v0.2.2
+[1m[92m    Checking[0m cpufeatures v0.2.17
 [1m[92m    Checking[0m base64 v0.22.1
+[1m[92m    Checking[0m sync_wrapper v1.0.2
 [1m[92m    Checking[0m linux-raw-sys v0.12.1
+[1m[92m    Checking[0m time-core v0.1.9
 [1m[92m   Compiling[0m litrs v1.0.0
 [1m[92m    Checking[0m deranged v0.5.8
-[1m[92m    Checking[0m sync_wrapper v1.0.2
-[1m[92m    Checking[0m cpufeatures v0.2.17
-[1m[92m    Checking[0m powerfmt v0.2.0
-[1m[92m    Checking[0m utf8parse v0.2.2
-[1m[92m    Checking[0m time-core v0.1.9
-[1m[92m    Checking[0m atomic-waker v1.1.2
-[1m[92m    Checking[0m num_threads v0.1.7
-[1m[92m    Checking[0m num-conv v0.2.2
-[1m[92m    Checking[0m hyper v1.10.1
+[1m[92m    Checking[0m ureq v2.12.1
 [1m[92m    Checking[0m anstyle-parse v1.0.0
 [1m[92m   Compiling[0m document-features v0.2.12
-[1m[92m    Checking[0m ureq v2.12.1
 [1m[92m    Checking[0m sha2 v0.10.9
-[1m[92m    Checking[0m time v0.3.53
 [1m[92m    Checking[0m toml v0.8.23
+[1m[92m    Checking[0m hyper v1.10.1
 [1m[92m    Checking[0m derive_more v2.1.1
 [1m[92m    Checking[0m signal-hook-mio v0.2.5
 [1m[92m    Checking[0m parking_lot v0.12.5
+[1m[92m    Checking[0m time v0.3.53
 [1m[92m    Checking[0m dirs v5.0.1
 [1m[92m    Checking[0m line-clipping v0.3.7
 [1m[92m    Checking[0m fs2 v0.4.3
-[1m[92m    Checking[0m futures-sink v0.3.32
-[1m[92m    Checking[0m is_terminal_polyfill v1.70.2
 [1m[92m    Checking[0m anstyle v1.0.14
-[1m[92m    Checking[0m regex-syntax v0.8.11
-[1m[92m    Checking[0m colorchoice v1.0.5
 [1m[92m   Compiling[0m anyhow v1.0.103
 [1m[92m    Checking[0m anstyle-query v1.1.5
-[1m[92m    Checking[0m anstream v1.0.0
-[1m[92m    Checking[0m takokit-package v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-package)
+[1m[92m    Checking[0m colorchoice v1.0.5
+[1m[92m    Checking[0m futures-sink v0.3.32
+[1m[92m    Checking[0m is_terminal_polyfill v1.70.2
+[1m[92m    Checking[0m regex-syntax v0.8.11
 [1m[92m    Checking[0m tokio-util v0.7.18
+[1m[92m    Checking[0m anstream v1.0.0
 [1m[92m    Checking[0m ratatui-widgets v0.3.2
+[1m[92m    Checking[0m takokit-package v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-package)
+[1m[92m    Checking[0m hyper-util v0.1.20
 [1m[92m    Checking[0m takokit-store v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-store)
 [1m[92m    Checking[0m crossterm v0.29.0
 [1m[92m    Checking[0m regex-automata v0.4.15
-[1m[92m    Checking[0m hyper-util v0.1.20
-[1m[92m    Checking[0m tower v0.5.3
 [1m[92m    Checking[0m axum-core v0.4.5
+[1m[92m    Checking[0m tower v0.5.3
 [1m[92m    Checking[0m takokit-audio v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-audio)
 [1m[92m    Checking[0m serde_urlencoded v0.7.1
 [1m[92m    Checking[0m serde_path_to_error v0.1.20
 [1m[92m    Checking[0m is-docker v0.2.0
-[1m[92m    Checking[0m matchit v0.7.3
-[1m[92m    Checking[0m http-range-header v0.4.2
 [1m[92m    Checking[0m clap_lex v1.1.0
+[1m[92m    Checking[0m matchit v0.7.3
 [1m[92m    Checking[0m lazy_static v1.5.0
+[1m[92m    Checking[0m http-range-header v0.4.2
 [1m[92m    Checking[0m clap_builder v4.6.0
+[1m[92m    Checking[0m tower-http v0.6.11
 [1m[92m    Checking[0m sharded-slab v0.1.7
 [1m[92m    Checking[0m matchers v0.2.0
-[1m[92m    Checking[0m tower-http v0.6.11
 [1m[92m    Checking[0m is-wsl v0.4.0
 [1m[92m    Checking[0m takokit-models v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-models)
-[1m[92m    Checking[0m ratatui-macros v0.7.2
 [1m[92m    Checking[0m ratatui-crossterm v0.1.2
+[1m[92m    Checking[0m ratatui-macros v0.7.2
 [1m[92m    Checking[0m tracing-log v0.2.0
+[1m[92m    Checking[0m axum v0.7.9
 [1m[92m   Compiling[0m clap_derive v4.6.1
 [1m[92m    Checking[0m thread_local v1.1.10
 [1m[92m    Checking[0m nu-ansi-term v0.50.3
-[1m[92m    Checking[0m axum v0.7.9
 [1m[92m    Checking[0m tracing-subscriber v0.3.23
 [1m[92m    Checking[0m ratatui v0.30.2
 [1m[92m    Checking[0m open v5.3.6
@@ -163,114 +163,113 @@ file_size_audit=0
     [1m[94m|[0m               [1m[33m^^^^^^^^^^^^^^^[0m
 
 [1m[33mwarning[0m: `takokit-cli` (lib) generated 5 warnings (run `cargo fix --lib -p takokit-cli` to apply 1 suggestion)
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 27.65s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 27.27s
 
 == cargo test ==
-[1m[92m   Compiling[0m unicode-segmentation v1.13.3
+[1m[92m   Compiling[0m cpufeatures v0.2.17
 [1m[92m   Compiling[0m sha2 v0.10.9
-[1m[92m   Compiling[0m http-body v1.0.1
 [1m[92m   Compiling[0m ureq v2.12.1
+[1m[92m   Compiling[0m http-body v1.0.1
 [1m[92m   Compiling[0m toml v0.8.23
-[1m[92m   Compiling[0m zip v2.4.2
 [1m[92m   Compiling[0m dirs v5.0.1
+[1m[92m   Compiling[0m zip v2.4.2
 [1m[92m   Compiling[0m fs2 v0.4.3
 [1m[92m   Compiling[0m tracing-core v0.1.36
 [1m[92m   Compiling[0m tower-service v0.3.3
 [1m[92m   Compiling[0m futures-task v0.3.32
 [1m[92m   Compiling[0m slab v0.4.12
 [1m[92m   Compiling[0m darling_core v0.23.0
-[1m[92m   Compiling[0m tracing v0.1.44
 [1m[92m   Compiling[0m futures-util v0.3.32
+[1m[92m   Compiling[0m tracing v0.1.44
 [1m[92m   Compiling[0m takokit-store v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-store)
 [1m[92m   Compiling[0m takokit-package v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-package)
 [1m[92m   Compiling[0m takokit-audio v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-audio)
-[1m[92m   Compiling[0m either v1.16.0
-[1m[92m   Compiling[0m httpdate v1.0.3
+[1m[92m   Compiling[0m mime v0.3.17
 [1m[92m   Compiling[0m tower-layer v0.3.3
 [1m[92m   Compiling[0m unicase v2.9.0
-[1m[92m   Compiling[0m mime v0.3.17
-[1m[92m   Compiling[0m mime_guess v2.0.5
+[1m[92m   Compiling[0m either v1.16.0
+[1m[92m   Compiling[0m httpdate v1.0.3
 [1m[92m   Compiling[0m itertools v0.14.0
+[1m[92m   Compiling[0m mime_guess v2.0.5
 [1m[92m   Compiling[0m httparse v1.10.1
 [1m[92m   Compiling[0m http-body-util v0.1.3
 [1m[92m   Compiling[0m castaway v0.2.4
 [1m[92m   Compiling[0m futures-channel v0.3.32
 [1m[92m   Compiling[0m hashbrown v0.16.1
 [1m[92m   Compiling[0m darling_macro v0.23.0
-[1m[92m   Compiling[0m unicode-width v0.2.2
-[1m[92m   Compiling[0m sync_wrapper v1.0.2
-[1m[92m   Compiling[0m atomic-waker v1.1.2
 [1m[92m   Compiling[0m static_assertions v1.1.0
+[1m[92m   Compiling[0m atomic-waker v1.1.2
+[1m[92m   Compiling[0m sync_wrapper v1.0.2
+[1m[92m   Compiling[0m unicode-width v0.2.2
 [1m[92m   Compiling[0m hyper v1.10.1
-[1m[92m   Compiling[0m compact_str v0.9.1
-[1m[92m   Compiling[0m kasuari v0.4.12
 [1m[92m   Compiling[0m unicode-truncate v2.0.1
+[1m[92m   Compiling[0m kasuari v0.4.12
+[1m[92m   Compiling[0m compact_str v0.9.1
 [1m[92m   Compiling[0m darling v0.23.0
 [1m[92m   Compiling[0m strum v0.28.0
 [1m[92m   Compiling[0m convert_case v0.10.0
 [1m[92m   Compiling[0m lru v0.18.1
 [1m[92m   Compiling[0m critical-section v1.2.0
-[1m[92m   Compiling[0m futures-sink v0.3.32
 [1m[92m   Compiling[0m scopeguard v1.2.0
-[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m   Compiling[0m futures-sink v0.3.32
 [1m[92m   Compiling[0m tokio-util v0.7.18
 [1m[92m   Compiling[0m lock_api v0.4.14
-[1m[92m   Compiling[0m instability v0.3.12
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
 [1m[92m   Compiling[0m ratatui-core v0.1.2
+[1m[92m   Compiling[0m instability v0.3.12
 [1m[92m   Compiling[0m hyper-util v0.1.20
-[1m[92m   Compiling[0m parking_lot_core v0.9.12
 [1m[92m   Compiling[0m signal-hook v0.3.18
-[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
 [1m[92m   Compiling[0m axum-core v0.4.5
+[1m[92m   Compiling[0m tower v0.5.3
 [1m[92m   Compiling[0m takokit-models v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-models)
 [1m[92m   Compiling[0m serde_urlencoded v0.7.1
 [1m[92m   Compiling[0m serde_path_to_error v0.1.20
-[1m[92m   Compiling[0m utf8parse v0.2.2
-[1m[92m   Compiling[0m num_threads v0.1.7
 [1m[92m   Compiling[0m num-conv v0.2.2
-[1m[92m   Compiling[0m http-range-header v0.4.2
 [1m[92m   Compiling[0m matchit v0.7.3
-[1m[92m   Compiling[0m deranged v0.5.8
 [1m[92m   Compiling[0m powerfmt v0.2.0
 [1m[92m   Compiling[0m time-core v0.1.9
+[1m[92m   Compiling[0m utf8parse v0.2.2
 [1m[92m   Compiling[0m fastrand v2.4.1
-[1m[92m   Compiling[0m tower-http v0.6.11
+[1m[92m   Compiling[0m http-range-header v0.4.2
+[1m[92m   Compiling[0m num_threads v0.1.7
+[1m[92m   Compiling[0m deranged v0.5.8
 [1m[92m   Compiling[0m tempfile v3.27.0
-[1m[92m   Compiling[0m axum v0.7.9
+[1m[92m   Compiling[0m tower-http v0.6.11
 [1m[92m   Compiling[0m anstyle-parse v1.0.0
-[1m[92m   Compiling[0m time v0.3.53
-[1m[92m   Compiling[0m signal-hook-mio v0.2.5
+[1m[92m   Compiling[0m axum v0.7.9
 [1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m signal-hook-mio v0.2.5
 [1m[92m   Compiling[0m derive_more v2.1.1
 [1m[92m   Compiling[0m anyhow v1.0.103
+[1m[92m   Compiling[0m time v0.3.53
 [1m[92m   Compiling[0m line-clipping v0.3.7
-[1m[92m   Compiling[0m is_terminal_polyfill v1.70.2
-[1m[92m   Compiling[0m anstyle v1.0.14
 [1m[92m   Compiling[0m colorchoice v1.0.5
-[1m[92m   Compiling[0m anstyle-query v1.1.5
+[1m[92m   Compiling[0m is_terminal_polyfill v1.70.2
 [1m[92m   Compiling[0m regex-syntax v0.8.11
+[1m[92m   Compiling[0m anstyle v1.0.14
+[1m[92m   Compiling[0m anstyle-query v1.1.5
 [1m[92m   Compiling[0m anstream v1.0.0
 [1m[92m   Compiling[0m ratatui-widgets v0.3.2
 [1m[92m   Compiling[0m crossterm v0.29.0
 [1m[92m   Compiling[0m regex-automata v0.4.15
 [1m[92m   Compiling[0m is-docker v0.2.0
-[1m[92m   Compiling[0m clap_lex v1.1.0
 [1m[92m   Compiling[0m lazy_static v1.5.0
-[1m[92m   Compiling[0m sharded-slab v0.1.7
-[1m[92m   Compiling[0m clap_builder v4.6.0
+[1m[92m   Compiling[0m clap_lex v1.1.0
 [1m[92m   Compiling[0m is-wsl v0.4.0
+[1m[92m   Compiling[0m clap_builder v4.6.0
+[1m[92m   Compiling[0m sharded-slab v0.1.7
 [1m[92m   Compiling[0m ratatui-macros v0.7.2
 [1m[92m   Compiling[0m ratatui-crossterm v0.1.2
-[1m[92m   Compiling[0m tracing-log v0.2.0
 [1m[92m   Compiling[0m takokit-server v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-server)
 [1m[92m   Compiling[0m matchers v0.2.0
+[1m[92m   Compiling[0m tracing-log v0.2.0
 [1m[92m   Compiling[0m thread_local v1.1.10
 [1m[92m   Compiling[0m nu-ansi-term v0.50.3
 [1m[92m   Compiling[0m clap v4.6.1
 [1m[92m   Compiling[0m tracing-subscriber v0.3.23
 [1m[92m   Compiling[0m ratatui v0.30.2
 [1m[92m   Compiling[0m open v5.3.6
-[1m[92m   Compiling[0m takokit-safety v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-safety)
 [1m[92m   Compiling[0m takokit-cli v0.1.0 (/home/runner/work/Takokit/Takokit/apps/cli)
 [1m[33mwarning[0m[1m: variable does not need to be mutable[0m
   [1m[94m--> [0mapps/cli/src/tui/mod.rs:37:19
@@ -315,6 +314,7 @@ file_size_audit=0
 [1m[94m185[0m [1m[94m|[0m pub(crate) fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
     [1m[94m|[0m               [1m[33m^^^^^^^^^^^^^^^[0m
 
+[1m[92m   Compiling[0m takokit-safety v0.1.0 (/home/runner/work/Takokit/Takokit/crates/takokit-safety)
 [1m[33mwarning[0m: `takokit-cli` (lib) generated 5 warnings (run `cargo fix --lib -p takokit-cli` to apply 1 suggestion)
 [1m[91merror[E0063][0m[1m: missing field `storage_root` in initializer of `ExecutionPlan`[0m
    [1m[94m--> [0mcrates/takokit-models/src/runners/onnx/tests.rs:152:5
@@ -332,7 +332,33 @@ file_size_audit=0
 > takokit-gui@0.1.0 build
 > tsc && vite build
 
-src/features/voices/VoicesPage.tsx(177,28): error TS2367: This comparison appears to be unintentional because the types '"not required" | "required"' and '"affirmed"' have no overlap.
+[36mvite v6.4.3 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 1614 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                                              [39m[1m[2m  0.40 kB[22m[1m[22m[2m │ gzip:  0.27 kB[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-vietnamese-400-normal-B0PMp_xB.woff   [39m[1m[2m  5.41 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-vietnamese-700-normal-D-KrLuLr.woff   [39m[1m[2m  5.45 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-400-normal-U6xZUhur.woff2         [39m[1m[2m  6.40 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-700-normal-4jsRXGGJ.woff2         [39m[1m[2m  6.53 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-600-normal-mazHmDYu.woff2         [39m[1m[2m  6.59 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-vietnamese-400-normal-BNOj0Qhp.woff2  [39m[1m[2m  7.27 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-vietnamese-700-normal-DWQgDHuA.woff2  [39m[1m[2m  7.33 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-400-normal-DBk4Dmer.woff          [39m[1m[2m  8.66 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-700-normal-DmYOh-W9.woff          [39m[1m[2m  8.97 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32morbitron-latin-600-normal-75H6acHo.woff          [39m[1m[2m  9.04 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-400-normal-_3DlpgIW.woff        [39m[1m[2m 12.31 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-700-normal-D7A851RN.woff        [39m[1m[2m 12.42 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-ext-700-normal-B_E7P90g.woff    [39m[1m[2m 12.48 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-ext-400-normal-D4cJI_B-.woff    [39m[1m[2m 12.61 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-ext-700-normal-B2s3bDs2.woff2   [39m[1m[2m 15.81 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-ext-400-normal-DTLbW2xa.woff2   [39m[1m[2m 15.83 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-400-normal-Rg4St2Dn.woff2       [39m[1m[2m 16.52 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[32mspace-mono-latin-700-normal-mWgeinG7.woff2       [39m[1m[2m 16.72 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[35mindex-DpxaDhfR.css                               [39m[1m[2m 28.98 kB[22m[1m[22m[2m │ gzip:  6.14 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-B6JkvmC4.js                                [39m[1m[2m223.96 kB[22m[1m[22m[2m │ gzip: 64.96 kB[22m
+[32m✓ built in 2.00s[39m
 
 == file-size audit ==
 Audited 257 tracked source/config/documentation files.
