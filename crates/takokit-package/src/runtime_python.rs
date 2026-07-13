@@ -11,6 +11,7 @@ const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_
 const CHATTERBOX_ADAPTER: &str = include_str!("../../../runners/python/chatterbox_adapter.py");
 const F5_TTS_ADAPTER: &str = include_str!("../../../runners/python/f5_tts_adapter.py");
 const DIA_ADAPTER: &str = include_str!("../../../runners/python/dia_adapter.py");
+const SENSEVOICE_ADAPTER: &str = include_str!("../../../runners/python/sensevoice_adapter.py");
 
 #[derive(Debug, Clone, Copy)]
 struct AdapterSpec {
@@ -59,6 +60,14 @@ const ADAPTER_SPECS: &[AdapterSpec] = &[
         ],
         script: Some(DIA_ADAPTER),
         note: "Dia text-to-dialogue generation through the official Transformers integration.",
+    },
+    AdapterSpec {
+        id: "sensevoice",
+        model_family: "sensevoice",
+        python: "3.11",
+        packages: &["torch", "torchaudio", "funasr", "modelscope"],
+        script: Some(SENSEVOICE_ADAPTER),
+        note: "SenseVoice multilingual transcription through the official FunASR AutoModel API.",
     },
     AdapterSpec {
         id: "cosyvoice2",
