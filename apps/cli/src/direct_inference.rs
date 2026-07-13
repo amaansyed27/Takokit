@@ -4,7 +4,6 @@ use takokit_core::{SessionTask, SpeechRequest, TranscriptionRequest};
 
 pub(crate) async fn run_speak(
     args: SpeakArgs,
-    store: &LocalStore,
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     workspace: &CliWorkspace,
@@ -30,7 +29,7 @@ pub(crate) async fn run_speak(
         MockTextToSpeechEngine
             .synthesize(request.clone(), &workspace.outputs_dir())
             .await
-            .map_err(Into::into)
+            .map_err(anyhow::Error::from)
     };
     match result {
         Ok(response) => {
@@ -72,7 +71,6 @@ pub(crate) async fn run_model(
                 model: args.model,
                 voice: args.voice.unwrap_or_else(|| "default".to_string()),
             },
-            &LocalStore::new(LocalStore::default_root()),
             package_registry,
             installed_registry,
             workspace,
