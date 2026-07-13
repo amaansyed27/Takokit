@@ -1,0 +1,35 @@
+name: Cleanup product maintenance workflows
+
+on:
+  push:
+    branches:
+      - agent/workspaces-sessions-model-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspaces-sessions-model-matrix
+      - name: Remove branch-only write workflows
+        run: |
+          rm -f \
+            .github/workflows/format-product-branch.yml \
+            .github/workflows/fix-clone-call.yml \
+            .github/workflows/apply-voice-ui.yml \
+            .github/workflows/apply-voice-style.yml \
+            .github/workflows/wire-tui-clone.yml \
+            .github/workflows/cleanup-product-maintenance.yml
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A .github/workflows
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Remove branch-only maintenance workflows"
+          git push origin HEAD:agent/workspaces-sessions-model-matrix
