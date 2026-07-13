@@ -137,6 +137,50 @@ export type TranscriptionApiResponse = {
   text: string;
 };
 
+export type SessionTask =
+  | "text_to_speech"
+  | "speech_to_text"
+  | "voice_cloning"
+  | "voice_training"
+  | "voice_conversion"
+  | "model_install"
+  | "runner_install"
+  | "diagnostics"
+  | "system";
+
+export type SessionEventState = "started" | "completed" | "failed";
+
+export type SessionEvent = {
+  id: string;
+  session_id: string;
+  timestamp: number;
+  task: SessionTask;
+  state: SessionEventState;
+  model?: string;
+  input?: string;
+  source_path?: string;
+  output_path?: string;
+  text?: string;
+  message?: string;
+};
+
+export type SessionSummary = {
+  id: string;
+  title: string;
+  workspace_root: string;
+  created_at: number;
+  updated_at: number;
+  event_count: number;
+  output_count: number;
+  last_task?: SessionTask;
+  last_model?: string;
+};
+
+export type SessionRecord = {
+  summary: SessionSummary;
+  events: SessionEvent[];
+};
+
 export type DoctorCheck = {
   section: string;
   label: string;
