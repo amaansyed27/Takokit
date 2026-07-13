@@ -6,6 +6,7 @@ const F5_TTS_ADAPTER: &str = include_str!("../../../runners/python/f5_tts_adapte
 const DIA_ADAPTER: &str = include_str!("../../../runners/python/dia_adapter.py");
 const SENSEVOICE_ADAPTER: &str = include_str!("../../../runners/python/sensevoice_adapter.py");
 const VOXTRAL_ADAPTER: &str = include_str!("../../../runners/python/voxtral_adapter.py");
+const NEMO_ASR_ADAPTER: &str = include_str!("../../../runners/python/nemo_asr_adapter.py");
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AdapterSpec {
@@ -76,6 +77,22 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         ],
         script: Some(VOXTRAL_ADAPTER),
         note: "Voxtral multilingual transcription through the official Transformers API.",
+    },
+    AdapterSpec {
+        id: "nemo_asr",
+        model_family: "canary",
+        python: "3.12",
+        packages: &["torch", "nemo-toolkit[asr]"],
+        script: Some(NEMO_ASR_ADAPTER),
+        note: "NVIDIA Canary transcription through the official NeMo ASR API.",
+    },
+    AdapterSpec {
+        id: "nemo_asr",
+        model_family: "parakeet",
+        python: "3.12",
+        packages: &["torch", "nemo-toolkit[asr]"],
+        script: Some(NEMO_ASR_ADAPTER),
+        note: "NVIDIA Parakeet transcription through the official NeMo ASR API.",
     },
     AdapterSpec {
         id: "cosyvoice2",
