@@ -140,7 +140,7 @@ pub(crate) fn adapter_spec(id: &str) -> Option<&'static AdapterSpec> {
     ADAPTER_SPECS.iter().find(|spec| spec.id == id)
 }
 
-pub(crate) fn adapter_for_model(model_id: &str) -> Option<&'static str> {
+pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
     ADAPTER_SPECS
         .iter()
         .find(|spec| spec.model_family == model_id)
