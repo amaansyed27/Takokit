@@ -3,16 +3,17 @@ name = "Voxtral"
 family = "voxtral"
 version = "0.1.0"
 kind = "omni-audio"
-backend = "transformers-audio"
-runner = "takokit-transformers-audio"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "voxtral"
 license = "license-check-required"
-description = "Voxtral audio-language model family. Metadata-only; no Transformers audio adapter or verified artifacts are installed."
+description = "Voxtral Mini multilingual speech transcription and audio-language inference through the official Transformers API in an isolated managed environment."
 
 [capabilities]
 tts = false
 stt = true
 voice_cloning = false
-live_transcription = true
+live_transcription = false
 live_audio = true
 
 [hardware]
@@ -21,6 +22,6 @@ gpu = true
 min_ram = "16gb"
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
 voices = []
