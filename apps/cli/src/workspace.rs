@@ -23,9 +23,7 @@ impl CliWorkspace {
         create_new: bool,
         title: &str,
     ) -> anyhow::Result<Self> {
-        let workspace_root = absolute_workspace(workspace)?;
-        let store = WorkspaceStore::new(workspace_root);
-        store.ensure_layout()?;
+        let store = resolve_store(workspace)?;
         let selected = if session_id.is_some() {
             session_id
         } else if create_new {
@@ -135,6 +133,12 @@ impl CliWorkspace {
             },
         );
     }
+}
+
+pub(crate) fn resolve_store(workspace: Option<PathBuf>) -> anyhow::Result<WorkspaceStore> {
+    let store = WorkspaceStore::new(absolute_workspace(workspace)?);
+    store.ensure_layout()?;
+    Ok(store)
 }
 
 fn absolute_workspace(workspace: Option<PathBuf>) -> anyhow::Result<PathBuf> {
