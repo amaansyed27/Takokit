@@ -1,5 +1,6 @@
 mod app;
 mod catalog;
+mod clone;
 mod editor;
 mod input;
 mod job;
@@ -144,6 +145,22 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
         TuiAction::Transcribe { model, audio } => (
             format!("Transcribing with {model}"),
             vec!["transcribe".into(), audio, "--model".into(), model],
+        ),
+        TuiAction::CloneVoice {
+            model,
+            name,
+            sample,
+        } => (
+            format!("Creating voice profile {name}"),
+            vec![
+                "clone".into(),
+                sample,
+                "--name".into(),
+                name,
+                "--model".into(),
+                model,
+                "--consent".into(),
+            ],
         ),
         TuiAction::PullRunner(runner) => (
             format!("Adding {runner}"),

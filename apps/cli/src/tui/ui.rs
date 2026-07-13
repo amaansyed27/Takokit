@@ -23,6 +23,7 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         TuiTab::Models => render_models(frame, page[1], app),
         TuiTab::Speak => render_speak(frame, page[1], app),
         TuiTab::Transcribe => render_transcribe(frame, page[1], app),
+        TuiTab::Clone => super::clone::render(frame, page[1], app),
         TuiTab::Sessions => render_sessions(frame, page[1], app),
         TuiTab::Runners => render_runners(frame, page[1], app),
         TuiTab::System => render_system(frame, page[1], app),
@@ -314,6 +315,7 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · /sessions · F1 help · Ctrl+C exit",
         TuiTab::Speak => "Tab fields · type Voice/Text · Enter continue/run · Ctrl+←/→ views · /sessions",
         TuiTab::Transcribe => "Tab fields · type audio path · Enter continue/run · Ctrl+←/→ views · /sessions",
+        TuiTab::Clone => "Tab fields · Space consent · Enter continue/create · /sessions",
         TuiTab::Sessions => "↑/↓ select · Enter open · N new · /new · ←/→ views · F1 help",
         TuiTab::Runners => "↑/↓ select · Enter add/install/check · P/I/D/X actions · /sessions",
         TuiTab::System => "↑/↓ select · Enter run · R refresh · /sessions · F1 help · Ctrl+C exit",
@@ -334,7 +336,7 @@ fn render_slash(frame: &mut Frame<'_>, app: &App) {
             .block(
                 Block::default()
                     .title(
-                        " Go to · sessions, new, models, speak, transcribe, runners, system, help ",
+                        " Go to · sessions, new, models, speak, transcribe, clone, runners, system, help ",
                     )
                     .borders(Borders::ALL),
             )
@@ -430,7 +432,7 @@ fn render_help(frame: &mut Frame<'_>) {
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nThis interface is task-based; no CLI syntax is required.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak and Transcribe\n  Tab through fields, type directly, and press Enter on the main action. Outputs are saved in the active .tako session.\n\nSessions\n  Use /sessions from anywhere. Select a previous session and press Enter, or press N / use /new.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes list views. Ctrl+Left/Right works inside forms. PageUp/PageDown scrolls activity. F1 closes help. Ctrl+C exits.",
+            "Takokit TUI\n\nThis interface is task-based; no CLI syntax is required.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak, Transcribe, and Clone\n  Tab through fields, type directly, and press Enter on the main action. Outputs are saved in the active .tako session.\n\nSessions\n  Use /sessions from anywhere. Select a previous session and press Enter, or press N / use /new.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes list views. Ctrl+Left/Right works inside forms. PageUp/PageDown scrolls activity. F1 closes help. Ctrl+C exits.",
         )
         .wrap(Wrap { trim: false })
         .block(Block::default().title(" Help ").borders(Borders::ALL)),

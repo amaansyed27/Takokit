@@ -286,13 +286,7 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, app: &App) {
     }
 }
 
-fn render_field(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    title: &str,
-    value: &str,
-    focused: bool,
-) {
+fn render_field(frame: &mut Frame<'_>, area: Rect, title: &str, value: &str, focused: bool) {
     frame.render_widget(
         Paragraph::new(value).block(
             Block::default()

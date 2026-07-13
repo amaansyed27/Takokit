@@ -55,6 +55,10 @@ impl App {
             TuiTab::Models => self.handle_models_key(key),
             TuiTab::Speak => self.handle_speak_key(key),
             TuiTab::Transcribe => self.handle_transcribe_key(key),
+            TuiTab::Clone => super::clone::handle_key(self, key),
+            TuiTab::Clone => {
+                super::clone::handle_key(self, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+            }
             TuiTab::Sessions => self.handle_sessions_key(key),
             TuiTab::Runners => self.handle_runners_key(key),
             TuiTab::System => self.handle_system_key(key),
@@ -81,12 +85,13 @@ impl App {
             "models" => self.tab = TuiTab::Models,
             "speak" => self.tab = TuiTab::Speak,
             "transcribe" | "stt" => self.tab = TuiTab::Transcribe,
+            "clone" | "voices" => self.tab = TuiTab::Clone,
             "runners" => self.tab = TuiTab::Runners,
             "system" | "doctor" => self.tab = TuiTab::System,
             "help" | "?" => self.show_help = true,
             "" => {}
             _ => self.set_status(format!(
-                "Unknown shortcut /{command}. Use /sessions, /new, /models, /speak, /transcribe, /runners, /system, or /help."
+                "Unknown shortcut /{command}. Use /sessions, /new, /models, /speak, /transcribe, /clone, /runners, /system, or /help."
             )),
         }
         None
@@ -380,6 +385,9 @@ impl App {
                     model: model.id,
                     audio,
                 })
+            }
+            TuiTab::Clone => {
+                super::clone::handle_key(self, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
             }
             TuiTab::Sessions => self
                 .selected_session()

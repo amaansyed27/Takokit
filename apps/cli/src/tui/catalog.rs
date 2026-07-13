@@ -8,6 +8,7 @@ pub struct ModelRow {
     pub detail: String,
     pub tts: bool,
     pub stt: bool,
+    pub voice_cloning: bool,
     pub executable: bool,
 }
 
@@ -96,6 +97,7 @@ pub fn load_runtime_rows(
                 ),
                 tts: model.capabilities.tts,
                 stt: model.capabilities.stt,
+                voice_cloning: model.capabilities.voice_cloning,
                 executable: plan.executable,
             })
         })

@@ -25,6 +25,11 @@ pub enum TuiAction {
         model: String,
         audio: String,
     },
+    CloneVoice {
+        model: String,
+        name: String,
+        sample: String,
+    },
     PullRunner(String),
     InstallRunner(String),
     RemoveRunner(String),
@@ -39,16 +44,18 @@ pub enum TuiTab {
     Models,
     Speak,
     Transcribe,
+    Clone,
     Sessions,
     Runners,
     System,
 }
 
 impl TuiTab {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Models,
         Self::Speak,
         Self::Transcribe,
+        Self::Clone,
         Self::Sessions,
         Self::Runners,
         Self::System,
@@ -59,6 +66,7 @@ impl TuiTab {
             Self::Models => "Models",
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
+            Self::Clone => "Clone",
             Self::Sessions => "Sessions",
             Self::Runners => "Runners",
             Self::System => "System",
@@ -151,6 +159,7 @@ pub struct App {
     pub speak_text_cursor: usize,
     pub transcribe_audio: String,
     pub transcribe_audio_cursor: usize,
+    pub clone_state: super::clone::CloneState,
     pub storage_root: String,
     pub server: String,
     pub status: String,
@@ -176,6 +185,7 @@ impl App {
     ) -> anyhow::Result<Self> {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
         let (tts_models, stt_models) = capability_indexes(&models);
+        let clone_state = super::clone::CloneState::new(&models);
         let sessions = workspace.store.list_sessions(None)?;
         let active_session = workspace.session_id();
         let session_index = session_position(&sessions, active_session);
@@ -206,6 +216,7 @@ impl App {
             speak_text_cursor: 0,
             transcribe_audio: String::new(),
             transcribe_audio_cursor: 0,
+            clone_state,
             storage_root: store.root().display().to_string(),
             server: config.local_base_url(),
             status: format!(
@@ -259,6 +270,7 @@ impl App {
             transcribe_model.as_deref(),
             "whisper-tiny",
         );
+        self.clone_state.reload_models(&self.models);
         self.storage_root = store.root().display().to_string();
         self.server = config.local_base_url();
         self.reload_sessions()?;
@@ -323,6 +335,13 @@ impl App {
     pub fn selected_speak_model(&self) -> Option<&ModelRow> {
         self.tts_models
             .get(self.speak_model_index)
+            .and_then(|index| self.models.get(*index))
+    }
+
+    pub fn selected_clone_model(&self) -> Option<&ModelRow> {
+        self.clone_state
+            .model_indexes
+            .get(self.clone_state.model_index)
             .and_then(|index| self.models.get(*index))
     }
 
