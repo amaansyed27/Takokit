@@ -1,26 +1,27 @@
 id = "canary"
-name = "Canary"
+name = "Canary 1B v2"
 family = "canary"
-version = "0.1.0"
+version = "2.0.0"
 kind = "stt"
-backend = "nemo"
-runner = "takokit-nemo"
-license = "license-check-required"
-description = "Canary NeMo-style ASR family. Metadata-only; no NeMo runtime adapter or verified artifacts are installed."
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "nemo_asr"
+license = "cc-by-4.0"
+description = "NVIDIA Canary 1B v2 multilingual speech transcription and translation model through the official NeMo ASR API."
 
 [capabilities]
 tts = false
 stt = true
 voice_cloning = false
-live_transcription = true
+live_transcription = false
 live_audio = false
 
 [hardware]
-cpu = true
+cpu = false
 gpu = true
-min_ram = "8gb"
+min_ram = "12gb"
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
 voices = []
