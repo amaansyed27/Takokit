@@ -1,0 +1,56 @@
+name: Split TUI catalog
+
+on:
+  push:
+    branches:
+      - agent/unified-tui-feature-parity
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unified-tui-feature-parity
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Move catalogs out of app state
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app = Path("apps/cli/src/tui/app.rs")
+          text = app.read_text(encoding="utf-8")
+          old = "use super::{command, ui};"
+          new = "use super::{catalog::{operation_rows, system_rows}, command, ui};"
+          if old in text:
+              text = text.replace(old, new, 1)
+          start = text.find("fn operation_rows()")
+          end = text.find("fn shifted_index")
+          if start >= 0 and end > start:
+              text = text[:start] + text[end:]
+          app.write_text(text, encoding="utf-8")
+
+          module = Path("apps/cli/src/tui/mod.rs")
+          text = module.read_text(encoding="utf-8")
+          if "mod catalog;" not in text:
+              text = text.replace("mod app;\n", "mod app;\nmod catalog;\n", 1)
+          module.write_text(text, encoding="utf-8")
+      - name: Format
+        run: cargo fmt --all
+      - name: Commit split
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Catalog already split."
+            exit 0
+          fi
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/cli/src/tui
+          git commit -m "Keep TUI state modular under the file-size ceiling"
+          git push origin HEAD:agent/unified-tui-feature-parity
