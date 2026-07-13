@@ -20,6 +20,7 @@ clap.workspace = true
 crossterm.workspace = true
 fs2.workspace = true
 open.workspace = true
+percent-encoding.workspace = true
 ratatui.workspace = true
 serde = { workspace = true }
 takokit-core = { path = "../../crates/takokit-core" }
