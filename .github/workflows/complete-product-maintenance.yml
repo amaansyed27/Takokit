@@ -1,0 +1,61 @@
+name: Complete product maintenance
+
+on:
+  push:
+    branches:
+      - agent/workspaces-sessions-model-matrix
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format-and-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspaces-sessions-model-matrix
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply Rust formatting
+        run: cargo fmt --all
+      - name: Build repository inventory
+        shell: bash
+        run: |
+          {
+            echo "# Registry models"
+            find registry/models -maxdepth 1 -type f -print | sort
+            echo
+            echo "# Registry runners"
+            find registry/runners -maxdepth 1 -type f -print | sort
+            echo
+            echo "# Model runtime sources"
+            find crates/takokit-models/src crates/takokit-package/src -maxdepth 3 -type f -print | sort
+            echo
+            echo "# Python adapter sources"
+            find . -path '*python*' -type f -not -path './target/*' -print | sort
+            echo
+            echo "# Source line counts"
+            find apps crates -type f \( -name '*.rs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.css' \) -print0 | xargs -0 wc -l | sort -nr | head -80
+          } > product-inventory.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: complete-product-inventory
+          path: product-inventory.txt
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps crates Cargo.toml Cargo.lock
+          git commit -m "Format workspace and session implementation"
+          git push origin HEAD:agent/workspaces-sessions-model-matrix
