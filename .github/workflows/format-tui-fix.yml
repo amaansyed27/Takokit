@@ -1,0 +1,34 @@
+name: Format TUI interaction branch
+
+on:
+  push:
+    branches:
+      - agent/fix-tui-interaction
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-tui-interaction
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply rustfmt
+        run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/cli/src/tui
+          git commit -m "Format TUI interaction fixes"
+          git push origin HEAD:agent/fix-tui-interaction
