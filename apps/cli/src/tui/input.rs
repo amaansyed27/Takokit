@@ -56,9 +56,6 @@ impl App {
             TuiTab::Speak => self.handle_speak_key(key),
             TuiTab::Transcribe => self.handle_transcribe_key(key),
             TuiTab::Clone => super::clone::handle_key(self, key),
-            TuiTab::Clone => {
-                super::clone::handle_key(self, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
-            }
             TuiTab::Sessions => self.handle_sessions_key(key),
             TuiTab::Runners => self.handle_runners_key(key),
             TuiTab::System => self.handle_system_key(key),
