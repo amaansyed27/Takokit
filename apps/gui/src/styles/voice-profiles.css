@@ -1,0 +1,43 @@
+.consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.consent-check input {
+  margin-top: 3px;
+}
+
+.consent-check span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--text-primary);
+  background: var(--surface-muted);
+}
