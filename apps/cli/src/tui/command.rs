@@ -1,54 +1,91 @@
+use clap::Parser;
+
+use crate::args::{Cli, Command};
+
 use super::app::TuiAction;
 
 pub fn parse(input: &str) -> Result<TuiAction, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
-        return Err("Type a command after `/`. Press `?` for help.".to_string());
+        return Err("Type a Takokit command after `/`. Press `?` for help.".to_string());
+    }
+    if matches!(trimmed, "q" | "quit" | "exit") {
+        return Ok(TuiAction::Quit);
+    }
+    if matches!(trimmed, "refresh" | "reload") {
+        return Ok(TuiAction::Refresh);
     }
 
-    let mut parts = trimmed.split_whitespace();
-    let command = parts.next().unwrap_or_default();
-    let remaining = parts.collect::<Vec<_>>();
+    let args = split_command(trimmed)?;
+    validate_cli(&args)?;
+    Ok(TuiAction::RunCli(args))
+}
 
-    match command {
-        "q" | "quit" | "exit" => expect_no_args(command, &remaining).map(|_| TuiAction::Quit),
-        "refresh" | "reload" => {
-            expect_no_args(command, &remaining).map(|_| TuiAction::Refresh)
+fn validate_cli(args: &[String]) -> Result<(), String> {
+    let mut argv = vec!["takokit".to_string()];
+    argv.extend(args.iter().cloned());
+    let cli = Cli::try_parse_from(argv).map_err(|error| clean_clap_error(error.to_string()))?;
+
+    match cli.command {
+        None => Err("A command is required inside the TUI palette.".to_string()),
+        Some(Command::Serve {
+            daemon_child: false,
+            ..
+        }) => Err(
+            "Foreground `serve` would block the TUI. Use `daemon start` instead.".to_string(),
+        ),
+        Some(Command::Serve {
+            daemon_child: true,
+            ..
+        }) => Err("Internal daemon-child flags cannot be launched from the TUI.".to_string()),
+        Some(_) => Ok(()),
+    }
+}
+
+fn clean_clap_error(error: String) -> String {
+    error
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("For more information"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn split_command(input: &str) -> Result<Vec<String>, String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    let mut characters = input.chars().peekable();
+
+    while let Some(character) = characters.next() {
+        match quote {
+            Some(delimiter) if character == delimiter => quote = None,
+            Some('"') if character == '\\' && characters.peek() == Some(&'"') => {
+                characters.next();
+                current.push('"');
+            }
+            Some(_) => current.push(character),
+            None if matches!(character, '\'' | '"') => quote = Some(character),
+            None if character.is_whitespace() => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            None => current.push(character),
         }
-        "doctor" => expect_no_args(command, &remaining).map(|_| TuiAction::Doctor),
-        "gui" => expect_no_args(command, &remaining).map(|_| TuiAction::OpenGui),
-        "server" | "serve" => {
-            expect_no_args(command, &remaining).map(|_| TuiAction::StartServer)
-        }
-        "pull" => one_arg(command, &remaining).map(TuiAction::PullModel),
-        "plan" => one_arg(command, &remaining).map(TuiAction::PlanModel),
-        "runner" => parse_runner(&remaining),
-        _ => Err(format!(
-            "Unknown TUI command `{command}`. Try pull, plan, runner install, doctor, gui, server, refresh, or quit."
-        )),
     }
-}
 
-fn parse_runner(parts: &[&str]) -> Result<TuiAction, String> {
-    match parts {
-        ["install", runner] => Ok(TuiAction::InstallRunner((*runner).to_string())),
-        ["show", runner] => Ok(TuiAction::ShowRunner((*runner).to_string())),
-        _ => Err("Usage: runner install <id> or runner show <id>".to_string()),
+    if let Some(delimiter) = quote {
+        return Err(format!("Unclosed {delimiter} quote in command."));
     }
-}
-
-fn one_arg(command: &str, parts: &[&str]) -> Result<String, String> {
-    match parts {
-        [value] => Ok((*value).to_string()),
-        _ => Err(format!("Usage: {command} <id>")),
+    if !current.is_empty() {
+        args.push(current);
     }
-}
-
-fn expect_no_args(command: &str, parts: &[&str]) -> Result<(), String> {
-    if parts.is_empty() {
-        Ok(())
+    if args.is_empty() {
+        Err("A command is required inside the TUI palette.".to_string())
     } else {
-        Err(format!("`{command}` does not accept arguments"))
+        Ok(args)
     }
 }
 
@@ -57,20 +94,89 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_model_and_runner_commands() {
+    fn preserves_quoted_text_and_windows_paths() {
         assert_eq!(
-            parse("pull whisper-tiny"),
-            Ok(TuiAction::PullModel("whisper-tiny".to_string()))
+            split_command("speak \"Hello from Takokit\" --model kokoro").unwrap(),
+            vec!["speak", "Hello from Takokit", "--model", "kokoro"]
         );
         assert_eq!(
-            parse("runner install takokit-whispercpp"),
-            Ok(TuiAction::InstallRunner("takokit-whispercpp".to_string()))
+            split_command("run whisper-tiny --file \"C:\\Users\\Amaan\\test.wav\"").unwrap(),
+            vec![
+                "run",
+                "whisper-tiny",
+                "--file",
+                "C:\\Users\\Amaan\\test.wav"
+            ]
         );
     }
 
     #[test]
-    fn rejects_unknown_or_incomplete_commands() {
-        assert!(parse("pull").is_err());
+    fn accepts_the_complete_public_cli_surface() {
+        let commands = [
+            "daemon start",
+            "daemon stop",
+            "daemon restart",
+            "daemon status",
+            "daemon logs",
+            "gui",
+            "doctor",
+            "doctor --json",
+            "version",
+            "status",
+            "capabilities",
+            "models",
+            "runners",
+            "library models",
+            "library runners",
+            "speak hello --model mock-tts",
+            "pull whisper-tiny",
+            "pull whisper-tiny --metadata-only",
+            "show whisper-tiny",
+            "plan whisper-tiny",
+            "plan whisper-tiny --json",
+            "rm whisper-tiny",
+            "list",
+            "list models",
+            "list runners",
+            "list voices",
+            "run kokoro hello --voice default",
+            "run whisper-tiny --file sample.wav",
+            "ps",
+            "runner pull takokit-whispercpp",
+            "runner install takokit-whispercpp",
+            "runner doctor takokit-whispercpp",
+            "runner doctor takokit-whispercpp --json",
+            "runner show takokit-whispercpp",
+            "runner rm takokit-whispercpp",
+            "adapter list",
+            "adapter install qwen3_tts",
+            "adapter doctor qwen3_tts",
+            "adapter doctor qwen3_tts --json",
+            "quickstart",
+            "quickstart --full",
+            "deps doctor",
+            "deps bootstrap",
+            "samples create",
+            "test whisper-tiny",
+            "test whisper-tiny --run --file sample.wav",
+            "test --suite fast --run",
+            "test --suite launch --json",
+            "transcribe sample.wav --model whisper-tiny",
+            "clone sample.wav --name local-voice",
+            "train samples --name local-voice",
+        ];
+
+        for command in commands {
+            assert!(parse(command).is_ok(), "TUI rejected `{command}`");
+        }
+    }
+
+    #[test]
+    fn handles_tui_control_commands_and_rejects_foreground_server() {
+        assert_eq!(parse("quit"), Ok(TuiAction::Quit));
+        assert_eq!(parse("refresh"), Ok(TuiAction::Refresh));
+        assert!(parse("serve").is_err());
         assert!(parse("unknown").is_err());
+        assert!(parse("speak \"unfinished").is_err());
     }
 }
