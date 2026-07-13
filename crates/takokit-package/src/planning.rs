@@ -46,7 +46,9 @@ pub(crate) fn has_verified_executor(
     matches!(
         (runner.kind.clone(), model.id.as_str()),
         (RunnerKind::Onnx, "kokoro")
-    ) || (runner.kind == RunnerKind::PythonManaged && model.id == "qwen3-tts" && adapter_ready)
+    ) || (runner.kind == RunnerKind::PythonManaged
+        && model.required_adapter.is_some()
+        && adapter_ready)
         || (runner.kind == RunnerKind::Whispercpp
             && model.family.eq_ignore_ascii_case("whisper")
             && model.capabilities.stt)
