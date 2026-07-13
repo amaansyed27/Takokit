@@ -43,7 +43,8 @@ pub async fn run_launcher(
                 } else {
                     format!("Command failed.\n\n{}", result.output)
                 });
-                if let Err(error) = state.reload(config, store, package_registry, installed_registry)
+                if let Err(error) =
+                    state.reload(config, store, package_registry, installed_registry)
                 {
                     state.status.push_str(&format!(
                         "\n\nThe command finished, but refreshing shared state failed: {error:#}"

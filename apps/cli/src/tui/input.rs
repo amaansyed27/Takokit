@@ -127,7 +127,9 @@ impl App {
             }
             KeyCode::Enter => return self.submit_command(),
             KeyCode::Left => self.command_cursor = self.command_cursor.saturating_sub(1),
-            KeyCode::Right => self.command_cursor = (self.command_cursor + 1).min(self.command_len()),
+            KeyCode::Right => {
+                self.command_cursor = (self.command_cursor + 1).min(self.command_len())
+            }
             KeyCode::Home => self.command_cursor = 0,
             KeyCode::End => self.command_cursor = self.command_len(),
             KeyCode::Backspace => self.delete_backward(),
