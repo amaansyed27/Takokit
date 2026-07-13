@@ -55,6 +55,7 @@ pub async fn execute_transcription(
     match plan.runner.kind {
         RunnerKind::Onnx => OnnxRunner.transcribe(plan, request).await,
         RunnerKind::Whispercpp => WhisperCppRunner.transcribe(plan, request).await,
+        RunnerKind::PythonManaged => PythonManagedRunner.transcribe(plan, request).await,
         _ => Err(runner_not_implemented(format!(
             "Runner {} contract resolved, but transcription execution is not implemented yet.",
             plan.runner.id
