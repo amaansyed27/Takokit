@@ -1,12 +1,12 @@
 //! Managed Python runtime and model-adapter lifecycle.
 
 use crate::{
-    runtime_command::{run_logged_command, runner_python_path},
+    runtime_command::{run_logged_command, runner_python_path, PathOrArg},
     runtime_python_specs::{adapter_spec, AdapterSpec, ADAPTER_SPECS},
     runtime_uv::bootstrap_uv,
     *,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) fn write_python_adapter_manifests(
     layout: &PythonManagedRunnerLayout,
@@ -45,7 +45,8 @@ pub fn python_adapter_records(takokit_root: &Path) -> PackageResult<Vec<AdapterR
     for entry in entries {
         let path = entry.path().join("adapter.toml");
         if path.is_file() {
-            records.push(toml::from_str(&std::fs::read_to_string(path)?)?);
+            let source = std::fs::read_to_string(path)?;
+            records.push(toml::from_str::<AdapterRecord>(&source)?);
         }
     }
     Ok(records)
@@ -56,18 +57,17 @@ pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResul
         .adapters
         .join(adapter)
         .join("adapter.toml");
-    std::fs::read_to_string(&path)
-        .map_err(|error| match error.kind() {
-            std::io::ErrorKind::NotFound => PackageError::ArtifactInstallFailed {
-                artifact: adapter.to_string(),
-                reason: format!(
-                    "adapter is not available; run `takokit runner install takokit-python-managed`: {}",
-                    path.display()
-                ),
-            },
-            _ => PackageError::Io(error),
-        })
-        .and_then(|source| Ok(toml::from_str(&source)?))
+    let source = std::fs::read_to_string(&path).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => PackageError::ArtifactInstallFailed {
+            artifact: adapter.to_string(),
+            reason: format!(
+                "adapter is not available; run `takokit runner install takokit-python-managed`: {}",
+                path.display()
+            ),
+        },
+        _ => PackageError::Io(error),
+    })?;
+    Ok(toml::from_str::<AdapterRecord>(&source)?)
 }
 
 pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
@@ -199,14 +199,14 @@ fn install_adapter_spec(
             venv.display()
         ),
     })?;
-    let mut arguments = vec![
+    let mut arguments: Vec<PathOrArg> = vec![
         "pip".into(),
         "install".into(),
         "--python".into(),
         python.into(),
         "--no-progress".into(),
     ];
-    arguments.extend(spec.packages.iter().map(PathBuf::from));
+    arguments.extend(spec.packages.iter().map(|package| (*package).into()));
     run_logged_command(&log, &uv, &arguments)?;
     std::fs::write(adapter_dir.join(format!("{}.py", spec.id)), script)?;
     Ok(format!(
