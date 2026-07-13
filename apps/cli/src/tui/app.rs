@@ -379,8 +379,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tab_cycle_includes_sessions() {
-        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Sessions);
-        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Transcribe);
+    fn tab_cycle_includes_clone_and_sessions() {
+        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Clone);
+        assert_eq!(TuiTab::Clone.next(), TuiTab::Sessions);
+        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Clone);
     }
 }
