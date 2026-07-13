@@ -23,6 +23,7 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         TuiTab::Models => render_models(frame, page[1], app),
         TuiTab::Speak => render_speak(frame, page[1], app),
         TuiTab::Transcribe => render_transcribe(frame, page[1], app),
+        TuiTab::Sessions => render_sessions(frame, page[1], app),
         TuiTab::Runners => render_runners(frame, page[1], app),
         TuiTab::System => render_system(frame, page[1], app),
     }
@@ -30,6 +31,9 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
     render_footer(frame, page[3], app);
     if app.show_help {
         render_help(frame);
+    }
+    if app.slash_open {
+        render_slash(frame, app);
     }
 }
 
@@ -42,7 +46,10 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .running_label
         .as_ref()
         .map(|label| format!("  {} {label}", spinner(app.tick)))
-        .unwrap_or_else(|| "  local voice runtime".to_string());
+        .unwrap_or_else(|| {
+            let id = app.active_session().to_string();
+            format!("  local voice runtime · session {}", &id[..8])
+        });
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
@@ -90,6 +97,56 @@ fn render_models(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .map(|model| model.detail.as_str())
         .unwrap_or("No models are available.");
     frame.render_widget(detail_panel(" Details ", detail), columns[1]);
+}
+
+fn render_sessions(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let columns = split_columns(area);
+    let active = app.active_session();
+    let items = app
+        .sessions
+        .iter()
+        .map(|session| {
+            let state = if session.id == active {
+                "active".to_string()
+            } else {
+                format!("{} events", session.event_count)
+            };
+            row_item(&session.title, &state)
+        })
+        .collect::<Vec<_>>();
+    render_list(
+        frame,
+        columns[0],
+        " Sessions ",
+        items,
+        app.session_index,
+    );
+    let detail = app
+        .selected_session()
+        .map(|session| {
+            format!(
+                "{}\n\nID: {}\nCreated: {}\nUpdated: {}\nEvents: {}\nOutputs: {}\nLast task: {}\nLast model: {}\nWorkspace: {}\n\nEnter opens this session. Press N to create a new one.",
+                session.title,
+                session.id,
+                session.created_at,
+                session.updated_at,
+                session.event_count,
+                session.output_count,
+                session
+                    .last_task
+                    .map(|task| task.label())
+                    .unwrap_or("none"),
+                session.last_model.as_deref().unwrap_or("none"),
+                session.workspace_root.display()
+            )
+        })
+        .unwrap_or_else(|| "No sessions yet. Press N to create one.".to_string());
+    frame.render_widget(
+        Paragraph::new(detail)
+            .wrap(Wrap { trim: false })
+            .block(Block::default().title(" Details ").borders(Borders::ALL)),
+        columns[1],
+    );
 }
 
 fn render_runners(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -258,11 +315,12 @@ fn render_activity(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
 fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let text = match app.tab {
-        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · ←/→ views · F1 help · Ctrl+C exit",
-        TuiTab::Speak => "Tab next field · ↑/↓ choose model · type in Voice/Text · Enter continue/run · Ctrl+←/→ views",
-        TuiTab::Transcribe => "Tab next field · ↑/↓ choose model · type audio path · Enter continue/run · Ctrl+←/→ views",
-        TuiTab::Runners => "↑/↓ select · Enter add/install/check · P add · I install · D check · X remove · ←/→ views",
-        TuiTab::System => "↑/↓ select · Enter run · ←/→ views · R refresh · F1 help · Ctrl+C exit",
+        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · /sessions · F1 help · Ctrl+C exit",
+        TuiTab::Speak => "Tab fields · type Voice/Text · Enter continue/run · Ctrl+←/→ views · /sessions",
+        TuiTab::Transcribe => "Tab fields · type audio path · Enter continue/run · Ctrl+←/→ views · /sessions",
+        TuiTab::Sessions => "↑/↓ select · Enter open · N new · /new · ←/→ views · F1 help",
+        TuiTab::Runners => "↑/↓ select · Enter add/install/check · P/I/D/X actions · /sessions",
+        TuiTab::System => "↑/↓ select · Enter run · R refresh · /sessions · F1 help · Ctrl+C exit",
     };
     frame.render_widget(
         Paragraph::new(text)
@@ -270,6 +328,26 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .alignment(Alignment::Left),
         area,
     );
+}
+
+fn render_slash(frame: &mut Frame<'_>, app: &App) {
+    let area = centered_rect(72, 12, frame.area());
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(format!("/{}", app.slash_input))
+            .block(
+                Block::default()
+                    .title(" Go to · sessions, new, models, speak, transcribe, runners, system, help ")
+                    .borders(Borders::ALL),
+            )
+            .style(Style::default().fg(Color::White)),
+        area,
+    );
+    let x = area
+        .x
+        .saturating_add(2 + app.slash_cursor as u16)
+        .min(area.right().saturating_sub(2));
+    frame.set_cursor_position((x, area.y.saturating_add(1)));
 }
 
 fn render_list(
@@ -350,11 +428,11 @@ fn set_input_cursor(frame: &mut Frame<'_>, area: Rect, cursor: usize) {
 }
 
 fn render_help(frame: &mut Frame<'_>) {
-    let area = centered_rect(78, 72, frame.area());
+    let area = centered_rect(78, 76, frame.area());
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nThis interface is task-based; you do not need to type CLI commands.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak\n  Tab between model, voice, text, and the Generate button. Type directly in the text fields.\n\nTranscribe\n  Tab between model, audio path, and the Transcribe button.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes views on list screens. Ctrl+Left/Right works everywhere.\n  PageUp/PageDown scrolls activity. F1 or Enter closes this help. Ctrl+C exits.",
+            "Takokit TUI\n\nThis interface is task-based; no CLI syntax is required.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak and Transcribe\n  Tab through fields, type directly, and press Enter on the main action. Outputs are saved in the active .tako session.\n\nSessions\n  Use /sessions from anywhere. Select a previous session and press Enter, or press N / use /new.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes list views. Ctrl+Left/Right works inside forms. PageUp/PageDown scrolls activity. F1 closes help. Ctrl+C exits.",
         )
         .wrap(Wrap { trim: false })
         .block(Block::default().title(" Help ").borders(Borders::ALL)),
