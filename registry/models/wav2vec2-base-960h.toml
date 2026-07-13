@@ -1,0 +1,27 @@
+id = "wav2vec2-base-960h"
+name = "Wav2Vec2 Base 960h"
+family = "wav2vec2-base-960h"
+version = "1.0.0"
+kind = "stt"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "hf_audio"
+license = "apache-2.0"
+description = "Facebook Wav2Vec2 Base 960h English speech recognition through the official Transformers automatic-speech-recognition pipeline."
+
+[capabilities]
+tts = false
+stt = true
+voice_cloning = false
+live_transcription = false
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "4gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
