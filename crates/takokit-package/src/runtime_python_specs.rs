@@ -1,4 +1,4 @@
-//! Verified managed-Python adapter definitions.
+//! Managed-Python adapter definitions used by model planning and installation.
 
 const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_adapter.py");
 const CHATTERBOX_ADAPTER: &str = include_str!("../../../runners/python/chatterbox_adapter.py");
@@ -7,6 +7,9 @@ const DIA_ADAPTER: &str = include_str!("../../../runners/python/dia_adapter.py")
 const SENSEVOICE_ADAPTER: &str = include_str!("../../../runners/python/sensevoice_adapter.py");
 const VOXTRAL_ADAPTER: &str = include_str!("../../../runners/python/voxtral_adapter.py");
 const NEMO_ASR_ADAPTER: &str = include_str!("../../../runners/python/nemo_asr_adapter.py");
+const HF_AUDIO_ADAPTER: &str = include_str!("../../../runners/python/hf_audio_adapter.py");
+const COQUI_TTS_ADAPTER: &str = include_str!("../../../runners/python/coqui_tts_adapter.py");
+const KYUTAI_TTS_ADAPTER: &str = include_str!("../../../runners/python/kyutai_tts_adapter.py");
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AdapterSpec {
@@ -17,6 +20,17 @@ pub(crate) struct AdapterSpec {
     pub script: Option<&'static str>,
     pub note: &'static str,
 }
+
+const HF_AUDIO_PACKAGES: &[&str] = &[
+    "torch",
+    "torchaudio",
+    "transformers",
+    "accelerate",
+    "soundfile",
+    "scipy",
+];
+const COQUI_PACKAGES: &[&str] = &["coqui-tts", "torch", "torchaudio"];
+const NEMO_PACKAGES: &[&str] = &["torch", "nemo-toolkit[asr]"];
 
 pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     AdapterSpec {
@@ -62,7 +76,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         python: "3.11",
         packages: &["torch", "torchaudio", "funasr", "modelscope"],
         script: Some(SENSEVOICE_ADAPTER),
-        note: "SenseVoice multilingual transcription through the official FunASR AutoModel API.",
+        note: "SenseVoice multilingual transcription through the official FunASR API.",
     },
     AdapterSpec {
         id: "voxtral",
@@ -82,7 +96,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         id: "nemo_asr",
         model_family: "canary",
         python: "3.12",
-        packages: &["torch", "nemo-toolkit[asr]"],
+        packages: NEMO_PACKAGES,
         script: Some(NEMO_ASR_ADAPTER),
         note: "NVIDIA Canary transcription through the official NeMo ASR API.",
     },
@@ -90,9 +104,65 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         id: "nemo_asr",
         model_family: "parakeet",
         python: "3.12",
-        packages: &["torch", "nemo-toolkit[asr]"],
+        packages: NEMO_PACKAGES,
         script: Some(NEMO_ASR_ADAPTER),
         note: "NVIDIA Parakeet transcription through the official NeMo ASR API.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "bark-small",
+        python: "3.11",
+        packages: HF_AUDIO_PACKAGES,
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Bark Small generation through the official Transformers BarkModel API.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "mms-tts-eng",
+        python: "3.11",
+        packages: HF_AUDIO_PACKAGES,
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "MMS-TTS generation through the official Transformers VitsModel API.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "distil-whisper-large-v3",
+        python: "3.11",
+        packages: HF_AUDIO_PACKAGES,
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Distil-Whisper transcription through the official Transformers ASR pipeline.",
+    },
+    AdapterSpec {
+        id: "hf_audio",
+        model_family: "wav2vec2-base-960h",
+        python: "3.11",
+        packages: HF_AUDIO_PACKAGES,
+        script: Some(HF_AUDIO_ADAPTER),
+        note: "Wav2Vec2 transcription through the official Transformers ASR pipeline.",
+    },
+    AdapterSpec {
+        id: "coqui_tts",
+        model_family: "xtts-v2",
+        python: "3.11",
+        packages: COQUI_PACKAGES,
+        script: Some(COQUI_TTS_ADAPTER),
+        note: "XTTS v2 zero-shot cloning through the Coqui TTS API.",
+    },
+    AdapterSpec {
+        id: "coqui_tts",
+        model_family: "yourtts",
+        python: "3.11",
+        packages: COQUI_PACKAGES,
+        script: Some(COQUI_TTS_ADAPTER),
+        note: "YourTTS zero-shot cloning through the Coqui TTS API.",
+    },
+    AdapterSpec {
+        id: "kyutai_tts",
+        model_family: "kyutai-tts-1.6b",
+        python: "3.12",
+        packages: &["moshi==0.2.11", "torch", "sphn", "numpy"],
+        script: Some(KYUTAI_TTS_ADAPTER),
+        note: "Kyutai DSM streaming-capable TTS using the official Moshi PyTorch API.",
     },
     AdapterSpec {
         id: "cosyvoice2",
