@@ -65,15 +65,12 @@ pub async fn run_launcher(
                         return Ok(());
                     }
                 }
-                TuiAction::Refresh => match state.reload(
-                    config,
-                    store,
-                    package_registry,
-                    installed_registry,
-                ) {
-                    Ok(()) => state.set_status("Local model and runner state refreshed."),
-                    Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
-                },
+                TuiAction::Refresh => {
+                    match state.reload(config, store, package_registry, installed_registry) {
+                        Ok(()) => state.set_status("Local model and runner state refreshed."),
+                        Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
+                    }
+                }
                 action => {
                     if active_job.is_some() {
                         state.set_status(
@@ -97,14 +94,12 @@ pub async fn run_launcher(
 
 fn task_for_action(action: TuiAction) -> Option<(String, Vec<String>)> {
     match action {
-        TuiAction::PullModel(model) => Some((
-            format!("Preparing {model}"),
-            vec!["pull".into(), model],
-        )),
-        TuiAction::RemoveModel(model) => Some((
-            format!("Removing {model}"),
-            vec!["rm".into(), model],
-        )),
+        TuiAction::PullModel(model) => {
+            Some((format!("Preparing {model}"), vec!["pull".into(), model]))
+        }
+        TuiAction::RemoveModel(model) => {
+            Some((format!("Removing {model}"), vec!["rm".into(), model]))
+        }
         TuiAction::Speak { model, voice, text } => Some((
             format!("Generating speech with {model}"),
             vec![
@@ -113,7 +108,11 @@ fn task_for_action(action: TuiAction) -> Option<(String, Vec<String>)> {
                 "--model".into(),
                 model,
                 "--voice".into(),
-                if voice.is_empty() { "default".into() } else { voice },
+                if voice.is_empty() {
+                    "default".into()
+                } else {
+                    voice
+                },
             ],
         )),
         TuiAction::Transcribe { model, audio } => Some((

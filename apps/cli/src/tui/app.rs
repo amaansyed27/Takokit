@@ -195,8 +195,7 @@ impl App {
     ) -> anyhow::Result<Self> {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
         let (tts_models, stt_models) = capability_indexes(&models);
-        let speak_model_index =
-            find_capability_index(&models, &tts_models, None, "kokoro");
+        let speak_model_index = find_capability_index(&models, &tts_models, None, "kokoro");
         let transcribe_model_index =
             find_capability_index(&models, &stt_models, None, "whisper-tiny");
         Ok(Self {
@@ -293,7 +292,8 @@ impl App {
     }
 
     pub fn set_speak_model(&mut self, id: &str) {
-        self.speak_model_index = find_capability_index(&self.models, &self.tts_models, Some(id), id);
+        self.speak_model_index =
+            find_capability_index(&self.models, &self.tts_models, Some(id), id);
     }
 
     pub fn set_transcribe_model(&mut self, id: &str) {
@@ -425,7 +425,11 @@ fn find_capability_index(
 ) -> usize {
     selected
         .and_then(|id| indexes.iter().position(|index| models[*index].id == id))
-        .or_else(|| indexes.iter().position(|index| models[*index].id == preferred))
+        .or_else(|| {
+            indexes
+                .iter()
+                .position(|index| models[*index].id == preferred)
+        })
         .unwrap_or(0)
 }
 

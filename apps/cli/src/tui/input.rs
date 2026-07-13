@@ -52,8 +52,12 @@ impl App {
         match key.code {
             KeyCode::Left => self.tab = self.tab.previous(),
             KeyCode::Right | KeyCode::Tab => self.tab = self.tab.next(),
-            KeyCode::Up => self.model_index = shifted_index(self.model_index, self.models.len(), -1),
-            KeyCode::Down => self.model_index = shifted_index(self.model_index, self.models.len(), 1),
+            KeyCode::Up => {
+                self.model_index = shifted_index(self.model_index, self.models.len(), -1)
+            }
+            KeyCode::Down => {
+                self.model_index = shifted_index(self.model_index, self.models.len(), 1)
+            }
             KeyCode::Enter => return self.open_or_install_selected_model(),
             KeyCode::Char('p') => {
                 return self
@@ -83,29 +87,19 @@ impl App {
         match self.speak_field {
             SpeakField::Model => match key.code {
                 KeyCode::Left | KeyCode::Up => {
-                    self.speak_model_index = shifted_index(
-                        self.speak_model_index,
-                        self.tts_models.len(),
-                        -1,
-                    )
+                    self.speak_model_index =
+                        shifted_index(self.speak_model_index, self.tts_models.len(), -1)
                 }
                 KeyCode::Right | KeyCode::Down => {
-                    self.speak_model_index = shifted_index(
-                        self.speak_model_index,
-                        self.tts_models.len(),
-                        1,
-                    )
+                    self.speak_model_index =
+                        shifted_index(self.speak_model_index, self.tts_models.len(), 1)
                 }
                 KeyCode::Enter => self.speak_field = SpeakField::Voice,
                 KeyCode::Esc => self.tab = TuiTab::Models,
                 _ => {}
             },
             SpeakField::Voice => {
-                if edit_text(
-                    &mut self.speak_voice,
-                    &mut self.speak_voice_cursor,
-                    key,
-                ) {
+                if edit_text(&mut self.speak_voice, &mut self.speak_voice_cursor, key) {
                     return None;
                 }
                 match key.code {
@@ -115,11 +109,7 @@ impl App {
                 }
             }
             SpeakField::Text => {
-                if edit_text(
-                    &mut self.speak_text,
-                    &mut self.speak_text_cursor,
-                    key,
-                ) {
+                if edit_text(&mut self.speak_text, &mut self.speak_text_cursor, key) {
                     return None;
                 }
                 match key.code {
@@ -150,18 +140,12 @@ impl App {
         match self.transcribe_field {
             TranscribeField::Model => match key.code {
                 KeyCode::Left | KeyCode::Up => {
-                    self.transcribe_model_index = shifted_index(
-                        self.transcribe_model_index,
-                        self.stt_models.len(),
-                        -1,
-                    )
+                    self.transcribe_model_index =
+                        shifted_index(self.transcribe_model_index, self.stt_models.len(), -1)
                 }
                 KeyCode::Right | KeyCode::Down => {
-                    self.transcribe_model_index = shifted_index(
-                        self.transcribe_model_index,
-                        self.stt_models.len(),
-                        1,
-                    )
+                    self.transcribe_model_index =
+                        shifted_index(self.transcribe_model_index, self.stt_models.len(), 1)
                 }
                 KeyCode::Enter => self.transcribe_field = TranscribeField::Audio,
                 KeyCode::Esc => self.tab = TuiTab::Models,
@@ -232,8 +216,12 @@ impl App {
         match key.code {
             KeyCode::Left => self.tab = self.tab.previous(),
             KeyCode::Right | KeyCode::Tab => self.tab = self.tab.next(),
-            KeyCode::Up => self.system_index = shifted_index(self.system_index, self.system.len(), -1),
-            KeyCode::Down => self.system_index = shifted_index(self.system_index, self.system.len(), 1),
+            KeyCode::Up => {
+                self.system_index = shifted_index(self.system_index, self.system.len(), -1)
+            }
+            KeyCode::Down => {
+                self.system_index = shifted_index(self.system_index, self.system.len(), 1)
+            }
             KeyCode::Enter => {
                 return self
                     .selected_system()
