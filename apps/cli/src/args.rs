@@ -4,6 +4,8 @@ use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+pub(crate) use takokit_core::SpeechRequest;
+
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
