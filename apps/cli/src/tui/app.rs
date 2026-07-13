@@ -12,29 +12,25 @@ use super::{command, ui};
 pub enum TuiAction {
     Quit,
     Refresh,
-    PullModel(String),
-    PlanModel(String),
-    InstallRunner(String),
-    ShowRunner(String),
-    Doctor,
-    OpenGui,
-    StartServer,
+    RunCli(Vec<String>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TuiTab {
     Models,
     Runners,
+    Operations,
     System,
 }
 
 impl TuiTab {
-    pub const ALL: [Self; 3] = [Self::Models, Self::Runners, Self::System];
+    pub const ALL: [Self; 4] = [Self::Models, Self::Runners, Self::Operations, Self::System];
 
     pub fn title(self) -> &'static str {
         match self {
             Self::Models => "Models",
             Self::Runners => "Runners",
+            Self::Operations => "Operations",
             Self::System => "System",
         }
     }
@@ -42,7 +38,8 @@ impl TuiTab {
     fn next(self) -> Self {
         match self {
             Self::Models => Self::Runners,
-            Self::Runners => Self::System,
+            Self::Runners => Self::Operations,
+            Self::Operations => Self::System,
             Self::System => Self::Models,
         }
     }
@@ -51,7 +48,8 @@ impl TuiTab {
         match self {
             Self::Models => Self::System,
             Self::Runners => Self::Models,
-            Self::System => Self::Runners,
+            Self::Operations => Self::Runners,
+            Self::System => Self::Operations,
         }
     }
 }
@@ -62,14 +60,20 @@ pub struct TuiRow {
     pub title: String,
     pub state: String,
     pub detail: String,
+    pub command: Option<Vec<String>>,
+    pub template: Option<String>,
 }
 
 pub struct App {
     pub tab: TuiTab,
     pub models: Vec<TuiRow>,
     pub runners: Vec<TuiRow>,
+    pub operations: Vec<TuiRow>,
+    pub system: Vec<TuiRow>,
     pub model_index: usize,
     pub runner_index: usize,
+    pub operation_index: usize,
+    pub system_index: usize,
     pub storage_root: String,
     pub server: String,
     pub status: String,
@@ -91,30 +95,26 @@ impl App {
             .into_iter()
             .map(|model| {
                 let plan = plan_model(package_registry, installed_registry, &model.id)?;
-                let state = if plan.executable {
-                    "ready".to_string()
-                } else {
-                    plan.lifecycle_state.to_string()
-                };
-                let detail = format!(
-                    "{}\n\nFamily: {}\nTask: {}\nRunner: {}\nExecutable: {}\nMissing: {}\nNext: {}",
-                    model.description,
-                    plan.family,
-                    plan.task,
-                    plan.required_runner,
-                    yes_no(plan.executable),
-                    if plan.missing.is_empty() {
-                        "none".to_string()
-                    } else {
-                        plan.missing.join("; ")
-                    },
-                    plan.next_command
-                );
                 Ok(TuiRow {
-                    id: model.id,
+                    id: model.id.clone(),
                     title: model.name,
-                    state,
-                    detail,
+                    state: if plan.executable {
+                        "ready".to_string()
+                    } else {
+                        plan.lifecycle_state.to_string()
+                    },
+                    detail: format!(
+                        "{}\n\nFamily: {}\nTask: {}\nRunner: {}\nExecutable: {}\nMissing: {}\nNext: {}\n\nKeys\nEnter plan  ·  p pull  ·  t test  ·  x remove",
+                        model.description,
+                        plan.family,
+                        plan.task,
+                        plan.required_runner,
+                        yes_no(plan.executable),
+                        if plan.missing.is_empty() { "none".to_string() } else { plan.missing.join("; ") },
+                        plan.next_command
+                    ),
+                    command: Some(vec!["plan".into(), model.id.clone()]),
+                    template: None,
                 })
             })
             .collect::<Result<Vec<_>, takokit_package::PackageError>>()?;
@@ -128,23 +128,21 @@ impl App {
                     .as_ref()
                     .map(|record| record.status.to_string())
                     .unwrap_or_else(|| "available".to_string());
-                let detail = format!(
-                    "{}\n\nVersion: {}\nPlatforms: {}\nFamilies: {}\nState: {}\nNote: {}",
-                    runner.description,
-                    runner.version,
-                    runner.platforms.join(", "),
-                    runner.supported_model_families.join(", "),
-                    state,
-                    record
-                        .as_ref()
-                        .map(|record| record.note.as_str())
-                        .unwrap_or(&runner.notes)
-                );
                 TuiRow {
-                    id: runner.id,
+                    id: runner.id.clone(),
                     title: runner.name,
-                    state,
-                    detail,
+                    state: state.clone(),
+                    detail: format!(
+                        "{}\n\nVersion: {}\nPlatforms: {}\nFamilies: {}\nState: {}\nNote: {}\n\nKeys\nEnter show  ·  p pull contract  ·  i install runtime  ·  x remove",
+                        runner.description,
+                        runner.version,
+                        runner.platforms.join(", "),
+                        runner.supported_model_families.join(", "),
+                        state,
+                        record.as_ref().map(|record| record.note.as_str()).unwrap_or(&runner.notes)
+                    ),
+                    command: Some(vec!["runner".into(), "show".into(), runner.id.clone()]),
+                    template: None,
                 }
             })
             .collect();
@@ -153,8 +151,12 @@ impl App {
             tab: TuiTab::Models,
             models,
             runners,
+            operations: operation_rows(),
+            system: system_rows(),
             model_index: 0,
             runner_index: 0,
+            operation_index: 0,
+            system_index: 0,
             storage_root: store.root().display().to_string(),
             server: config.local_base_url(),
             status,
@@ -164,55 +166,66 @@ impl App {
         })
     }
 
-    pub fn selected_model(&self) -> Option<&TuiRow> {
-        self.models.get(self.model_index)
+    pub fn selected_rows(&self) -> &[TuiRow] {
+        match self.tab {
+            TuiTab::Models => &self.models,
+            TuiTab::Runners => &self.runners,
+            TuiTab::Operations => &self.operations,
+            TuiTab::System => &self.system,
+        }
     }
 
-    pub fn selected_runner(&self) -> Option<&TuiRow> {
-        self.runners.get(self.runner_index)
+    pub fn selected_index(&self) -> usize {
+        match self.tab {
+            TuiTab::Models => self.model_index,
+            TuiTab::Runners => self.runner_index,
+            TuiTab::Operations => self.operation_index,
+            TuiTab::System => self.system_index,
+        }
+    }
+
+    pub fn selected_row(&self) -> Option<&TuiRow> {
+        self.selected_rows().get(self.selected_index())
     }
 
     pub fn selected_detail(&self) -> String {
-        match self.tab {
-            TuiTab::Models => self
-                .selected_model()
-                .map(|row| row.detail.clone())
-                .unwrap_or_else(|| "No models in the catalog.".to_string()),
-            TuiTab::Runners => self
-                .selected_runner()
-                .map(|row| row.detail.clone())
-                .unwrap_or_else(|| "No runners in the catalog.".to_string()),
-            TuiTab::System => format!(
-                "Storage\n{}\n\nManaged daemon\n{}\n\nSurfaces\n- Direct CLI: takokit <command>\n- Interactive TUI: takokit\n- GUI: takokit gui",
-                self.storage_root, self.server
-            ),
-        }
+        self.selected_row()
+            .map(|row| row.detail.clone())
+            .unwrap_or_else(|| "No entries are available in this section.".to_string())
     }
 
     fn move_selection(&mut self, delta: isize) {
+        let len = self.selected_rows().len();
         match self.tab {
-            TuiTab::Models => {
-                self.model_index = shifted_index(self.model_index, self.models.len(), delta)
+            TuiTab::Models => self.model_index = shifted_index(self.model_index, len, delta),
+            TuiTab::Runners => self.runner_index = shifted_index(self.runner_index, len, delta),
+            TuiTab::Operations => {
+                self.operation_index = shifted_index(self.operation_index, len, delta)
             }
-            TuiTab::Runners => {
-                self.runner_index = shifted_index(self.runner_index, self.runners.len(), delta)
-            }
-            TuiTab::System => {}
+            TuiTab::System => self.system_index = shifted_index(self.system_index, len, delta),
         }
     }
 
-    fn action_for_enter(&self) -> TuiAction {
-        match self.tab {
-            TuiTab::Models => self
-                .selected_model()
-                .map(|row| TuiAction::PlanModel(row.id.clone()))
-                .unwrap_or(TuiAction::Refresh),
-            TuiTab::Runners => self
-                .selected_runner()
-                .map(|row| TuiAction::ShowRunner(row.id.clone()))
-                .unwrap_or(TuiAction::Refresh),
-            TuiTab::System => TuiAction::Doctor,
+    fn open_template(&mut self, template: String) {
+        self.command_mode = true;
+        self.command_input = template;
+    }
+
+    fn action_for_enter(&mut self) -> Option<TuiAction> {
+        let row = self.selected_row()?.clone();
+        if let Some(template) = row.template {
+            self.open_template(template);
+            None
+        } else {
+            row.command.map(TuiAction::RunCli)
         }
+    }
+
+    fn selected_cli(&self, command: &[&str]) -> Option<TuiAction> {
+        let id = self.selected_row()?.id.clone();
+        let mut args = command.iter().map(|part| (*part).to_string()).collect::<Vec<_>>();
+        args.push(id);
+        Some(TuiAction::RunCli(args))
     }
 
     fn handle_command_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
@@ -243,10 +256,7 @@ impl App {
             return Some(TuiAction::Quit);
         }
         if self.show_help {
-            if matches!(
-                key.code,
-                KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
-            ) {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')) {
                 self.show_help = false;
             }
             return None;
@@ -262,8 +272,7 @@ impl App {
                 None
             }
             KeyCode::Char('/') => {
-                self.command_mode = true;
-                self.command_input.clear();
+                self.open_template(String::new());
                 None
             }
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
@@ -282,16 +291,27 @@ impl App {
                 self.move_selection(1);
                 None
             }
-            KeyCode::Enter => Some(self.action_for_enter()),
-            KeyCode::Char('p') => self
-                .selected_model()
-                .map(|row| TuiAction::PullModel(row.id.clone())),
-            KeyCode::Char('i') => self
-                .selected_runner()
-                .map(|row| TuiAction::InstallRunner(row.id.clone())),
-            KeyCode::Char('d') => Some(TuiAction::Doctor),
-            KeyCode::Char('g') => Some(TuiAction::OpenGui),
-            KeyCode::Char('s') => Some(TuiAction::StartServer),
+            KeyCode::Enter => self.action_for_enter(),
+            KeyCode::Char('p') if self.tab == TuiTab::Models => self.selected_cli(&["pull"]),
+            KeyCode::Char('p') if self.tab == TuiTab::Runners => {
+                self.selected_cli(&["runner", "pull"])
+            }
+            KeyCode::Char('i') if self.tab == TuiTab::Runners => {
+                self.selected_cli(&["runner", "install"])
+            }
+            KeyCode::Char('x') if self.tab == TuiTab::Models => self.selected_cli(&["rm"]),
+            KeyCode::Char('x') if self.tab == TuiTab::Runners => {
+                self.selected_cli(&["runner", "rm"])
+            }
+            KeyCode::Char('t') if self.tab == TuiTab::Models => {
+                if let Some(row) = self.selected_row() {
+                    self.open_template(format!("test {} --run", row.id));
+                }
+                None
+            }
+            KeyCode::Char('d') => Some(TuiAction::RunCli(vec!["doctor".into()])),
+            KeyCode::Char('g') => Some(TuiAction::RunCli(vec!["gui".into()])),
+            KeyCode::Char('s') => Some(TuiAction::RunCli(vec!["daemon".into(), "start".into()])),
             KeyCode::Char('r') => Some(TuiAction::Refresh),
             _ => None,
         }
@@ -316,6 +336,71 @@ pub fn run(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<TuiActio
     }
 }
 
+fn operation_rows() -> Vec<TuiRow> {
+    [
+        ("speech", "Generate speech", "TTS", "speak \"Hello from Takokit\" --model kokoro --voice default", "Generate WAV speech with any executable TTS model."),
+        ("run", "Run a model", "TTS / STT", "run whisper-tiny --file \"C:\\path\\audio.wav\"", "Unified model execution. Supply text for TTS or --file for STT."),
+        ("transcribe", "Transcribe audio", "STT", "transcribe \"C:\\path\\audio.wav\" --model whisper-tiny", "Transcribe a local audio file."),
+        ("clone", "Clone a voice", "planned", "clone \"C:\\path\\sample.wav\" --name my-voice", "Consent-gated voice cloning command. The backend currently reports not implemented."),
+        ("train", "Train a voice", "planned", "train \"C:\\path\\samples\" --name my-voice", "Voice training job command. The backend currently reports not implemented."),
+        ("adapter-install", "Install adapter", "runtime", "adapter install qwen3_tts", "Install a managed Python model adapter."),
+        ("adapter-doctor", "Inspect adapter", "diagnostics", "adapter doctor qwen3_tts", "Inspect adapter state, paths, runtime and logs."),
+        ("test-model", "Test one model", "test", "test whisper-tiny --run --file \"C:\\path\\audio.wav\"", "Run model planning or a real model smoke test."),
+        ("test-fast", "Run fast suite", "test", "test --suite fast --run", "Run the fast executable-model suite."),
+        ("test-launch", "Run launch suite", "test", "test --suite launch --run", "Run the complete launch readiness suite."),
+        ("quickstart", "Quickstart", "setup", "quickstart", "Prepare Kokoro and Whisper Tiny and run smoke tests."),
+        ("quickstart-full", "Full quickstart", "setup", "quickstart --full", "Also prepare managed Python and Qwen3-TTS."),
+        ("deps", "Bootstrap dependencies", "setup", "deps bootstrap", "Prepare Takokit's pinned uv and managed Python tooling."),
+        ("samples", "Create samples", "audio", "samples create", "Create real hello.wav and silence.wav fixtures."),
+    ]
+    .into_iter()
+    .map(|(id, title, state, template, detail)| TuiRow {
+        id: id.into(),
+        title: title.into(),
+        state: state.into(),
+        detail: format!("{}\n\nCommand template\n{}\n\nPress Enter to edit and run this command.", detail, template),
+        command: None,
+        template: Some(template.into()),
+    })
+    .collect()
+}
+
+fn system_rows() -> Vec<TuiRow> {
+    [
+        ("status", "Runtime status", "read", vec!["status"]),
+        ("doctor", "Doctor", "diagnostics", vec!["doctor"]),
+        ("capabilities", "Capabilities", "read", vec!["capabilities"]),
+        ("models", "Model catalog", "read", vec!["models"]),
+        ("runners", "Runner catalog", "read", vec!["runners"]),
+        ("voices", "Voice catalog", "read", vec!["list", "voices"]),
+        ("processes", "Active executions", "read", vec!["ps"]),
+        ("daemon-status", "Daemon status", "daemon", vec!["daemon", "status"]),
+        ("daemon-start", "Start daemon", "daemon", vec!["daemon", "start"]),
+        ("daemon-stop", "Stop daemon", "daemon", vec!["daemon", "stop"]),
+        ("daemon-restart", "Restart daemon", "daemon", vec!["daemon", "restart"]),
+        ("daemon-logs", "Daemon logs", "daemon", vec!["daemon", "logs"]),
+        ("deps-doctor", "Dependency doctor", "diagnostics", vec!["deps", "doctor"]),
+        ("gui", "Open GUI", "surface", vec!["gui"]),
+        ("version", "Version", "read", vec!["version"]),
+    ]
+    .into_iter()
+    .map(|(id, title, state, command)| {
+        let args = command.into_iter().map(str::to_string).collect::<Vec<_>>();
+        TuiRow {
+            id: id.into(),
+            title: title.into(),
+            state: state.into(),
+            detail: format!(
+                "Runs the exact direct CLI command:\n\ntakokit {}\n\nThe TUI captures its stdout, stderr and completion timing, then refreshes shared state.",
+                args.join(" ")
+            ),
+            command: Some(args),
+            template: None,
+        }
+    })
+    .collect()
+}
+
 fn shifted_index(current: usize, len: usize, delta: isize) -> usize {
     if len == 0 {
         return 0;
@@ -324,11 +409,7 @@ fn shifted_index(current: usize, len: usize, delta: isize) -> usize {
 }
 
 fn yes_no(value: bool) -> &'static str {
-    if value {
-        "yes"
-    } else {
-        "no"
-    }
+    if value { "yes" } else { "no" }
 }
 
 #[cfg(test)]
@@ -340,5 +421,14 @@ mod tests {
         assert_eq!(shifted_index(0, 3, -1), 2);
         assert_eq!(shifted_index(2, 3, 1), 0);
         assert_eq!(shifted_index(0, 0, 1), 0);
+    }
+
+    #[test]
+    fn operations_cover_execution_setup_and_testing() {
+        let rows = operation_rows();
+        let ids = rows.iter().map(|row| row.id.as_str()).collect::<Vec<_>>();
+        for expected in ["speech", "run", "transcribe", "clone", "train", "adapter-install", "test-fast", "quickstart", "deps", "samples"] {
+            assert!(ids.contains(&expected), "missing operation {expected}");
+        }
     }
 }
