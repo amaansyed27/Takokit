@@ -1,31 +1,33 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
     Frame,
 };
 
-use super::app::{App, TuiTab};
+use super::app::{App, SpeakField, TranscribeField, TuiTab};
 
 pub fn render(frame: &mut Frame<'_>, app: &App) {
     let page = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(4),
-            Constraint::Min(10),
-            Constraint::Length(9),
-            Constraint::Length(3),
+            Constraint::Min(12),
+            Constraint::Length(8),
             Constraint::Length(2),
         ])
         .split(frame.area());
-
     render_header(frame, page[0], app);
-    render_body(frame, page[1], app);
-    render_status(frame, page[2], app);
-    render_command_bar(frame, page[3], app);
-    render_footer(frame, page[4], app);
-
+    match app.tab {
+        TuiTab::Models => render_models(frame, page[1], app),
+        TuiTab::Speak => render_speak(frame, page[1], app),
+        TuiTab::Transcribe => render_transcribe(frame, page[1], app),
+        TuiTab::Runners => render_runners(frame, page[1], app),
+        TuiTab::System => render_system(frame, page[1], app),
+    }
+    render_activity(frame, page[2], app);
+    render_footer(frame, page[3], app);
     if app.show_help {
         render_help(frame);
     }
@@ -36,27 +38,24 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(2), Constraint::Length(2)])
         .split(area);
-
-    let state = if let Some(command) = &app.running_command {
-        format!("  {} running: takokit {command}", spinner(app.tick))
-    } else if app.command_mode {
-        "  INSERT · Enter runs · Esc cancels".to_string()
-    } else {
-        "  NAVIGATE · type anytime".to_string()
-    };
-    let title = Paragraph::new(Line::from(vec![
-        Span::styled(
-            "TAKOKIT",
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw("  local voice runtime"),
-        Span::styled(state, Style::default().add_modifier(Modifier::DIM)),
-    ]))
-    .block(Block::default().borders(Borders::BOTTOM));
-    frame.render_widget(title, header[0]);
-
+    let state = app
+        .running_label
+        .as_ref()
+        .map(|label| format!("  {} {label}", spinner(app.tick)))
+        .unwrap_or_else(|| "  local voice runtime".to_string());
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "TAKOKIT",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(state, Style::default().add_modifier(Modifier::DIM)),
+        ]))
+        .block(Block::default().borders(Borders::BOTTOM)),
+        header[0],
+    );
     let labels = TuiTab::ALL
         .iter()
         .map(|tab| Line::from(tab.title()))
@@ -65,129 +64,205 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .iter()
         .position(|tab| *tab == app.tab)
         .unwrap_or_default();
-    let tabs = Tabs::new(labels)
-        .select(selected)
-        .divider("  ")
-        .highlight_style(
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-        );
-    frame.render_widget(tabs, header[1]);
-}
-
-fn render_body(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
-        .split(area);
-
-    let title = match app.tab {
-        TuiTab::Models => " Models ",
-        TuiTab::Runners => " Runners ",
-        TuiTab::Operations => " Operations ",
-        TuiTab::System => " System ",
-    };
-    render_rows(
-        frame,
-        columns[0],
-        title,
-        app.selected_rows(),
-        app.selected_index(),
+    frame.render_widget(
+        Tabs::new(labels)
+            .select(selected)
+            .divider("  ")
+            .highlight_style(
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            ),
+        header[1],
     );
-
-    let detail = Paragraph::new(app.selected_detail())
-        .wrap(Wrap { trim: false })
-        .block(Block::default().title(" Details ").borders(Borders::ALL));
-    frame.render_widget(detail, columns[1]);
 }
 
-fn render_rows(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    title: &'static str,
-    rows: &[super::app::TuiRow],
-    selected: usize,
-) {
-    let items = rows
+fn render_models(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let columns = split_columns(area);
+    let items = app
+        .models
         .iter()
-        .map(|row| {
-            ListItem::new(Line::from(vec![
-                Span::raw(format!("{}  ", row.title)),
-                Span::styled(
-                    row.state.clone(),
-                    Style::default().add_modifier(Modifier::DIM),
-                ),
-            ]))
-        })
+        .map(|model| row_item(&model.title, &model.state))
         .collect::<Vec<_>>();
-    let list = List::new(items)
-        .block(Block::default().title(title).borders(Borders::ALL))
-        .highlight_symbol("› ")
-        .highlight_style(
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        );
-    let mut state = ListState::default();
-    if !rows.is_empty() {
-        state.select(Some(selected.min(rows.len() - 1)));
-    }
-    frame.render_stateful_widget(list, area, &mut state);
+    render_list(frame, columns[0], " Models ", items, app.model_index);
+    let detail = app
+        .selected_model()
+        .map(|model| model.detail.as_str())
+        .unwrap_or("No models are available.");
+    frame.render_widget(detail_panel(" Details ", detail), columns[1]);
 }
 
-fn render_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let title = if let Some(command) = &app.running_command {
-        format!(" {} Running takokit {command} ", spinner(app.tick))
-    } else if let Some(command) = &app.last_command {
-        format!(" Output · takokit {command} ")
-    } else {
-        " Output ".to_string()
-    };
-    let status = Paragraph::new(app.status.as_str())
-        .scroll((app.output_scroll, 0))
-        .wrap(Wrap { trim: false })
-        .block(Block::default().title(title).borders(Borders::ALL));
-    frame.render_widget(status, area);
+fn render_runners(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let columns = split_columns(area);
+    let items = app
+        .runners
+        .iter()
+        .map(|runner| row_item(&runner.title, &runner.state))
+        .collect::<Vec<_>>();
+    render_list(frame, columns[0], " Runners ", items, app.runner_index);
+    let detail = app
+        .selected_runner()
+        .map(|runner| runner.detail.as_str())
+        .unwrap_or("No runners are available.");
+    frame.render_widget(detail_panel(" Details ", detail), columns[1]);
 }
 
-fn render_command_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let (content, title, style) = if app.command_mode {
-        (
-            Line::from(vec![
-                Span::styled("> ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(app.command_input.as_str()),
-            ]),
-            " Command · Enter run · Esc cancel · ↑/↓ history ",
-            Style::default().fg(Color::White),
-        )
-    } else {
-        (
-            Line::from("Type a command, press /, or select an item and press Enter…"),
-            " Command bar ",
-            Style::default().add_modifier(Modifier::DIM),
-        )
-    };
-    let command = Paragraph::new(content)
-        .style(style)
-        .alignment(Alignment::Left)
-        .block(Block::default().title(title).borders(Borders::ALL));
-    frame.render_widget(command, area);
+fn render_system(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let columns = split_columns(area);
+    let items = app
+        .system
+        .iter()
+        .map(|row| row_item(row.title, row.state))
+        .collect::<Vec<_>>();
+    render_list(frame, columns[0], " System ", items, app.system_index);
+    let detail = app
+        .selected_system()
+        .map(|row| row.detail)
+        .unwrap_or("No system action is available.");
+    frame.render_widget(detail_panel(" Details ", detail), columns[1]);
+}
 
-    if app.command_mode {
-        let x = area
-            .x
-            .saturating_add(3 + app.command_cursor as u16)
-            .min(area.right().saturating_sub(2));
-        frame.set_cursor_position((x, area.y.saturating_add(1)));
+fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let form = centered_rect(82, 100, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(5),
+            Constraint::Length(3),
+        ])
+        .split(form);
+    frame.render_widget(
+        Paragraph::new("Choose a voice model, type text, and generate a local WAV."),
+        rows[0],
+    );
+    let model = app.selected_speak_model();
+    frame.render_widget(
+        field(
+            " Model · ↑/↓ change ",
+            model
+                .map(|model| format!("{}  ·  {}", model.title, model.state))
+                .unwrap_or_else(|| "No TTS model available".to_string()),
+            app.speak_field == SpeakField::Model,
+        ),
+        rows[1],
+    );
+    frame.render_widget(
+        field(
+            " Voice ",
+            app.speak_voice.as_str(),
+            app.speak_field == SpeakField::Voice,
+        ),
+        rows[2],
+    );
+    frame.render_widget(
+        field(
+            " Text ",
+            if app.speak_text.is_empty() {
+                "Type what Takokit should say…"
+            } else {
+                app.speak_text.as_str()
+            },
+            app.speak_field == SpeakField::Text,
+        )
+        .wrap(Wrap { trim: false }),
+        rows[3],
+    );
+    let label = if model.is_some_and(|model| model.executable) {
+        " Generate speech "
+    } else {
+        " Install selected model "
+    };
+    frame.render_widget(
+        primary_button(label, app.speak_field == SpeakField::Primary),
+        rows[4],
+    );
+    if app.speak_field == SpeakField::Voice {
+        set_input_cursor(frame, rows[2], app.speak_voice_cursor);
+    } else if app.speak_field == SpeakField::Text {
+        set_input_cursor(frame, rows[3], app.speak_text_cursor);
     }
+}
+
+fn render_transcribe(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let form = centered_rect(82, 100, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(1),
+        ])
+        .split(form);
+    frame.render_widget(
+        Paragraph::new("Choose a transcription model and enter a local audio file path."),
+        rows[0],
+    );
+    let model = app.selected_transcribe_model();
+    frame.render_widget(
+        field(
+            " Model · ↑/↓ change ",
+            model
+                .map(|model| format!("{}  ·  {}", model.title, model.state))
+                .unwrap_or_else(|| "No STT model available".to_string()),
+            app.transcribe_field == TranscribeField::Model,
+        ),
+        rows[1],
+    );
+    frame.render_widget(
+        field(
+            " Audio file ",
+            if app.transcribe_audio.is_empty() {
+                r#"C:\path\to\audio.wav"#
+            } else {
+                app.transcribe_audio.as_str()
+            },
+            app.transcribe_field == TranscribeField::Audio,
+        ),
+        rows[2],
+    );
+    let label = if model.is_some_and(|model| model.executable) {
+        " Transcribe audio "
+    } else {
+        " Install selected model "
+    };
+    frame.render_widget(
+        primary_button(label, app.transcribe_field == TranscribeField::Primary),
+        rows[3],
+    );
+    if app.transcribe_field == TranscribeField::Audio {
+        set_input_cursor(frame, rows[2], app.transcribe_audio_cursor);
+    }
+}
+
+fn render_activity(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let title = if let Some(label) = &app.running_label {
+        format!(" {} {label} ", spinner(app.tick))
+    } else if let Some(label) = &app.last_label {
+        format!(" Last result · {label} ")
+    } else {
+        " Activity ".to_string()
+    };
+    frame.render_widget(
+        Paragraph::new(app.status.as_str())
+            .scroll((app.output_scroll, 0))
+            .wrap(Wrap { trim: false })
+            .block(Block::default().title(title).borders(Borders::ALL)),
+        area,
+    );
 }
 
 fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let text = if app.command_mode {
-        "←/→ edit · Home/End · Ctrl+U clear · Enter run · Esc cancel"
-    } else {
-        "Tab switch · ↑/↓ select · Enter prepare · type command · Ctrl+P pull · F1 help · Esc exit"
+    let text = match app.tab {
+        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · ←/→ views · F1 help · Ctrl+C exit",
+        TuiTab::Speak => "Tab next field · ↑/↓ choose model · type in Voice/Text · Enter continue/run · Ctrl+←/→ views",
+        TuiTab::Transcribe => "Tab next field · ↑/↓ choose model · type audio path · Enter continue/run · Ctrl+←/→ views",
+        TuiTab::Runners => "↑/↓ select · Enter add/install/check · P add · I install · D check · X remove · ←/→ views",
+        TuiTab::System => "↑/↓ select · Enter run · ←/→ views · R refresh · F1 help · Ctrl+C exit",
     };
     frame.render_widget(
         Paragraph::new(text)
@@ -197,15 +272,94 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     );
 }
 
-fn render_help(frame: &mut Frame<'_>) {
-    let area = centered_rect(88, 88, frame.area());
-    frame.render_widget(Clear, area);
-    let help = Paragraph::new(
-        "Interaction\n\nType any character  start entering a Takokit command\n/                   open an empty command bar\nEnter on a row      load its command into the bar\nEnter in command    validate and run it\nEsc in command      cancel command editing\n↑ / ↓ in command    browse command history\n← / → Home / End    edit at the cursor\nPageUp / PageDown   scroll command output\nTab / Shift+Tab     switch section\n↑ / ↓               move selection\nF1                  open or close this help\nEsc / Ctrl+C        exit from navigation mode\n\nDirect shortcuts\n\nCtrl+P  pull selected model or runner contract\nCtrl+I  install selected runner runtime\nCtrl+T  prepare a model test\nCtrl+X  remove selected model or runner\nCtrl+D  doctor\nCtrl+S  start managed daemon\nCtrl+G  open GUI\nCtrl+R  refresh shared state\n\nCommand bar\n\nThe command bar accepts the same Clap grammar as direct CLI commands. You may type either `plan whisper-tiny` or `takokit plan whisper-tiny`. Quoted text and Windows paths are supported. Foreground `serve` is blocked; use `daemon start`.\n\nCommands run in a background worker. The TUI remains visible and shows running state, captured stdout/stderr, errors, and completion timing.",
+fn render_list(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &'static str,
+    items: Vec<ListItem<'_>>,
+    selected: usize,
+) {
+    let has_items = !items.is_empty();
+    let list = List::new(items)
+        .block(Block::default().title(title).borders(Borders::ALL))
+        .highlight_symbol("› ")
+        .highlight_style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        );
+    let mut state = ListState::default();
+    if has_items {
+        state.select(Some(selected));
+    }
+    frame.render_stateful_widget(list, area, &mut state);
+}
+
+fn row_item<'a>(title: &'a str, state: &'a str) -> ListItem<'a> {
+    ListItem::new(Line::from(vec![
+        Span::raw(format!("{title}  ")),
+        Span::styled(state, Style::default().add_modifier(Modifier::DIM)),
+    ]))
+}
+
+fn field<'a>(title: &'a str, value: impl Into<Text<'a>>, focused: bool) -> Paragraph<'a> {
+    Paragraph::new(value).block(
+        Block::default()
+            .title(title)
+            .borders(Borders::ALL)
+            .border_style(if focused {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().add_modifier(Modifier::DIM)
+            }),
     )
-    .wrap(Wrap { trim: false })
-    .block(Block::default().title(" Takokit TUI help ").borders(Borders::ALL));
-    frame.render_widget(help, area);
+}
+
+fn primary_button<'a>(label: &'a str, focused: bool) -> Paragraph<'a> {
+    Paragraph::new(label)
+        .alignment(Alignment::Center)
+        .style(if focused {
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        } else {
+            Style::default().add_modifier(Modifier::BOLD)
+        })
+        .block(Block::default().borders(Borders::ALL))
+}
+
+fn detail_panel<'a>(title: &'a str, detail: &'a str) -> Paragraph<'a> {
+    Paragraph::new(detail)
+        .wrap(Wrap { trim: false })
+        .block(Block::default().title(title).borders(Borders::ALL))
+}
+
+fn split_columns(area: Rect) -> std::rc::Rc<[Rect]> {
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
+        .split(area)
+}
+
+fn set_input_cursor(frame: &mut Frame<'_>, area: Rect, cursor: usize) {
+    let x = area
+        .x
+        .saturating_add(1 + cursor as u16)
+        .min(area.right().saturating_sub(2));
+    frame.set_cursor_position((x, area.y.saturating_add(1)));
+}
+
+fn render_help(frame: &mut Frame<'_>) {
+    let area = centered_rect(78, 72, frame.area());
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(
+            "Takokit TUI\n\nThis interface is task-based; you do not need to type CLI commands.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak\n  Tab between model, voice, text, and the Generate button. Type directly in the text fields.\n\nTranscribe\n  Tab between model, audio path, and the Transcribe button.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes views on list screens. Ctrl+Left/Right works everywhere.\n  PageUp/PageDown scrolls activity. F1 or Enter closes this help. Ctrl+C exits.",
+        )
+        .wrap(Wrap { trim: false })
+        .block(Block::default().title(" Help ").borders(Borders::ALL)),
+        area,
+    );
 }
 
 fn spinner(tick: u64) -> char {
