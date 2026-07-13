@@ -65,7 +65,7 @@ pub async fn session_output(
     validate_filename(&filename)?;
     let store = store_from_headers(&headers).map_err(ApiError)?;
     let path = store.session_outputs_dir(id).join(&filename);
-    let bytes = tokio::fs::read(&path).await.map_err(|error| {
+    let bytes = std::fs::read(&path).map_err(|error| {
         ApiError(TakokitError::Storage(format!(
             "could not read session output {}: {error}",
             path.display()
