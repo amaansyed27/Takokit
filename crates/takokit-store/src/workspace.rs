@@ -58,7 +58,7 @@ impl WorkspaceStore {
         std::fs::create_dir_all(self.sessions_dir()).map_err(storage_error)?;
         let version = self.root.join("version");
         if !version.is_file() {
-            atomic_write(&version, WORKSPACE_VERSION.as_bytes())?;
+            replace_file(&version, WORKSPACE_VERSION.as_bytes())?;
         }
         Ok(())
     }
@@ -81,7 +81,7 @@ impl WorkspaceStore {
             last_model: None,
         };
         self.write_summary(&summary)?;
-        atomic_write(&session_dir.join("events.jsonl"), b"")?;
+        replace_file(&session_dir.join("events.jsonl"), b"")?;
         self.set_active_session(id)?;
         Ok(SessionRecord {
             summary,
@@ -115,7 +115,7 @@ impl WorkspaceStore {
 
     pub fn set_active_session(&self, id: Uuid) -> TakokitResult<()> {
         self.ensure_layout()?;
-        atomic_write(
+        replace_file(
             &self.root.join("active-session"),
             id.to_string().as_bytes(),
         )
@@ -232,7 +232,7 @@ impl WorkspaceStore {
         let directory = self.session_outputs_dir(session_id);
         std::fs::create_dir_all(&directory).map_err(storage_error)?;
         let path = directory.join(filename);
-        atomic_write(&path, content.as_bytes())?;
+        replace_file(&path, content.as_bytes())?;
         Ok(path)
     }
 
@@ -255,14 +255,17 @@ impl WorkspaceStore {
     fn read_summary(&self, id: Uuid) -> TakokitResult<SessionSummary> {
         let path = self.summary_path(id);
         let source = std::fs::read_to_string(&path).map_err(|error| {
-            TakokitError::Storage(format!("could not read session {id} at {}: {error}", path.display()))
+            TakokitError::Storage(format!(
+                "could not read session {id} at {}: {error}",
+                path.display()
+            ))
         })?;
         serde_json::from_str(&source).map_err(storage_error)
     }
 
     fn write_summary(&self, summary: &SessionSummary) -> TakokitResult<()> {
         let source = serde_json::to_vec_pretty(summary).map_err(storage_error)?;
-        atomic_write(&self.summary_path(summary.id), &source)
+        replace_file(&self.summary_path(summary.id), &source)
     }
 
     fn lock(&self) -> TakokitResult<WorkspaceLock> {
@@ -309,13 +312,38 @@ fn safe_filename(filename: &str) -> TakokitResult<&str> {
     Ok(value)
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> TakokitResult<()> {
+fn replace_file(path: &Path, bytes: &[u8]) -> TakokitResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(storage_error)?;
     }
     let temporary = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
     std::fs::write(&temporary, bytes).map_err(storage_error)?;
-    std::fs::rename(&temporary, path).map_err(storage_error)
+    replace_file_platform(path, &temporary)
+}
+
+#[cfg(not(windows))]
+fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
+    std::fs::rename(temporary, path).map_err(storage_error)
+}
+
+#[cfg(windows)]
+fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
+    if !path.exists() {
+        return std::fs::rename(temporary, path).map_err(storage_error);
+    }
+    let backup = path.with_extension(format!("bak-{}", Uuid::new_v4()));
+    std::fs::rename(path, &backup).map_err(storage_error)?;
+    match std::fs::rename(temporary, path) {
+        Ok(()) => {
+            let _ = std::fs::remove_file(backup);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = std::fs::rename(backup, path);
+            let _ = std::fs::remove_file(temporary);
+            Err(storage_error(error))
+        }
+    }
 }
 
 fn now() -> u64 {
@@ -362,6 +390,18 @@ mod tests {
         assert_eq!(record.events.len(), 1);
         assert_eq!(record.summary.output_count, 1);
         assert_eq!(store.list_sessions(Some("hello world")).unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn summary_replacement_supports_multiple_updates() {
+        let root = std::env::temp_dir().join(format!("takokit-replace-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = WorkspaceStore::new(&root);
+        let session = store.create_session(Some("one")).unwrap();
+        store.set_active_session(session.summary.id).unwrap();
+        store.set_active_session(session.summary.id).unwrap();
+        assert_eq!(store.active_session().unwrap(), Some(session.summary.id));
         let _ = std::fs::remove_dir_all(root);
     }
 }
