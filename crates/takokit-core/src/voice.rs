@@ -14,6 +14,18 @@ pub struct VoiceProfile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CreateVoiceProfileRequest {
+    pub sample_path: PathBuf,
+    pub name: String,
+    #[serde(default = "default_clone_model")]
+    pub model: String,
+    #[serde(default)]
+    pub consent_affirmed: bool,
+    #[serde(default)]
+    pub consent_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CloneVoiceResponse {
     pub data: VoiceProfile,
 }
@@ -21,4 +33,8 @@ pub struct CloneVoiceResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VoiceProfilesResponse {
     pub data: Vec<VoiceProfile>,
+}
+
+fn default_clone_model() -> String {
+    "chatterbox".to_string()
 }
