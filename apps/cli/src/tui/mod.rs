@@ -1,11 +1,15 @@
 mod app;
 mod catalog;
 mod command;
+mod input;
+mod job;
 mod ui;
 
-use std::process::Command;
+use std::{io, time::Duration};
 
 use app::{App, TuiAction};
+use crossterm::event::{self, Event, KeyEventKind};
+use job::CommandJob;
 use takokit_core::RuntimeConfig;
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
@@ -16,98 +20,89 @@ pub async fn run_launcher(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
 ) -> anyhow::Result<()> {
-    let mut status = format!(
-        "Ready. All palette commands use the same CLI and daemon backend. Storage: {}",
-        store.root().display()
-    );
+    let mut state = App::new(
+        config,
+        store,
+        package_registry,
+        installed_registry,
+        format!(
+            "Ready. Type a command at any time, or select an item and press Enter. Storage: {}",
+            store.root().display()
+        ),
+    )?;
+    let mut active_job: Option<CommandJob> = None;
 
-    loop {
-        let mut state = App::new(config, store, package_registry, installed_registry, status)?;
-        let mut selected_action = None;
-        ratatui::run(|mut terminal| -> std::io::Result<()> {
-            selected_action = Some(app::run(&mut terminal, &mut state)?);
-            Ok(())
-        })?;
-
-        match selected_action.unwrap_or(TuiAction::Quit) {
-            TuiAction::Quit => return Ok(()),
-            TuiAction::Refresh => {
-                status = "Catalog, installed state and daemon-backed data refreshed.".to_string()
+    ratatui::run(|mut terminal| -> io::Result<()> {
+        loop {
+            state.tick = state.tick.wrapping_add(1);
+            if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
+                state.running_command = None;
+                state.last_command = Some(result.command.clone());
+                state.set_status(if result.success {
+                    result.output
+                } else {
+                    format!("Command failed.\n\n{}", result.output)
+                });
+                if let Err(error) =
+                    state.reload(config, store, package_registry, installed_registry)
+                {
+                    state.status.push_str(&format!(
+                        "\n\nThe command finished, but refreshing shared state failed: {error:#}"
+                    ));
+                }
+                active_job = None;
             }
-            TuiAction::RunCli(args) => {
-                status = execute_cli(&args).unwrap_or_else(|error| format!("Error: {error:#}"));
+
+            terminal.draw(|frame| ui::render(frame, &state))?;
+            if !event::poll(Duration::from_millis(120))? {
+                continue;
+            }
+            let Event::Key(key) = event::read()? else {
+                continue;
+            };
+            if key.kind == KeyEventKind::Release {
+                continue;
+            }
+
+            let Some(action) = state.handle_key(key) else {
+                continue;
+            };
+            match action {
+                TuiAction::Quit => {
+                    if active_job.is_some() {
+                        state.set_status(
+                            "A command is still running. Wait for it to finish before exiting so Takokit does not leave a detached installer or model pull behind.",
+                        );
+                    } else {
+                        return Ok(());
+                    }
+                }
+                TuiAction::Refresh => {
+                    match state.reload(config, store, package_registry, installed_registry) {
+                        Ok(()) => state.set_status(
+                            "Catalog, installed state, and daemon-backed data refreshed.",
+                        ),
+                        Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
+                    }
+                }
+                TuiAction::RunCli(args) => {
+                    if active_job.is_some() {
+                        state.set_status(
+                            "A command is already running. You can continue navigating or prepare the next command while it finishes.",
+                        );
+                        continue;
+                    }
+                    let job = CommandJob::start(args);
+                    state.running_command = Some(job.label.clone());
+                    state.set_status(format!(
+                        "Running `takokit {}`. The TUI will remain open and show the result here.",
+                        job.label
+                    ));
+                    active_job = Some(job);
+                }
             }
         }
-    }
-}
+    })?;
 
-fn execute_cli(args: &[String]) -> anyhow::Result<String> {
-    let executable = std::env::current_exe()?;
-    let output = Command::new(&executable).args(args).output()?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let rendered = combine_output(&stdout, &stderr);
-
-    if output.status.success() {
-        if rendered.is_empty() {
-            Ok(format!("Completed: takokit {}", display_args(args)))
-        } else {
-            Ok(rendered)
-        }
-    } else {
-        anyhow::bail!(
-            "takokit {} exited with {}{}",
-            display_args(args),
-            output.status,
-            if rendered.is_empty() {
-                String::new()
-            } else {
-                format!("\n\n{rendered}")
-            }
-        )
-    }
-}
-
-fn combine_output(stdout: &str, stderr: &str) -> String {
-    match (stdout.is_empty(), stderr.is_empty()) {
-        (true, true) => String::new(),
-        (false, true) => stdout.to_string(),
-        (true, false) => stderr.to_string(),
-        (false, false) => format!("{stdout}\n\n{stderr}"),
-    }
-}
-
-fn display_args(args: &[String]) -> String {
-    args.iter()
-        .map(|argument| {
-            if argument.chars().any(char::is_whitespace) {
-                format!("\"{}\"", argument.replace('"', "\\\""))
-            } else {
-                argument.clone()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn combines_cli_streams_without_losing_completion_timing() {
-        assert_eq!(
-            combine_output("json", "Completed in 1.2s"),
-            "json\n\nCompleted in 1.2s"
-        );
-        assert_eq!(combine_output("", "failure"), "failure");
-    }
-
-    #[test]
-    fn displays_arguments_with_spaces_as_quoted_values() {
-        assert_eq!(
-            display_args(&["speak".into(), "Hello world".into()]),
-            "speak \"Hello world\""
-        );
-    }
+    Ok(())
 }
