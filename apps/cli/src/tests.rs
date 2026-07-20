@@ -108,7 +108,7 @@ fn cli_parses_direct_list_run_and_ps() {
         Some(Command::List { target: None })
     ));
     assert!(
-        matches!(run.command, Some(Command::Run(RunArgs { model, text: Some(text), voice: Some(voice), file: None })) if model == "kokoro" && text == "hello" && voice == "Ryan")
+        matches!(run.command, Some(Command::Run(RunArgs { model, text: Some(text), voice: Some(voice), file: None, .. })) if model == "kokoro" && text == "hello" && voice == "Ryan")
     );
     assert!(matches!(ps.command, Some(Command::Ps)));
 }
@@ -120,24 +120,36 @@ fn run_argument_validation_accepts_tts_or_stt_and_rejects_ambiguous_input() {
         text: Some("hello".into()),
         voice: None,
         file: None,
+        language: None,
+        instruction: None,
+        reference_text: None,
     };
     let stt = RunArgs {
         model: "whisper-tiny".into(),
         text: None,
         voice: None,
         file: Some(PathBuf::from("sample.wav")),
+        language: None,
+        instruction: None,
+        reference_text: None,
     };
     let missing = RunArgs {
         model: "kokoro".into(),
         text: None,
         voice: None,
         file: None,
+        language: None,
+        instruction: None,
+        reference_text: None,
     };
     let both = RunArgs {
         model: "kokoro".into(),
         text: Some("hello".into()),
         voice: None,
         file: Some(PathBuf::from("sample.wav")),
+        language: None,
+        instruction: None,
+        reference_text: None,
     };
     assert!(validate_run_args(&tts).is_ok());
     assert!(validate_run_args(&stt).is_ok());
@@ -347,6 +359,26 @@ fn launch_suite_default_is_human_readable_and_json_flag_is_json() {
     assert!(human.contains("whisper-base"));
     assert!(!human.trim_start().starts_with('['));
     assert!(json.trim_start().starts_with('['));
+}
+
+#[test]
+fn bundled_launch_catalog_contains_every_current_model() {
+    let models = PackageRegistry::bundled().models().expect("bundled models");
+    assert_eq!(models.len(), 31);
+    for id in [
+        "piper-lessac",
+        "qwen3-tts-0.6b-base",
+        "qwen3-tts-1.7b-custom",
+        "qwen3-tts-1.7b-base",
+        "qwen3-tts-1.7b-voice-design",
+        "openvoice",
+        "gpt-sovits",
+        "rvc",
+        "qwen2-5-omni",
+        "qwen3-omni",
+    ] {
+        assert!(models.iter().any(|model| model.id == id), "missing {id}");
+    }
 }
 
 #[test]
