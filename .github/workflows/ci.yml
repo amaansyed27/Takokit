@@ -58,23 +58,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
-        id: formatting
         run: cargo fmt --all -- --check
-
-      - name: Capture rustfmt patch
-        if: failure() && steps.formatting.outcome == 'failure'
-        shell: bash
-        run: |
-          cargo fmt --all
-          git diff --binary > rustfmt-${{ runner.os }}.patch
-
-      - name: Upload rustfmt patch
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustfmt-${{ matrix.os }}
-          path: rustfmt-${{ runner.os }}.patch
-          if-no-files-found: ignore
 
       - name: Check workspace (Linux)
         if: runner.os == 'Linux'
