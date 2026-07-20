@@ -61,6 +61,9 @@ pub(crate) async fn route_daemon_command(
                 input: args.text.clone(),
                 voice: Some(args.voice.clone()),
                 response_format: Some("wav".to_string()),
+                language: args.language.clone(),
+                instruction: args.instruction.clone(),
+                reference_text: args.reference_text.clone(),
             },
         )?,
         Command::Transcribe { audio, model } => client.post(
@@ -90,6 +93,9 @@ pub(crate) async fn route_daemon_command(
                         input: text.clone(),
                         voice: args.voice.clone(),
                         response_format: Some("wav".to_string()),
+                        language: args.language.clone(),
+                        instruction: args.instruction.clone(),
+                        reference_text: args.reference_text.clone(),
                     },
                 )?,
                 (None, Some(file)) if supports("speech_to_text") => client.post(
