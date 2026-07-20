@@ -1,26 +1,37 @@
 id = "fish-speech"
-name = "Fish Speech"
+name = "Fish Speech S2 Pro"
 family = "fish-speech"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "license-check-required"
-description = "Fish Speech TTS and voice cloning family. Metadata-only; Takokit has no verified weights or managed runtime adapter yet."
+required_adapter = "fish_speech"
+license = "fish-audio-research-license"
+description = "Fish Speech S2 Pro multilingual expressive TTS with instruction following and optional reference-audio conditioning through the pinned official runtime."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = false
+voice_conversion = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
-cpu = true
+cpu = false
 gpu = true
-min_ram = "16gb"
+min_ram = "24gb"
+min_vram = "12gb"
+
+[source]
+provider = "hugging-face"
+repository = "fishaudio/s2-pro"
+revision = "15765083472df91a268805e2c5a99c5cddce5f7f"
+ignore_patterns = ["overview.png"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
