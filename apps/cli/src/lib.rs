@@ -262,8 +262,23 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Clone(args)) => {
             run_clone(args, workspace.as_ref().expect("clone workspace"))?
         }
+        Some(Command::Convert(args)) => {
+            run_convert(
+                args,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref().expect("conversion workspace"),
+            )
+            .await?
+        }
         Some(Command::Train(args)) => {
-            run_train(args, workspace.as_ref().expect("training workspace"))?
+            run_train(
+                args,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref().expect("training workspace"),
+            )
+            .await?
         }
         Some(Command::Sessions { command }) => run_sessions_command(workspace_arg, command)?,
         Some(Command::Runner { command }) => match command {
@@ -352,6 +367,7 @@ fn command_uses_workspace(command: &Option<Command>) -> bool {
             | Some(Command::Run(_))
             | Some(Command::Transcribe { .. })
             | Some(Command::Clone(_))
+            | Some(Command::Convert(_))
             | Some(Command::Train(_))
     )
 }
@@ -367,6 +383,7 @@ fn surface_title(command: &Option<Command>) -> &'static str {
         Some(Command::Speak(_)) => "CLI speech",
         Some(Command::Transcribe { .. }) => "CLI transcription",
         Some(Command::Clone(_)) => "CLI voice cloning",
+        Some(Command::Convert(_)) => "CLI voice conversion",
         Some(Command::Train(_)) => "CLI voice training",
         _ => "Takokit CLI",
     }
