@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Backward-compatible entrypoint for the repository source-size audit."""
+"""Backward-compatible entrypoint for the repository source-size audit.
+
+Kept so older release-test instructions continue to work.
+"""
 
 from __future__ import annotations
 
