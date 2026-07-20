@@ -5,7 +5,9 @@ mod launch;
 
 use super::*;
 pub(crate) use fast::run_fast_smokes;
-pub(crate) use launch::{format_launch_suite, print_launch_suite, LaunchSuiteRow};
+pub(crate) use launch::print_launch_suite;
+#[cfg(test)]
+pub(crate) use launch::{format_launch_suite, LaunchSuiteRow};
 
 pub(crate) async fn run_test_command(
     store: &LocalStore,
