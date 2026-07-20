@@ -144,11 +144,7 @@ impl InstalledRegistry {
                         .as_ref()
                         .expect("snapshot source")
                         .repository,
-                    manifest
-                        .source
-                        .as_ref()
-                        .expect("snapshot source")
-                        .revision
+                    manifest.source.as_ref().expect("snapshot source").revision
                 );
             }
         }
@@ -374,12 +370,13 @@ impl InstalledRegistry {
                 }
             })?;
             let destination = model_dir.join(relative);
-            let parent = destination.parent().ok_or_else(|| {
-                PackageError::ArtifactInstallFailed {
-                    artifact: artifact.name.clone(),
-                    reason: "artifact path has no parent directory".to_string(),
-                }
-            })?;
+            let parent =
+                destination
+                    .parent()
+                    .ok_or_else(|| PackageError::ArtifactInstallFailed {
+                        artifact: artifact.name.clone(),
+                        reason: "artifact path has no parent directory".to_string(),
+                    })?;
             std::fs::create_dir_all(parent)?;
             if destination.is_file()
                 && artifact.bytes.is_none_or(|expected| {

@@ -172,7 +172,8 @@ pub async fn convert_voice(
     headers: HeaderMap,
     Json(request): Json<VoiceConversionRequest>,
 ) -> Result<Json<VoiceConversionResponse>, ApiError> {
-    let workspace = RequestWorkspace::from_headers(&headers, "Voice conversion").map_err(ApiError)?;
+    let workspace =
+        RequestWorkspace::from_headers(&headers, "Voice conversion").map_err(ApiError)?;
     let session_id = workspace.session_id();
     let model = request.model.clone();
     let source_path = request.source_path.clone();

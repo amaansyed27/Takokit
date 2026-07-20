@@ -71,11 +71,7 @@ fn install_hugging_face_snapshot(
     std::fs::create_dir_all(&logs_root)?;
 
     let destination = models_root.join(&manifest.id);
-    let temporary = models_root.join(format!(
-        ".{}.download-{}",
-        manifest.id,
-        timestamp_suffix()
-    ));
+    let temporary = models_root.join(format!(".{}.download-{}", manifest.id, timestamp_suffix()));
     let backup = models_root.join(format!(".{}.backup", manifest.id));
     remove_dir_if_exists(&temporary)?;
     remove_dir_if_exists(&backup)?;

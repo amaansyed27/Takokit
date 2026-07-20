@@ -356,7 +356,10 @@ fn adapter_id(plan: &ExecutionPlan) -> TakokitResult<&str> {
         .ok_or_else(|| blocked_adapter(&plan.model.id))
 }
 
-fn resolve_speech_voice(plan: &ExecutionPlan, voice: Option<&str>) -> TakokitResult<Option<String>> {
+fn resolve_speech_voice(
+    plan: &ExecutionPlan,
+    voice: Option<&str>,
+) -> TakokitResult<Option<String>> {
     let Some(voice) = voice.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
     };
@@ -432,9 +435,8 @@ fn validate_file_output(
     expected: &Path,
     reported: Option<&Path>,
 ) -> TakokitResult<()> {
-    let reported = reported.ok_or_else(|| {
-        TakokitError::Audio(format!("{adapter} did not return an output path"))
-    })?;
+    let reported = reported
+        .ok_or_else(|| TakokitError::Audio(format!("{adapter} did not return an output path")))?;
     if reported != expected || !expected.is_file() {
         return Err(TakokitError::Audio(format!(
             "{adapter} did not create the requested WAV at {}",
