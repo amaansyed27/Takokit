@@ -62,6 +62,9 @@ pub enum TakokitError {
     #[error("model error: {0}")]
     Model(String),
 
+    #[error("execution error: {0}")]
+    Execution(String),
+
     #[error("{message}")]
     Resolution { code: ErrorCode, message: String },
 
