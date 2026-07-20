@@ -1,0 +1,37 @@
+id = "qwen3-tts-1.7b-custom"
+name = "Qwen3-TTS 1.7B CustomVoice"
+family = "qwen3-tts-1.7b-custom"
+version = "0.1.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen3_tts"
+license = "apache-2.0"
+description = "Qwen3-TTS 12Hz 1.7B CustomVoice with official preset speakers and natural-language delivery instructions."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+voice_training = false
+voice_conversion = false
+live_transcription = false
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "24gb"
+min_vram = "8gb"
+
+[source]
+provider = "hugging-face"
+repository = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+revision = "b611c9f8f2ad5c741ed9c7a0a6a3750e43e0dfd7"
+ignore_patterns = ["README.md"]
+
+[artifacts]
+metadata_only = false
+weights = []
+configs = []
+voices = []
