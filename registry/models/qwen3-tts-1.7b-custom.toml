@@ -1,0 +1,34 @@
+id = "qwen3-tts-1.7b-custom"
+name = "Qwen3-TTS 1.7B CustomVoice"
+family = "qwen"
+version = "0.2.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen3_tts"
+license = "apache-2.0"
+description = "Official Qwen3-TTS 12Hz 1.7B CustomVoice checkpoint with built-in speakers."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "24gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
+
+[[artifacts.configs]]
+name = ".takokit-snapshot"
+url = "hf://Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice@main"
+sha256 = "3b8f41d7e315cb38a52e7ac966973cb56e93e7a0738a43709d53aa6e2169b84e"
+bytes = 46
+role = "other"
