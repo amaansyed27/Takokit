@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{de::DeserializeOwned, Serialize};
-use takokit_core::{DaemonIdentity, DaemonMode, RuntimeConfig, SpeechRequest, SpeechResponse};
+use takokit_core::{DaemonIdentity, DaemonMode, RuntimeConfig};
 use takokit_store::LocalStore;
 
 use crate::workspace::{SESSION_ENV, WORKSPACE_ENV};
@@ -48,10 +48,6 @@ impl Client {
             .send_json(serde_json::to_value(body)?)
             .map_err(|error| anyhow!(error.to_string()))?
             .into_json()?)
-    }
-
-    pub fn speech(&self, request: SpeechRequest) -> anyhow::Result<SpeechResponse> {
-        self.post("/v1/audio/speech", &request)
     }
 
     pub fn delete(&self, path: &str) -> anyhow::Result<()> {
