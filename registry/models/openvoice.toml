@@ -1,26 +1,37 @@
 id = "openvoice"
-name = "OpenVoice"
+name = "OpenVoice V2"
 family = "openvoice"
 version = "0.1.0"
-kind = "voice-cloning"
+kind = "voice-convert"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "license-check-required"
-description = "OpenVoice voice cloning and conversion family. Metadata-only; runtime dependency and license risk must be reviewed before execution support."
+required_adapter = "openvoice"
+license = "mit"
+description = "OpenVoice V2 instant voice cloning and tone-colour conversion using the pinned official checkpoints and runtime."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = false
+voice_conversion = true
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
 min_ram = "8gb"
+min_vram = "2gb"
+
+[source]
+provider = "hugging-face"
+repository = "myshell-ai/OpenVoiceV2"
+revision = "0ca21e94934d02c13c161296791a5a35972d019c"
+ignore_patterns = ["README.md", ".DS_Store"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
