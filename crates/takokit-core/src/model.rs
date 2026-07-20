@@ -6,6 +6,8 @@ pub enum CapabilityKind {
     TextToSpeech,
     SpeechToText,
     VoiceCloning,
+    VoiceTraining,
+    VoiceConversion,
     LiveTranscription,
     LiveAudio,
 }
@@ -13,10 +15,12 @@ pub enum CapabilityKind {
 pub type ModelCapability = CapabilityKind;
 
 impl CapabilityKind {
-    pub const ALL: [CapabilityKind; 5] = [
+    pub const ALL: [CapabilityKind; 7] = [
         CapabilityKind::TextToSpeech,
         CapabilityKind::SpeechToText,
         CapabilityKind::VoiceCloning,
+        CapabilityKind::VoiceTraining,
+        CapabilityKind::VoiceConversion,
         CapabilityKind::LiveTranscription,
         CapabilityKind::LiveAudio,
     ];
@@ -26,6 +30,8 @@ impl CapabilityKind {
             CapabilityKind::TextToSpeech => "TTS",
             CapabilityKind::SpeechToText => "STT",
             CapabilityKind::VoiceCloning => "Voice Cloning",
+            CapabilityKind::VoiceTraining => "Voice Training",
+            CapabilityKind::VoiceConversion => "Voice Conversion",
             CapabilityKind::LiveTranscription => "Live Transcription API",
             CapabilityKind::LiveAudio => "Live Audio API",
         }
@@ -36,6 +42,12 @@ impl CapabilityKind {
             CapabilityKind::TextToSpeech => "Text input to speech or audio output.",
             CapabilityKind::SpeechToText => "Audio file or input to text transcript.",
             CapabilityKind::VoiceCloning => "Voice samples to a reusable local voice profile.",
+            CapabilityKind::VoiceTraining => {
+                "A consent-backed dataset to a reusable locally trained voice checkpoint."
+            }
+            CapabilityKind::VoiceConversion => {
+                "Source audio converted into a selected local target voice."
+            }
             CapabilityKind::LiveTranscription => {
                 "Local STT models exposed through an API for streaming or submitted audio."
             }
