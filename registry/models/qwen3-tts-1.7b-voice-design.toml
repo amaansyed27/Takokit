@@ -1,0 +1,34 @@
+id = "qwen3-tts-1.7b-voice-design"
+name = "Qwen3-TTS 1.7B VoiceDesign"
+family = "qwen"
+version = "0.2.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen3_tts"
+license = "apache-2.0"
+description = "Official Qwen3-TTS 12Hz 1.7B VoiceDesign checkpoint for natural-language voice creation."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = false
+live_transcription = false
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "24gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
+
+[[artifacts.configs]]
+name = ".takokit-snapshot"
+url = "hf://Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@main"
+sha256 = "cb90b7afd334d44619ab43766598d20ce7c68c2924d61618790506b886e5a229"
+bytes = 46
+role = "other"
