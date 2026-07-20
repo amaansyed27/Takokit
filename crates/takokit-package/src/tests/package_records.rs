@@ -56,7 +56,14 @@ fn bundled_metadata_only_models_install_without_artifact_downloads() {
     for model_id in ["chatterbox", "gpt-sovits"] {
         let manifest = registry.model(model_id).expect("model manifest");
 
-        installed.install_model(&manifest).expect("install model");
+        installed
+            .install_model_with_options(
+                &manifest,
+                InstallModelOptions {
+                    metadata_only: true,
+                },
+            )
+            .expect("install metadata-only model");
 
         let record = installed
             .installed_model_record(model_id)

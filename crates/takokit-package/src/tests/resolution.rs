@@ -197,7 +197,7 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
 
     let qwen_plan = plan_model(&registry, &installed, "qwen3-tts").expect("qwen plan");
     assert_eq!(qwen_plan.required_runner, "takokit-python-managed");
-    assert_eq!(qwen_plan.family, "qwen");
+    assert_eq!(qwen_plan.family, "qwen3-tts");
     assert_eq!(qwen_plan.artifact_state, ModelLifecycleState::MetadataOnly);
     assert!(qwen_plan
         .missing

@@ -115,7 +115,7 @@ fn install_model_writes_installed_record() {
 
     assert_eq!(record.runner, "takokit-onnx");
 
-    assert_eq!(record.source, "local-mock-registry");
+    assert_eq!(record.source, "takokit-registry");
 
     assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
 

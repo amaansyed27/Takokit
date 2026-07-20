@@ -2,13 +2,13 @@ use super::*;
 use std::collections::HashSet;
 
 #[test]
-fn bundled_catalog_contains_twenty_to_thirty_unique_models() {
+fn bundled_catalog_contains_exactly_thirty_one_unique_models() {
     let registry = PackageRegistry::bundled();
     let models = registry.models().expect("bundled models");
-    assert!(
-        (20..=30).contains(&models.len()),
-        "release catalog must contain 20-30 models, found {}",
-        models.len()
+    assert_eq!(
+        models.len(),
+        31,
+        "release catalog must contain exactly 31 models"
     );
     let unique = models
         .iter()
@@ -28,6 +28,8 @@ fn every_model_has_a_known_runner_and_capability() {
             model.capabilities.tts
                 || model.capabilities.stt
                 || model.capabilities.voice_cloning
+                || model.capabilities.voice_training
+                || model.capabilities.voice_conversion
                 || model.capabilities.live_transcription
                 || model.capabilities.live_audio,
             "model {} declares no capability",
