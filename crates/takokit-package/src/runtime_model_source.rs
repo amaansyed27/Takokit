@@ -6,7 +6,7 @@ use crate::{
     *,
 };
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const READY_MARKER: &str = ".takokit-source.json";
 
