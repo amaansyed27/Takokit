@@ -59,6 +59,9 @@ mod tests {
                     input: "hello".to_string(),
                     voice: Some("default".to_string()),
                     response_format: Some("wav".to_string()),
+                    language: None,
+                    instruction: None,
+                    reference_text: None,
                 },
                 &dir,
             )
