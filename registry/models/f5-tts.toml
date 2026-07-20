@@ -1,27 +1,37 @@
 id = "f5-tts"
 name = "F5-TTS"
 family = "f5-tts"
-version = "0.1.0"
+version = "0.2.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
 required_adapter = "f5_tts"
 license = "license-check-required"
-description = "F5-TTS local speech generation with optional reference-audio voice transfer through the official API in an isolated managed environment."
+description = "F5-TTS local speech generation using a Takokit-managed checkpoint snapshot."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = false
+voice_conversion = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
 min_ram = "12gb"
+min_vram = "6gb"
+
+[source]
+provider = "hugging-face"
+repository = "SWivid/F5-TTS"
+revision = "main"
+allow_patterns = ["F5TTS_v1_Base/*", "vocab.txt", "README.md"]
 
 [artifacts]
 metadata_only = false
 weights = []
+configs = []
 voices = []
