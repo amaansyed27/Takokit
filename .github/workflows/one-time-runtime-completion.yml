@@ -1,0 +1,55 @@
+name: One-time runtime completion
+
+on:
+  pull_request_target:
+    types: [synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/complete-model-runtimes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: agent/complete-model-runtimes
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/gui/package-lock.json
+      - name: Apply deterministic repository patch
+        run: python scripts/apply_runtime_completion.py
+      - name: Remove branch-side one-time files
+        run: rm scripts/apply_runtime_completion.py .github/workflows/apply-runtime-completion.yml
+      - name: Format Rust
+        run: cargo fmt --all
+      - name: Validate source sizes
+        run: python scripts/audit_file_sizes.py
+      - name: Compile and test Rust
+        run: |
+          cargo check --workspace
+          cargo test --workspace
+      - name: Build GUI
+        working-directory: apps/gui
+        run: |
+          npm ci
+          npm run build
+      - name: Commit generated implementation
+        run: |
+          git config user.name "takokit-runtime-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement expanded local model runtimes"
+          git push origin HEAD:agent/complete-model-runtimes
