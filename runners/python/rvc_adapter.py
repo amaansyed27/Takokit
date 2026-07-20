@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -30,29 +31,41 @@ def main() -> None:
     source_audio = Path(request["audio_path"]).expanduser().resolve()
     target = Path(request["target_voice"]).expanduser().resolve()
     output_path = Path(request["output_path"]).expanduser().resolve()
+    model_dir = Path(request["model_dir"]).expanduser().resolve()
+    hubert_path = model_dir / "hubert_base.pt"
+    rmvpe_path = model_dir / "rmvpe.pt"
     if not source_audio.is_file():
         raise FileNotFoundError(f"source audio does not exist: {source_audio}")
+    if not hubert_path.is_file() or not rmvpe_path.is_file():
+        raise FileNotFoundError(
+            f"RVC base assets are incomplete below {model_dir}; run `tako pull rvc`"
+        )
     model_path, index_path = find_model(target)
 
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
+    os.environ["rmvpe_root"] = str(model_dir)
+    os.environ["hubert_path"] = str(hubert_path)
     from scipy.io import wavfile
     from rvc.modules.vc.modules import VC
 
     converter = VC()
     converter.get_vc(str(model_path))
-    sample_rate, audio, _, _ = converter.vc_inference(
+    sample_rate, audio, _, error = converter.vc_inference(
         0,
         source_audio,
         f0_up_key=int(request.get("pitch_shift") or 0),
         f0_method="rmvpe",
-        file_index=str(index_path) if index_path else "",
+        index_file=str(index_path) if index_path else "",
         index_rate=0.75 if index_path else 0.0,
         filter_radius=3,
         resample_sr=0,
         rms_mix_rate=0.25,
         protect=0.33,
+        hubert_path=str(hubert_path),
     )
+    if error or sample_rate is None or audio is None:
+        raise RuntimeError(error or "RVC returned no converted audio")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wavfile.write(str(output_path), int(sample_rate), audio)
     if not output_path.is_file() or output_path.stat().st_size <= 44:
