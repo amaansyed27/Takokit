@@ -111,18 +111,17 @@ pub async fn transcriptions(
     let _execution = state
         .register_execution(model.clone(), "speech_to_text")
         .await;
-    let result: Result<takokit_core::TranscriptionResponse, TakokitError> =
-        match resolve_execution_plan(
-            &state.package_registry,
-            &state.installed_registry,
-            &model,
-            CapabilityKind::SpeechToText,
-        )
-        .map_err(TakokitError::from)
-        {
-            Ok(plan) => execute_transcription(&plan, request).await,
-            Err(error) => Err(error),
-        };
+    let result = match resolve_execution_plan(
+        &state.package_registry,
+        &state.installed_registry,
+        &model,
+        CapabilityKind::SpeechToText,
+    )
+    .map_err(TakokitError::from)
+    {
+        Ok(plan) => execute_transcription(&plan, request).await,
+        Err(error) => Err(error),
+    };
 
     match result {
         Ok(response) => {
@@ -157,6 +156,69 @@ pub async fn transcriptions(
                     state: SessionEventState::Failed,
                     model: Some(model),
                     input: None,
+                    source_path: Some(source_path),
+                    output_path: None,
+                    text: None,
+                    message: Some(error.to_string()),
+                },
+            );
+            Err(ApiError(error))
+        }
+    }
+}
+
+pub async fn convert_voice(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<VoiceConversionRequest>,
+) -> Result<Json<VoiceConversionResponse>, ApiError> {
+    let workspace = RequestWorkspace::from_headers(&headers, "Voice conversion").map_err(ApiError)?;
+    let session_id = workspace.session_id();
+    let model = request.model.clone();
+    let source_path = request.source_path.clone();
+    let target_voice = request.target_voice.clone();
+    let _execution = state
+        .register_execution(model.clone(), "voice_conversion")
+        .await;
+    let result = match resolve_execution_plan(
+        &state.package_registry,
+        &state.installed_registry,
+        &model,
+        CapabilityKind::VoiceConversion,
+    )
+    .map_err(TakokitError::from)
+    {
+        Ok(plan) => execute_voice_conversion(&plan, request, &workspace.outputs_dir()).await,
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(response) => {
+            workspace
+                .store
+                .append_event(
+                    session_id,
+                    NewSessionEvent {
+                        task: SessionTask::VoiceConversion,
+                        state: SessionEventState::Completed,
+                        model: Some(model),
+                        input: Some(target_voice),
+                        source_path: Some(source_path),
+                        output_path: Some(response.output_path.clone()),
+                        text: None,
+                        message: Some(format!("Converted {} bytes", response.bytes)),
+                    },
+                )
+                .map_err(ApiError)?;
+            Ok(Json(response))
+        }
+        Err(error) => {
+            let _ = workspace.store.append_event(
+                session_id,
+                NewSessionEvent {
+                    task: SessionTask::VoiceConversion,
+                    state: SessionEventState::Failed,
+                    model: Some(model),
+                    input: Some(target_voice),
                     source_path: Some(source_path),
                     output_path: None,
                     text: None,
@@ -240,26 +302,64 @@ pub async fn clone_voice(
 }
 
 pub async fn train_voice(
+    State(state): State<AppState>,
     headers: HeaderMap,
     Json(request): Json<TrainVoiceRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<Json<TrainVoiceResponse>, ApiError> {
     let workspace = RequestWorkspace::from_headers(&headers, "Voice training").map_err(ApiError)?;
-    let error = TakokitError::NotImplemented {
-        feature: "voice training",
-        reason: "training jobs and dataset preparation are not yet release-ready",
+    let session_id = workspace.session_id();
+    let model = request.model.clone();
+    let samples_path = request.samples_path.clone();
+    let name = request.name.clone();
+    let _execution = state
+        .register_execution(model.clone(), "voice_training")
+        .await;
+    let result = match resolve_execution_plan(
+        &state.package_registry,
+        &state.installed_registry,
+        &model,
+        CapabilityKind::VoiceTraining,
+    )
+    .map_err(TakokitError::from)
+    {
+        Ok(plan) => execute_voice_training(&plan, request).await,
+        Err(error) => Err(error),
     };
-    let _ = workspace.store.append_event(
-        workspace.session_id(),
-        NewSessionEvent {
-            task: SessionTask::VoiceTraining,
-            state: SessionEventState::Failed,
-            model: None,
-            input: Some(request.name),
-            source_path: Some(request.samples_path),
-            output_path: None,
-            text: None,
-            message: Some(error.to_string()),
-        },
-    );
-    Err(ApiError(error))
+    match result {
+        Ok(response) => {
+            workspace
+                .store
+                .append_event(
+                    session_id,
+                    NewSessionEvent {
+                        task: SessionTask::VoiceTraining,
+                        state: SessionEventState::Completed,
+                        model: Some(model),
+                        input: Some(name),
+                        source_path: Some(samples_path),
+                        output_path: Some(response.output_path.clone()),
+                        text: None,
+                        message: Some(format!("Training status: {}", response.status)),
+                    },
+                )
+                .map_err(ApiError)?;
+            Ok(Json(response))
+        }
+        Err(error) => {
+            let _ = workspace.store.append_event(
+                session_id,
+                NewSessionEvent {
+                    task: SessionTask::VoiceTraining,
+                    state: SessionEventState::Failed,
+                    model: Some(model),
+                    input: Some(name),
+                    source_path: Some(samples_path),
+                    output_path: None,
+                    text: None,
+                    message: Some(error.to_string()),
+                },
+            );
+            Err(ApiError(error))
+        }
+    }
 }
