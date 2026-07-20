@@ -22,6 +22,8 @@ pub struct ModelManifest {
     pub description: String,
     pub capabilities: CapabilityManifest,
     pub hardware: HardwareManifest,
+    #[serde(default)]
+    pub source: Option<ModelSourceManifest>,
     pub artifacts: ArtifactManifest,
 }
 
@@ -58,6 +60,10 @@ pub struct CapabilityManifest {
     #[serde(default, alias = "clone")]
     pub voice_cloning: bool,
     #[serde(default)]
+    pub voice_training: bool,
+    #[serde(default)]
+    pub voice_conversion: bool,
+    #[serde(default)]
     pub live_transcription: bool,
     #[serde(default)]
     pub live_audio: bool,
@@ -68,6 +74,25 @@ pub struct HardwareManifest {
     pub cpu: bool,
     pub gpu: bool,
     pub min_ram: Option<String>,
+    #[serde(default)]
+    pub min_vram: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelSourceManifest {
+    pub provider: ModelSourceProvider,
+    pub repository: String,
+    pub revision: String,
+    #[serde(default)]
+    pub allow_patterns: Vec<String>,
+    #[serde(default)]
+    pub ignore_patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModelSourceProvider {
+    HuggingFace,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -143,7 +168,7 @@ impl ModelManifest {
             missing: if installed {
                 vec![format!("runner contract: {}", self.runner)]
             } else {
-                vec!["verified artifacts".to_string()]
+                vec!["verified artifacts or pinned model snapshot".to_string()]
             },
             next_command: if installed {
                 format!("takokit runner pull {}", self.runner)
@@ -172,7 +197,7 @@ impl ModelManifest {
             backend: self.backend.as_str().to_string(),
             runner: self.runner.clone(),
             hardware_notes: self.hardware.notes(),
-            artifact_count: self.artifacts.all().count(),
+            artifact_count: self.artifacts.all().count() + usize::from(self.source.is_some()),
             capabilities: self.capabilities.to_model_capabilities(),
             installed,
             runner_installed,
@@ -192,6 +217,8 @@ impl CapabilityManifest {
             CapabilityKind::TextToSpeech => self.tts,
             CapabilityKind::SpeechToText => self.stt,
             CapabilityKind::VoiceCloning => self.voice_cloning,
+            CapabilityKind::VoiceTraining => self.voice_training,
+            CapabilityKind::VoiceConversion => self.voice_conversion,
             CapabilityKind::LiveTranscription => self.live_transcription,
             CapabilityKind::LiveAudio => self.live_audio,
         }
@@ -207,6 +234,12 @@ impl CapabilityManifest {
         }
         if self.voice_cloning {
             capabilities.push(CapabilityKind::VoiceCloning);
+        }
+        if self.voice_training {
+            capabilities.push(CapabilityKind::VoiceTraining);
+        }
+        if self.voice_conversion {
+            capabilities.push(CapabilityKind::VoiceConversion);
         }
         if self.live_transcription {
             capabilities.push(CapabilityKind::LiveTranscription);
@@ -235,9 +268,17 @@ impl HardwareManifest {
             (false, true) => "GPU",
             (false, false) => "unspecified hardware",
         };
-        match self.min_ram.as_deref() {
-            Some(min_ram) => format!("{acceleration}, minimum RAM {min_ram}"),
-            None => acceleration.to_string(),
+        let mut requirements = Vec::new();
+        if let Some(min_ram) = self.min_ram.as_deref() {
+            requirements.push(format!("minimum RAM {min_ram}"));
+        }
+        if let Some(min_vram) = self.min_vram.as_deref() {
+            requirements.push(format!("minimum VRAM {min_vram}"));
+        }
+        if requirements.is_empty() {
+            acceleration.to_string()
+        } else {
+            format!("{acceleration}, {}", requirements.join(", "))
         }
     }
 }
