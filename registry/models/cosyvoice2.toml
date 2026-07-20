@@ -1,26 +1,37 @@
 id = "cosyvoice2"
-name = "CosyVoice2"
-family = "cosyvoice"
+name = "CosyVoice2 0.5B"
+family = "cosyvoice2"
 version = "0.1.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "license-check-required"
-description = "CosyVoice2 TTS and voice cloning family. Metadata-only; no verified artifacts or managed runtime adapter are installed."
+required_adapter = "cosyvoice2"
+license = "apache-2.0"
+description = "CosyVoice2 0.5B with zero-shot cloning, cross-lingual synthesis, instruction control, and voice conversion through the pinned official runtime."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = false
+voice_conversion = true
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
 min_ram = "16gb"
+min_vram = "6gb"
+
+[source]
+provider = "hugging-face"
+repository = "FunAudioLLM/CosyVoice2-0.5B"
+revision = "e6287195fc87df8cacb06d1e18e87434b22f506a"
+ignore_patterns = ["asset/**"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
