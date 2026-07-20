@@ -1,26 +1,34 @@
 id = "openvoice"
-name = "OpenVoice"
+name = "OpenVoice V2"
 family = "openvoice"
-version = "0.1.0"
+version = "0.2.0"
 kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "license-check-required"
-description = "OpenVoice voice cloning and conversion family. Metadata-only; runtime dependency and license risk must be reviewed before execution support."
+required_adapter = "openvoice"
+license = "mit"
+description = "OpenVoice V2 tone-colour cloning with a consent-backed reference voice and a managed MeloTTS base speaker."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "12gb"
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
 voices = []
+
+[[artifacts.configs]]
+name = ".takokit-snapshot"
+url = "hf://myshell-ai/OpenVoiceV2@main"
+sha256 = "76dc3877e81b80e0315a7af383739229a601fee4180713292a5343876df8890d"
+bytes = 32
+role = "other"
