@@ -127,7 +127,7 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
 }
 
 #[tokio::test]
-async fn capabilities_route_returns_five_surfaces() {
+async fn capabilities_route_returns_all_voice_runtime_surfaces() {
     let root = std::env::temp_dir().join("takokit-server-capabilities-test");
     let state = AppState::new(
         RuntimeConfig::local(root.clone()),
@@ -147,9 +147,10 @@ async fn capabilities_route_returns_five_surfaces() {
     let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-    assert_eq!(json["data"].as_array().unwrap().len(), 5);
+    assert_eq!(json["data"].as_array().unwrap().len(), 7);
     assert_eq!(json["data"][0]["label"], "TTS");
-    assert_eq!(json["data"][3]["label"], "Live Transcription API");
+    assert_eq!(json["data"][3]["label"], "Voice Training");
+    assert_eq!(json["data"][5]["label"], "Live Transcription API");
 }
 
 #[tokio::test]
