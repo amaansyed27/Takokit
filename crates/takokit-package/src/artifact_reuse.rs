@@ -1,8 +1,8 @@
-//! Verification and classification of artifacts from previous model pulls.
+//! Verification and classification of artifacts and snapshots from previous pulls.
 
 use crate::{
-    artifact_io::sha256_file, ArtifactEntry, InstalledArtifactRecord, InstalledModelRecord,
-    InstalledPackageStatus, ModelManifest,
+    artifact_io::sha256_file, runtime_model_source::snapshot_is_ready, ArtifactEntry,
+    InstalledArtifactRecord, InstalledModelRecord, InstalledPackageStatus, ModelManifest,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,18 +29,31 @@ pub(crate) fn classify(
     }
 }
 
-/// A ready record is trustworthy only when it describes exactly the current
-/// manifest and every recorded local file still verifies.
+/// A ready record is trustworthy only when it describes the current manifest
+/// and every declared local artifact or pinned snapshot still verifies.
 pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManifest) -> bool {
     if record.status != InstalledPackageStatus::Ready || manifest.artifacts.metadata_only {
         return false;
     }
 
-    let expected = manifest.artifacts.all().collect::<Vec<_>>();
-    if expected.is_empty() || record.artifacts.len() != expected.len() {
+    let source_ready = match manifest.source.as_ref() {
+        Some(source) => record
+            .snapshot
+            .as_ref()
+            .is_some_and(|snapshot| snapshot_is_ready(snapshot, source)),
+        None => true,
+    };
+    if !source_ready {
         return false;
     }
 
+    let expected = manifest.artifacts.all().collect::<Vec<_>>();
+    if expected.is_empty() {
+        return manifest.source.is_some();
+    }
+    if record.artifacts.len() != expected.len() {
+        return false;
+    }
     expected.into_iter().all(|artifact| {
         record
             .artifacts
@@ -50,8 +63,8 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
     })
 }
 
-/// Blob-path existence is deliberately insufficient: every field from the
-/// current manifest and the actual local bytes must still match.
+/// Blob-path existence is deliberately insufficient: every manifest field and
+/// the actual local bytes must still match.
 pub(crate) fn is_verified(record: &InstalledArtifactRecord, artifact: &ArtifactEntry) -> bool {
     if record.name != artifact.name
         || record.role != artifact.role
