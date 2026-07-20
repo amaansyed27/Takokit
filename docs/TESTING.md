@@ -53,7 +53,7 @@ From the repository root:
 cargo fmt --all -- --check
 cargo check --workspace
 cargo test --workspace
-python .\scripts\check_file_sizes.py
+python .\scripts\audit_file_sizes.py
 ```
 
 GUI and release build:

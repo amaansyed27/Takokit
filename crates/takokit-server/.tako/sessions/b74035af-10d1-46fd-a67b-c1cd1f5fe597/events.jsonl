@@ -1,0 +1,1 @@
+{"id":"e39e4c7a-799a-432c-9012-286e719d169c","session_id":"b74035af-10d1-46fd-a67b-c1cd1f5fe597","timestamp":1784548460,"task":"speech_to_text","state":"failed","model":"whisper-base","source_path":"C:\\Users\\Amaan\\AppData\\Local\\Temp\\takokit-server-transcription-executor-test\\audio.wav","message":"Whisper artifact ggml-base.bin is recorded but not downloaded"}

@@ -1,0 +1,11 @@
+{
+  "id": "21ffcca1-75a3-4407-b97a-6e20a81fbee8",
+  "title": "Speech",
+  "workspace_root": "D:\\TheDawnlightGroup\\DawnlightLabs\\Takokit\\crates\\takokit-server",
+  "created_at": 1784548460,
+  "updated_at": 1784548460,
+  "event_count": 1,
+  "output_count": 0,
+  "last_task": "text_to_speech",
+  "last_model": "kokoro"
+}
