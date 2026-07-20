@@ -1,5 +1,5 @@
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use takokit_core::{
     NewSessionEvent, SessionEventState, SessionRecord, SessionTask, SpeechRequest, SpeechResponse,
     TranscriptionRequest, TranscriptionResponse,
@@ -150,13 +150,6 @@ fn absolute_workspace(workspace: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     } else {
         Ok(std::env::current_dir()?.join(path))
     }
-}
-
-pub(crate) fn filename(path: &Path) -> String {
-    path.file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("output")
-        .to_string()
 }
 
 #[cfg(test)]
