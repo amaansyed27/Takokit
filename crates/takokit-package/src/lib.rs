@@ -13,6 +13,7 @@ mod resolution;
 mod runner;
 mod runtime;
 mod runtime_command;
+mod runtime_model_source;
 mod runtime_onnx;
 mod runtime_python;
 mod runtime_python_specs;
