@@ -5,8 +5,9 @@ pub mod whispercpp;
 use async_trait::async_trait;
 use std::path::Path;
 use takokit_core::{
-    ErrorCode, SpeechRequest, SpeechResponse, TakokitError, TakokitResult, TranscriptionRequest,
-    TranscriptionResponse,
+    ErrorCode, SpeechRequest, SpeechResponse, TakokitError, TakokitResult, TrainVoiceRequest,
+    TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse, VoiceConversionRequest,
+    VoiceConversionResponse,
 };
 use takokit_package::{ExecutionPlan, RunnerKind};
 
@@ -33,6 +34,25 @@ pub trait TranscriptionRunner: Send + Sync {
     ) -> TakokitResult<TranscriptionResponse>;
 }
 
+#[async_trait]
+pub trait VoiceConversionRunner: Send + Sync {
+    async fn convert(
+        &self,
+        plan: &ExecutionPlan,
+        request: VoiceConversionRequest,
+        output_dir: &Path,
+    ) -> TakokitResult<VoiceConversionResponse>;
+}
+
+#[async_trait]
+pub trait VoiceTrainingRunner: Send + Sync {
+    async fn train(
+        &self,
+        plan: &ExecutionPlan,
+        request: TrainVoiceRequest,
+    ) -> TakokitResult<TrainVoiceResponse>;
+}
+
 pub async fn execute_speech(
     plan: &ExecutionPlan,
     request: SpeechRequest,
@@ -42,7 +62,7 @@ pub async fn execute_speech(
         RunnerKind::Onnx => OnnxRunner.speak(plan, request, output_dir).await,
         RunnerKind::PythonManaged => PythonManagedRunner.speak(plan, request, output_dir).await,
         _ => Err(runner_not_implemented(format!(
-            "Runner {} contract resolved, but speech execution is not implemented yet.",
+            "Runner {} resolved, but speech execution is not implemented.",
             plan.runner.id
         ))),
     }
@@ -57,7 +77,34 @@ pub async fn execute_transcription(
         RunnerKind::Whispercpp => WhisperCppRunner.transcribe(plan, request).await,
         RunnerKind::PythonManaged => PythonManagedRunner.transcribe(plan, request).await,
         _ => Err(runner_not_implemented(format!(
-            "Runner {} contract resolved, but transcription execution is not implemented yet.",
+            "Runner {} resolved, but transcription execution is not implemented.",
+            plan.runner.id
+        ))),
+    }
+}
+
+pub async fn execute_voice_conversion(
+    plan: &ExecutionPlan,
+    request: VoiceConversionRequest,
+    output_dir: &Path,
+) -> TakokitResult<VoiceConversionResponse> {
+    match plan.runner.kind {
+        RunnerKind::PythonManaged => PythonManagedRunner.convert(plan, request, output_dir).await,
+        _ => Err(runner_not_implemented(format!(
+            "Runner {} resolved, but voice conversion is not implemented.",
+            plan.runner.id
+        ))),
+    }
+}
+
+pub async fn execute_voice_training(
+    plan: &ExecutionPlan,
+    request: TrainVoiceRequest,
+) -> TakokitResult<TrainVoiceResponse> {
+    match plan.runner.kind {
+        RunnerKind::PythonManaged => PythonManagedRunner.train(plan, request).await,
+        _ => Err(runner_not_implemented(format!(
+            "Runner {} resolved, but voice training is not implemented.",
             plan.runner.id
         ))),
     }
@@ -65,14 +112,14 @@ pub async fn execute_transcription(
 
 pub(crate) fn onnx_not_implemented() -> TakokitError {
     runner_not_implemented(
-        "ONNX runner contract resolved, but real ONNX execution is not implemented yet.",
+        "ONNX runner contract resolved, but real ONNX execution is not implemented.",
     )
 }
 
 pub(crate) fn piper_not_implemented() -> TakokitError {
     TakokitError::Resolution {
         code: ErrorCode::PiperTextFrontendNotImplemented,
-        message: "Piper artifacts and config resolved, but phonemizer/token preparation is not implemented yet. Takokit will not vendor GPL/eSpeak runtime code; the next implementation step is a verified, Takokit-managed text frontend that maps text to Piper phoneme IDs.".to_string(),
+        message: "Piper ONNX execution requires the managed Piper frontend adapter.".to_string(),
     }
 }
 
@@ -117,6 +164,9 @@ mod tests {
                 input: "Hello".to_string(),
                 voice: Some("default".to_string()),
                 response_format: Some("wav".to_string()),
+                language: None,
+                instruction: None,
+                reference_text: None,
             },
             temp.path(),
         )
