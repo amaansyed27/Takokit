@@ -1,8 +1,10 @@
 use super::*;
 use crate::workspace::CliWorkspace;
 use takokit_core::{
-    NewSessionEvent, SessionEventState, SessionTask, SpeechRequest, TranscriptionRequest,
+    NewSessionEvent, SessionEventState, SessionTask, SpeechRequest, TrainVoiceRequest,
+    TranscriptionRequest, VoiceConversionRequest,
 };
+use takokit_models::{execute_voice_conversion, execute_voice_training};
 use takokit_store::VoiceProfileStore;
 
 pub(crate) async fn run_speak(
@@ -16,6 +18,9 @@ pub(crate) async fn run_speak(
         input: args.text,
         voice: Some(args.voice),
         response_format: Some("wav".to_string()),
+        language: args.language,
+        instruction: args.instruction,
+        reference_text: args.reference_text,
     };
     let result = if request.model != "mock-tts" {
         let plan = resolve_execution_plan(
@@ -73,6 +78,9 @@ pub(crate) async fn run_model(
                 text,
                 model: args.model,
                 voice: args.voice.unwrap_or_else(|| "default".to_string()),
+                language: args.language,
+                instruction: args.instruction,
+                reference_text: args.reference_text,
             },
             package_registry,
             installed_registry,
@@ -163,8 +171,7 @@ pub(crate) fn run_clone(args: CloneArgs, workspace: &CliWorkspace) -> anyhow::Re
             args.model
         ));
     }
-    let plan =
-        plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
+    let plan = plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
     if !plan.executable {
         let error = anyhow::anyhow!(
             "model {} is not ready: {}. Next: {}",
@@ -213,17 +220,110 @@ pub(crate) fn run_clone(args: CloneArgs, workspace: &CliWorkspace) -> anyhow::Re
     Ok(())
 }
 
-pub(crate) fn run_train(args: TrainArgs, workspace: &CliWorkspace) -> anyhow::Result<()> {
-    let error = anyhow::anyhow!(
-        "voice training model {} is not executable until its training adapter is installed",
-        args.model
-    );
-    workspace.record_failure(
-        SessionTask::VoiceTraining,
-        Some(args.model),
-        Some(args.samples),
-        Some(args.name),
-        &error,
-    );
-    Err(error)
+pub(crate) async fn run_convert(
+    args: ConvertArgs,
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    workspace: &CliWorkspace,
+) -> anyhow::Result<()> {
+    let request = VoiceConversionRequest {
+        model: args.model.clone(),
+        source_path: args.source.clone(),
+        target_voice: args.target_voice,
+        pitch_shift: args.pitch_shift,
+        consent_affirmed: args.consent,
+    };
+    let plan = resolve_execution_plan(
+        package_registry,
+        installed_registry,
+        &args.model,
+        CapabilityKind::VoiceConversion,
+    )
+    .map_err(cli_error)?;
+    match execute_voice_conversion(&plan, request.clone(), &workspace.outputs_dir())
+        .await
+        .map_err(runtime_error)
+    {
+        Ok(response) => {
+            workspace.store.append_event(
+                workspace.session_id(),
+                NewSessionEvent {
+                    task: SessionTask::VoiceConversion,
+                    state: SessionEventState::Completed,
+                    model: Some(args.model),
+                    input: Some(request.target_voice.clone()),
+                    source_path: Some(request.source_path),
+                    output_path: Some(response.output_path.clone()),
+                    text: None,
+                    message: Some(format!("Converted {} bytes", response.bytes)),
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            Ok(())
+        }
+        Err(error) => {
+            workspace.record_failure(
+                SessionTask::VoiceConversion,
+                Some(args.model),
+                Some(args.source),
+                Some(request.target_voice),
+                &error,
+            );
+            Err(error)
+        }
+    }
+}
+
+pub(crate) async fn run_train(
+    args: TrainArgs,
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    workspace: &CliWorkspace,
+) -> anyhow::Result<()> {
+    let request = TrainVoiceRequest {
+        samples_path: args.samples.clone(),
+        name: args.name.clone(),
+        model: args.model.clone(),
+        consent_affirmed: args.consent,
+        epochs: args.epochs,
+    };
+    let plan = resolve_execution_plan(
+        package_registry,
+        installed_registry,
+        &args.model,
+        CapabilityKind::VoiceTraining,
+    )
+    .map_err(cli_error)?;
+    match execute_voice_training(&plan, request.clone())
+        .await
+        .map_err(runtime_error)
+    {
+        Ok(response) => {
+            workspace.store.append_event(
+                workspace.session_id(),
+                NewSessionEvent {
+                    task: SessionTask::VoiceTraining,
+                    state: SessionEventState::Completed,
+                    model: Some(args.model),
+                    input: Some(args.name),
+                    source_path: Some(args.samples),
+                    output_path: Some(response.output_path.clone()),
+                    text: None,
+                    message: Some(format!("Training status: {}", response.status)),
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            Ok(())
+        }
+        Err(error) => {
+            workspace.record_failure(
+                SessionTask::VoiceTraining,
+                Some(args.model),
+                Some(args.samples),
+                Some(args.name),
+                &error,
+            );
+            Err(error)
+        }
+    }
 }
