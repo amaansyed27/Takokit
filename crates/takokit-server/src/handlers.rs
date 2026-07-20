@@ -9,9 +9,13 @@ use takokit_core::{
     DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse, ModelInstallReport,
     ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
     RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
-    TranscriptionRequest, VoicesResponse,
+    TrainVoiceResponse, TranscriptionRequest, VoiceConversionRequest, VoiceConversionResponse,
+    VoicesResponse,
 };
-use takokit_models::{execute_speech, execute_transcription, TextToSpeechEngine};
+use takokit_models::{
+    execute_speech, execute_transcription, execute_voice_conversion, execute_voice_training,
+    TextToSpeechEngine,
+};
 use takokit_package::{
     initialize_runner_runtime, install_model_complete, install_python_adapter,
     model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
