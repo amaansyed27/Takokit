@@ -139,6 +139,7 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
                 downloaded: true,
             },
         ],
+        snapshot: None,
         status: InstalledPackageStatus::Ready,
         note: "test".to_string(),
     };
@@ -151,12 +152,17 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
     )
     .expect("write piper record");
     installed
-        .install_runner(&registry.runner("takokit-onnx").expect("onnx runner"))
-        .expect("install onnx runner contract");
+        .install_runner(
+            &registry
+                .runner("takokit-python-managed")
+                .expect("managed Python runner"),
+        )
+        .expect("install managed Python runner contract");
 
     let piper_plan = plan_model(&registry, &installed, "piper-lessac").expect("piper plan");
     assert_eq!(piper_plan.model_id, "piper-lessac");
-    assert_eq!(piper_plan.family, "piper");
+    assert_eq!(piper_plan.family, "piper-lessac");
+    assert_eq!(piper_plan.required_runner, "takokit-python-managed");
     assert_eq!(piper_plan.artifact_state, ModelLifecycleState::MetadataOnly);
     assert_eq!(
         piper_plan.runner_contract_state,
@@ -173,7 +179,8 @@ fn model_plan_is_honest_for_piper_whisper_qwen_and_missing_model() {
         .any(|item| item == "verified artifacts"));
     assert!(piper_plan
         .missing
-        .contains(&"Piper text frontend (phonemizer/token preparation)".to_string()));
+        .iter()
+        .any(|item| item.contains("piper managed adapter")));
 
     let whisper_plan = plan_model(&registry, &installed, "whisper-base").expect("whisper plan");
     assert_eq!(whisper_plan.required_runner, "takokit-whispercpp");
