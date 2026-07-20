@@ -34,7 +34,7 @@ pub async fn run_launcher(
     )?;
     let mut active_job: Option<CommandJob> = None;
 
-    ratatui::run(|mut terminal| -> io::Result<()> {
+    ratatui::run(|terminal| -> io::Result<()> {
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
