@@ -8,6 +8,7 @@ authors.workspace = true
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 takokit-core = { path = "../takokit-core" }
 thiserror.workspace = true
