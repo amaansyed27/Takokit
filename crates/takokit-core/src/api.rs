@@ -141,6 +141,12 @@ pub struct SpeechRequest {
     pub input: String,
     pub voice: Option<String>,
     pub response_format: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub instruction: Option<String>,
+    #[serde(default)]
+    pub reference_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -176,9 +182,52 @@ pub struct CloneVoiceRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VoiceConversionRequest {
+    pub model: String,
+    pub source_path: PathBuf,
+    pub target_voice: String,
+    #[serde(default)]
+    pub pitch_shift: i32,
+    #[serde(default)]
+    pub consent_affirmed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VoiceConversionResponse {
+    pub id: Uuid,
+    pub model: String,
+    pub target_voice: String,
+    pub output_path: PathBuf,
+    pub content_type: String,
+    pub bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TrainVoiceRequest {
     pub samples_path: PathBuf,
     pub name: String,
+    #[serde(default = "default_training_model")]
+    pub model: String,
+    #[serde(default)]
+    pub consent_affirmed: bool,
+    #[serde(default)]
+    pub epochs: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TrainVoiceResponse {
+    pub id: Uuid,
+    pub model: String,
+    pub name: String,
+    pub output_path: PathBuf,
+    pub status: String,
+    pub log_path: Option<PathBuf>,
+}
+
+fn default_training_model() -> String {
+    "gpt-sovits".to_string()
 }
 
 #[cfg(test)]
@@ -192,10 +241,11 @@ mod tests {
             input: "Hello from Takokit".to_string(),
             voice: Some("default".to_string()),
             response_format: Some("wav".to_string()),
+            language: None,
+            instruction: None,
+            reference_text: None,
         };
-
         let json = serde_json::to_value(request).expect("serializes");
-
         assert_eq!(json["model"], "kokoro");
         assert_eq!(json["input"], "Hello from Takokit");
         assert_eq!(json["voice"], "default");
@@ -206,7 +256,6 @@ mod tests {
     fn pull_model_request_keeps_metadata_only_optional() {
         let request: PullModelRequest =
             serde_json::from_str(r#"{"model":"piper-lessac"}"#).expect("pull request");
-
         assert_eq!(request.model, "piper-lessac");
         assert!(!request.metadata_only);
     }
