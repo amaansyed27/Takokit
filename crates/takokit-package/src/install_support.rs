@@ -15,10 +15,9 @@ pub(crate) fn installed_model_record(
         manifest_path,
         InstalledArtifactSet {
             records: installed_artifacts(&manifest.artifacts),
+            snapshot: None,
             status: InstalledPackageStatus::MetadataOnly,
-            note:
-                "Installed model metadata from local mock registry. No model weights were downloaded."
-                    .to_string(),
+            note: "Installed model metadata only. No model files were downloaded.".to_string(),
         },
     )
 }
@@ -31,11 +30,16 @@ pub(crate) fn installed_model_record_with_artifacts(
     InstalledModelRecord {
         id: manifest.id.clone(),
         version: manifest.version.clone(),
-        source: "local-mock-registry".to_string(),
+        source: manifest
+            .source
+            .as_ref()
+            .map(|source| format!("{}@{}", source.repository, source.revision))
+            .unwrap_or_else(|| "takokit-registry".to_string()),
         manifest_path,
         runner: manifest.runner.clone(),
         installed_at: timestamp_now(),
         artifacts: artifacts.records,
+        snapshot: artifacts.snapshot,
         status: artifacts.status,
         note: artifacts.note,
     }
@@ -60,25 +64,25 @@ pub(crate) fn installed_runner_record(
 pub(crate) fn runner_contract_note(manifest: &RunnerManifest) -> &'static str {
     match manifest.kind {
         RunnerKind::Whispercpp => {
-            "Installed runner contract from local registry. Run `takokit runner install takokit-whispercpp` to install or verify the whisper.cpp runtime."
+            "Installed runner contract. Run `takokit runner install takokit-whispercpp` to install or verify whisper.cpp."
         }
         RunnerKind::Onnx => {
-            "Installed runner contract from local registry. Run `takokit runner install takokit-onnx` to initialize the ONNX runner; Piper remains blocked on a verified text frontend."
+            "Installed runner contract. Run `takokit runner install takokit-onnx` to initialize the ONNX runtime."
         }
         RunnerKind::PythonManaged => {
-            "Installed runner contract from local registry. Run `takokit runner install takokit-python-managed` to initialize the managed Python layout and adapter slots."
+            "Installed runner contract. Run `takokit runner install takokit-python-managed` to initialize managed Python and adapter slots."
         }
         RunnerKind::TransformersAudio => {
-            "Installed runner contract from local registry. Runtime adapter is planned and not installable yet."
+            "Installed Transformers audio runner contract. Managed adapter installation is required."
         }
         RunnerKind::Nemo => {
-            "Installed runner contract from local registry. NeMo runtime adapter is planned and not installable yet."
+            "Installed NeMo runner contract. Managed adapter installation is required."
         }
         RunnerKind::Native => {
-            "Installed native runner contract from local registry. Run runner doctor for current runtime readiness."
+            "Installed native runner contract. Run runner doctor for current readiness."
         }
         RunnerKind::External => {
-            "Installed external runner contract from local registry. Run runner doctor for current runtime readiness."
+            "Installed external runner contract. Run runner doctor for current readiness."
         }
     }
 }
@@ -163,7 +167,6 @@ fn backup_existing_file(path: &Path) -> PackageResult<Option<PathBuf>> {
     if !path.exists() {
         return Ok(None);
     }
-
     let backup_path = sibling_temp_path(path).with_extension("bak");
     std::fs::rename(path, &backup_path)?;
     Ok(Some(backup_path))
@@ -184,6 +187,7 @@ fn remove_backup(backup: Option<PathBuf>) {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct InstalledArtifactSet {
     pub(crate) records: Vec<InstalledArtifactRecord>,
+    pub(crate) snapshot: Option<InstalledSnapshotRecord>,
     pub(crate) status: InstalledPackageStatus,
     pub(crate) note: String,
 }
