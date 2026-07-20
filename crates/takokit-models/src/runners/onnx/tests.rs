@@ -86,7 +86,7 @@ fn parses_piper_json_config_into_typed_struct() {
 }
 
 #[tokio::test]
-async fn piper_speech_reports_typed_text_frontend_blocker_after_artifact_prep() {
+async fn piper_speech_reports_managed_frontend_requirement_after_artifact_prep() {
     let temp = tempfile::tempdir().expect("tempdir");
     let model_path = temp.path().join("en_US-lessac-medium.onnx");
     let config_path = temp.path().join("en_US-lessac-medium.onnx.json");
@@ -128,14 +128,14 @@ async fn piper_speech_reports_typed_text_frontend_blocker_after_artifact_prep() 
             temp.path(),
         )
         .await
-        .expect_err("piper frontend is intentionally blocked");
+        .expect_err("Piper requires its managed frontend adapter");
 
     assert!(matches!(
         error,
         TakokitError::Resolution {
             code: ErrorCode::PiperTextFrontendNotImplemented,
             message
-        } if message.contains("phonemizer/token preparation")
+        } if message.contains("managed Piper frontend adapter")
     ));
 }
 
