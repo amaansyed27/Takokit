@@ -1,26 +1,37 @@
 id = "qwen2-5-omni"
-name = "Qwen2.5 Omni"
-family = "qwen"
+name = "Qwen2.5 Omni 3B"
+family = "qwen2-5-omni"
 version = "0.1.0"
 kind = "omni-audio"
-backend = "transformers-audio"
-runner = "takokit-transformers-audio"
-license = "license-check-required"
-description = "Qwen2.5 Omni audio-language model family. Metadata-only; no Transformers audio adapter or verified artifacts are installed."
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen_omni"
+license = "qwen-research"
+description = "Qwen2.5-Omni 3B local audio understanding, transcription, and talker speech generation through the official Transformers model API."
 
 [capabilities]
-tts = false
+tts = true
 stt = true
 voice_cloning = false
-live_transcription = true
-live_audio = true
+voice_training = false
+voice_conversion = false
+live_transcription = false
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "24gb"
+min_ram = "32gb"
+min_vram = "8gb"
+
+[source]
+provider = "hugging-face"
+repository = "Qwen/Qwen2.5-Omni-3B"
+revision = "f75b40e3da2003cdd6e1829b1f420ca70797c34e"
+ignore_patterns = ["README.md"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
