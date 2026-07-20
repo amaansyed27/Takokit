@@ -43,6 +43,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/voices", get(handlers::voices))
         .route("/v1/audio/speech", post(handlers::speech))
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
+        .route("/v1/audio/conversions", post(handlers::convert_voice))
         .route("/v1/voices/clone", post(handlers::clone_voice))
         .route("/v1/voices/train", post(handlers::train_voice))
         .route("/v1/sessions/open", post(handlers::open_session))
@@ -62,7 +63,6 @@ pub fn server_router(state: AppState) -> Router {
 fn gui_service() -> ServeDir<ServeFile> {
     let dist = gui_dist_path();
     let index = dist.join("index.html");
-
     ServeDir::new(&dist)
         .append_index_html_on_directories(true)
         .fallback(ServeFile::new(index))
@@ -81,7 +81,6 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
     let listener = TcpListener::bind(&bind_addr)
         .await
         .with_context(|| format!("failed to bind Takokit server at {bind_addr}"))?;
-
     tracing::info!(%bind_addr, "Takokit server listening");
     run_server_with_listener(state, listener, None).await?;
     Ok(())
