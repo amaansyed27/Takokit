@@ -109,7 +109,7 @@ pub(crate) async fn run_quickstart(
         let manifest = registry.model("qwen3-tts").map_err(cli_error)?;
         installed.install_model(&manifest).map_err(cli_error)?;
     }
-    // This is intentionally an execution test, not a lifecycle check.  It
+    // This is intentionally an execution test, not a lifecycle check. It
     // creates speech with Kokoro and transcribes that exact WAV with Whisper.
     run_fast_smokes(store, registry, installed, true, false).await?;
     for (label, model) in [
@@ -163,6 +163,9 @@ pub(crate) async fn create_samples(
                     input: "Hello from Takokit.".to_string(),
                     voice: Some("af_heart".to_string()),
                     response_format: Some("wav".to_string()),
+                    language: None,
+                    instruction: None,
+                    reference_text: None,
                 },
                 &samples,
             )
