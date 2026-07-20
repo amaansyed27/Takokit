@@ -87,6 +87,7 @@ pub(crate) enum Command {
         model: String,
     },
     Clone(CloneArgs),
+    Convert(ConvertArgs),
     Train(TrainArgs),
 }
 
@@ -106,6 +107,14 @@ pub(crate) struct SpeakArgs {
     pub(crate) model: String,
     #[arg(long, default_value = "default")]
     pub(crate) voice: String,
+    #[arg(long)]
+    pub(crate) language: Option<String>,
+    /// Natural-language voice or delivery instruction for compatible models.
+    #[arg(long)]
+    pub(crate) instruction: Option<String>,
+    /// Transcript of the reference sample for cloning models that require it.
+    #[arg(long)]
+    pub(crate) reference_text: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -116,6 +125,12 @@ pub(crate) struct RunArgs {
     pub(crate) voice: Option<String>,
     #[arg(long)]
     pub(crate) file: Option<PathBuf>,
+    #[arg(long)]
+    pub(crate) language: Option<String>,
+    #[arg(long)]
+    pub(crate) instruction: Option<String>,
+    #[arg(long)]
+    pub(crate) reference_text: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -185,12 +200,31 @@ pub(crate) struct CloneArgs {
 }
 
 #[derive(Debug, Args)]
+pub(crate) struct ConvertArgs {
+    pub(crate) source: PathBuf,
+    #[arg(long)]
+    pub(crate) target_voice: String,
+    #[arg(long, default_value = "rvc")]
+    pub(crate) model: String,
+    #[arg(long, default_value_t = 0)]
+    pub(crate) pitch_shift: i32,
+    /// Confirm ownership or explicit permission for the source and target voices.
+    #[arg(long)]
+    pub(crate) consent: bool,
+}
+
+#[derive(Debug, Args)]
 pub(crate) struct TrainArgs {
     pub(crate) samples: PathBuf,
     #[arg(long)]
     pub(crate) name: String,
     #[arg(long, default_value = "gpt-sovits")]
     pub(crate) model: String,
+    #[arg(long)]
+    pub(crate) epochs: Option<u32>,
+    /// Confirm ownership or explicit permission for every training sample.
+    #[arg(long)]
+    pub(crate) consent: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -229,31 +263,21 @@ pub(crate) enum LibraryTarget {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum RunnerCommand {
-    Pull {
-        runner: String,
-    },
-    Install {
-        runner: String,
-    },
+    Pull { runner: String },
+    Install { runner: String },
     Doctor {
         runner: String,
         #[arg(long)]
         json: bool,
     },
-    Show {
-        runner: String,
-    },
-    Rm {
-        runner: String,
-    },
+    Show { runner: String },
+    Rm { runner: String },
 }
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum AdapterCommand {
     List,
-    Install {
-        adapter: String,
-    },
+    Install { adapter: String },
     Doctor {
         adapter: String,
         #[arg(long)]
