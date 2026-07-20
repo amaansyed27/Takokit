@@ -1,26 +1,37 @@
 id = "qwen3-omni"
-name = "Qwen3 Omni"
-family = "qwen"
+name = "Qwen3 Omni 30B-A3B Instruct"
+family = "qwen3-omni"
 version = "0.1.0"
 kind = "omni-audio"
-backend = "transformers-audio"
-runner = "takokit-transformers-audio"
-license = "license-check-required"
-description = "Qwen3 Omni audio-language model family. Metadata-only; no Transformers audio adapter or verified artifacts are installed."
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen_omni"
+license = "apache-2.0"
+description = "Qwen3-Omni 30B-A3B Instruct local audio understanding, transcription, and talker speech generation. This model is executable but requires workstation-class memory beyond an 8 GB laptop GPU."
 
 [capabilities]
-tts = false
+tts = true
 stt = true
 voice_cloning = false
-live_transcription = true
-live_audio = true
+voice_training = false
+voice_conversion = false
+live_transcription = false
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "24gb"
+min_ram = "64gb"
+min_vram = "40gb"
+
+[source]
+provider = "hugging-face"
+repository = "Qwen/Qwen3-Omni-30B-A3B-Instruct"
+revision = "12a3ac6"
+ignore_patterns = ["README.md"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
