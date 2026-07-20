@@ -6,22 +6,32 @@ kind = "voice-cloning"
 backend = "python-managed"
 runner = "takokit-python-managed"
 required_adapter = "chatterbox"
-license = "non-commercial-check-required"
-description = "Chatterbox local TTS with optional reference-audio voice cloning through an isolated official Python adapter. Model weights are downloaded into Takokit's global cache on first use."
+license = "mit"
+description = "Resemble AI Chatterbox local TTS and zero-shot voice cloning from a pulled, pinned model snapshot."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = false
+voice_conversion = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "12gb"
+min_vram = "4gb"
+
+[source]
+provider = "hugging-face"
+repository = "ResembleAI/chatterbox"
+revision = "a19a7c880ce4f7d461e049cd561db0a0a5ec4593"
+ignore_patterns = ["README.md", "*.png", "*.jpg", "Cangjie5_TC.json"]
 
 [artifacts]
 metadata_only = false
 weights = []
+configs = []
 voices = []
