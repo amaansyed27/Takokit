@@ -1,6 +1,7 @@
 //! Managed-Python adapter definitions used by model planning and installation.
 
 const QWEN3_TTS_ADAPTER: &str = include_str!("../../../runners/python/qwen3_tts_adapter.py");
+const PIPER_TTS_ADAPTER: &str = include_str!("../../../runners/python/piper_tts_adapter.py");
 const CHATTERBOX_ADAPTER: &str = include_str!("../../../runners/python/chatterbox_adapter.py");
 const F5_TTS_ADAPTER: &str = include_str!("../../../runners/python/f5_tts_adapter.py");
 const DIA_ADAPTER: &str = include_str!("../../../runners/python/dia_adapter.py");
@@ -10,6 +11,7 @@ const NEMO_ASR_ADAPTER: &str = include_str!("../../../runners/python/nemo_asr_ad
 const HF_AUDIO_ADAPTER: &str = include_str!("../../../runners/python/hf_audio_adapter.py");
 const COQUI_TTS_ADAPTER: &str = include_str!("../../../runners/python/coqui_tts_adapter.py");
 const KYUTAI_TTS_ADAPTER: &str = include_str!("../../../runners/python/kyutai_tts_adapter.py");
+const OPENVOICE_ADAPTER: &str = include_str!("../../../runners/python/openvoice_adapter.py");
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AdapterSpec {
@@ -31,15 +33,64 @@ const HF_AUDIO_PACKAGES: &[&str] = &[
 ];
 const COQUI_PACKAGES: &[&str] = &["coqui-tts", "torch", "torchaudio"];
 const NEMO_PACKAGES: &[&str] = &["torch", "nemo-toolkit[asr]"];
+const QWEN_TTS_PACKAGES: &[&str] = &["qwen-tts==0.1.1", "soundfile"];
+const OPENVOICE_PACKAGES: &[&str] = &[
+    "git+https://github.com/myshell-ai/OpenVoice.git",
+    "git+https://github.com/myshell-ai/MeloTTS.git",
+    "huggingface_hub",
+    "torch",
+    "torchaudio",
+    "soundfile",
+];
 
 pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     AdapterSpec {
         id: "qwen3_tts",
         model_family: "qwen3-tts",
         python: "3.11",
-        packages: &["qwen-tts==0.1.1", "soundfile"],
+        packages: QWEN_TTS_PACKAGES,
         script: Some(QWEN3_TTS_ADAPTER),
         note: "Qwen3-TTS speech generation using the official qwen-tts package.",
+    },
+    AdapterSpec {
+        id: "qwen3_tts",
+        model_family: "qwen3-tts-0.6b-base",
+        python: "3.11",
+        packages: QWEN_TTS_PACKAGES,
+        script: Some(QWEN3_TTS_ADAPTER),
+        note: "Qwen3-TTS 0.6B zero-shot voice cloning.",
+    },
+    AdapterSpec {
+        id: "qwen3_tts",
+        model_family: "qwen3-tts-1.7b-custom",
+        python: "3.11",
+        packages: QWEN_TTS_PACKAGES,
+        script: Some(QWEN3_TTS_ADAPTER),
+        note: "Qwen3-TTS 1.7B custom voice generation.",
+    },
+    AdapterSpec {
+        id: "qwen3_tts",
+        model_family: "qwen3-tts-1.7b-base",
+        python: "3.11",
+        packages: QWEN_TTS_PACKAGES,
+        script: Some(QWEN3_TTS_ADAPTER),
+        note: "Qwen3-TTS 1.7B zero-shot voice cloning.",
+    },
+    AdapterSpec {
+        id: "qwen3_tts",
+        model_family: "qwen3-tts-1.7b-voice-design",
+        python: "3.11",
+        packages: QWEN_TTS_PACKAGES,
+        script: Some(QWEN3_TTS_ADAPTER),
+        note: "Qwen3-TTS 1.7B natural-language voice design.",
+    },
+    AdapterSpec {
+        id: "piper_tts",
+        model_family: "piper-lessac",
+        python: "3.11",
+        packages: &["piper-tts"],
+        script: Some(PIPER_TTS_ADAPTER),
+        note: "Piper CPU TTS through the managed piper-tts command line.",
     },
     AdapterSpec {
         id: "chatterbox",
@@ -165,9 +216,17 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         note: "Kyutai DSM streaming-capable TTS using the official Moshi PyTorch API.",
     },
     AdapterSpec {
+        id: "openvoice",
+        model_family: "openvoice",
+        python: "3.11",
+        packages: OPENVOICE_PACKAGES,
+        script: Some(OPENVOICE_ADAPTER),
+        note: "OpenVoice V2 tone-colour cloning through the official local runtime.",
+    },
+    AdapterSpec {
         id: "cosyvoice2",
         model_family: "cosyvoice2",
-        python: "3.11",
+        python: "3.10",
         packages: &[],
         script: None,
         note: "Reserved for the CosyVoice2 official runtime integration.",
@@ -175,23 +234,15 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     AdapterSpec {
         id: "fish_speech",
         model_family: "fish-speech",
-        python: "3.11",
+        python: "3.10",
         packages: &[],
         script: None,
         note: "Reserved for the Fish Speech official runtime integration.",
     },
     AdapterSpec {
-        id: "openvoice",
-        model_family: "openvoice",
-        python: "3.11",
-        packages: &[],
-        script: None,
-        note: "Reserved for the OpenVoice tone-color conversion integration.",
-    },
-    AdapterSpec {
         id: "gpt_sovits",
         model_family: "gpt-sovits",
-        python: "3.11",
+        python: "3.10",
         packages: &[],
         script: None,
         note: "Reserved for the GPT-SoVITS inference and training integration.",
@@ -199,7 +250,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     AdapterSpec {
         id: "rvc",
         model_family: "rvc",
-        python: "3.11",
+        python: "3.10",
         packages: &[],
         script: None,
         note: "Reserved for the RVC voice-conversion integration.",
