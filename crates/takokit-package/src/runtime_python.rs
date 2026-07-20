@@ -170,12 +170,17 @@ fn install_adapter_spec(
                 spec.model_family
             ),
         })?;
-    if spec.packages.is_empty() {
+    if spec.packages.is_empty()
+        && spec.source_repository.is_none()
+        && spec.requirements.is_empty()
+        && !spec.editable_source
+    {
         return Err(PackageError::ArtifactInstallFailed {
             artifact: spec.id.to_string(),
-            reason: "adapter has no verified dependency set".to_string(),
+            reason: "adapter has no verified dependency installation strategy".to_string(),
         });
     }
+
     let adapter_dir = layout.adapters.join(spec.id);
     std::fs::create_dir_all(&adapter_dir)?;
     let venv = adapter_dir.join("venv");
@@ -199,15 +204,66 @@ fn install_adapter_spec(
             venv.display()
         ),
     })?;
-    let mut arguments: Vec<PathOrArg> = vec![
-        "pip".into(),
-        "install".into(),
-        "--python".into(),
-        python.into(),
-        "--no-progress".into(),
-    ];
-    arguments.extend(spec.packages.iter().map(|package| (*package).into()));
-    run_logged_command(&log, &uv, &arguments)?;
+
+    let source_dir = adapter_dir.join("source");
+    if let Some(repository) = spec.source_repository {
+        install_adapter_source(
+            &log,
+            repository,
+            spec.source_revision.unwrap_or("main"),
+            spec.source_recursive,
+            &source_dir,
+        )?;
+    }
+    if !spec.packages.is_empty() {
+        let mut arguments: Vec<PathOrArg> = vec![
+            "pip".into(),
+            "install".into(),
+            "--python".into(),
+            python.clone().into(),
+            "--no-progress".into(),
+        ];
+        arguments.extend(spec.packages.iter().map(|package| (*package).into()));
+        run_logged_command(&log, &uv, &arguments)?;
+    }
+    for requirements in spec.requirements {
+        let path = source_dir.join(requirements);
+        if !path.is_file() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: spec.id.to_string(),
+                reason: format!("adapter requirement file is missing: {}", path.display()),
+            });
+        }
+        run_logged_command(
+            &log,
+            &uv,
+            &[
+                "pip".into(),
+                "install".into(),
+                "--python".into(),
+                python.clone().into(),
+                "--no-progress".into(),
+                "-r".into(),
+                path.into(),
+            ],
+        )?;
+    }
+    if spec.editable_source {
+        run_logged_command(
+            &log,
+            &uv,
+            &[
+                "pip".into(),
+                "install".into(),
+                "--python".into(),
+                python.into(),
+                "--no-progress".into(),
+                "--editable".into(),
+                source_dir.clone().into(),
+            ],
+        )?;
+    }
+
     std::fs::write(adapter_dir.join(format!("{}.py", spec.id)), script)?;
     Ok(format!(
         "Ready. {} Environment: {}. Install log: {}",
@@ -215,6 +271,70 @@ fn install_adapter_spec(
         venv.display(),
         log.display()
     ))
+}
+
+fn install_adapter_source(
+    log: &Path,
+    repository: &str,
+    revision: &str,
+    recursive: bool,
+    source_dir: &Path,
+) -> PackageResult<()> {
+    if source_dir.exists() {
+        std::fs::remove_dir_all(source_dir)?;
+    }
+    run_logged_command(
+        log,
+        "git",
+        &[
+            "clone".into(),
+            "--filter=blob:none".into(),
+            "--no-checkout".into(),
+            repository.into(),
+            source_dir.to_path_buf().into(),
+        ],
+    )?;
+    run_logged_command(
+        log,
+        "git",
+        &[
+            "-C".into(),
+            source_dir.to_path_buf().into(),
+            "fetch".into(),
+            "--depth".into(),
+            "1".into(),
+            "origin".into(),
+            revision.into(),
+        ],
+    )?;
+    run_logged_command(
+        log,
+        "git",
+        &[
+            "-C".into(),
+            source_dir.to_path_buf().into(),
+            "checkout".into(),
+            "--detach".into(),
+            "FETCH_HEAD".into(),
+        ],
+    )?;
+    if recursive {
+        run_logged_command(
+            log,
+            "git",
+            &[
+                "-C".into(),
+                source_dir.to_path_buf().into(),
+                "submodule".into(),
+                "update".into(),
+                "--init".into(),
+                "--recursive".into(),
+                "--depth".into(),
+                "1".into(),
+            ],
+        )?;
+    }
+    Ok(())
 }
 
 pub(crate) fn write_adapter_record(path: &Path, record: &AdapterRecord) -> PackageResult<()> {
