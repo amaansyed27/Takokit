@@ -36,6 +36,7 @@ impl IntoResponse for ApiError {
             TakokitError::NotImplemented { .. } => "inference_not_implemented",
             TakokitError::Model(_) => "model_error",
             TakokitError::Storage(_) => "storage_error",
+            TakokitError::Execution(_) => "execution_error",
             TakokitError::Audio(_) => "audio_error",
         };
         let body = Json(serde_json::json!({
