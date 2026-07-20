@@ -1,150 +1,262 @@
-# Takokit model and voice-profile smoke tests
+# Takokit model and voice-runtime smoke tests
 
-This companion to [TESTING.md](TESTING.md) contains the heavy-model portion of the release gate. Run it only after the clean build, daemon, workspace, session and pull-reliability sections of the main guide pass.
+This guide is the hardware portion of the Takokit release gate. Run it only after the automated build, daemon, workspace, session and pull-reliability sections of [TESTING.md](TESTING.md) pass.
 
-Use the variables created by the main guide:
+A model is not verified because its manifest parses or its adapter imports. Verification requires a real pull, real execution, a non-empty output or transcript, manual quality inspection, retry evidence and recorded hardware details.
 
-```powershell
-$Tako
-$Evidence
-$ProjectA
-$Audio
-```
+## 1. Required inputs
 
-For every test, save the install log, model plan, command output, generated file size, elapsed time, hardware state and audible/transcript quality notes. A compiled adapter without a real inference result remains **executable path**, not verified.
-
-## 1. Common model procedure
-
-For each model:
+Use voice and training material that you own or have explicit permission to use.
 
 ```powershell
-& $Tako pull <model>
-& $Tako plan <model> --json | Tee-Object "$Evidence\plan-<model>.json"
+$Audio = "C:\path\to\test01_20s.wav"
+$ReferenceAudio = "C:\path\to\owned-reference.wav"
+$ReferenceText = "The exact words spoken in the reference audio."
+$TrainingSamples = "C:\path\to\gpt-sovits-dataset"
+$RvcTarget = "C:\path\to\owned-rvc-checkpoint-or-directory"
 ```
 
-Confirm:
+GPT-SoVITS training input must contain:
 
-- the required runner and adapter are installed automatically,
-- no global Python packages are modified,
-- the model is executable only after all required components are ready,
-- a repeat pull is idempotent,
-- the adapter has its own `venv` and `install.log`,
-- failure does not mark unrelated adapters failed.
+```text
+<dataset>/
+├── train.list
+└── wavs/
+```
 
-## 2. Kokoro
+Each `train.list` row uses:
+
+```text
+wav_path|speaker|language|transcript
+```
+
+RVC conversion needs a user-owned or consent-backed `.pth` checkpoint and may use a matching `.index` file from the same directory.
+
+## 2. Catalog integrity pass
+
+After building the release binary:
+
+```powershell
+$Tako = (Resolve-Path .\target\release\tako.exe).Path
+& $Tako test --suite launch --json |
+  Tee-Object "$Evidence\launch-catalog.json"
+```
+
+Pass criteria:
+
+- all **31** bundled model IDs appear,
+- every model resolves to a known runner,
+- each model reports its artifact, runner-runtime and executable state,
+- no model disappears because it was omitted from a hard-coded launch list,
+- missing requirements include a usable next command.
+
+Category filters:
+
+```powershell
+& $Tako test --suite launch --category tts
+& $Tako test --suite launch --category stt
+& $Tako test --suite launch --category clone
+& $Tako test --suite launch --category convert
+& $Tako test --suite launch --category train
+```
+
+## 3. Automated catalog-wide hardware runner
+
+The repository includes a PowerShell runner that pulls, plans and exercises all models with suitable inputs while preserving one log per phase.
+
+```powershell
+.\scripts\run_all_model_smokes.ps1 `
+  -Audio $Audio `
+  -ReferenceAudio $ReferenceAudio `
+  -ReferenceText $ReferenceText `
+  -TrainingSamples $TrainingSamples `
+  -RvcTarget $RvcTarget
+```
+
+Useful narrower passes:
+
+```powershell
+.\scripts\run_all_model_smokes.ps1 -Audio $Audio -Category stt
+.\scripts\run_all_model_smokes.ps1 -Audio $Audio -ReferenceAudio $ReferenceAudio -Category tts
+.\scripts\run_all_model_smokes.ps1 -Audio $Audio -PlanOnly
+```
+
+The script writes:
+
+```text
+~/takokit-test-evidence/all-models-<timestamp>/
+├── commit.txt
+├── nvidia-smi.txt
+├── results.json
+├── results.csv
+├── summary.json
+└── <model>-<phase>.log
+```
+
+Statuses are deliberately distinct:
+
+- `passed` — command exited successfully and the runtime validated its result,
+- `failed` — installation or execution failed,
+- `blocked-input` — a required consent-backed checkpoint or dataset was not supplied,
+- `blocked-hardware` — the current device cannot meet the declared model requirement.
+
+Do not convert a blocked result into a pass.
+
+## 4. Fast baseline before heavy models
 
 ```powershell
 & $Tako pull kokoro
-Push-Location $ProjectA
-& $Tako speak "Kokoro stability test from Takokit." --model kokoro |
-  Tee-Object "$Evidence\kokoro.json"
-Pop-Location
+& $Tako pull whisper-tiny
+& $Tako pull whisper-base
+& $Tako pull qwen3-tts
+& $Tako test --suite fast --run --json |
+  Tee-Object "$Evidence\fast-suite.json"
 ```
 
 Pass criteria:
 
-- output is a valid non-empty WAV,
-- the event and output appear in the active `.tako` session,
-- repeat generation creates a new file,
-- CPU execution remains usable when GPU acceleration is unavailable.
+- Kokoro and Qwen3-TTS create non-empty WAV files,
+- the generated Kokoro sample is used for Whisper rather than silence,
+- Whisper Tiny/Base produce non-empty transcripts,
+- repeat execution creates unique output files,
+- failures return a non-zero exit code.
 
-## 3. Qwen3-TTS
+## 5. Lightweight and general TTS
+
+Models:
+
+```text
+piper-lessac
+kokoro
+mms-tts-eng
+bark-small
+dia
+```
+
+Example commands:
+
+```powershell
+& $Tako pull piper-lessac
+& $Tako speak "Piper smoke test." --model piper-lessac
+
+& $Tako pull kokoro
+& $Tako speak "Kokoro smoke test." --model kokoro
+
+& $Tako pull mms-tts-eng
+& $Tako speak "MMS smoke test." --model mms-tts-eng
+
+& $Tako pull bark-small
+& $Tako speak "Bark smoke test." --model bark-small
+
+& $Tako pull dia
+& $Tako speak "[S1] Takokit is ready. [S2] The second speaker is responding." --model dia
+```
+
+Verify valid WAV structure, audible speech, expected speaker behavior for Dia, session persistence and idempotent repeat pulls.
+
+## 6. Qwen3-TTS checkpoint matrix
+
+### CustomVoice checkpoints
 
 ```powershell
 & $Tako pull qwen3-tts
-Push-Location $ProjectA
-& $Tako speak "Qwen three text to speech stability test." `
-  --model qwen3-tts --voice Ryan |
-  Tee-Object "$Evidence\qwen3-tts.json"
-Pop-Location
+& $Tako speak "Legacy custom voice test." --model qwen3-tts --voice Ryan
+
+& $Tako pull qwen3-tts-1.7b-custom
+& $Tako speak "One point seven billion custom voice test." `
+  --model qwen3-tts-1.7b-custom `
+  --voice Ryan `
+  --instruction "Clear, calm narration with a natural pace."
 ```
 
-Verify the isolated `qwen3_tts` environment, official package import, selected voice and output validation.
-
-## 4. Chatterbox and F5-TTS
+### Base cloning checkpoints
 
 ```powershell
-& $Tako pull chatterbox
-& $Tako pull f5-tts
-Push-Location $ProjectA
-& $Tako speak "Chatterbox base voice test." --model chatterbox |
-  Tee-Object "$Evidence\chatterbox-base.txt"
-& $Tako speak "F five base voice test." --model f5-tts |
-  Tee-Object "$Evidence\f5-base.txt"
-Pop-Location
+& $Tako pull qwen3-tts-0.6b-base
+& $Tako speak "Zero-shot cloning test." `
+  --model qwen3-tts-0.6b-base `
+  --voice $ReferenceAudio `
+  --reference-text $ReferenceText
+
+& $Tako pull qwen3-tts-1.7b-base
+& $Tako speak "Larger zero-shot cloning test." `
+  --model qwen3-tts-1.7b-base `
+  --voice $ReferenceAudio `
+  --reference-text $ReferenceText
 ```
 
-Verify that base synthesis works before testing stored voice profiles.
-
-## 5. Dia
+### VoiceDesign checkpoint
 
 ```powershell
-& $Tako pull dia
-Push-Location $ProjectA
-& $Tako speak "[S1] Takokit is ready. [S2] The dialogue model is responding." `
-  --model dia | Tee-Object "$Evidence\dia.txt"
-Pop-Location
-```
-
-Confirm both speaker markers are respected and a valid WAV is produced.
-
-## 6. Bark, MMS and Coqui families
-
-```powershell
-$Models = @("bark-small", "mms-tts-eng", "xtts-v2", "yourtts")
-foreach ($Model in $Models) {
-    & $Tako pull $Model
-    & $Tako plan $Model --json | Out-File "$Evidence\plan-$Model.json"
-}
-```
-
-Run one short sentence per model. For XTTS v2 and YourTTS, complete the profile-creation test before profile-conditioned synthesis.
-
-Check model-specific license warnings, especially MMS and Coqui-family assets.
-
-## 7. Kyutai DSM TTS
-
-```powershell
-& $Tako pull kyutai-tts-1.6b
-& $Tako plan kyutai-tts-1.6b --json |
-  Tee-Object "$Evidence\plan-kyutai.json"
-Push-Location $ProjectA
-& $Tako speak "Kyutai delayed streams modeling is running locally." `
-  --model kyutai-tts-1.6b |
-  Tee-Object "$Evidence\kyutai-tts.json"
-Pop-Location
+& $Tako pull qwen3-tts-1.7b-voice-design
+& $Tako speak "A newly designed voice is speaking." `
+  --model qwen3-tts-1.7b-voice-design `
+  --instruction "Warm, mature, confident documentary narration."
 ```
 
 Pass criteria:
 
-- CUDA is detected,
-- the official Moshi DSM checkpoint and voice assets resolve,
-- output is a valid non-empty WAV,
-- the voice is an official precomputed embedding,
-- arbitrary local reference WAVs are not accepted as Kyutai cloning,
-- out-of-memory errors are actionable and do not corrupt readiness records.
+- each ID loads its own pinned checkpoint directory,
+- CustomVoice uses supported preset speakers,
+- Base checkpoints reject missing reference audio,
+- VoiceDesign rejects a missing instruction,
+- 0.6B and 1.7B results are not accidentally served by the legacy model directory,
+- all outputs are non-empty WAV files.
 
-The first Takokit Kyutai adapter is batch-to-WAV even though the upstream model supports streaming. Do not advertise Takokit streaming until a streaming API test exists.
+## 7. Reference-conditioned TTS and cloning
+
+Models:
+
+```text
+chatterbox
+f5-tts
+xtts-v2
+yourtts
+cosyvoice2
+fish-speech
+openvoice
+gpt-sovits
+```
+
+Base speech examples:
+
+```powershell
+& $Tako speak "Chatterbox reference test." --model chatterbox --voice $ReferenceAudio
+& $Tako speak "F5 reference test." --model f5-tts --voice $ReferenceAudio
+& $Tako speak "XTTS reference test." --model xtts-v2 --voice $ReferenceAudio
+& $Tako speak "YourTTS reference test." --model yourtts --voice $ReferenceAudio
+& $Tako speak "CosyVoice reference test." --model cosyvoice2 --voice $ReferenceAudio
+& $Tako speak "Fish Speech reference test." --model fish-speech --voice $ReferenceAudio
+& $Tako speak "OpenVoice reference test." --model openvoice --voice $ReferenceAudio
+& $Tako speak "GPT-SoVITS reference test." `
+  --model gpt-sovits `
+  --voice $ReferenceAudio `
+  --reference-text $ReferenceText
+```
+
+Profile creation must be tested separately:
+
+```powershell
+& $Tako clone $ReferenceAudio --name "Amaan Test Voice" --model chatterbox --consent
+& $Tako list voices
+```
+
+Also test the rejection path without `--consent`. No profile or completed event may be created.
 
 ## 8. Whisper family
-
-Whisper Tiny is the baseline locally verified STT path.
 
 ```powershell
 $WhisperModels = @("whisper-tiny", "whisper-base", "whisper-small")
 foreach ($Model in $WhisperModels) {
-    & $Tako pull $Model
-    & $Tako plan $Model --json | Out-File "$Evidence\plan-$Model.json"
-    Push-Location $ProjectA
-    & $Tako transcribe $Audio --model $Model *>&1 |
-      Tee-Object "$Evidence\transcribe-$Model.txt"
-    Pop-Location
+  & $Tako pull $Model
+  & $Tako transcribe $Audio --model $Model *>&1 |
+    Tee-Object "$Evidence\transcribe-$Model.txt"
 }
 ```
 
-Verify transcript quality, elapsed time, output persistence and idempotent runner installation.
+Verify non-empty intelligible transcripts, output persistence, elapsed time, repeated pull reuse and distinct model IDs in session history.
 
-## 9. Transformers and specialist STT
+## 9. Specialist STT
 
 ```powershell
 $SttModels = @(
@@ -156,128 +268,132 @@ $SttModels = @(
   "parakeet"
 )
 foreach ($Model in $SttModels) {
-    & $Tako pull $Model
-    & $Tako plan $Model --json | Out-File "$Evidence\plan-$Model.json"
-    Push-Location $ProjectA
-    & $Tako transcribe $Audio --model $Model *>&1 |
-      Tee-Object "$Evidence\transcribe-$Model.txt"
-    Pop-Location
+  & $Tako pull $Model
+  & $Tako transcribe $Audio --model $Model *>&1 |
+    Tee-Object "$Evidence\transcribe-$Model.txt"
 }
 ```
 
-Do not run Voxtral, Canary and Parakeet concurrently on an 8 GB GPU.
+Do not run Voxtral, Canary and Parakeet concurrently on an 8 GB GPU. Distinguish GPU out-of-memory from adapter defects.
 
-Pass criteria per model:
-
-- dependency environment installs without mutating other adapters,
-- the official upstream API loads,
-- transcript is non-empty,
-- session history identifies the correct model,
-- model-specific errors and install logs are useful,
-- GPU out-of-memory is distinguished from an adapter defect.
-
-## 10. Consent rejection
-
-Use only a voice you own or have permission to use.
+## 10. Qwen Omni
 
 ```powershell
-& $Tako clone $Audio --name "No Consent" --model chatterbox
+& $Tako pull qwen2-5-omni
+& $Tako transcribe $Audio --model qwen2-5-omni
+& $Tako speak "Qwen two point five Omni speech test." --model qwen2-5-omni
 ```
 
-Expected:
+`qwen3-omni` declares workstation-class requirements of roughly 64 GB system RAM and 40 GB VRAM. On the RTX 5060 Laptop GPU, record it as `blocked-hardware`; do not attempt to force a misleading pass.
 
-- command fails,
-- no global voice profile is created,
-- the failure is recorded in the active project session,
-- API, TUI and GUI enforce the same consent boundary.
-
-## 11. Voice profile creation
+Only run it on suitable hardware:
 
 ```powershell
-& $Tako clone $Audio --name "Amaan Test Voice" `
-  --model chatterbox --consent |
-  Tee-Object "$Evidence\clone-profile.json"
-& $Tako list voices | Tee-Object "$Evidence\voices-after-clone.json"
+.\scripts\run_all_model_smokes.ps1 `
+  -Audio $Audio `
+  -Category omni `
+  -IncludeWorkstation
 ```
 
-Verify:
-
-- the reference file is copied under `~/.takokit/voices/amaan-test-voice/`,
-- `profile.json` contains the model and consent metadata,
-- duplicate profile IDs are rejected rather than overwritten,
-- the active `.tako` session records the profile event,
-- deleting or corrupting the copied sample produces a typed failure.
-
-## 12. Profile reuse
+## 11. OpenVoice conversion
 
 ```powershell
-Push-Location $ProjectA
-& $Tako speak "This sentence uses the stored profile." `
-  --model chatterbox --voice amaan-test-voice |
-  Tee-Object "$Evidence\chatterbox-profile.txt"
-& $Tako speak "This sentence tests profile portability." `
-  --model f5-tts --voice amaan-test-voice |
-  Tee-Object "$Evidence\f5-profile.txt"
-Pop-Location
+& $Tako pull openvoice
+& $Tako convert $Audio `
+  --target-voice $ReferenceAudio `
+  --model openvoice `
+  --consent
 ```
 
-Repeat with XTTS v2 and YourTTS when their base paths pass.
+Verify source and target embeddings are created from the supplied files, the converter writes a non-empty WAV, and missing consent or target audio fails cleanly.
 
-A model without the cloning capability must not treat a local file path as a voice profile.
-
-## 13. Adapter isolation
+## 12. RVC conversion
 
 ```powershell
-& $Tako pull qwen3-tts
-& $Tako pull chatterbox
-& $Tako pull sensevoice
-Get-ChildItem "$env:TAKOKIT_HOME\runners\python-managed\adapters" -Directory
+& $Tako pull rvc
+& $Tako convert $Audio `
+  --target-voice $RvcTarget `
+  --model rvc `
+  --consent
+```
+
+Verify HuBERT and RMVPE assets were pulled, the supplied `.pth` checkpoint is loaded, an optional `.index` is discovered, and no target checkpoint is downloaded or invented by Takokit.
+
+RVC training is not currently advertised. Do not mark RVC training as passed.
+
+## 13. GPT-SoVITS training
+
+```powershell
+& $Tako pull gpt-sovits
+& $Tako train $TrainingSamples `
+  --name "amaan-smoke" `
+  --model gpt-sovits `
+  --epochs 1 `
+  --consent
 ```
 
 Pass criteria:
 
-- every adapter owns its own `venv`, manifest and install log,
-- installing or repairing one environment leaves the others unchanged,
-- shared caches do not replace environment isolation,
-- one failed adapter does not mark the shared runner or other models failed.
+- dataset validation requires `train.list` and `wavs/`,
+- preparation scripts complete,
+- SoVITS and GPT training commands complete,
+- output directories and `training-complete.json` exist,
+- `train.log` is retained,
+- missing consent fails before training starts.
 
-## 14. Failure matrix
+A one-epoch smoke confirms orchestration only; it is not a quality training benchmark.
 
-For at least one lightweight and one heavy model, test:
+## 14. Adapter isolation
+
+After several families are installed:
+
+```powershell
+Get-ChildItem "$env:TAKOKIT_HOME\runners\python-managed\adapters" -Directory
+```
+
+Each adapter must own its environment, source revision marker, manifest and install log. Repairing one adapter must not mutate unrelated environments.
+
+## 15. Failure matrix
+
+Test at least one lightweight and one heavy model for:
 
 - unavailable network,
-- interrupted dependency install,
-- interrupted model download,
-- insufficient disk space,
-- missing CUDA runtime,
-- GPU out of memory,
-- invalid voice/profile ID,
-- missing input file,
+- interrupted package installation,
+- interrupted model snapshot download,
+- insufficient disk,
+- missing CUDA,
+- GPU out-of-memory,
+- invalid reference audio,
+- invalid voice profile,
+- missing RVC checkpoint,
+- malformed GPT-SoVITS dataset,
 - empty TTS input,
+- empty transcript,
 - unsupported capability,
 - repeated concurrent pull.
 
-Takokit must not emit a completed event or mark a model executable after a failed operation.
+A failed operation must never produce a completed event or executable readiness record.
 
-## 15. Evidence table
+## 16. Evidence row
 
-Create one row per tested model:
+Create one row per model and capability tested:
 
 | Field | Value |
 |---|---|
 | Model ID | |
+| Capability | TTS / STT / clone / convert / train |
 | Takokit commit | |
 | OS / architecture | |
 | CPU / RAM | |
 | GPU / VRAM / driver | |
 | Pull result and duration | |
 | Runner/adapter result | |
-| Inference command | |
+| Command | |
 | Output path and bytes | |
 | Transcript/audio quality | |
-| Retry/idempotency result | |
+| Retry/idempotency | |
 | Session/history result | |
-| Status | Pass / Fail / Blocked |
+| Status | Pass / Fail / Blocked input / Blocked hardware |
 | Tester and date | |
 
-Promote a model to **locally verified** only after this record is complete and the output has been manually inspected.
+Promote a model to **Locally verified** only after the relevant row is complete and the output has been manually inspected.
