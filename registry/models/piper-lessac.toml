@@ -1,19 +1,20 @@
 id = "piper-lessac"
 name = "Piper Lessac"
 family = "piper"
-version = "0.1.0"
+version = "0.2.0"
 kind = "tts"
-backend = "onnx"
-runner = "takokit-onnx"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "piper_tts"
 license = "mit"
-description = "Piper English Lessac medium ONNX voice package with verified model and config artifacts."
+description = "Piper English Lessac medium with verified ONNX artifacts and an isolated managed Piper text frontend."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
