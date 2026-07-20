@@ -144,8 +144,7 @@ async fn run_launch_smokes(
         };
         if launch_model_is_heavy(&manifest) && !include_heavy {
             row.run_result = Some(
-                "skipped: heavy model; rerun with --include-heavy on suitable hardware"
-                    .to_string(),
+                "skipped: heavy model; rerun with --include-heavy on suitable hardware".to_string(),
             );
             continue;
         }
@@ -166,8 +165,7 @@ async fn run_launch_smokes(
         } else if manifest.capabilities.voice_cloning {
             "manual: run `tako clone` with a consent-backed reference sample".to_string()
         } else {
-            "manual: no unattended smoke handler is appropriate for this capability set"
-                .to_string()
+            "manual: no unattended smoke handler is appropriate for this capability set".to_string()
         });
     }
 }

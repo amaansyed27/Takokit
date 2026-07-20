@@ -202,7 +202,12 @@ fn install_adapter_spec(
         None => None,
     };
     if !spec.packages.is_empty() {
-        uv_pip_install(&uv, &python, &log, spec.packages.iter().map(|item| (*item).into()))?;
+        uv_pip_install(
+            &uv,
+            &python,
+            &log,
+            spec.packages.iter().map(|item| (*item).into()),
+        )?;
     }
     if let (Some(source), Some(source_dir)) = (spec.source.as_ref(), source_dir.as_ref()) {
         for requirements in source.requirement_files {
@@ -213,12 +218,7 @@ fn install_adapter_spec(
                     reason: format!("required dependency file is missing: {}", path.display()),
                 });
             }
-            uv_pip_install(
-                &uv,
-                &python,
-                &log,
-                ["-r".into(), path.into()].into_iter(),
-            )?;
+            uv_pip_install(&uv, &python, &log, ["-r".into(), path.into()].into_iter())?;
         }
         if source.editable {
             uv_pip_install(

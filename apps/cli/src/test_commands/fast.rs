@@ -101,14 +101,14 @@ pub(crate) async fn run_fast_smokes(
                 )
                 .await
                 {
-                    Ok(response) if response.text.trim().is_empty() => rows.push(
-                        FastSuiteRow::failed(
+                    Ok(response) if response.text.trim().is_empty() => {
+                        rows.push(FastSuiteRow::failed(
                             id,
                             "transcript was empty".to_string(),
                             started.elapsed().as_millis(),
                             store,
-                        ),
-                    ),
+                        ))
+                    }
                     Ok(response) => rows.push(FastSuiteRow::passed(
                         id,
                         Some(sample),

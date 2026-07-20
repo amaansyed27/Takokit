@@ -171,7 +171,8 @@ pub(crate) fn run_clone(args: CloneArgs, workspace: &CliWorkspace) -> anyhow::Re
             args.model
         ));
     }
-    let plan = plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
+    let plan =
+        plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
     if !plan.executable {
         let error = anyhow::anyhow!(
             "model {} is not ready: {}. Next: {}",

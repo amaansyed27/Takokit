@@ -263,21 +263,31 @@ pub(crate) enum LibraryTarget {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum RunnerCommand {
-    Pull { runner: String },
-    Install { runner: String },
+    Pull {
+        runner: String,
+    },
+    Install {
+        runner: String,
+    },
     Doctor {
         runner: String,
         #[arg(long)]
         json: bool,
     },
-    Show { runner: String },
-    Rm { runner: String },
+    Show {
+        runner: String,
+    },
+    Rm {
+        runner: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum AdapterCommand {
     List,
-    Install { adapter: String },
+    Install {
+        adapter: String,
+    },
     Doctor {
         adapter: String,
         #[arg(long)]

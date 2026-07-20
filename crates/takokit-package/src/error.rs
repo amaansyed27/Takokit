@@ -138,12 +138,10 @@ impl From<PackageError> for TakokitError {
                 code: ErrorCode::RunnerNotInstalled,
                 message: error.to_string(),
             },
-            error @ PackageError::RunnerUnsupportedOnPlatform { .. } => {
-                TakokitError::Resolution {
-                    code: ErrorCode::RunnerUnsupportedOnPlatform,
-                    message: error.to_string(),
-                }
-            }
+            error @ PackageError::RunnerUnsupportedOnPlatform { .. } => TakokitError::Resolution {
+                code: ErrorCode::RunnerUnsupportedOnPlatform,
+                message: error.to_string(),
+            },
             PackageError::Io(error) => TakokitError::Storage(error.to_string()),
             PackageError::Toml(error) => TakokitError::Model(error.to_string()),
             PackageError::TomlSer(error) => TakokitError::Model(error.to_string()),
