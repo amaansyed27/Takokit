@@ -43,8 +43,19 @@ pub struct InstalledModelRecord {
     pub runner: String,
     pub installed_at: String,
     pub artifacts: Vec<InstalledArtifactRecord>,
+    #[serde(default)]
+    pub snapshot: Option<InstalledSnapshotRecord>,
     pub status: InstalledPackageStatus,
     pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledSnapshotRecord {
+    pub provider: ModelSourceProvider,
+    pub repository: String,
+    pub revision: String,
+    pub local_path: PathBuf,
+    pub ready_marker: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -87,7 +98,6 @@ pub struct ExecutionPlan {
     pub runner_installed: bool,
     pub status: ExecutionStatus,
     pub installed_model: Option<InstalledModelRecord>,
-    /// Global Takokit storage root containing models, runners, adapters, voices, and caches.
     pub storage_root: PathBuf,
 }
 
