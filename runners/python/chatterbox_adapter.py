@@ -10,12 +10,15 @@ def respond(**payload):
 def main():
     request = json.load(sys.stdin)
     if request.get("operation") != "speech":
-        raise ValueError("chatterbox adapter only supports speech")
+        raise ValueError("Chatterbox adapter only supports speech")
     text = str(request.get("input") or "").strip()
     if not text:
         raise ValueError("speech input cannot be empty")
     output_path = Path(request["output_path"]).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    model_dir = Path(request["model_dir"]).expanduser().resolve()
+    if not model_dir.is_dir():
+        raise FileNotFoundError(f"Chatterbox snapshot is missing: {model_dir}")
 
     import torch
     import torchaudio
@@ -28,7 +31,7 @@ def main():
     else:
         device = "cpu"
 
-    model = ChatterboxTTS.from_pretrained(device=device)
+    model = ChatterboxTTS.from_local(model_dir, device=device)
     voice = request.get("voice")
     options = {}
     if voice and voice != "default":
@@ -38,12 +41,15 @@ def main():
         options["audio_prompt_path"] = str(reference)
     waveform = model.generate(text, **options)
     torchaudio.save(str(output_path), waveform.detach().cpu(), model.sr)
+    if not output_path.is_file() or output_path.stat().st_size <= 44:
+        raise RuntimeError(f"Chatterbox did not create a valid WAV at {output_path}")
     respond(
         ok=True,
         output_path=str(output_path),
         bytes=output_path.stat().st_size,
         sample_rate=int(model.sr),
         voice=voice or "default",
+        device=device,
     )
 
 
