@@ -2,25 +2,36 @@ id = "gpt-sovits"
 name = "GPT-SoVITS"
 family = "gpt-sovits"
 version = "0.1.0"
-kind = "voice-cloning"
+kind = "voice-train"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "research-check-required"
-description = "Few-shot voice cloning and TTS package placeholder. Metadata-only; GPL/runtime dependency risks must be reviewed before execution support."
+required_adapter = "gpt_sovits"
+license = "mit"
+description = "GPT-SoVITS V2 reference-audio speech generation plus local two-stage SoVITS and GPT voice training through the pinned official runtime."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = true
+voice_training = true
+voice_conversion = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "8gb"
+min_ram = "24gb"
+min_vram = "6gb"
+
+[source]
+provider = "hugging-face"
+repository = "lj1995/GPT-SoVITS"
+revision = "336b2ec"
+allow_patterns = ["chinese-hubert-base/**", "chinese-roberta-wwm-ext-large/**", "gsv-v2final-pretrained/**", "README.md"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
