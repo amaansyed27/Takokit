@@ -5,22 +5,33 @@ version = "0.1.0"
 kind = "voice-convert"
 backend = "python-managed"
 runner = "takokit-python-managed"
-license = "license-check-required"
-description = "Retrieval-based voice conversion family. Metadata-only; GPL/runtime dependency risks must be documented before executable support."
+required_adapter = "rvc"
+license = "mit"
+description = "Retrieval-based Voice Conversion with pinned HuBERT and RMVPE base assets. Conversion requires a user-supplied or trained target .pth checkpoint and optional .index file."
 
 [capabilities]
 tts = false
 stt = false
-voice_cloning = true
+voice_cloning = false
+voice_training = false
+voice_conversion = true
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
 min_ram = "8gb"
+min_vram = "4gb"
+
+[source]
+provider = "hugging-face"
+repository = "lj1995/VoiceConversionWebUI"
+revision = "d53cd75f4e954ffc87f251200a682c9e63b6b821"
+allow_patterns = ["hubert_base.pt", "rmvpe.pt"]
 
 [artifacts]
-metadata_only = true
+metadata_only = false
 weights = []
+configs = []
 voices = []
