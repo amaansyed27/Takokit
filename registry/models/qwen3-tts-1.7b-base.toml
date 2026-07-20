@@ -1,0 +1,34 @@
+id = "qwen3-tts-1.7b-base"
+name = "Qwen3-TTS 1.7B Base"
+family = "qwen"
+version = "0.2.0"
+kind = "voice-cloning"
+backend = "python-managed"
+runner = "takokit-python-managed"
+required_adapter = "qwen3_tts"
+license = "apache-2.0"
+description = "Official Qwen3-TTS 12Hz 1.7B Base checkpoint for higher-quality zero-shot voice cloning."
+
+[capabilities]
+tts = true
+stt = false
+voice_cloning = true
+live_transcription = false
+live_audio = false
+
+[hardware]
+cpu = true
+gpu = true
+min_ram = "24gb"
+
+[artifacts]
+metadata_only = false
+weights = []
+voices = []
+
+[[artifacts.configs]]
+name = ".takokit-snapshot"
+url = "hf://Qwen/Qwen3-TTS-12Hz-1.7B-Base@main"
+sha256 = "55b57d34d61f78c5533d96957f157a188fdd09fff7c2c6d22054e48c51c17ea7"
+bytes = 39
+role = "other"
