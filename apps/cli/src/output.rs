@@ -114,7 +114,7 @@ pub(crate) fn print_runner_doctor(
                 "not-installed"
             }
         );
-        println!("Piper frontend status: piper_text_frontend_not_implemented");
+        println!("Piper runtime: managed by takokit-python-managed");
         println!(
             "executable models: {}",
             if ready { "kokoro" } else { "none" }
@@ -167,7 +167,7 @@ pub(crate) fn print_runner_doctor_json(
             "logs_path": layout.logs,
             "adapters": adapters,
             "onnx_session_capability": if manifest.id == "takokit-onnx" && record.as_ref().is_some_and(|item| item.status == takokit_package::RunnerLifecycleState::Ready) { Some("kokoro-onnx-ready") } else { None },
-            "piper_frontend_status": if manifest.id == "takokit-onnx" { Some("piper_text_frontend_not_implemented") } else { None },
+            "piper_runtime": if manifest.id == "takokit-onnx" { Some("managed-by-takokit-python-managed") } else { None },
             "executable_models": executable_models,
         }))?
     );
@@ -180,10 +180,6 @@ pub(crate) fn yes_no(value: bool) -> &'static str {
     } else {
         "no"
     }
-}
-
-pub(crate) fn not_implemented(feature: &'static str, reason: &'static str) -> anyhow::Result<()> {
-    Err(TakokitError::NotImplemented { feature, reason }.into())
 }
 
 pub(crate) fn cli_error(error: PackageError) -> anyhow::Error {
@@ -274,8 +270,7 @@ pub(crate) fn runner_status_text(
         Some(takokit_package::RunnerLifecycleState::RuntimeInstalled)
             if manifest.id == "takokit-onnx" =>
         {
-            "runtime installed; missing Piper text frontend and ONNX TTS execution verification"
-                .to_string()
+            "runtime installed; missing Kokoro ONNX TTS execution verification".to_string()
         }
         Some(state) => state.to_string(),
         None => "runtime missing".to_string(),
