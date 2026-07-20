@@ -1,11 +1,11 @@
 id = "takokit-python-managed"
 name = "Takokit Managed Python Runner"
-version = "0.1.0"
+version = "0.2.0"
 kind = "python-managed"
 platforms = ["windows-x64", "linux-x64", "macos-arm64"]
-supported_model_families = ["Qwen3-TTS", "CosyVoice", "CosyVoice2", "F5-TTS", "Fish Speech", "Dia", "Chatterbox", "GPT-SoVITS", "OpenVoice", "RVC"]
-supported_tasks = ["text_to_speech", "voice_cloning", "live_audio"]
+supported_model_families = ["Qwen3-TTS", "Qwen Omni", "Piper", "CosyVoice2", "F5-TTS", "Fish Speech", "Dia", "Chatterbox", "GPT-SoVITS", "OpenVoice", "RVC", "Coqui TTS", "Bark", "MMS", "SenseVoice", "Voxtral", "NVIDIA NeMo", "Kyutai DSM"]
+supported_tasks = ["text_to_speech", "speech_to_text", "voice_cloning", "voice_training", "voice_conversion", "live_transcription", "live_audio"]
 dependency_strategy = "managed"
 install_state = "runtime-missing"
-notes = "Takokit will manage isolated Python, packages, wheels, caches, and logs internally under ~/.takokit/runners/python-managed. Users do not manually install Python, Torch, CUDA packages, FFmpeg, clone repositories, or patch requirements files."
-description = "Shared managed Python/PyTorch runner contract for heavy research voice models."
+notes = "Takokit creates isolated Python environments, pins model-adapter source revisions, installs packages, and stores caches and logs under ~/.takokit/runners/python-managed. A compatible GPU driver remains a system prerequisite for CUDA models."
+description = "Shared managed Python/PyTorch runner for local TTS, STT, cloning, training, conversion, and multimodal audio models."
