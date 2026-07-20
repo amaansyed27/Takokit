@@ -2,12 +2,12 @@ use super::*;
 use std::collections::HashSet;
 
 #[test]
-fn bundled_catalog_contains_twenty_to_thirty_unique_models() {
+fn bundled_catalog_contains_launch_scale_unique_models() {
     let registry = PackageRegistry::bundled();
     let models = registry.models().expect("bundled models");
     assert!(
-        (20..=30).contains(&models.len()),
-        "release catalog must contain 20-30 models, found {}",
+        (27..=32).contains(&models.len()),
+        "release catalog must contain 27-32 models including official checkpoint variants, found {}",
         models.len()
     );
     let unique = models
