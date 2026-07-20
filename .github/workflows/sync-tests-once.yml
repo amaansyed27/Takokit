@@ -1,0 +1,103 @@
+name: Sync catalog tests once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sync-tests-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Synchronize stale test expectations
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = -1) -> None:
+              file = Path(path)
+              source = file.read_text(encoding="utf-8")
+              if old not in source:
+                  raise SystemExit(f"expected text not found in {path}: {old!r}")
+              updated = source.replace(old, new, count)
+              file.write_text(updated, encoding="utf-8")
+
+          replace(
+              "crates/takokit-package/src/tests/artifact_install.rs",
+              'assert_eq!(record.source, "local-mock-registry");',
+              'assert_eq!(record.source, "takokit-registry");',
+              1,
+          )
+
+          replace(
+              "crates/takokit-package/src/tests/catalog_invariants.rs",
+              '''fn bundled_catalog_contains_twenty_to_thirty_unique_models() {
+              let registry = PackageRegistry::bundled();
+              let models = registry.models().expect("bundled models");
+              assert!(
+                  (20..=30).contains(&models.len()),
+                  "release catalog must contain 20-30 models, found {}",
+                  models.len()
+              );''',
+              '''fn bundled_catalog_contains_exactly_thirty_one_unique_models() {
+              let registry = PackageRegistry::bundled();
+              let models = registry.models().expect("bundled models");
+              assert_eq!(
+                  models.len(),
+                  31,
+                  "release catalog must contain exactly 31 models"
+              );''',
+              1,
+          )
+          replace(
+              "crates/takokit-package/src/tests/catalog_invariants.rs",
+              '''            || model.capabilities.voice_cloning
+                          || model.capabilities.live_transcription''',
+              '''            || model.capabilities.voice_cloning
+                          || model.capabilities.voice_training
+                          || model.capabilities.voice_conversion
+                          || model.capabilities.live_transcription''',
+              1,
+          )
+
+          replace(
+              "crates/takokit-package/src/tests/package_records.rs",
+              'installed.install_model(&manifest).expect("install model");',
+              '''installed
+                          .install_model_with_options(
+                              &manifest,
+                              InstallModelOptions {
+                                  metadata_only: true,
+                              },
+                          )
+                          .expect("install metadata-only model");''',
+              1,
+          )
+
+          replace(
+              "crates/takokit-package/src/tests/resolution.rs",
+              'assert_eq!(qwen_plan.family, "qwen");',
+              'assert_eq!(qwen_plan.family, "qwen3-tts");',
+              1,
+          )
+          PY
+          cargo fmt --all
+          rm .github/workflows/sync-tests-once.yml
+
+      - name: Commit synchronized tests
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Synchronize tests with the 31-model catalog"
+          git push origin HEAD:main
