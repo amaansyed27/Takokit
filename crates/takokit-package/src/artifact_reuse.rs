@@ -41,13 +41,50 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
         return false;
     }
 
-    expected.into_iter().all(|artifact| {
+    let artifacts_verified = expected.iter().all(|artifact| {
         record
             .artifacts
             .iter()
             .find(|candidate| candidate.name == artifact.name && candidate.role == artifact.role)
             .is_some_and(|candidate| is_verified(candidate, artifact))
-    })
+    });
+    artifacts_verified && snapshot_payloads_exist(record, manifest)
+}
+
+fn snapshot_payloads_exist(record: &InstalledModelRecord, manifest: &ModelManifest) -> bool {
+    manifest
+        .artifacts
+        .all()
+        .filter(|artifact| {
+            artifact
+                .url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("hf://"))
+        })
+        .all(|artifact| {
+            let Some(marker) = record
+                .artifacts
+                .iter()
+                .find(|candidate| candidate.name == artifact.name)
+                .and_then(|candidate| candidate.local_path.as_ref())
+            else {
+                return false;
+            };
+            let Some(root) = marker
+                .parent()
+                .and_then(std::path::Path::parent)
+                .and_then(std::path::Path::parent)
+            else {
+                return false;
+            };
+            let model_dir = root.join("models").join(&manifest.id);
+            std::fs::read_dir(model_dir)
+                .ok()
+                .into_iter()
+                .flatten()
+                .flatten()
+                .any(|entry| entry.file_name() != ".takokit-snapshot")
+        })
 }
 
 /// Blob-path existence is deliberately insufficient: every field from the
