@@ -1,27 +1,36 @@
 id = "dia"
-name = "Dia"
+name = "Dia 1.6B"
 family = "dia"
-version = "0.1.0"
+version = "0.2.0"
 kind = "tts"
 backend = "python-managed"
 runner = "takokit-python-managed"
 required_adapter = "dia"
 license = "license-check-required"
-description = "Dia local text-to-dialogue generation through the official Transformers implementation in an isolated managed environment."
+description = "Dia speech generation loaded from a Takokit-managed local snapshot."
 
 [capabilities]
 tts = true
 stt = false
 voice_cloning = false
+voice_training = false
+voice_conversion = false
 live_transcription = false
-live_audio = true
+live_audio = false
 
 [hardware]
 cpu = true
 gpu = true
-min_ram = "12gb"
+min_ram = "16gb"
+min_vram = "8gb"
+
+[source]
+provider = "hugging-face"
+repository = "nari-labs/Dia-1.6B-0626"
+revision = "main"
 
 [artifacts]
 metadata_only = false
 weights = []
+configs = []
 voices = []
