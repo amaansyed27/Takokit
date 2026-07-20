@@ -2,11 +2,11 @@
 
 use crate::{
     runtime_command::{run_logged_command, runner_python_path, PathOrArg},
-    runtime_python_specs::{adapter_spec, AdapterSpec, ADAPTER_SPECS},
+    runtime_python_specs::{adapter_spec, AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS},
     runtime_uv::bootstrap_uv,
     *,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn write_python_adapter_manifests(
     layout: &PythonManagedRunnerLayout,
@@ -76,8 +76,7 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
     let mut record = python_adapter_record(takokit_root, adapter)?;
     record.state = AdapterLifecycleState::Installing;
-    record.notes =
-        "Takokit is installing this adapter in an isolated managed environment.".to_string();
+    record.notes = "Takokit is installing this adapter in an isolated environment.".to_string();
     write_adapter_record(&manifest_path, &record)?;
 
     let result = adapter_spec(adapter)
@@ -148,7 +147,7 @@ pub(crate) fn install_python_managed_runtime(
         manifest,
         RunnerLifecycleState::Ready,
         format!(
-            "Managed Python runtime is ready at {} using {}. Install model adapters independently with `takokit adapter install <id>`. Runtime log: {}",
+            "Managed Python runtime is ready at {} using {}. Install per-model adapters with `takokit adapter install <id>`. Log: {}",
             layout.root.display(),
             python.display(),
             log.display()
@@ -165,17 +164,15 @@ fn install_adapter_spec(
         .script
         .ok_or_else(|| PackageError::ArtifactInstallFailed {
             artifact: spec.id.to_string(),
-            reason: format!(
-                "{} is catalogued but its official adapter is not implemented yet",
-                spec.model_family
-            ),
+            reason: format!("{} has no adapter script", spec.model_family),
         })?;
-    if spec.packages.is_empty() {
+    if spec.packages.is_empty() && spec.source.is_none() {
         return Err(PackageError::ArtifactInstallFailed {
             artifact: spec.id.to_string(),
-            reason: "adapter has no verified dependency set".to_string(),
+            reason: "adapter has no dependency or source installation plan".to_string(),
         });
     }
+
     let adapter_dir = layout.adapters.join(spec.id);
     std::fs::create_dir_all(&adapter_dir)?;
     let venv = adapter_dir.join("venv");
@@ -199,22 +196,136 @@ fn install_adapter_spec(
             venv.display()
         ),
     })?;
+
+    let source_dir = match spec.source.as_ref() {
+        Some(source) => Some(install_adapter_source(&adapter_dir, &log, source)?),
+        None => None,
+    };
+    if !spec.packages.is_empty() {
+        uv_pip_install(&uv, &python, &log, spec.packages.iter().map(|item| (*item).into()))?;
+    }
+    if let (Some(source), Some(source_dir)) = (spec.source.as_ref(), source_dir.as_ref()) {
+        for requirements in source.requirement_files {
+            let path = source_dir.join(requirements);
+            if !path.is_file() {
+                return Err(PackageError::ArtifactInstallFailed {
+                    artifact: spec.id.to_string(),
+                    reason: format!("required dependency file is missing: {}", path.display()),
+                });
+            }
+            uv_pip_install(
+                &uv,
+                &python,
+                &log,
+                ["-r".into(), path.into()].into_iter(),
+            )?;
+        }
+        if source.editable {
+            uv_pip_install(
+                &uv,
+                &python,
+                &log,
+                ["-e".into(), source_dir.clone().into()].into_iter(),
+            )?;
+        }
+    }
+
+    std::fs::write(adapter_dir.join(format!("{}.py", spec.id)), script)?;
+    Ok(format!(
+        "Ready. {} Environment: {}. Source: {}. Install log: {}",
+        spec.note,
+        venv.display(),
+        source_dir
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "package-managed".to_string()),
+        log.display()
+    ))
+}
+
+fn install_adapter_source(
+    adapter_dir: &Path,
+    log: &Path,
+    source: &AdapterSourceSpec,
+) -> PackageResult<PathBuf> {
+    let destination = adapter_dir.join("source");
+    let marker = destination.join(".takokit-revision");
+    if destination.is_dir()
+        && std::fs::read_to_string(&marker)
+            .ok()
+            .is_some_and(|revision| revision.trim() == source.revision)
+    {
+        return Ok(destination);
+    }
+    if destination.exists() {
+        std::fs::remove_dir_all(&destination)?;
+    }
+    let temporary = adapter_dir.join("source.download");
+    if temporary.exists() {
+        std::fs::remove_dir_all(&temporary)?;
+    }
+    let clone_args = if source.recursive {
+        vec![
+            "clone".into(),
+            "--recursive".into(),
+            "--no-checkout".into(),
+            source.repository.into(),
+            temporary.clone().into(),
+        ]
+    } else {
+        vec![
+            "clone".into(),
+            "--no-checkout".into(),
+            source.repository.into(),
+            temporary.clone().into(),
+        ]
+    };
+    run_logged_command(log, "git", &clone_args)?;
+    run_logged_command(
+        log,
+        "git",
+        &[
+            "-C".into(),
+            temporary.clone().into(),
+            "checkout".into(),
+            "--detach".into(),
+            source.revision.into(),
+        ],
+    )?;
+    if source.recursive {
+        run_logged_command(
+            log,
+            "git",
+            &[
+                "-C".into(),
+                temporary.clone().into(),
+                "submodule".into(),
+                "update".into(),
+                "--init".into(),
+                "--recursive".into(),
+            ],
+        )?;
+    }
+    std::fs::write(temporary.join(".takokit-revision"), source.revision)?;
+    std::fs::rename(&temporary, &destination)?;
+    Ok(destination)
+}
+
+fn uv_pip_install(
+    uv: &Path,
+    python: &Path,
+    log: &Path,
+    dependencies: impl IntoIterator<Item = PathOrArg>,
+) -> PackageResult<()> {
     let mut arguments: Vec<PathOrArg> = vec![
         "pip".into(),
         "install".into(),
         "--python".into(),
-        python.into(),
+        python.to_path_buf().into(),
         "--no-progress".into(),
     ];
-    arguments.extend(spec.packages.iter().map(|package| (*package).into()));
-    run_logged_command(&log, &uv, &arguments)?;
-    std::fs::write(adapter_dir.join(format!("{}.py", spec.id)), script)?;
-    Ok(format!(
-        "Ready. {} Environment: {}. Install log: {}",
-        spec.note,
-        venv.display(),
-        log.display()
-    ))
+    arguments.extend(dependencies);
+    run_logged_command(log, uv, &arguments)
 }
 
 pub(crate) fn write_adapter_record(path: &Path, record: &AdapterRecord) -> PackageResult<()> {
