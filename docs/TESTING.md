@@ -1,23 +1,21 @@
 # Takokit comprehensive stability and release test guide
 
-This is the mandatory stability gate before website work or a public release. It covers the shared Rust backend, CLI, TUI, GUI, daemon ownership, project-local `.tako` sessions, pull reliability, security and packaging.
+This is the mandatory gate before website work, packaging or a public release. It covers the Rust workspace, GUI, daemon lifecycle, global model storage, project-local `.tako` sessions, all 31 model manifests, runner installation, security and hardware smoke evidence.
 
-Heavy model and voice-profile commands are in [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md). Both guides are required.
+Run [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md) after the core gate. A compiled adapter or parsed manifest is not a model pass.
 
-Do not promote a model to verified because its adapter compiles. Record real inference evidence.
+## 1. Primary Windows environment
 
-## 1. Windows test environment
-
-Primary machine:
+Target machine:
 
 - Windows 11 x64
 - PowerShell 7 recommended
 - RTX 5060 Laptop GPU, 8 GB VRAM
 - Rust stable
 - Node.js LTS and npm
-- at least 80 GB free for the full heavy-model pass
+- at least 100 GB free for broad model testing
 
-Create evidence storage:
+Create an evidence directory:
 
 ```powershell
 $Evidence = "$HOME\takokit-test-evidence"
@@ -31,21 +29,19 @@ npm --version | Add-Content "$Evidence\toolchain.txt"
 git rev-parse HEAD | Out-File "$Evidence\commit.txt"
 ```
 
-## 2. Stop existing processes
-
-A running daemon can lock `target\release\takokit.exe`.
+## 2. Stop stale processes
 
 ```powershell
-if (Test-Path .\target\release\takokit.exe) {
-    .\target\release\takokit.exe daemon stop
+if (Test-Path .\target\release\tako.exe) {
+  .\target\release\tako.exe daemon stop
 }
 Get-Process takokit,tako -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-NetTCPConnection -LocalPort 5050 -ErrorAction SilentlyContinue
 ```
 
-Expected: no Takokit listener remains.
+Expected: no Takokit listener remains on port 5050.
 
-## 3. Automated gates
+## 3. Automated repository gates
 
 From the repository root:
 
@@ -54,15 +50,12 @@ cargo fmt --all -- --check
 cargo check --workspace
 cargo test --workspace
 python .\scripts\audit_file_sizes.py
-```
 
-GUI and release build:
-
-```powershell
 Push-Location .\apps\gui
 npm ci
 npm run build
 Pop-Location
+
 cargo build --release
 Get-Item .\target\release\takokit.exe
 Get-Item .\target\release\tako.exe
@@ -77,13 +70,14 @@ cargo test --workspace *>&1 | Tee-Object "$Evidence\cargo-test.txt"
 
 Pass criteria:
 
-- formatting, check and tests pass,
+- formatting, workspace check and workspace tests pass,
 - GUI TypeScript/Vite build passes,
 - file-size audit passes,
-- both aliases exist,
-- no production path emits an unreachable-code or dead-state warning.
+- both executable aliases exist,
+- no production path emits an unreachable-code or dead-state warning,
+- the catalog invariant test reports exactly 31 model manifests.
 
-## 4. Clean global runtime store
+## 4. Isolated runtime home
 
 ```powershell
 $env:TAKOKIT_HOME = "$env:TEMP\takokit-release-test"
@@ -95,9 +89,9 @@ $Takokit = (Resolve-Path .\target\release\takokit.exe).Path
 & $Takokit version
 ```
 
-Expected: aliases report the same version and storage root.
+Expected: both aliases report the same version and storage root.
 
-## 5. Registry and baseline diagnostics
+## 5. Registry and launch-catalog diagnostics
 
 ```powershell
 & $Tako doctor --json | Tee-Object "$Evidence\doctor-clean.json"
@@ -107,18 +101,21 @@ Expected: aliases report the same version and storage root.
 & $Tako runners | Tee-Object "$Evidence\runners-clean.json"
 & $Tako library models | Tee-Object "$Evidence\library-models.json"
 & $Tako library runners | Tee-Object "$Evidence\library-runners.json"
+& $Tako test --suite launch --json |
+  Tee-Object "$Evidence\launch-catalog.json"
 ```
 
 Verify:
 
-- all 27 model IDs parse,
-- every model names a known runner,
-- planned models remain non-executable,
+- all 31 model IDs parse,
+- every model names an existing runner,
+- each model reports a lifecycle, artifact and runner-runtime state,
 - executable-path models are not ready before installation,
-- diagnostics provide actionable next steps,
-- model status agrees with [model-support.md](model-support.md).
+- missing state has an actionable next command,
+- model output agrees with [model-support.md](model-support.md),
+- Qwen3-Omni is represented but not falsely marked verified on the 8 GB machine.
 
-## 6. Daemon ownership and stale recovery
+## 6. Daemon ownership and recovery
 
 ```powershell
 & $Tako daemon start
@@ -148,7 +145,7 @@ Get-Process takokit | Stop-Process -Force
 & $Tako daemon status
 ```
 
-Expected: stale PID/lock ownership is recovered safely.
+Expected: stale PID and lock ownership are recovered safely.
 
 ## 7. Two isolated project workspaces
 
@@ -172,10 +169,10 @@ Pop-Location
 
 Pass criteria:
 
-- each directory owns its own `.tako`,
-- A sessions never appear in B,
-- models/runners remain under `$env:TAKOKIT_HOME`,
-- outputs do not fall back to global `outputs/`.
+- each project owns its own `.tako`,
+- sessions from A never appear in B,
+- global models and runners remain under `$env:TAKOKIT_HOME`,
+- generated outputs never fall back to a global output folder.
 
 ## 8. Session lifecycle and search
 
@@ -197,7 +194,7 @@ Pop-Location
 
 Verify exact resume, content search, inactive deletion and valid active-session state.
 
-## 9. Session output persistence
+## 9. Output persistence
 
 ```powershell
 Push-Location $ProjectA
@@ -211,28 +208,12 @@ Pop-Location
 
 Pass criteria:
 
-- non-empty WAV in active session `outputs/`,
-- completed event in `events.jsonl`,
-- accurate summary counts,
-- no output path escape.
+- non-empty WAV exists in the active session `outputs/`,
+- a completed event exists in `events.jsonl`,
+- summary counts are accurate,
+- no output path escapes the session.
 
-## 10. Whisper Tiny baseline
-
-```powershell
-$Audio = "C:\path\to\test01_20s.wav"
-& $Tako pull whisper-tiny
-& $Tako plan whisper-tiny --json |
-  Tee-Object "$Evidence\plan-whisper-tiny.json"
-Push-Location $ProjectA
-& $Tako transcribe $Audio --model whisper-tiny |
-  Tee-Object "$Evidence\whisper-tiny-transcript.json"
-& $Tako sessions list --query "whisper-tiny"
-Pop-Location
-```
-
-Verify intelligible text, transcript output, elapsed time and unique repeat outputs.
-
-## 11. Pull idempotency and recovery
+## 10. Pull idempotency and recovery
 
 ```powershell
 & $Tako pull whisper-tiny
@@ -243,32 +224,44 @@ Verify intelligible text, transcript output, elapsed time and unique repeat outp
 
 Pass criteria:
 
-- verified artifacts are reused,
+- verified artifacts and snapshots are reused,
 - ready state is not downgraded,
-- digests are rechecked,
+- digests or pinned source markers are rechecked,
 - duplicate content-addressed blobs are not created.
 
-Interrupt one large pull and restart it. A partial file must never be treated as ready. Test checksum rollback only in the isolated store.
+Interrupt one large pull and restart it. A partial snapshot must never be treated as ready.
 
-## 12. Model and cloning pass
+## 11. Fast real-inference baseline
 
-Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md) for:
+```powershell
+& $Tako pull kokoro
+& $Tako pull whisper-tiny
+& $Tako pull whisper-base
+& $Tako pull qwen3-tts
+& $Tako test --suite fast --run --json |
+  Tee-Object "$Evidence\fast-suite.json"
+```
 
-- Kokoro and Qwen3-TTS,
-- Chatterbox and F5-TTS,
-- Dia, Bark, MMS, XTTS and YourTTS,
-- Kyutai DSM TTS,
-- Whisper Base/Small,
-- Distil-Whisper, Wav2Vec2, SenseVoice, Voxtral, Canary and Parakeet,
-- consent rejection,
-- global profile creation and profile reuse,
-- adapter isolation and heavy-model failure cases.
+The suite must synthesize actual speech and use that speech for transcription. Silence is not a valid STT pass.
 
-Do not execute several large GPU models concurrently on an 8 GB GPU.
+## 12. Complete model and voice-runtime pass
+
+Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md) or run:
+
+```powershell
+.\scripts\run_all_model_smokes.ps1 `
+  -Audio C:\path\to\test01_20s.wav `
+  -ReferenceAudio C:\path\to\owned-reference.wav `
+  -ReferenceText "Exact reference transcript" `
+  -TrainingSamples C:\path\to\gpt-sovits-dataset `
+  -RvcTarget C:\path\to\owned-rvc-checkpoint
+```
+
+The runner covers all 31 model IDs. It records separate `passed`, `failed`, `blocked-input` and `blocked-hardware` states.
+
+Do not run multiple large GPU models concurrently. Qwen3-Omni requires workstation-class hardware and is expected to be `blocked-hardware` on the primary laptop.
 
 ## 13. TUI
-
-From project A:
 
 ```powershell
 Push-Location $ProjectA
@@ -277,20 +270,16 @@ Push-Location $ProjectA
 
 Verify:
 
-- simple task screens are reachable,
-- text and Windows paths edit correctly,
-- Enter runs the visible action,
+- Models, Speak, Transcribe, Clone, Sessions, Runners and System are reachable,
+- Windows and Unicode paths edit correctly,
+- Enter runs the visible primary action,
 - model state refreshes after pulls,
-- Speak and Transcribe save to the active session,
-- Clone requires name, sample and consent,
+- actions save to the active session,
+- clone requires name, sample and consent,
 - `/sessions`, `/new` and `/clone` work,
-- previous sessions can be resumed,
-- progress/errors remain visible,
-- no terminal teardown, flashing or hidden double-Enter flow,
+- progress and errors remain visible,
 - Ctrl+C does not orphan installation work,
-- small terminal sizes do not panic.
-
-Inspect `.tako` after exit.
+- small terminals do not panic.
 
 ## 14. GUI
 
@@ -301,28 +290,28 @@ Push-Location $ProjectA
 
 Verify:
 
-- URL carries workspace/session context,
-- routing and refresh retain that context,
-- Models and Runners agree with CLI `plan`,
+- URL carries workspace and session context,
+- refresh retains that context,
+- Models and Runners agree with CLI planning,
 - pulls update the same installed records,
-- Speak and Transcribe write to active history,
-- Voices lists custom profiles and enforces consent,
+- Speak and Transcribe write to active History,
+- Voices enforces consent,
 - History searches titles, prompts, models, transcripts and errors,
 - old sessions can be resumed,
 - WAV files play and transcripts reopen,
 - inactive sessions can be deleted,
-- output requests cannot read outside session outputs,
-- responsive layout works below 900 px.
+- output routes cannot read outside session outputs,
+- layout works below 900 px.
 
 ## 15. Cross-interface parity
 
 For one TTS and one STT model:
 
-1. Pull in CLI; confirm ready in TUI/GUI.
-2. Generate in TUI; confirm in GUI History and CLI session JSON.
-3. Transcribe in GUI; confirm in TUI Sessions and `sessions show`.
-4. Remove with CLI; confirm both UIs become non-executable.
-5. Re-pull in GUI; confirm CLI `plan` becomes executable.
+1. Pull in CLI and confirm ready in TUI/GUI.
+2. Generate in TUI and confirm in GUI History and CLI session JSON.
+3. Transcribe in GUI and confirm in TUI Sessions and `sessions show`.
+4. Remove with CLI and confirm both UIs become non-executable.
+5. Re-pull in GUI and confirm CLI planning becomes executable.
 
 No surface may own a second model database, output root or session implementation.
 
@@ -330,26 +319,25 @@ No surface may own a second model database, output root or session implementatio
 
 Test:
 
-- unknown model,
-- unsupported capability,
-- missing/empty input,
-- invalid/deleted session,
-- `..`, `/`, `\` and encoded separator output names,
+- unknown model and unsupported capability,
+- missing or empty input,
+- invalid or deleted session,
+- `..`, `/`, `\` and encoded separators in output names,
 - absolute output paths,
 - symlink or Windows junction escape,
 - cross-session and cross-workspace output access,
 - paths with spaces and Unicode,
 - read-only workspace,
-- unavailable network,
-- insufficient disk,
-- interrupted runner/adapter install,
-- GPU out of memory or missing CUDA,
-- cloning without consent,
-- corrupt/missing voice profile,
-- simultaneous pulls of one model,
-- simultaneous daemon starts.
+- unavailable network and insufficient disk,
+- interrupted runner or adapter installation,
+- missing CUDA and GPU out-of-memory,
+- cloning, conversion or training without consent,
+- corrupt voice profile,
+- malformed GPT-SoVITS dataset,
+- missing RVC target checkpoint,
+- simultaneous pulls and daemon starts.
 
-Any arbitrary file read/write, output escape, consent bypass or corrupted global store is a release-blocking failure.
+Any arbitrary file access, output escape, consent bypass or corrupted global store is release-blocking.
 
 ## 17. Persistence and upgrade simulation
 
@@ -357,46 +345,25 @@ Any arbitrary file read/write, output escape, consent bypass or corrupted global
 2. Build a binary from a later commit.
 3. Run it against the same isolated home and projects.
 4. Confirm all state remains readable.
-5. Confirm no active temporary/backup metadata files remain.
+5. Confirm no temporary or backup metadata remains active.
 
-## 18. Packaging smoke gate
+## 18. Packaging gate
 
-In clean VMs, test available release artifacts:
+In clean VMs, test each available artifact:
 
 - Windows MSI and portable ZIP,
-- macOS Intel/Apple Silicon package,
+- macOS Intel and Apple Silicon package,
 - Linux `.deb`, `.rpm`, AppImage or install script.
 
-Verify PATH aliases, upgrade preservation, uninstall safety, checksums and version metadata. The core installer must not bundle large models.
+Verify PATH aliases, upgrade preservation, uninstall safety, checksums and version metadata. Installers must not bundle large models.
 
-## 19. Evidence and sign-off
+## 19. Sign-off
 
-For each promoted model record:
+Before website work or release:
 
-| Field | Value |
-|---|---|
-| Model ID | |
-| Takokit commit | |
-| OS / architecture | |
-| CPU / RAM | |
-| GPU / VRAM / driver | |
-| Pull result and duration | |
-| Runner/adapter result | |
-| Inference command | |
-| Output path and bytes | |
-| Quality notes | |
-| Retry/idempotency | |
-| Session/history | |
-| Status | Pass / Fail / Blocked |
-| Tester/date | |
-
-Website work may begin only when:
-
-- permanent CI is green on Linux and Windows,
-- the Codex review has no unresolved P0/P1 issues,
-- workspace/session and interface-parity tests pass,
-- Whisper Tiny, another STT, Kokoro, a managed TTS and a cloning model pass real-device testing,
-- all other models have truthful tiers,
-- known limitations and packaging state are documented.
-
-A failed heavy model can remain catalogued only after being downgraded to experimental or planned with the exact blocker.
+- automated gates are green on Linux and Windows,
+- all 31 models have a recorded status,
+- every claimed verified model has real-device evidence,
+- hardware-blocked models are labelled honestly,
+- all P0/P1 review findings are resolved,
+- no planned capability is represented by fake output or a success placeholder.
