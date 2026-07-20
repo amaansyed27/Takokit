@@ -1,28 +1,36 @@
 # Takokit
 
-Takokit is a Rust-first local voice AI runtime: an Ollama-like pull, run, inspect and remove experience for text-to-speech, speech-to-text and consent-backed voice profiles.
+Takokit is a Rust-first local voice AI runtime: an Ollama-like pull, run, inspect and remove experience for text-to-speech, speech-to-text, consent-backed voice cloning, voice conversion and local voice training.
 
-It ships one shared backend with three interfaces:
+It exposes one shared runtime through:
 
-- `tako` / `takokit` command-line interface,
-- a task-oriented Ratatui terminal interface when started without a subcommand,
-- a local browser GUI opened with `tako gui`.
+- `tako` / `takokit` CLI,
+- a task-oriented Ratatui interface when started without a subcommand,
+- a local browser GUI opened with `tako gui`,
+- an Axum API on `127.0.0.1:5050`.
 
-The local Axum daemon binds to `127.0.0.1:5050`. CLI, TUI, GUI and API use the same registry, installed records, execution planner, runners, sessions and output locations.
+CLI, TUI, GUI and API share the same registry, installed records, runners, voice profiles, sessions and output locations.
 
-## Current release status
+## Release status
 
-Takokit is preparing for a `v0.1.0` public beta. The codebase contains a **27-model catalog** across TTS, STT, cloning, conversion and training families, but it deliberately distinguishes:
+Takokit is preparing for a `v0.1.0` public beta. The bundled catalog currently contains **31 model IDs** across:
 
-- **locally verified** models,
-- **executable paths awaiting hardware smoke tests**,
-- **planned or blocked** models.
+- local TTS,
+- speech-to-text,
+- zero-shot voice cloning,
+- tone-colour and RVC conversion,
+- GPT-SoVITS training,
+- audio-language / Omni models.
 
-Compilation or a registry manifest alone is not treated as model support. See [docs/model-support.md](docs/model-support.md) for the complete model and runner matrix.
+Support labels remain evidence-based:
 
-The website and public model library are intentionally postponed until the stability guide and Codex review are complete.
+- **Locally verified** — real installation and inference were observed on a recorded device.
+- **Executable path** — pull, runner, adapter and output contracts are implemented but still require the hardware smoke record.
+- **Hardware-blocked** — the execution path exists, but the test device cannot satisfy the declared memory requirement.
 
-## Storage model
+Compilation or a manifest entry is not treated as a model pass. See [docs/model-support.md](docs/model-support.md) and [docs/MODEL_SMOKE_TESTS.md](docs/MODEL_SMOKE_TESTS.md).
+
+## Storage
 
 Reusable runtime data is global:
 
@@ -37,7 +45,7 @@ Reusable runtime data is global:
 └── logs/
 ```
 
-User-facing outputs and history belong to the directory that launched Takokit:
+Outputs and history belong to the directory that launched Takokit:
 
 ```text
 <project>/.tako/
@@ -50,15 +58,16 @@ User-facing outputs and history belong to the directory that launched Takokit:
         └── outputs/
 ```
 
-Starting CLI inference, the TUI or `tako gui` from a project creates or resumes that project's `.tako` workspace. Use `--workspace <path>` and `--session <uuid>` for explicit context.
+Use `--workspace <path>` and `--session <uuid>` for explicit context.
 
-## Quick start from source
+## Build from source
 
 Prerequisites:
 
 - Rust stable,
-- Node.js LTS and npm for the GUI build,
-- sufficient disk space for selected models.
+- Node.js LTS and npm,
+- enough disk space for the selected models,
+- a compatible NVIDIA driver for CUDA models.
 
 ```powershell
 cd apps\gui
@@ -73,7 +82,7 @@ cargo build --release
 
 `target\release\takokit.exe` and `target\release\tako.exe` are aliases for the same application and storage.
 
-A running Windows daemon can lock the release executable. Stop it before rebuilding:
+Stop the daemon before rebuilding if Windows has locked the executable:
 
 ```powershell
 .\target\release\tako.exe daemon stop
@@ -101,10 +110,11 @@ tako run kokoro "Hello from the unified run command"
 tako run whisper-tiny --file ./sample.wav
 
 tako clone ./reference.wav --name "My Voice" --model chatterbox --consent
-tako list voices
+tako convert ./source.wav --target-voice ./target.wav --model openvoice --consent
+tako train ./dataset --name "My Voice" --model gpt-sovits --epochs 1 --consent
 
+tako list voices
 tako sessions list
-tako sessions list --query interview
 tako sessions new --title "Narration tests"
 tako sessions show <session-id>
 tako sessions open <session-id>
@@ -119,75 +129,66 @@ tako daemon stop
 tako gui
 ```
 
-## Ollama-style pull lifecycle
+## Pull lifecycle
 
-`tako pull <model>` owns the model setup. Users should not manually clone upstream repositories, launch Gradio applications or install random Python requirements globally.
+`tako pull <model>` owns setup. Users should not clone upstream repositories, launch Gradio applications or install random Python dependencies globally.
 
-A pull resolves and prepares:
+A pull resolves:
 
-1. model manifest and capabilities,
-2. required runner contract,
-3. required runner runtime,
-4. isolated adapter environment when needed,
-5. pinned artifacts or official upstream weight resolution,
-6. readiness state and actionable failure details.
+1. the model manifest and capabilities,
+2. the required runner contract,
+3. the runner runtime,
+4. an isolated adapter environment when required,
+5. pinned model snapshots or checksum-backed artifacts,
+6. readiness checks and actionable failure details.
 
-Examples:
-
-```bash
-tako pull whisper-tiny
-tako pull kokoro
-tako pull qwen3-tts
-tako pull chatterbox
-tako pull kyutai-tts-1.6b
-```
-
-Repeat pulls are designed to be idempotent. Checksum-backed artifacts use content-addressed storage and verified local reuse. Heavy managed-Python models keep independent adapter environments under:
+Heavy Python families retain independent environments under:
 
 ```text
 ~/.takokit/runners/python-managed/adapters/<adapter>/venv
 ```
 
-One model family cannot silently mutate another family's environment.
+One family cannot silently mutate another family's environment.
 
-## Models and runners
+## Model families
 
-The catalog currently spans:
+The current catalog includes:
 
-- native/managed ONNX TTS,
-- whisper.cpp STT,
-- managed Qwen, Chatterbox, F5-TTS and Coqui TTS/cloning,
-- Transformers audio generation and transcription,
-- FunASR SenseVoice,
-- NeMo Canary and Parakeet,
-- Voxtral audio-language transcription,
-- Kyutai DSM TTS,
-- planned OpenVoice, GPT-SoVITS and RVC conversion/training workflows.
+- Kokoro and Piper,
+- Whisper Tiny/Base/Small,
+- Qwen3-TTS 0.6B and 1.7B CustomVoice/Base/VoiceDesign checkpoints,
+- Chatterbox, F5-TTS, XTTS v2, YourTTS, CosyVoice2 and Fish Speech,
+- Dia, Bark, MMS and Kyutai DSM TTS,
+- Distil-Whisper, Wav2Vec2, SenseVoice, Voxtral, Canary and Parakeet,
+- OpenVoice V2 conversion,
+- RVC conversion with user-supplied checkpoints,
+- GPT-SoVITS reference inference and local training,
+- Qwen2.5-Omni and Qwen3-Omni audio execution paths.
+
+Qwen3-Omni requires workstation-class memory beyond the primary 8 GB laptop GPU and must be reported as hardware-blocked there rather than falsely passed.
 
 Primary runner contracts:
 
 - `takokit-onnx`
 - `takokit-whispercpp`
 - `takokit-python-managed`
-- `takokit-transformers-audio`
-- `takokit-nemo`
+- `takokit-transformers-audio` compatibility contract
+- `takokit-nemo` compatibility contract
 
-See [docs/runners.md](docs/runners.md) and [docs/model-support.md](docs/model-support.md).
+See [docs/runners.md](docs/runners.md).
 
-## Voice profiles and consent
+## Voice consent
 
-Voice-profile creation requires explicit confirmation that the user owns the voice or has permission to use it.
+Voice-profile creation, conversion and training require confirmation that the user owns the supplied voice or has explicit permission to use it.
 
 ```bash
 tako clone ./reference.wav --name "My Voice" --model chatterbox --consent
 tako speak "Profile reuse test" --model chatterbox --voice my-voice
 ```
 
-Takokit copies the reference into global local-only voice storage and records the profile-creation event in the active project session. CLI, TUI, GUI and API enforce the consent boundary.
+Takokit stores reference material locally and records consent-backed operations in the active project session. CLI, TUI, GUI and API enforce the same boundary.
 
-Kyutai TTS uses official precomputed voice embeddings. Takokit does not claim arbitrary reference-audio cloning for Kyutai.
-
-## Terminal interface
+## TUI
 
 Run Takokit without a subcommand:
 
@@ -195,7 +196,7 @@ Run Takokit without a subcommand:
 tako
 ```
 
-The TUI is task-oriented, not a raw CLI command editor. It provides:
+Primary sections:
 
 - Models
 - Speak
@@ -210,17 +211,15 @@ Useful shortcuts:
 ```text
 Arrow keys          Navigate
 Tab / Shift+Tab     Move through form fields
-Enter               Run the visible primary action
+Enter               Run the visible action
 /sessions           Open saved sessions
 /new                Create a session
 /clone              Open voice profile creation
-F1                   Help
+F1                  Help
 Ctrl+C               Exit safely
 ```
 
-## Local GUI
-
-Build the GUI and open it through the daemon:
+## GUI
 
 ```bash
 cd apps/gui
@@ -230,7 +229,7 @@ cd ../..
 tako gui
 ```
 
-The GUI includes model and runner state, Speak, Transcribe, consent-backed Voices, searchable History, diagnostics and settings. Its workspace and session are carried in the launch context, and its API requests write to the same active `.tako` session as CLI and TUI.
+The GUI shares model state, runners, Speak, Transcribe, Voices, searchable History, diagnostics and settings with the CLI and TUI.
 
 ## Local API
 
@@ -258,8 +257,6 @@ DELETE /v1/sessions/:id
 GET    /v1/sessions/:id/outputs/:filename
 ```
 
-Workspace-aware requests use Takokit workspace and session headers. Output-serving routes validate single filenames and remain restricted to the selected session output directory.
-
 ## Architecture
 
 ```text
@@ -270,48 +267,51 @@ GUI/API ─┘                 │
                            └── project .tako sessions and outputs
 ```
 
-Major workspace crates:
+Major workspace components:
 
-- `takokit-core` — shared types, capabilities, sessions and typed errors,
+- `takokit-core` — shared types, capabilities, sessions and errors,
 - `takokit-package` — registry, pull/install, planning and runner lifecycle,
 - `takokit-models` — execution adapters,
 - `takokit-server` — daemon and local API,
-- `takokit-store` — global resources, voice profiles and project sessions,
+- `takokit-store` — global resources, voices and project sessions,
 - `takokit-audio` — audio utilities,
 - `apps/cli` — CLI and Ratatui interface,
 - `apps/gui` — React/Vite local GUI.
 
-## Stability gate
+## Test the complete catalog
 
-Before website or public release work:
-
-1. Follow [docs/TESTING.md](docs/TESTING.md) on the Windows RTX 5060 test machine.
-2. Record real-device evidence for each model promoted to verified.
-3. Run the prompt in [docs/CODEX_REVIEW_PROMPT.md](docs/CODEX_REVIEW_PROMPT.md).
-4. Resolve all P0/P1 findings.
-5. Keep untested heavy models labelled executable-path or planned.
-
-Automated gates:
+Automated repository gates:
 
 ```bash
 cargo fmt --all -- --check
 cargo check --workspace
 cargo test --workspace
-python scripts/check_file_sizes.py
+python scripts/audit_file_sizes.py
 cd apps/gui && npm ci && npm run build
 ```
 
-The repository is ready for website work only after these automated gates and the documented hardware/core-flow smoke tests pass.
+Catalog planning:
 
-## Development status boundaries
+```powershell
+.\target\release\tako.exe test --suite launch --json
+```
 
-The following remain honest roadmap items until their complete workflows pass testing:
+Full hardware runner:
 
-- GPT-SoVITS dataset preparation and training jobs,
-- RVC training and conversion,
-- OpenVoice tone-colour conversion,
-- Piper's safe text/phoneme frontend,
-- production installers and signed release artifacts,
-- broad macOS/Linux heavy-model hardware verification.
+```powershell
+.\scripts\run_all_model_smokes.ps1 `
+  -Audio C:\path\to\test01_20s.wav `
+  -ReferenceAudio C:\path\to\owned-reference.wav `
+  -TrainingSamples C:\path\to\gpt-sovits-dataset `
+  -RvcTarget C:\path\to\owned-rvc-checkpoint
+```
 
-Takokit returns typed, actionable blockers for these paths rather than fake audio or success responses.
+The repository is ready for website work only after the automated gates pass and every model has an honest `passed`, `failed`, `blocked-input` or `blocked-hardware` evidence record.
+
+## Remaining release work
+
+- complete real-device evidence for every advertised verified model,
+- run Qwen3-Omni on suitable workstation-class hardware,
+- finish production installers and signed release artifacts,
+- complete broad macOS/Linux heavy-model verification,
+- resolve all P0/P1 findings from the release review.
