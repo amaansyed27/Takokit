@@ -13,6 +13,7 @@ fn command(home: &std::path::Path, port: u16, args: &[&str]) -> std::process::Ou
         .args(args)
         .env("TAKOKIT_HOME", home)
         .env("TAKOKIT_PORT", port.to_string())
+        .env("TAKOKIT_OUTPUT", "json")
         .output()
         .unwrap()
 }
