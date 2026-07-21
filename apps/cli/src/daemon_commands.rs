@@ -43,7 +43,7 @@ pub(crate) async fn route_daemon_command(
         Command::Status => client.get("/v1/status")?,
         Command::Doctor(_) => client.get("/v1/doctor")?,
         Command::Capabilities => client.get("/v1/capabilities")?,
-        Command::Pull(args) => post_with_activity(
+        Command::Pull(args) => post_retryable_with_activity(
             &client,
             format!("Pulling {}", args.model),
             "/v1/models/pull",
@@ -140,10 +140,13 @@ pub(crate) async fn route_daemon_command(
         }
         Command::Ps => client.get("/v1/ps")?,
         Command::Runner { command } => match command {
-            RunnerCommand::Pull { runner } => {
-                client.post("/v1/runners/pull", &serde_json::json!({"runner":runner}))?
-            }
-            RunnerCommand::Install { runner } => post_with_activity(
+            RunnerCommand::Pull { runner } => post_retryable_with_activity(
+                &client,
+                format!("Pulling runner {runner}"),
+                "/v1/runners/pull",
+                &serde_json::json!({"runner":runner}),
+            )?,
+            RunnerCommand::Install { runner } => post_retryable_with_activity(
                 &client,
                 format!("Installing runner {runner}"),
                 "/v1/runners/install",
@@ -160,7 +163,7 @@ pub(crate) async fn route_daemon_command(
         },
         Command::Adapter { command } => match command {
             AdapterCommand::List => client.get("/v1/adapters")?,
-            AdapterCommand::Install { adapter } => post_with_activity(
+            AdapterCommand::Install { adapter } => post_retryable_with_activity(
                 &client,
                 format!("Installing adapter {adapter}"),
                 "/v1/adapters/install",
@@ -189,6 +192,18 @@ fn post_with_activity<B: serde::Serialize>(
 ) -> anyhow::Result<serde_json::Value> {
     let activity = Activity::start(label);
     let result = client.post(path, body);
+    drop(activity);
+    result
+}
+
+fn post_retryable_with_activity<B: serde::Serialize>(
+    client: &daemon_client::Client,
+    label: String,
+    path: &str,
+    body: &B,
+) -> anyhow::Result<serde_json::Value> {
+    let activity = Activity::start(label);
+    let result = client.post_retryable(path, body);
     drop(activity);
     result
 }
