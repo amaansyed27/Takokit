@@ -7,6 +7,10 @@ use takokit_core::{
 use takokit_models::{execute_voice_conversion, execute_voice_training};
 use takokit_store::VoiceProfileStore;
 
+#[path = "progress.rs"]
+mod progress;
+use progress::Activity;
+
 pub(crate) async fn run_speak(
     args: SpeakArgs,
     package_registry: &PackageRegistry,
@@ -22,6 +26,7 @@ pub(crate) async fn run_speak(
         instruction: args.instruction,
         reference_text: args.reference_text,
     };
+    let activity = Activity::start(format!("Generating speech with {}", request.model));
     let result = if request.model != "mock-tts" {
         let plan = resolve_execution_plan(
             package_registry,
@@ -39,6 +44,7 @@ pub(crate) async fn run_speak(
             .await
             .map_err(anyhow::Error::from)
     };
+    drop(activity);
     match result {
         Ok(response) => {
             workspace.record_speech(&request, &response)?;
@@ -122,10 +128,12 @@ pub(crate) async fn run_transcription(
         CapabilityKind::SpeechToText,
     )
     .map_err(cli_error)?;
-    match execute_transcription(&plan, request.clone())
+    let activity = Activity::start(format!("Transcribing with {model}"));
+    let result = execute_transcription(&plan, request.clone())
         .await
-        .map_err(runtime_error)
-    {
+        .map_err(runtime_error);
+    drop(activity);
+    match result {
         Ok(response) => {
             let output = workspace.record_transcription(&request, &response)?;
             print_serializable(&response)?;
@@ -241,10 +249,12 @@ pub(crate) async fn run_convert(
         CapabilityKind::VoiceConversion,
     )
     .map_err(cli_error)?;
-    match execute_voice_conversion(&plan, request.clone(), &workspace.outputs_dir())
+    let activity = Activity::start(format!("Converting voice with {}", args.model));
+    let result = execute_voice_conversion(&plan, request.clone(), &workspace.outputs_dir())
         .await
-        .map_err(runtime_error)
-    {
+        .map_err(runtime_error);
+    drop(activity);
+    match result {
         Ok(response) => {
             workspace.store.append_event(
                 workspace.session_id(),
@@ -295,10 +305,12 @@ pub(crate) async fn run_train(
         CapabilityKind::VoiceTraining,
     )
     .map_err(cli_error)?;
-    match execute_voice_training(&plan, request.clone())
+    let activity = Activity::start(format!("Training voice with {}", args.model));
+    let result = execute_voice_training(&plan, request.clone())
         .await
-        .map_err(runtime_error)
-    {
+        .map_err(runtime_error);
+    drop(activity);
+    match result {
         Ok(response) => {
             workspace.store.append_event(
                 workspace.session_id(),
