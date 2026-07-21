@@ -75,7 +75,10 @@ pub(crate) fn configure_managed_command(command: &mut Command) {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        const SW_HIDE: u16 = 0;
+        command
+            .creation_flags(CREATE_NO_WINDOW)
+            .show_window(SW_HIDE);
     }
 }
 
