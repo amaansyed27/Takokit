@@ -1,4 +1,4 @@
-import { FileAudio, Library, Mic, Server, Volume2 } from "lucide-react";
+import { Box, FileAudio, Mic, Server, Volume2 } from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Section";
@@ -7,19 +7,19 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { useServerStatus } from "../../hooks/useServerStatus";
 
 export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
-  const installed = runtime.models.filter((model) => model.status === "installed").length;
+  const ready = runtime.models.filter((model) => model.executable).length;
   const status = useServerStatus(runtime);
 
   return (
     <section className="page">
       <header className="page__header">
-        <h1>Local web GUI</h1>
-        <p>Run the Rust daemon, inspect model plans, install shared runners, and execute models only when they are truly ready.</p>
+        <h1>Local voice runtime</h1>
+        <p>Use installed models, manage local voices, and run speech or transcription tasks.</p>
       </header>
 
       <div className="stats-grid" aria-label="Runtime summary">
-        <StatTile label="Models tracked" value={runtime.models.length} detail="Registry entries" />
-        <StatTile label="Installed" value={installed} detail="Ready locally" />
+        <StatTile label="Installed models" value={runtime.models.length} detail="Verified locally" />
+        <StatTile label="Ready" value={ready} detail="Executable now" />
         <StatTile label="Voices" value={runtime.voices.length} detail="Profiles available" />
         <Tooltip content={`Local server at ${status.url}`}>
           <div>
@@ -33,7 +33,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           <button className="quick-action" type="button" onClick={() => onNavigate("speak")}>
             <Volume2 size={18} />
             <strong>Generate speech</strong>
-            <span>Executable TTS only</span>
+            <span>Installed TTS models</span>
           </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
             <Mic size={18} />
@@ -43,17 +43,17 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           <button className="quick-action" type="button" onClick={() => onNavigate("transcribe")}>
             <FileAudio size={18} />
             <strong>Transcribe audio</strong>
-            <span>Whisper runner path</span>
+            <span>Installed STT models</span>
           </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("models")}>
-            <Library size={18} />
+            <Box size={18} />
             <strong>Manage models</strong>
-            <span>Registry</span>
+            <span>Installed only</span>
           </button>
         </div>
       </Section>
 
-      <Section title="Product surfaces" description="The runtime treats each surface as an explicit model capability.">
+      <Section title="Available tasks" description="Capabilities exposed by the local runtime.">
         <div className="capability-strip">
           {runtime.capabilities.map((capability) => (
             <div className="capability-chip" key={capability.id}>
@@ -73,27 +73,8 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
             <span>adapters</span>
             <span>runners</span>
           </div>
-          <p>
-            Rust CLI, daemon, browser GUI, storage, safety, and runners stay separated.
-          </p>
+          <p>Rust CLI, daemon, browser GUI, storage, safety, and runners stay separated.</p>
           <Badge tone="success"><Server size={12} /> Local-first</Badge>
-        </div>
-      </Section>
-
-      <Section title="Runtime lanes" description="Clean boundaries for future runners.">
-        <div className="runtime-lanes">
-          <div className="runtime-lane">
-            <strong>Control plane</strong>
-            <span>CLI, local web GUI, and API coordinate jobs.</span>
-          </div>
-          <div className="runtime-lane">
-            <strong>Model adapters</strong>
-            <span>TTS, STT, voice cloning, live transcription, and live audio.</span>
-          </div>
-          <div className="runtime-lane">
-            <strong>Runner boundary</strong>
-            <span>Python, ONNX, and whisper.cpp stay isolated.</span>
-          </div>
         </div>
       </Section>
 
