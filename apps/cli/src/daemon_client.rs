@@ -78,9 +78,7 @@ impl Client {
         let attempts = attempts.max(1);
 
         for attempt in 1..=attempts {
-            let response = self
-                .headers(ureq::post(&url))
-                .send_json(payload.clone());
+            let response = self.headers(ureq::post(&url)).send_json(payload.clone());
             match response {
                 Ok(response) => {
                     return response
@@ -97,9 +95,7 @@ impl Client {
                     return Err(anyhow!(message));
                 }
                 Err(ureq::Error::Transport(error)) => {
-                    let message = format!(
-                        "POST {url}: could not contact Takokit daemon: {error}"
-                    );
+                    let message = format!("POST {url}: could not contact Takokit daemon: {error}");
                     if attempt < attempts {
                         thread::sleep(retry_delay(attempt));
                         continue;

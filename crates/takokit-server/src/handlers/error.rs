@@ -49,9 +49,7 @@ impl IntoResponse for ApiError {
             }
         ) || matches!(
             status,
-            StatusCode::BAD_GATEWAY
-                | StatusCode::SERVICE_UNAVAILABLE
-                | StatusCode::GATEWAY_TIMEOUT
+            StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT
         );
         let body = Json(serde_json::json!({
             "error": {

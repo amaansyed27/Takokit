@@ -225,10 +225,7 @@ fn download_with_ureq(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
                 }
                 return Err(PackageError::ArtifactDownloadFailed {
                     artifact: artifact.to_string(),
-                    reason: format!(
-                        "upstream returned HTTP {status}: {}",
-                        concise_body(&body)
-                    ),
+                    reason: format!("upstream returned HTTP {status}: {}", concise_body(&body)),
                 });
             }
             Err(ureq::Error::Transport(error)) => {
@@ -239,9 +236,7 @@ fn download_with_ureq(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
                 }
                 return Err(PackageError::ArtifactDownloadFailed {
                     artifact: artifact.to_string(),
-                    reason: format!(
-                        "transport failed after {DOWNLOAD_ATTEMPTS} attempts: {error}"
-                    ),
+                    reason: format!("transport failed after {DOWNLOAD_ATTEMPTS} attempts: {error}"),
                 });
             }
         }
