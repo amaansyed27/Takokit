@@ -1,6 +1,5 @@
 import { HistoryPage } from "../features/history/HistoryPage";
 import { HomePage } from "../features/home/HomePage";
-import { LibraryPage } from "../features/library/LibraryPage";
 import { ModelsPage } from "../features/models/ModelsPage";
 import { RunnersPage } from "../features/runners/RunnersPage";
 import { ServerPage } from "../features/server/ServerPage";
@@ -26,7 +25,6 @@ export const routes: AppRoute[] = [
   { id: "home", component: HomePage },
   { id: "models", component: ModelsPage },
   { id: "runners", component: RunnersPage },
-  { id: "library", component: LibraryPage },
   { id: "voices", component: VoicesPage },
   { id: "speak", component: SpeakPage },
   { id: "transcribe", component: TranscribePage },
