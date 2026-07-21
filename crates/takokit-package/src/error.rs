@@ -90,10 +90,9 @@ impl PackageError {
 impl From<PackageError> for TakokitError {
     fn from(value: PackageError) -> Self {
         match value {
-            PackageError::InstallStage { stage, source } => TakokitError::Resolution {
-                code: ErrorCode::ArtifactInstallFailed,
-                message: format!("model installation failed during {stage:?}: {source}"),
-            },
+            PackageError::InstallStage { stage, source } => {
+                add_install_stage(stage, TakokitError::from(*source))
+            }
             PackageError::ModelNotFound(id) => TakokitError::Resolution {
                 code: ErrorCode::ModelNotFound,
                 message: format!("model is not available in the local registry: {id}"),
@@ -150,4 +149,68 @@ impl From<PackageError> for TakokitError {
     }
 }
 
+fn add_install_stage(stage: InstallFailureStage, error: TakokitError) -> TakokitError {
+    let prefix = format!("model installation failed during {stage:?}: ");
+    match error {
+        TakokitError::Resolution { code, message } => TakokitError::Resolution {
+            code,
+            message: format!("{prefix}{message}"),
+        },
+        TakokitError::InvalidRequest(message) => {
+            TakokitError::InvalidRequest(format!("{prefix}{message}"))
+        }
+        TakokitError::Storage(message) => TakokitError::Storage(format!("{prefix}{message}")),
+        TakokitError::Model(message) => TakokitError::Model(format!("{prefix}{message}")),
+        TakokitError::Execution(message) => TakokitError::Execution(format!("{prefix}{message}")),
+        TakokitError::Audio(message) => TakokitError::Audio(format!("{prefix}{message}")),
+        TakokitError::NotImplemented { feature, reason } => TakokitError::Resolution {
+            code: ErrorCode::ArtifactInstallFailed,
+            message: format!("{prefix}{feature} is not implemented yet: {reason}"),
+        },
+    }
+}
+
 pub type PackageResult<T> = Result<T, PackageError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn staged_download_failure_preserves_retryable_error_code() {
+        let error = PackageError::at_stage(
+            InstallFailureStage::RunnerRuntime,
+            PackageError::ArtifactDownloadFailed {
+                artifact: "whisper-runtime".into(),
+                reason: "connection reset".into(),
+            },
+        );
+
+        assert!(matches!(
+            TakokitError::from(error),
+            TakokitError::Resolution {
+                code: ErrorCode::ArtifactDownloadFailed,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn staged_install_failure_remains_install_failure() {
+        let error = PackageError::at_stage(
+            InstallFailureStage::FinalVerification,
+            PackageError::ArtifactInstallFailed {
+                artifact: "model".into(),
+                reason: "verification failed".into(),
+            },
+        );
+
+        assert!(matches!(
+            TakokitError::from(error),
+            TakokitError::Resolution {
+                code: ErrorCode::ArtifactInstallFailed,
+                ..
+            }
+        ));
+    }
+}
