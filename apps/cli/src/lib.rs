@@ -53,10 +53,14 @@ pub async fn run() -> anyhow::Result<()> {
 
     let Cli {
         direct,
+        output,
         workspace: workspace_arg,
         session: session_arg,
         command,
     } = Cli::parse();
+    if let Some(output) = output {
+        set_json_output(matches!(output, OutputFormat::Json));
+    }
     let store = LocalStore::new(cli_storage_root());
     store.ensure_layout()?;
     let config = RuntimeConfig::local(store.root().to_path_buf());
@@ -124,7 +128,7 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Doctor(args)) => {
             let report =
                 doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
-            if args.json {
+            if args.json || json_output_requested() {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 doctor::print_report(&report);
@@ -201,7 +205,7 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Plan(args)) => {
             let plan = plan_model(&package_registry, &installed_registry, &args.model)
                 .map_err(cli_error)?;
-            print_or_json_plan(&plan, args.json)?;
+            print_or_json_plan(&plan, args.json || json_output_requested())?;
         }
         Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
@@ -287,7 +291,7 @@ pub async fn run() -> anyhow::Result<()> {
             }
             RunnerCommand::Doctor { runner, json } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                if json {
+                if json || json_output_requested() {
                     print_runner_doctor_json(&store, &installed_registry, &manifest)?;
                 } else {
                     print_runner_doctor(&store, &installed_registry, &manifest);
@@ -334,10 +338,11 @@ pub async fn run() -> anyhow::Result<()> {
             AdapterCommand::Doctor { adapter, json } => {
                 let adapter = normalize_adapter_id(&adapter);
                 let record = python_adapter_record(store.root(), &adapter).map_err(cli_error)?;
-                print_adapter_doctor(&store, &record, json)?;
+                print_adapter_doctor(&store, &record, json || json_output_requested())?;
             }
         },
-        Some(Command::Test(args)) => {
+        Some(Command::Test(mut args)) => {
+            args.json |= json_output_requested();
             run_test_command(&store, &package_registry, &installed_registry, args).await?
         }
     }
