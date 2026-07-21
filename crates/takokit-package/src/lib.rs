@@ -7,6 +7,7 @@ mod installed;
 mod model;
 mod orchestrator;
 mod planning;
+mod progress;
 mod records;
 mod registry;
 mod resolution;
@@ -26,6 +27,10 @@ pub use error::*;
 pub use installed::InstalledRegistry;
 pub use model::*;
 pub use orchestrator::install_model_complete;
+pub use progress::{
+    model_progress_path, read_model_progress, InstallProgress, InstallProgressMonitor,
+    InstallProgressReporter, InstallProgressState,
+};
 pub use records::*;
 pub use registry::PackageRegistry;
 pub use resolution::{
