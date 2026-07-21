@@ -1,0 +1,130 @@
+name: One-time structured output compatibility fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-structured-output.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply structured output fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new, count=-1):
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"missing target in {path}: {old!r}")
+              file.write_text(text.replace(old, new, count), encoding="utf-8")
+
+          replace(
+              "apps/cli/src/args.rs",
+              '''    /// Output format for commands that support structured responses.\n    #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Human)]\n    pub(crate) output: OutputFormat,''',
+              '''    /// Override the output format. When omitted, TAKOKIT_OUTPUT remains supported.\n    #[arg(long, global = true, value_enum)]\n    pub(crate) output: Option<OutputFormat>,'''
+          )
+
+          replace(
+              "apps/cli/src/lib.rs",
+              '''    let Cli {\n        direct,\n        workspace: workspace_arg,''',
+              '''    let Cli {\n        direct,\n        output,\n        workspace: workspace_arg,'''
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''    } = Cli::parse();\n    let store = LocalStore::new(cli_storage_root());''',
+              '''    } = Cli::parse();\n    if let Some(output) = output {\n        set_json_output(matches!(output, OutputFormat::Json));\n    }\n    let store = LocalStore::new(cli_storage_root());'''
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''            if args.json {''',
+              '''            if args.json || json_output_requested() {''',
+              1
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''            print_or_json_plan(&plan, args.json)?;''',
+              '''            print_or_json_plan(&plan, args.json || json_output_requested())?;'''
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''                if json {\n                    print_runner_doctor_json''',
+              '''                if json || json_output_requested() {\n                    print_runner_doctor_json'''
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''                print_adapter_doctor(&store, &record, json)?;''',
+              '''                print_adapter_doctor(&store, &record, json || json_output_requested())?;'''
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''        Some(Command::Test(args)) => {\n            run_test_command(&store, &package_registry, &installed_registry, args).await?\n        }''',
+              '''        Some(Command::Test(mut args)) => {\n            args.json |= json_output_requested();\n            run_test_command(&store, &package_registry, &installed_registry, args).await?\n        }'''
+          )
+
+          tests = Path("apps/cli/src/tests.rs")
+          text = tests.read_text(encoding="utf-8")
+          marker = '''#[test]\nfn cli_parses_doctor_command() {'''
+          addition = '''#[test]\nfn cli_parses_global_output_override_before_or_after_subcommands() {\n    let before = Cli::try_parse_from([\n        "takokit",\n        "--output",\n        "json",\n        "sessions",\n        "list",\n    ])\n    .expect("global output before command");\n    let after = Cli::try_parse_from([\n        "takokit",\n        "sessions",\n        "list",\n        "--output",\n        "json",\n    ])\n    .expect("global output after command");\n\n    assert_eq!(before.output, Some(OutputFormat::Json));\n    assert_eq!(after.output, Some(OutputFormat::Json));\n}\n\n'''
+          if "cli_parses_global_output_override_before_or_after_subcommands" not in text:
+              if marker not in text:
+                  raise SystemExit("test insertion marker missing")
+              text = text.replace(marker, addition + marker, 1)
+          tests.write_text(text, encoding="utf-8")
+
+          doc = Path("docs/TESTING.md")
+          text = doc.read_text(encoding="utf-8")
+          replacements = {
+              '& $Tako models | Tee-Object "$Evidence\\models-clean.json"': '& $Tako --output json models | Tee-Object "$Evidence\\models-clean.json"',
+              '& $Tako runners | Tee-Object "$Evidence\\runners-clean.json"': '& $Tako --output json runners | Tee-Object "$Evidence\\runners-clean.json"',
+              '& $Tako library models | Tee-Object "$Evidence\\library-models.json"': '& $Tako --output json library models | Tee-Object "$Evidence\\library-models.json"',
+              '& $Tako library runners | Tee-Object "$Evidence\\library-runners.json"': '& $Tako --output json library runners | Tee-Object "$Evidence\\library-runners.json"',
+              '$Daemon = & $Tako daemon status | ConvertFrom-Json': '$Daemon = & $Tako --output json daemon status | ConvertFrom-Json',
+              '& $Tako daemon start | Out-Null': '& $Tako daemon start',
+              '$Before = & $Tako daemon status | ConvertFrom-Json': '$Before = & $Tako --output json daemon status | ConvertFrom-Json',
+              '$After = & $Tako daemon start | ConvertFrom-Json': '$After = & $Tako --output json daemon start | ConvertFrom-Json',
+              '& $Tako sessions list | Tee-Object "$Evidence\\session-a-list.json"': '& $Tako --output json sessions list | Tee-Object "$Evidence\\session-a-list.json"',
+              '& $Tako sessions list | Tee-Object "$Evidence\\session-b-list.json"': '& $Tako --output json sessions list | Tee-Object "$Evidence\\session-b-list.json"',
+              '$Session = & $Tako sessions new --title "Searchable interview" | ConvertFrom-Json': '$Session = & $Tako --output json sessions new --title "Searchable interview" | ConvertFrom-Json',
+              '$Disposable = & $Tako sessions new --title "Delete me" | ConvertFrom-Json': '$Disposable = & $Tako --output json sessions new --title "Delete me" | ConvertFrom-Json',
+              '& $Tako speak "Mock session persistence test" --model mock-tts |': '& $Tako --output json speak "Mock session persistence test" --model mock-tts |',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f"testing guide target missing: {old}")
+              text = text.replace(old, new)
+          note_marker = 'Expected: both aliases report the same version and storage root.\n'
+          note = ('\nHuman-readable output is the default. Use `--output json` for commands that are piped to '
+                  '`ConvertFrom-Json` or saved as JSON evidence. `TAKOKIT_OUTPUT=json` remains supported for automation.\n')
+          if note.strip() not in text:
+              text = text.replace(note_marker, note_marker + note, 1)
+          doc.write_text(text, encoding="utf-8")
+      - name: Format
+        run: cargo fmt --all
+      - name: Verify format
+        run: cargo fmt --all -- --check
+      - name: Test workspace
+        run: cargo test --workspace
+      - name: Build release
+        run: cargo build --release
+      - name: Commit result
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/cli/src/args.rs apps/cli/src/lib.rs apps/cli/src/tests.rs docs/TESTING.md
+          git commit -m "Add explicit structured output mode and fix testing guide"
+          git pull --rebase origin main
+          git push origin HEAD:main
