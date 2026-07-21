@@ -4,6 +4,7 @@ import { type PageId } from "./navigation";
 import { routes } from "./routes";
 import { mockRuntime } from "../lib/mockData";
 import { loadRuntimeSnapshot } from "../lib/api";
+import { withVerifiedInstalledModels } from "../lib/installedModels";
 import { initializeWorkspaceSession } from "../lib/sessions";
 
 const routeIds = new Set<PageId>(routes.map((route) => route.id));
@@ -15,7 +16,7 @@ function pageFromHash(): PageId {
 
 export function App() {
   const [activePage, setActivePage] = useState<PageId>(() => pageFromHash());
-  const [runtime, setRuntime] = useState(mockRuntime);
+  const [runtime, setRuntime] = useState(() => ({ ...mockRuntime, models: [] }));
   const route = routes.find((item) => item.id === activePage) ?? routes[0];
   const Page = route.component;
 
@@ -41,8 +42,12 @@ export function App() {
   }, []);
 
   async function refreshRuntime() {
-    const nextRuntime = await loadRuntimeSnapshot();
-    setRuntime(nextRuntime);
+    const snapshot = await loadRuntimeSnapshot();
+    try {
+      setRuntime(await withVerifiedInstalledModels(snapshot));
+    } catch {
+      setRuntime({ ...snapshot, models: [] });
+    }
   }
 
   function navigate(page: PageId) {
