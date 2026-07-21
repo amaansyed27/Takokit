@@ -24,6 +24,10 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/library/runners", get(handlers::library_runners))
         .route("/v1/models/:id/plan", get(handlers::model_plan))
         .route(
+            "/v1/models/:id/progress",
+            get(handlers::model_pull_progress),
+        )
+        .route(
             "/v1/models/:id",
             get(handlers::model).delete(handlers::remove_model),
         )
