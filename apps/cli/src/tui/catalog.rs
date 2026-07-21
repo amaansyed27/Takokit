@@ -4,6 +4,7 @@ use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
 pub struct ModelRow {
     pub id: String,
     pub title: String,
+    pub model_type: String,
     pub state: String,
     pub detail: String,
     pub tts: bool,
@@ -45,55 +46,48 @@ pub fn load_runtime_rows(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
 ) -> anyhow::Result<(Vec<ModelRow>, Vec<RunnerRow>)> {
-    let models = package_registry
-        .models()?
+    let inventory = installed_registry.installed_model_inventory(package_registry)?;
+    let models = inventory
+        .data
         .into_iter()
-        .map(|model| {
+        .map(|installed| {
+            let model = package_registry.model(&installed.name)?;
             let plan = plan_model(package_registry, installed_registry, &model.id)?;
-            let capabilities = [
-                model.capabilities.tts.then_some("text to speech"),
-                model.capabilities.stt.then_some("speech to text"),
-                model.capabilities.voice_cloning.then_some("voice cloning"),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(", ");
+            let action = if plan.executable {
+                "Ready to use. Press Enter to open the matching task screen.".to_string()
+            } else {
+                format!(
+                    "Model files are installed, but the runtime needs repair. Press Enter or P to repair it.\nMissing: {}",
+                    if plan.missing.is_empty() {
+                        "runtime setup".to_string()
+                    } else {
+                        plan.missing.join("; ")
+                    }
+                )
+            };
             Ok(ModelRow {
                 id: model.id,
                 title: model.name,
+                model_type: installed.model_type.clone(),
                 state: if plan.executable {
                     "ready".to_string()
                 } else {
-                    plan.lifecycle_state.to_string()
+                    "needs repair".to_string()
                 },
                 detail: format!(
-                    "{}\n\nCapability: {}\nFamily: {}\nRunner: {}\nHardware: {}\n\n{}",
+                    "{}\n\nType: {}\nFamily: {}\nRunner: {}\nLocal ID: {}\nStored size: {}\nHardware: {}\n\n{}",
                     model.description,
-                    if capabilities.is_empty() {
-                        "specialized"
-                    } else {
-                        &capabilities
-                    },
+                    installed.model_type,
                     model.family,
                     plan.required_runner,
+                    installed.id,
+                    format_size(installed.size_bytes),
                     model
                         .hardware
                         .min_ram
                         .as_deref()
                         .unwrap_or("no minimum listed"),
-                    if plan.executable {
-                        "Ready to use. Press Enter to open the matching task screen.".to_string()
-                    } else {
-                        format!(
-                            "Not ready yet. Press Enter to let Takokit install what is missing.\nMissing: {}",
-                            if plan.missing.is_empty() {
-                                "setup".to_string()
-                            } else {
-                                plan.missing.join("; ")
-                            }
-                        )
-                    }
+                    action
                 ),
                 tts: model.capabilities.tts,
                 stt: model.capabilities.stt,
@@ -225,4 +219,34 @@ pub fn system_rows() -> Vec<SystemRow> {
             action: SystemAction::OpenGui,
         },
     ]
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_store_has_no_tui_model_rows() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let package_registry = PackageRegistry::bundled();
+        let installed_registry = InstalledRegistry::new(temp.path().join("manifests"));
+
+        let (models, runners) =
+            load_runtime_rows(&package_registry, &installed_registry).expect("runtime rows");
+
+        assert!(models.is_empty());
+        assert!(!runners.is_empty());
+    }
 }
