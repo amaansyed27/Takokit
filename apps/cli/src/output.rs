@@ -1,22 +1,22 @@
 //! Human-readable and JSON rendering for package, plan, and runner views.
 
 use super::*;
+use std::io::IsTerminal;
 
 mod human;
 pub(crate) use human::{print_serializable, print_value};
 
 pub(crate) fn set_json_output(enabled: bool) {
-    if enabled {
+    if enabled || !std::io::stdout().is_terminal() {
         std::env::set_var("TAKOKIT_OUTPUT", "json");
-    } else {
-        std::env::remove_var("TAKOKIT_OUTPUT");
     }
 }
 
 pub(crate) fn json_output_requested() -> bool {
-    std::env::var("TAKOKIT_OUTPUT")
-        .map(|value| value.eq_ignore_ascii_case("json"))
-        .unwrap_or(false)
+    !std::io::stdout().is_terminal()
+        || std::env::var("TAKOKIT_OUTPUT")
+            .map(|value| value.eq_ignore_ascii_case("json"))
+            .unwrap_or(false)
 }
 
 pub(crate) fn print_or_json_plan(plan: &ModelPlan, json: bool) -> anyhow::Result<()> {
