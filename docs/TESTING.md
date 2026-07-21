@@ -119,7 +119,8 @@ Verify:
 
 ```powershell
 & $Tako daemon start
-& $Tako daemon status
+$Daemon = & $Tako daemon status | ConvertFrom-Json
+$Daemon
 & $Tako status
 & $Tako daemon start
 & $Tako daemon restart
@@ -132,20 +133,46 @@ Pass criteria:
 
 - repeated start is idempotent,
 - one managed daemon owns port 5050,
+- a daemon started through `tako.exe` records `takokit.exe` as its canonical executable,
 - restart preserves storage,
 - stop terminates the owned daemon,
 - logs and identity records are useful.
 
-Crash recovery:
+Crash recovery must terminate the exact managed PID from the active `TAKOKIT_HOME`; do not rely on a process name:
 
 ```powershell
-& $Tako daemon start
-Get-Process takokit | Stop-Process -Force
-& $Tako daemon start
+& $Tako daemon start | Out-Null
+$Before = & $Tako daemon status | ConvertFrom-Json
+
+if ([IO.Path]::GetFileName($Before.executable) -ne "takokit.exe") {
+  throw "Managed daemon used the wrong executable: $($Before.executable)"
+}
+
+Stop-Process -Id $Before.pid -Force
+Start-Sleep -Milliseconds 500
+
+if (Get-Process -Id $Before.pid -ErrorAction SilentlyContinue) {
+  throw "Managed daemon PID $($Before.pid) did not terminate"
+}
+if (Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue) {
+  throw "Port 5050 is still occupied after the simulated crash"
+}
+
+$After = & $Tako daemon start | ConvertFrom-Json
 & $Tako daemon status
+
+if ($After.pid -eq $Before.pid) {
+  throw "Crash recovery reused the stale PID"
+}
+if ($After.instance_id -eq $Before.instance_id) {
+  throw "Crash recovery reused the stale instance identity"
+}
+if ([IO.Path]::GetFileName($After.executable) -ne "takokit.exe") {
+  throw "Recovered daemon used the wrong executable: $($After.executable)"
+}
 ```
 
-Expected: stale PID and lock ownership are recovered safely.
+Expected: stale PID, identity and lock ownership are recovered safely; the replacement daemon has a new PID and instance ID and runs through the canonical `takokit.exe` binary.
 
 ## 7. Two isolated project workspaces
 
