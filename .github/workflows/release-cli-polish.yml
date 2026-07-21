@@ -1,0 +1,343 @@
+name: Release CLI polish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-cli-polish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply release-quality CLI output and Windows process behavior
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+          def write(path, text):
+              Path(path).write_text(text, encoding='utf-8')
+          def replace(path, old, new, count=-1):
+              text = read(path)
+              if old not in text:
+                  raise SystemExit(f'missing target in {path}: {old[:100]!r}')
+              write(path, text.replace(old, new, count))
+
+          # Global explicit JSON mode. Existing command-specific JSON fields become
+          # parse-skipped state populated from the global flag.
+          p = 'apps/cli/src/args.rs'
+          text = read(p)
+          text = text.replace(
+              '    #[arg(long, global = true)]\n    pub(crate) direct: bool,',
+              '    #[arg(long, global = true)]\n    pub(crate) direct: bool,\n    /// Emit stable machine-readable JSON instead of the default human output.\n    #[arg(long, global = true)]\n    pub(crate) json: bool,'
+          )
+          text = text.replace('    #[arg(long)]\n    pub(crate) json: bool,', '    #[arg(skip)]\n    pub(crate) json: bool,')
+          text = text.replace('        #[arg(long)]\n        json: bool,', '        #[arg(skip)]\n        json: bool,')
+          write(p, text)
+
+          # Central output layer.
+          p = 'apps/cli/src/output.rs'
+          text = read(p)
+          addition = r'''
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static JSON_OUTPUT: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn set_json_output(enabled: bool) {
+    JSON_OUTPUT.store(enabled, Ordering::Relaxed);
+}
+
+pub(crate) fn json_output() -> bool {
+    JSON_OUTPUT.load(Ordering::Relaxed)
+}
+
+pub(crate) fn print_serializable<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
+    let value = serde_json::to_value(value)?;
+    print_value(&value)
+}
+
+pub(crate) fn print_value(value: &serde_json::Value) -> anyhow::Result<()> {
+    if json_output() {
+        println!("{}", serde_json::to_string_pretty(value)?);
+    } else {
+        print_human_value(value, 0);
+    }
+    Ok(())
+}
+
+fn print_human_value(value: &serde_json::Value, depth: usize) {
+    if let Some(data) = value.get("data") {
+        print_human_value(data, depth);
+        return;
+    }
+    match value {
+        serde_json::Value::Array(items) => {
+            if items.is_empty() {
+                println!("No entries.");
+                return;
+            }
+            for item in items {
+                print_human_item(item);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            if map.contains_key("model_id") && map.contains_key("artifacts") {
+                let model = string_field(map, "model_id");
+                println!("Model {model}");
+                print_stage(map, "artifacts", "artifacts");
+                print_stage(map, "runner_contract", "runner");
+                print_stage(map, "runner_runtime", "runtime");
+                print_stage(map, "adapter", "adapter");
+                println!("  ready       {}", yes(map.get("executable").and_then(|v| v.as_bool()).unwrap_or(false)));
+                if let Some(path) = map.get("logs_path").and_then(|v| v.as_str()) {
+                    println!("  logs        {path}");
+                }
+                return;
+            }
+            if map.contains_key("output_path") {
+                let model = string_field(map, "model");
+                let output = string_field(map, "output_path");
+                if map.contains_key("text") {
+                    println!("Transcription complete");
+                    if !model.is_empty() { println!("  model       {model}"); }
+                    if let Some(text) = map.get("text").and_then(|v| v.as_str()) { println!("\n{text}"); }
+                    println!("\nSaved to {output}");
+                } else {
+                    println!("Audio ready");
+                    if !model.is_empty() { println!("  model       {model}"); }
+                    if let Some(engine) = map.get("engine").and_then(|v| v.as_str()) { println!("  engine      {engine}"); }
+                    if let Some(bytes) = map.get("bytes").and_then(|v| v.as_u64()) { println!("  size        {}", format_bytes(bytes)); }
+                    println!("  output      {output}");
+                }
+                return;
+            }
+            if map.contains_key("instance_id") && map.contains_key("pid") {
+                println!("Daemon running");
+                println!("  pid         {}", scalar(map.get("pid")));
+                println!("  address     {}:{}", string_field(map, "host"), scalar(map.get("port")));
+                println!("  executable  {}", string_field(map, "executable"));
+                println!("  storage     {}", string_field(map, "storage_root"));
+                return;
+            }
+            if let Some(removed) = map.get("removed").and_then(|v| v.as_bool()) {
+                let id = string_field(map, "id");
+                println!("{} {id}", if removed { "Removed" } else { "Not installed:" });
+                return;
+            }
+            if map.contains_key("summary") {
+                if let Some(summary) = map.get("summary") { print_human_item(summary); }
+                return;
+            }
+            for (key, value) in map {
+                if value.is_null() { continue; }
+                let indent = "  ".repeat(depth);
+                match value {
+                    serde_json::Value::Object(_) | serde_json::Value::Array(_) => {
+                        println!("{indent}{}:", label(key));
+                        print_human_value(value, depth + 1);
+                    }
+                    _ => println!("{indent}{:<14} {}", label(key), scalar(Some(value))),
+                }
+            }
+        }
+        _ => println!("{}", scalar(Some(value))),
+    }
+}
+
+fn print_human_item(value: &serde_json::Value) {
+    let Some(map) = value.as_object() else { println!("{}", scalar(Some(value))); return; };
+    let primary = ["name", "title", "id", "model_id"]
+        .iter().find_map(|key| map.get(*key).and_then(|v| v.as_str()))
+        .unwrap_or("entry");
+    let id = map.get("id").and_then(|v| v.as_str()).filter(|id| *id != primary);
+    let state = ["status", "state", "lifecycle_state", "runtime_state"]
+        .iter().find_map(|key| map.get(*key).and_then(|v| v.as_str()));
+    print!("{primary}");
+    if let Some(id) = id { print!("  {id}"); }
+    if let Some(state) = state { print!("  [{state}]"); }
+    if let Some(model) = map.get("last_model").and_then(|v| v.as_str()) { print!("  model={model}"); }
+    if let Some(count) = map.get("event_count").and_then(|v| v.as_u64()) { print!("  events={count}"); }
+    println!();
+}
+
+fn print_stage(map: &serde_json::Map<String, serde_json::Value>, key: &str, label_text: &str) {
+    let Some(value) = map.get(key) else { return; };
+    if value.is_null() { return; }
+    let state = value.get("state").and_then(|v| v.as_str()).unwrap_or("ready");
+    let detail = value.get("detail").and_then(|v| v.as_str()).unwrap_or("");
+    println!("  {label_text:<11} {state}");
+    if !detail.is_empty() && detail != state { println!("               {detail}"); }
+}
+
+fn string_field(map: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
+    map.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+}
+fn scalar(value: Option<&serde_json::Value>) -> String {
+    match value {
+        Some(serde_json::Value::String(v)) => v.clone(),
+        Some(serde_json::Value::Bool(v)) => v.to_string(),
+        Some(serde_json::Value::Number(v)) => v.to_string(),
+        Some(serde_json::Value::Null) | None => "-".to_string(),
+        Some(v) => v.to_string(),
+    }
+}
+fn label(value: &str) -> String { value.replace('_', " ") }
+fn yes(value: bool) -> &'static str { if value { "yes" } else { "no" } }
+fn format_bytes(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 { format!("{:.1} GB", bytes as f64 / 1_073_741_824.0) }
+    else if bytes >= 1_048_576 { format!("{:.1} MB", bytes as f64 / 1_048_576.0) }
+    else if bytes >= 1024 { format!("{:.1} KB", bytes as f64 / 1024.0) }
+    else { format!("{bytes} B") }
+}
+'''
+          if 'static JSON_OUTPUT' not in text:
+              text += addition
+          write(p, text)
+
+          # Main entrypoint: set global output mode and use central renderer.
+          p = 'apps/cli/src/lib.rs'
+          text = read(p)
+          text = text.replace('        direct,\n        workspace:', '        direct,\n        json,\n        workspace:')
+          text = text.replace('    let store = LocalStore::new(cli_storage_root());', '    set_json_output(json);\n    let store = LocalStore::new(cli_storage_root());')
+          text = text.replace('route_daemon_command(&command, &store, &config)', 'route_daemon_command(&command, &store, &config)')
+          replacements = {
+              'println!(\n                "{}",\n                serde_json::to_string_pretty(&daemon::start(&store, &config)?)?\n            )': 'print_serializable(&daemon::start(&store, &config)?)?',
+              'println!(\n                    "{}",\n                    serde_json::to_string_pretty(&daemon::start(&store, &config)?)?\n                );': 'print_serializable(&daemon::start(&store, &config)?)?;',
+              'Some(info) => println!("{}", serde_json::to_string_pretty(&info)?),': 'Some(info) => print_serializable(&info)?,',
+              'println!("{}", serde_json::to_string_pretty(&state.status())?);': 'print_serializable(&state.status())?;',
+              'println!("{}", serde_json::to_string_pretty(&report)?);': 'print_serializable(&report)?;',
+              'println!("{}", serde_json::to_string_pretty(registry.voices())?)': 'print_serializable(registry.voices())?',
+              'println!("{}", serde_json::to_string_pretty(&value)?);': 'print_value(&value)?;',
+              'println!("{}", serde_json::to_string_pretty(&records)?);': 'print_serializable(&records)?;',
+              'println!("{}", serde_json::to_string_pretty(&record)?);': 'print_serializable(&record)?;',
+              'Some(Command::Sessions { command }) => run_sessions_command(workspace_arg, command)?,': 'Some(Command::Sessions { command }) => run_sessions_command(workspace_arg, command)?,',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          # Replace remaining structured removal blocks conservatively.
+          text = text.replace('''println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "id": model,
+                    "removed": removed
+                }))?
+            );''', '''print_value(&serde_json::json!({"id": model, "removed": removed}))?;''')
+          text = text.replace('''println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "id": runner,
+                        "removed": removed
+                    }))?
+                );''', '''print_value(&serde_json::json!({"id": runner, "removed": removed}))?;''')
+          write(p, text)
+
+          # Daemon routed commands use the same renderer.
+          p = 'apps/cli/src/daemon_commands.rs'
+          text = read(p).replace(
+              '    println!("{}", serde_json::to_string_pretty(&output)?);',
+              '    print_value(&output)?;'
+          )
+          write(p, text)
+
+          # Direct inference surfaces.
+          p = 'apps/cli/src/direct_inference.rs'
+          text = read(p)
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&response)?);', 'print_serializable(&response)?;')
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&profile)?);', 'print_serializable(&profile)?;')
+          write(p, text)
+
+          # Sessions.
+          p = 'apps/cli/src/session_commands.rs'
+          text = read(p)
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&sessions)?);', 'crate::print_serializable(&sessions)?;')
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&session)?);', 'crate::print_serializable(&session)?;')
+          text = text.replace('''println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "id": id,
+                    "removed": store.remove_session(id)?
+                }))?
+            );''', '''crate::print_value(&serde_json::json!({
+                "id": id,
+                "removed": store.remove_session(id)?
+            }))?;''')
+          write(p, text)
+
+          # Lists and library views.
+          p = 'apps/cli/src/output.rs'
+          text = read(p)
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&models)?);', 'print_serializable(&models)?;')
+          text = text.replace('println!("{}", serde_json::to_string_pretty(&runners)?);', 'print_serializable(&runners)?;')
+          write(p, text)
+
+          # Prevent helper programs from opening a second console on Windows.
+          p = 'crates/takokit-package/src/runtime_command.rs'
+          text = read(p)
+          marker = '''    for arg in args {
+        command.arg(arg.as_os_str());
+    }
+    let output = command'''
+          replacement = '''    for arg in args {
+        command.arg(arg.as_os_str());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = command'''
+          if marker not in text:
+              raise SystemExit('runtime command insertion point missing')
+          text = text.replace(marker, replacement, 1)
+          write(p, text)
+
+          # Remove old command-specific JSON branches in favor of global mode.
+          p = 'apps/cli/src/lib.rs'
+          text = read(p)
+          text = text.replace('if args.json {\n                println!("{}", serde_json::to_string_pretty(&report)?);\n            } else {\n                doctor::print_report(&report);\n            }', 'if json_output() { print_serializable(&report)?; } else { doctor::print_report(&report); }')
+          text = text.replace('print_or_json_plan(&plan, args.json)?;', 'print_or_json_plan(&plan, json_output())?;')
+          text = text.replace('if json {\n                    print_runner_doctor_json(&store, &installed_registry, &manifest)?;\n                } else {', 'if json_output() {\n                    print_runner_doctor_json(&store, &installed_registry, &manifest)?;\n                } else {')
+          text = text.replace('print_adapter_doctor(&store, &record, json)?;', 'print_adapter_doctor(&store, &record, json_output())?;')
+          write(p, text)
+
+          # Ensure explicit JSON test mode still reaches test command.
+          p = 'apps/cli/src/lib.rs'
+          text = read(p)
+          text = text.replace('Some(Command::Test(args)) => {\n            run_test_command', 'Some(Command::Test(mut args)) => {\n            args.json = json_output();\n            run_test_command')
+          write(p, text)
+
+      - name: Audit remaining default raw JSON and process spawns
+        run: |
+          echo 'Remaining pretty JSON call sites:'
+          rg 'to_string_pretty' apps/cli/src || true
+          echo 'Managed process spawn sites:'
+          rg 'Command::new|\.command\(' crates apps/cli/src || true
+      - name: Format and verify
+        run: |
+          cargo fmt --all
+          cargo check --workspace
+          cargo test --workspace
+          python scripts/audit_file_sizes.py
+      - name: Remove one-time workflow
+        run: rm .github/workflows/release-cli-polish.yml
+      - name: Commit and push
+        run: |
+          git config user.name 'Takokit automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Polish CLI output and suppress Windows helper consoles'
+          git pull --rebase origin main
+          git push origin HEAD:main
