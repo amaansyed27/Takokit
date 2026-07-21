@@ -106,20 +106,14 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Daemon { command }) => match command {
-            DaemonCommand::Start => println!(
-                "{}",
-                serde_json::to_string_pretty(&daemon::start(&store, &config)?)?
-            ),
+            DaemonCommand::Start => print_serializable(&daemon::start(&store, &config)?)?,
             DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
             DaemonCommand::Restart => {
                 let _ = daemon::stop(&store, &config)?;
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&daemon::start(&store, &config)?)?
-                );
+                print_serializable(&daemon::start(&store, &config)?)?;
             }
             DaemonCommand::Status => match daemon::status(&store, &config)? {
-                Some(info) => println!("{}", serde_json::to_string_pretty(&info)?),
+                Some(info) => print_serializable(&info)?,
                 None => println!("not running"),
             },
             DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
@@ -162,7 +156,7 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Status) => {
             let state = AppState::new(config, store);
-            println!("{}", serde_json::to_string_pretty(&state.status())?);
+            print_serializable(&state.status())?;
         }
         Some(Command::Capabilities) => {
             for capability in CapabilityKind::ALL {
@@ -195,7 +189,7 @@ pub async fn run() -> anyhow::Result<()> {
                 },
             )
             .map_err(cli_error)?;
-            println!("{}", serde_json::to_string_pretty(&report)?);
+            print_serializable(&report)?;
         }
         Some(Command::Show { model }) => {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
@@ -211,13 +205,10 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Rm { model }) => {
             let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&serde_json::json!({
-                    "id": model,
-                    "removed": removed
-                }))?
-            );
+            print_value(&serde_json::json!({
+                "id": model,
+                "removed": removed
+            }))?;
         }
         Some(Command::List { target }) => {
             let registry = ModelRegistry::default();
@@ -226,9 +217,7 @@ pub async fn run() -> anyhow::Result<()> {
                     print_models(&package_registry, &installed_registry)?
                 }
                 Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
-                Some(ListTarget::Voices) => {
-                    println!("{}", serde_json::to_string_pretty(registry.voices())?)
-                }
+                Some(ListTarget::Voices) => print_serializable(registry.voices())?,
             }
         }
         Some(Command::Run(args)) => {
@@ -242,11 +231,11 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Ps) => {
             if direct {
-                println!("[]");
+                print_value(&serde_json::json!([]))?;
             } else {
                 let value: serde_json::Value =
                     daemon_client::Client::ensure(&store, &config)?.get("/v1/ps")?;
-                println!("{}", serde_json::to_string_pretty(&value)?);
+                print_value(&value)?;
             }
         }
         Some(Command::Transcribe { audio, model }) => {
@@ -287,14 +276,14 @@ pub async fn run() -> anyhow::Result<()> {
                 let report = installed_registry
                     .install_runner(&manifest)
                     .map_err(cli_error)?;
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                print_serializable(&report)?;
             }
             RunnerCommand::Install { runner } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
                 let report =
                     initialize_runner_runtime(store.root(), &installed_registry, &manifest)
                         .map_err(cli_error)?;
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                print_serializable(&report)?;
             }
             RunnerCommand::Doctor { runner, json } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
@@ -326,24 +315,21 @@ pub async fn run() -> anyhow::Result<()> {
                 let removed = installed_registry
                     .remove_runner(&runner)
                     .map_err(cli_error)?;
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "id": runner,
-                        "removed": removed
-                    }))?
-                );
+                print_value(&serde_json::json!({
+                    "id": runner,
+                    "removed": removed
+                }))?;
             }
         },
         Some(Command::Adapter { command }) => match command {
             AdapterCommand::List => {
                 let records = python_adapter_records(store.root()).map_err(cli_error)?;
-                println!("{}", serde_json::to_string_pretty(&records)?);
+                print_serializable(&records)?;
             }
             AdapterCommand::Install { adapter } => {
                 let adapter = normalize_adapter_id(&adapter);
                 let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
-                println!("{}", serde_json::to_string_pretty(&record)?);
+                print_serializable(&record)?;
             }
             AdapterCommand::Doctor { adapter, json } => {
                 let adapter = normalize_adapter_id(&adapter);
