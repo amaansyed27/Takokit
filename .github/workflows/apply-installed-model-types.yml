@@ -22,17 +22,21 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import textwrap
 
           def replace_once(path, old, new):
               file = Path(path)
               text = file.read_text()
+              old = textwrap.dedent(old)
+              new = textwrap.dedent(new)
               if old not in text:
                   raise SystemExit(f"marker not found in {path}: {old[:120]!r}")
               file.write_text(text.replace(old, new, 1))
 
           replace_once(
               "apps/cli/src/output/human.rs",
-              '''    println!(
+              '''
+              println!(
                   "{:<name_width$}  {:<12}  {:>10}  {}",
                   "NAME", "ID", "SIZE", "MODIFIED"
               );
@@ -43,7 +47,8 @@ jobs:
                       .unwrap_or("-");
                   let id = item
               ''',
-              '''    let type_width = items
+              '''
+              let type_width = items
                   .iter()
                   .filter_map(|item| item.get("model_type").and_then(serde_json::Value::as_str))
                   .map(str::len)
@@ -79,7 +84,8 @@ jobs:
           )
           replace_once(
               "apps/cli/src/tui/ui.rs",
-              '''    let items = app
+              '''
+              let items = app
                   .models
                   .iter()
                   .map(|model| row_item(&model.title, &model.state))
@@ -90,7 +96,8 @@ jobs:
                   .map(|model| model.detail.as_str())
                   .unwrap_or("No models are available.");
               ''',
-              '''    let items = app.models.iter().map(model_row_item).collect::<Vec<_>>();
+              '''
+              let items = app.models.iter().map(model_row_item).collect::<Vec<_>>();
               render_list(
                   frame,
                   columns[0],
@@ -105,13 +112,15 @@ jobs:
           )
           replace_once(
               "apps/cli/src/tui/ui.rs",
-              '''    let label = if model.is_some_and(|model| model.executable) {
+              '''
+              let label = if model.is_some_and(|model| model.executable) {
                   " Generate speech "
               } else {
                   " Install selected model "
               };
               ''',
-              '''    let label = match model {
+              '''
+              let label = match model {
                   Some(model) if model.executable => " Generate speech ",
                   Some(_) => " Repair selected model ",
                   None => " No TTS model installed ",
@@ -120,13 +129,15 @@ jobs:
           )
           replace_once(
               "apps/cli/src/tui/ui.rs",
-              '''    let label = if model.is_some_and(|model| model.executable) {
+              '''
+              let label = if model.is_some_and(|model| model.executable) {
                   " Transcribe audio "
               } else {
                   " Install selected model "
               };
               ''',
-              '''    let label = match model {
+              '''
+              let label = match model {
                   Some(model) if model.executable => " Transcribe audio ",
                   Some(_) => " Repair selected model ",
                   None => " No STT model installed ",
@@ -140,9 +151,9 @@ jobs:
           )
           replace_once(
               "apps/cli/src/tui/ui.rs",
-              '''fn row_item<'a>(title: &'a str, state: &'a str) -> ListItem<'a> {
-              ''',
-              '''fn model_row_item(model: &ModelRow) -> ListItem<'static> {
+              "fn row_item<'a>(title: &'a str, state: &'a str) -> ListItem<'a> {\n",
+              '''
+              fn model_row_item(model: &ModelRow) -> ListItem<'static> {
                   ListItem::new(Line::from(vec![
                       Span::raw(format!("{}  ", model.title)),
                       Span::styled(
@@ -157,23 +168,27 @@ jobs:
           )
           replace_once(
               "apps/cli/src/tui/ui.rs",
-              '''Models
+              '''
+              Models
                 Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.
               ''',
-              '''Models
+              '''
+              Models
                 Shows only models installed and verified on this machine. Type badges identify TTS, STT, cloning, conversion, training, or combined capabilities. Press Enter to use a ready model or repair its runtime. Browse the catalog with `tako models` or the GUI.
               ''',
           )
 
           replace_once(
               "apps/cli/src/tui/clone.rs",
-              '''    let label = if model.is_some_and(|model| model.executable) {
+              '''
+              let label = if model.is_some_and(|model| model.executable) {
                   " Create voice profile "
               } else {
                   " Install selected model "
               };
               ''',
-              '''    let label = match model {
+              '''
+              let label = match model {
                   Some(model) if model.executable => " Create voice profile ",
                   Some(_) => " Repair selected model ",
                   None => " No cloning model installed ",
@@ -189,11 +204,13 @@ jobs:
 
           replace_once(
               "README.md",
-              '''`tako list` is local-only: it shows models whose artifacts or pinned snapshots
+              '''
+              `tako list` is local-only: it shows models whose artifacts or pinned snapshots
               are still present and verified. Metadata-only catalog entries belong to
               `tako models`, not the installed-model list.
               ''',
-              '''`tako list` is local-only: it shows models whose artifacts or pinned snapshots
+              '''
+              `tako list` is local-only: it shows models whose artifacts or pinned snapshots
               are still present and verified. The TYPE column identifies TTS, STT, cloning,
               conversion, training, or combined capabilities. Metadata-only catalog entries
               belong to `tako models`, not the installed-model list. The TUI Models screen uses
