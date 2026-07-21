@@ -254,10 +254,10 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, app: &App) {
         },
         app.clone_state.field == CloneField::Consent,
     );
-    let label = if model.is_some_and(|model| model.executable) {
-        " Create voice profile "
-    } else {
-        " Install selected model "
+    let label = match model {
+        Some(model) if model.executable => " Create voice profile ",
+        Some(_) => " Repair selected model ",
+        None => " No cloning model installed ",
     };
     frame.render_widget(
         Paragraph::new(label)

@@ -92,11 +92,17 @@ fn render_models(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .iter()
         .map(|model| row_item(&model.title, &model.state))
         .collect::<Vec<_>>();
-    render_list(frame, columns[0], " Models ", items, app.model_index);
+    render_list(
+        frame,
+        columns[0],
+        " Installed models ",
+        items,
+        app.model_index,
+    );
     let detail = app
         .selected_model()
         .map(|model| model.detail.as_str())
-        .unwrap_or("No models are available.");
+        .unwrap_or("No models are installed. Install one through the companion library site or CLI, then press R to refresh.");
     frame.render_widget(detail_panel(" Details ", detail), columns[1]);
 }
 
@@ -224,10 +230,10 @@ fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .wrap(Wrap { trim: false }),
         rows[3],
     );
-    let label = if model.is_some_and(|model| model.executable) {
-        " Generate speech "
-    } else {
-        " Install selected model "
+    let label = match model {
+        Some(model) if model.executable => " Generate speech ",
+        Some(_) => " Repair selected model ",
+        None => " No TTS model installed ",
     };
     frame.render_widget(
         primary_button(label, app.speak_field == SpeakField::Primary),
@@ -279,10 +285,10 @@ fn render_transcribe(frame: &mut Frame<'_>, area: Rect, app: &App) {
         ),
         rows[2],
     );
-    let label = if model.is_some_and(|model| model.executable) {
-        " Transcribe audio "
-    } else {
-        " Install selected model "
+    let label = match model {
+        Some(model) if model.executable => " Transcribe audio ",
+        Some(_) => " Repair selected model ",
+        None => " No STT model installed ",
     };
     frame.render_widget(
         primary_button(label, app.transcribe_field == TranscribeField::Primary),
@@ -312,7 +318,7 @@ fn render_activity(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
 fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let text = match app.tab {
-        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · /sessions · F1 help · Ctrl+C exit",
+        TuiTab::Models => "↑/↓ select · Enter use/repair · P repair · X remove · R refresh · F1 help · Ctrl+C exit",
         TuiTab::Speak => "Tab fields · type Voice/Text · Enter continue/run · Ctrl+←/→ views · /sessions",
         TuiTab::Transcribe => "Tab fields · type audio path · Enter continue/run · Ctrl+←/→ views · /sessions",
         TuiTab::Clone => "Tab fields · Space consent · Enter continue/create · /sessions",
@@ -432,7 +438,7 @@ fn render_help(frame: &mut Frame<'_>) {
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nThis interface is task-based; no CLI syntax is required.\n\nModels\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.\n\nSpeak, Transcribe, and Clone\n  Tab through fields, type directly, and press Enter on the main action. Outputs are saved in the active .tako session.\n\nSessions\n  Use /sessions from anywhere. Select a previous session and press Enter, or press N / use /new.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes list views. Ctrl+Left/Right works inside forms. PageUp/PageDown scrolls activity. F1 closes help. Ctrl+C exits.",
+            "Takokit TUI\n\nThis interface is task-based; no CLI syntax is required.\n\nModels\n  Shows installed models only. Press Enter to use a ready model or repair its local runtime. Press R to refresh.\n\nSpeak, Transcribe, and Clone\n  Tab through fields, type directly, and press Enter on the main action. Outputs are saved in the active .tako session.\n\nSessions\n  Use /sessions from anywhere. Select a previous session and press Enter, or press N / use /new.\n\nRunners and System\n  Select an item and press Enter for the sensible default action.\n\nNavigation\n  Left/Right changes list views. Ctrl+Left/Right works inside forms. PageUp/PageDown scrolls activity. F1 closes help. Ctrl+C exits.",
         )
         .wrap(Wrap { trim: false })
         .block(Block::default().title(" Help ").borders(Borders::ALL)),
