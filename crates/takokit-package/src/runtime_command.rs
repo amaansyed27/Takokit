@@ -104,7 +104,7 @@ impl From<PathBuf> for PathOrArg {
 }
 
 impl PathOrArg {
-    fn as_os_str(&self) -> &std::ffi::OsStr {
+    pub(crate) fn as_os_str(&self) -> &std::ffi::OsStr {
         match self {
             Self::Arg(value) => value.as_ref(),
             Self::Path(value) => value.as_os_str(),
