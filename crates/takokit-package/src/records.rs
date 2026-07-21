@@ -58,6 +58,7 @@ pub struct InstalledModelsResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstalledModelSummary {
     pub name: String,
+    pub model_type: String,
     pub id: String,
     pub size_bytes: u64,
     pub modified_at: u64,
