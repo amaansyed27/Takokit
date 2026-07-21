@@ -1,0 +1,34 @@
+name: Apply pull progress formatting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-pull-progress-fmt.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/cli/src/daemon_client.rs apps/cli/src/daemon_commands.rs apps/cli/src/progress.rs crates/takokit-package/src/lib.rs crates/takokit-package/src/orchestrator.rs crates/takokit-package/src/progress.rs crates/takokit-package/src/runtime_command.rs crates/takokit-package/src/runtime_model_source.rs crates/takokit-server/src/handlers.rs crates/takokit-server/src/handlers/progress.rs crates/takokit-server/src/router.rs
+          git commit -m "Format pull progress implementation"
+          git push origin HEAD:main
