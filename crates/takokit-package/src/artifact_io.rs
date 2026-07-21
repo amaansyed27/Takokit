@@ -1,6 +1,9 @@
 //! Download, verify, unpack, and locate managed artifact files.
 
-use crate::{ArtifactEntry, ModelManifest, PackageError, PackageResult};
+use crate::{
+    runtime_command::configure_managed_command, ArtifactEntry, ModelManifest, PackageError,
+    PackageResult,
+};
 use sha2::{Digest, Sha256};
 use std::{
     fs::File,
@@ -149,7 +152,8 @@ pub(crate) fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> P
 }
 
 fn download_with_curl(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<bool> {
-    let output = match Command::new("curl")
+    let mut command = Command::new("curl");
+    command
         .args([
             "--location",
             "--fail",
@@ -160,9 +164,10 @@ fn download_with_curl(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
             "--output",
         ])
         .arg(temp_path)
-        .arg(url)
-        .output()
-    {
+        .arg(url);
+    configure_managed_command(&mut command);
+
+    let output = match command.output() {
         Ok(output) => output,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => {
