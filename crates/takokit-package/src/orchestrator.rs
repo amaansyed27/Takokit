@@ -3,6 +3,7 @@
 use crate::{
     artifact_reuse::{self, ArtifactReuseState},
     planning::has_verified_executor,
+    runtime_model_source::estimate_model_source_bytes,
     transaction::ModelInstallSnapshot,
     *,
 };
@@ -16,11 +17,37 @@ pub fn install_model_complete(
     model_id: &str,
     options: InstallModelOptions,
 ) -> PackageResult<ModelInstallReport> {
+    let progress = InstallProgressReporter::model(takokit_root, model_id);
+    let result = install_model_complete_inner(
+        package_registry,
+        installed_registry,
+        takokit_root,
+        model_id,
+        options,
+        &progress,
+    );
+    match &result {
+        Ok(report) => progress.complete(format!("{} is ready", report.model_id)),
+        Err(error) => progress.fail(error.to_string()),
+    }
+    result
+}
+
+fn install_model_complete_inner(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    takokit_root: &Path,
+    model_id: &str,
+    options: InstallModelOptions,
+    progress: &InstallProgressReporter,
+) -> PackageResult<ModelInstallReport> {
+    progress.update("resolving", "Resolving model and runner", 0, None);
     let model = package_registry.model(model_id)?;
     let runner = package_registry.runner(&model.runner)?;
     let logs_path = takokit_root.join("logs");
 
     if options.metadata_only {
+        progress.update("metadata", "Installing model metadata", 0, None);
         let artifacts_before = artifact_reuse::classify(
             installed_registry
                 .installed_model_record(&model.id)
@@ -61,6 +88,7 @@ pub fn install_model_complete(
         });
     }
 
+    progress.update("runner-contract", "Installing runner contract", 0, None);
     let was_contract = installed_registry.is_runner_installed(&runner.id);
     if !was_contract {
         installed_registry
@@ -82,8 +110,25 @@ pub fn install_model_complete(
         .ok()
         .is_some_and(|record| record.status == RunnerLifecycleState::Ready);
     if !runtime_ready_before {
-        initialize_runner_runtime(takokit_root, installed_registry, &runner)
-            .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerRuntime, error))?;
+        let runtime_layout = runner_runtime_layout(takokit_root, &runner);
+        let monitor = InstallProgressMonitor::start(
+            progress.clone(),
+            vec![runtime_layout.root],
+            "runner-runtime",
+            format!("Installing {} runtime", runner.id),
+            None,
+        );
+        let result = initialize_runner_runtime(takokit_root, installed_registry, &runner)
+            .map_err(|error| PackageError::at_stage(InstallFailureStage::RunnerRuntime, error));
+        drop(monitor);
+        result?;
+    } else {
+        progress.update(
+            "runner-runtime",
+            format!("{} runtime is already ready", runner.id),
+            0,
+            None,
+        );
     }
     let runtime_state = installed_registry
         .installed_runner_record(&runner.id)
@@ -118,8 +163,27 @@ pub fn install_model_complete(
             .ok()
             .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
         if !ready_before {
-            install_python_adapter(takokit_root, adapter_id)
-                .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error))?;
+            let adapter_path = python_managed_runner_layout(takokit_root)
+                .adapters
+                .join(adapter_id);
+            let monitor = InstallProgressMonitor::start(
+                progress.clone(),
+                vec![adapter_path],
+                "adapter",
+                format!("Installing {adapter_id} dependencies"),
+                None,
+            );
+            let result = install_python_adapter(takokit_root, adapter_id)
+                .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error));
+            drop(monitor);
+            result?;
+        } else {
+            progress.update(
+                "adapter",
+                format!("{adapter_id} adapter is already ready"),
+                0,
+                None,
+            );
         }
         let state = python_adapter_record(takokit_root, adapter_id)
             .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error))?
@@ -156,8 +220,6 @@ pub fn install_model_complete(
         (None, false)
     };
 
-    // Do not download large model artifacts for a runner/model combination that
-    // the current Takokit build cannot execute even after every dependency is ready.
     if !has_verified_executor(&model, &runner, adapter_ready) {
         return Err(PackageError::at_stage(
             InstallFailureStage::FinalVerification,
@@ -175,9 +237,41 @@ pub fn install_model_complete(
     let reuse_state = artifact_reuse::classify(previous_record.as_ref(), &model);
     let snapshot = ModelInstallSnapshot::capture(installed_registry, &model.id)
         .map_err(|error| PackageError::at_stage(InstallFailureStage::Materialization, error))?;
-    let artifact_report = installed_registry
+    let download_total = if reuse_state == ArtifactReuseState::Verified {
+        None
+    } else {
+        progress.update(
+            "planning-download",
+            "Calculating download size",
+            0,
+            None,
+        );
+        estimated_download_total(takokit_root, &model)
+    };
+    let monitor = InstallProgressMonitor::start(
+        progress.clone(),
+        vec![
+            takokit_root.join("cache").join("downloads"),
+            takokit_root.join("blobs").join("sha256"),
+            takokit_root.join("models"),
+        ],
+        if reuse_state == ArtifactReuseState::Verified {
+            "verifying-cache"
+        } else {
+            "model-download"
+        },
+        if reuse_state == ArtifactReuseState::Verified {
+            "Verifying cached model files"
+        } else {
+            "Downloading and materializing model files"
+        },
+        download_total,
+    );
+    let artifact_result = installed_registry
         .install_model_with_options(&model, options)
-        .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error))?;
+        .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error));
+    drop(monitor);
+    let artifact_report = artifact_result?;
     let artifacts = InstallStep {
         state: match reuse_state {
             ArtifactReuseState::Verified => InstallStepState::AlreadyReady,
@@ -188,6 +282,12 @@ pub fn install_model_complete(
         detail: artifact_report.note,
     };
 
+    progress.update(
+        "final-verification",
+        "Verifying the completed execution plan",
+        download_total.unwrap_or(0),
+        download_total,
+    );
     let plan = match plan_model(package_registry, installed_registry, model_id) {
         Ok(plan) => plan,
         Err(error) => {
@@ -226,6 +326,21 @@ pub fn install_model_complete(
         missing: Vec::new(),
         logs_path,
     })
+}
+
+fn estimated_download_total(takokit_root: &Path, model: &ModelManifest) -> Option<u64> {
+    let artifact_total = model
+        .artifacts
+        .all()
+        .try_fold(0_u64, |total, artifact| {
+            artifact.bytes.and_then(|bytes| total.checked_add(bytes))
+        })?;
+    let source_total = if model.source.is_some() {
+        estimate_model_source_bytes(takokit_root, model)?
+    } else {
+        0
+    };
+    artifact_total.checked_add(source_total).filter(|total| *total > 0)
 }
 
 fn rollback_final_verification(
