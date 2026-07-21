@@ -1,0 +1,28 @@
+name: Probe Whisper runtime asset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/probe-whisper-runtime.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - name: Download and hash official Windows runtime
+        shell: pwsh
+        run: |
+          $Url = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-bin-x64.zip'
+          $Path = Join-Path $env:RUNNER_TEMP 'whisper-bin-x64.zip'
+          Invoke-WebRequest -Uri $Url -OutFile $Path
+          $File = Get-Item $Path
+          $Hash = (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLowerInvariant()
+          Write-Host "URL=$Url"
+          Write-Host "BYTES=$($File.Length)"
+          Write-Host "SHA256=$Hash"
+          Expand-Archive -Path $Path -DestinationPath (Join-Path $env:RUNNER_TEMP 'whisper-runtime')
+          Get-ChildItem -Recurse (Join-Path $env:RUNNER_TEMP 'whisper-runtime') | Select-Object FullName,Length
