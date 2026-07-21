@@ -6,30 +6,40 @@ import { Section } from "../../components/ui/Section";
 import { Table, TableRow } from "../../components/ui/Table";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { getModelPlan, installRunner, pullModel, pullRunner, removeModel } from "../../lib/api";
-import type { ModelCapability, ModelInstallResponse, ModelPlan } from "../../lib/types";
+import type { ModelCapability, ModelPlan } from "../../lib/types";
 
 export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(runtime.models.find((model) => model.id !== "mock-tts")?.id ?? runtime.models[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(runtime.models[0]?.id ?? "");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null);
-  const [installReport, setInstallReport] = useState<ModelInstallResponse | null>(null);
+  const apiUnavailable = runtime.server.status !== "online";
+
   const models = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return runtime.models;
     return runtime.models.filter((model) =>
-      [model.name, model.purpose, model.runtime, model.status, model.license].some((value) => value.toLowerCase().includes(needle))
+      [model.name, model.family, model.runner, model.status]
+        .some((value) => value.toLowerCase().includes(needle))
     );
   }, [query, runtime.models]);
-  const selectedModel = runtime.models.find((model) => model.id === selectedId) ?? models[0] ?? runtime.models[0];
-  const requiredRunner = selectedModel ? runtime.runners.find((runner) => runner.id === selectedModel.runner) : undefined;
-  const apiUnavailable = runtime.server.status !== "online";
+
+  const selectedModel = runtime.models.find((model) => model.id === selectedId) ?? models[0];
+  const requiredRunner = selectedModel
+    ? runtime.runners.find((runner) => runner.id === selectedModel.runner)
+    : undefined;
+
+  useEffect(() => {
+    if (!runtime.models.some((model) => model.id === selectedId)) {
+      setSelectedId(runtime.models[0]?.id ?? "");
+    }
+  }, [runtime.models, selectedId]);
 
   useEffect(() => {
     let cancelled = false;
     setModelPlan(null);
-    if (!selectedModel || selectedModel.id === "mock-tts" || apiUnavailable) return;
+    if (!selectedModel || apiUnavailable) return;
 
     getModelPlan(selectedModel.id)
       .then((plan) => {
@@ -58,105 +68,90 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
     }
   }
 
+  const readyCount = runtime.models.filter((model) => model.executable).length;
+  const ttsCount = runtime.models.filter((model) => model.capabilities.includes("tts")).length;
+  const sttCount = runtime.models.filter((model) => model.capabilities.includes("stt")).length;
+
   return (
     <section className="page">
       <header className="page__header">
-        <h1>Models</h1>
-        <p>Runtime manifests, installed artifacts, shared runners, and executable state from the canonical planner.</p>
+        <h1>Installed models</h1>
+        <p>Models installed and verified on this machine.</p>
       </header>
 
       <div className="stats-grid">
-        <div className="stat-tile"><span>Installed</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.status === "installed").length}</strong><small>Artifacts present</small></div>
-        <div className="stat-tile"><span>Executable</span><strong className="stat-tile__value">{runtime.models.filter((model) => model.executable).length}</strong><small>Can run today</small></div>
-        <div className="stat-tile"><span>Blocked</span><strong className="stat-tile__value">{runtime.models.filter((model) => !model.executable).length}</strong><small>Missing pieces shown</small></div>
-        <div className="stat-tile"><span>Runners</span><strong className="stat-tile__value">{runtime.runners.length}</strong><small>Shared runtime families</small></div>
+        <div className="stat-tile"><span>Installed</span><strong className="stat-tile__value">{runtime.models.length}</strong><small>Verified locally</small></div>
+        <div className="stat-tile"><span>Ready</span><strong className="stat-tile__value">{readyCount}</strong><small>Executable now</small></div>
+        <div className="stat-tile"><span>TTS</span><strong className="stat-tile__value">{ttsCount}</strong><small>Speech models</small></div>
+        <div className="stat-tile"><span>STT</span><strong className="stat-tile__value">{sttCount}</strong><small>Transcription models</small></div>
       </div>
 
-      <Section title="Runtime honesty" description={runtime.modeNote}>
-        <div className="capability-strip">
-          <div className="capability-chip">
-            <strong>TTS</strong>
-            <span>Piper artifacts are verified; ONNX phonemizer and session execution remain tracked blockers.</span>
-          </div>
-          <div className="capability-chip">
-            <strong>STT</strong>
-            <span>Whisper Base can execute through the whisper.cpp runner when model artifacts and runtime are installed.</span>
-          </div>
-          <div className="capability-chip">
-            <strong>Voice Cloning</strong>
-            <span>Voice profile models are tracked as capability metadata only.</span>
-          </div>
-          <div className="capability-chip">
-            <strong>Live APIs</strong>
-            <span>Live transcription and live audio are local API surfaces, not cloud calls.</span>
-          </div>
-        </div>
-      </Section>
+      <Section title="Models" description={runtime.modeNote}>
+        {runtime.models.length > 0 && (
+          <input
+            className="search-input"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Filter installed models..."
+            aria-label="Filter installed models"
+          />
+        )}
 
-      <Section title="Registry">
-        <input
-          className="search-input"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Filter by model, runtime, license, or status..."
-          aria-label="Filter models"
-        />
-        <Table columns={["Model", "Capabilities", "Runner", "Lifecycle", "Actions"]} ariaLabel="Models">
-          {models.map((model) => (
-            <TableRow key={model.id}>
-              <div>
-                <strong>{model.name}</strong>
-                <span className="table-note">{model.family}</span>
-              </div>
-              <span className="badge-list" aria-label={`${model.name} capabilities`}>
-                {model.capabilities.map((capability) => (
-                  <Badge key={capability} tone="neutral">{capabilityLabel(capability)}</Badge>
-                ))}
-              </span>
-              <Tooltip content={`${model.backend} backend, ${model.version} manifest version`}>
-                <span>{model.runner}</span>
-              </Tooltip>
-              <span className="badge-list">
-                <Badge tone={model.executable ? "success" : model.lifecycleState === "failed" ? "warning" : "neutral"}>
-                  {stateLabel(model.lifecycleState)}
+        {runtime.models.length === 0 ? (
+          <div className="empty-state">
+            <strong>No models installed</strong>
+            <p>Install a model through the Takokit CLI or companion library site, then refresh this page.</p>
+          </div>
+        ) : (
+          <Table columns={["Model", "Type", "Runner", "State", "Actions"]} ariaLabel="Installed models">
+            {models.map((model) => (
+              <TableRow key={model.id}>
+                <div>
+                  <strong>{model.name}</strong>
+                  <span className="table-note">{model.family}</span>
+                </div>
+                <span className="badge-list" aria-label={`${model.name} capabilities`}>
+                  {model.capabilities.map((capability) => (
+                    <Badge key={capability} tone="neutral">{capabilityLabel(capability)}</Badge>
+                  ))}
+                </span>
+                <Tooltip content={`${model.backend} backend, ${model.version} manifest version`}>
+                  <span>{model.runner}</span>
+                </Tooltip>
+                <Badge tone={model.executable ? "success" : "warning"}>
+                  {model.executable ? "ready" : "needs repair"}
                 </Badge>
-                <Badge tone={model.runnerRuntimeState === "ready" ? "success" : "warning"}>
-                  runner {stateLabel(model.runnerRuntimeState)}
-                </Badge>
-              </span>
-              <span className="action-cluster">
-                <Button type="button" variant="ghost" onClick={() => setSelectedId(model.id)}>Show</Button>
-                {model.id !== "mock-tts" && (
-                  model.status === "installed" ? (
+                <span className="action-cluster">
+                  <Button type="button" variant="ghost" onClick={() => setSelectedId(model.id)}>Show</Button>
+                  {!model.executable && (
                     <Button
                       type="button"
                       variant="ghost"
                       disabled={apiUnavailable}
-                      loading={busyAction === `remove-model-${model.id}`}
-                      onClick={() => runAction(`remove-model-${model.id}`, () => removeModel(model.id))}
+                      loading={busyAction === `repair-model-${model.id}`}
+                      onClick={() => runAction(`repair-model-${model.id}`, () => pullModel(model.id).then(() => undefined))}
                     >
-                      Remove
+                      Repair
                     </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={apiUnavailable}
-                      loading={busyAction === `pull-model-${model.id}`}
-                      onClick={() => runAction(`pull-model-${model.id}`, () => pullModel(model.id).then((report) => { setInstallReport(report); }))}
-                    >
-                      Pull
-                    </Button>
-                  )
-                )}
-              </span>
-            </TableRow>
-          ))}
-        </Table>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={apiUnavailable}
+                    loading={busyAction === `remove-model-${model.id}`}
+                    onClick={() => runAction(`remove-model-${model.id}`, () => removeModel(model.id))}
+                  >
+                    Remove
+                  </Button>
+                </span>
+              </TableRow>
+            ))}
+          </Table>
+        )}
       </Section>
 
       {selectedModel && (
-        <Section title="Details" description="Manifest metadata and lifecycle state.">
+        <Section title="Details">
           <div className="details-panel">
             <div className="details-panel__main">
               <h3>{selectedModel.name}</h3>
@@ -165,50 +160,39 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
                 <span><strong>ID</strong>{selectedModel.id}</span>
                 <span><strong>Version</strong>{selectedModel.version}</span>
                 <span><strong>Family</strong>{selectedModel.family}</span>
+                <span><strong>Runner</strong>{selectedModel.runner}</span>
                 <span><strong>Backend</strong>{selectedModel.backend}</span>
                 <span><strong>License</strong>{selectedModel.license}</span>
-                <span><strong>Artifacts</strong>{selectedModel.artifactCount}</span>
                 <span><strong>Hardware</strong>{selectedModel.hardwareNotes}</span>
-                <span><strong>Execution</strong>{selectedModel.executionStatus}</span>
                 <span><strong>Lifecycle</strong>{stateLabel(modelPlan?.lifecycle_state ?? selectedModel.lifecycleState)}</span>
-                <span><strong>Artifact state</strong>{stateLabel(modelPlan?.artifact_state ?? selectedModel.lifecycleState)}</span>
                 <span><strong>Runner runtime</strong>{stateLabel(modelPlan?.runner_runtime_state ?? selectedModel.runnerRuntimeState)}</span>
-                <span><strong>Executable today</strong>{(modelPlan?.executable ?? selectedModel.executable) ? "yes" : "no"}</span>
-                <span><strong>Next command</strong>{modelPlan?.next_command ?? selectedModel.nextCommand}</span>
-                {selectedModel.licenseWarning && <span><strong>License warning</strong>{selectedModel.licenseWarning}</span>}
               </div>
               {(modelPlan?.missing.length ?? selectedModel.missing.length) > 0 && (
                 <p className="notice-line">Missing: {(modelPlan?.missing ?? selectedModel.missing).join("; ")}</p>
               )}
-              {installReport?.model_id === selectedModel.id && (
-                <p className="notice-line">Install: artifacts {installReport.artifacts.state}; runner {installReport.runner_runtime.state}; {installReport.executable ? "executable" : installReport.missing.join("; ")}</p>
-              )}
             </div>
             <div className="details-panel__side">
-              <Badge tone={selectedModel.executable ? "success" : "warning"}>{selectedModel.executable ? "executable" : "not executable"}</Badge>
-              <Badge tone={selectedModel.status === "installed" ? "success" : "neutral"}>{selectedModel.status}</Badge>
-              <Badge tone={selectedModel.runnerRuntimeState === "ready" ? "success" : "warning"}>
-                runner {stateLabel(selectedModel.runnerRuntimeState)}
+              <Badge tone={selectedModel.executable ? "success" : "warning"}>
+                {selectedModel.executable ? "ready" : "needs repair"}
               </Badge>
-              <span className="details-panel__runner">Required runner: {selectedModel.runner}</span>
-              {requiredRunner && !requiredRunner.installed && selectedModel.id !== "mock-tts" && (
+              {requiredRunner && !requiredRunner.installed && (
                 <Button
                   type="button"
                   disabled={apiUnavailable}
                   loading={busyAction === `pull-runner-${requiredRunner.id}`}
                   onClick={() => runAction(`pull-runner-${requiredRunner.id}`, () => pullRunner(requiredRunner.id).then(() => undefined))}
                 >
-                  Pull Required Runner
+                  Repair runner
                 </Button>
               )}
-              {requiredRunner && requiredRunner.installed && requiredRunner.install_state !== "ready" && selectedModel.id !== "mock-tts" && (
+              {requiredRunner && requiredRunner.installed && requiredRunner.install_state !== "ready" && (
                 <Button
                   type="button"
                   disabled={apiUnavailable}
                   loading={busyAction === `install-runner-${requiredRunner.id}`}
                   onClick={() => runAction(`install-runner-${requiredRunner.id}`, () => installRunner(requiredRunner.id).then(() => undefined))}
                 >
-                  Install Runner Runtime
+                  Repair runner runtime
                 </Button>
               )}
             </div>
@@ -216,22 +200,6 @@ export function ModelsPage({ runtime, onRefresh }: RouteComponentProps) {
           {notice && <p className="notice-line">{notice}</p>}
         </Section>
       )}
-
-      <Section title="Runners">
-        <Table columns={["Runner", "Kind", "Platforms", "Status", "Notes"]} ariaLabel="Runners">
-          {runtime.runners.map((runner) => (
-            <TableRow key={runner.id}>
-              <strong>{runner.name}</strong>
-              <span>{runner.kind}</span>
-              <span>{runner.platforms.join(", ")}</span>
-              <Badge tone={runner.install_state === "ready" ? "success" : runner.installed ? "neutral" : "warning"}>
-                {runner.install_state ? stateLabel(runner.install_state) : runner.installed ? "contract installed" : "available"}
-              </Badge>
-              <span>{runner.description}</span>
-            </TableRow>
-          ))}
-        </Table>
-      </Section>
     </section>
   );
 }
@@ -247,9 +215,9 @@ function capabilityLabel(capability: ModelCapability): string {
     case "stt":
       return "STT";
     case "voice_cloning":
-      return "Voice Cloning";
+      return "Cloning";
     case "live_transcription":
-      return "Live Transcription";
+      return "Live STT";
     case "live_audio":
       return "Live Audio";
   }
