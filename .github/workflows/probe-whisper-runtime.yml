@@ -1,4 +1,4 @@
-name: Probe Whisper runtime asset
+name: Verify Whisper runtime asset
 
 on:
   push:
@@ -7,22 +7,63 @@ on:
       - .github/workflows/probe-whisper-runtime.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  probe:
+  verify-and-apply:
     runs-on: windows-latest
     steps:
-      - name: Download and hash official Windows runtime
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Download, verify, and pin official Windows runtime
         shell: pwsh
         run: |
-          $Url = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-bin-x64.zip'
-          $Path = Join-Path $env:RUNNER_TEMP 'whisper-bin-x64.zip'
-          Invoke-WebRequest -Uri $Url -OutFile $Path
-          $File = Get-Item $Path
-          $Hash = (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLowerInvariant()
+          $Version = 'v1.8.6'
+          $Url = "https://github.com/ggml-org/whisper.cpp/releases/download/$Version/whisper-bin-x64.zip"
+          $Archive = Join-Path $env:RUNNER_TEMP 'whisper-bin-x64.zip'
+          $Extracted = Join-Path $env:RUNNER_TEMP 'whisper-runtime'
+          Invoke-WebRequest -Uri $Url -OutFile $Archive
+          $Hash = (Get-FileHash -Algorithm SHA256 $Archive).Hash.ToLowerInvariant()
+          Expand-Archive -Path $Archive -DestinationPath $Extracted
+          $Cli = Get-ChildItem -Recurse $Extracted -Filter whisper-cli.exe | Select-Object -First 1
+          if (-not $Cli) { throw 'Official archive does not contain whisper-cli.exe' }
+
+          $Path = 'crates/takokit-package/src/runtime_whisper.rs'
+          $Text = Get-Content -Raw $Path
+          $Text = $Text.Replace('releases/download/v1.9.1/whisper-bin-x64.zip', "releases/download/$Version/whisper-bin-x64.zip")
+          $Text = [regex]::Replace($Text, 'const WHISPERCPP_WIN_X64_SHA256: &str =\s*"[0-9a-f]+";', "const WHISPERCPP_WIN_X64_SHA256: &str =`n    `"$Hash`";")
+          $Text = $Text.Replace('whisper-bin-x64-v1.9.1.zip', "whisper-bin-x64-$Version.zip")
+          $Text = $Text.Replace('whisper.cpp v1.9.1 runtime installed', "whisper.cpp $Version runtime installed")
+          Set-Content -NoNewline -Encoding utf8 $Path $Text
+
           Write-Host "URL=$Url"
-          Write-Host "BYTES=$($File.Length)"
+          Write-Host "BYTES=$((Get-Item $Archive).Length)"
           Write-Host "SHA256=$Hash"
-          Expand-Archive -Path $Path -DestinationPath (Join-Path $env:RUNNER_TEMP 'whisper-runtime')
-          Get-ChildItem -Recurse (Join-Path $env:RUNNER_TEMP 'whisper-runtime') | Select-Object FullName,Length
+          Write-Host "CLI=$($Cli.FullName)"
+
+      - name: Verify repository
+        shell: pwsh
+        run: |
+          cargo fmt --all -- --check
+          cargo test --workspace
+          cargo build --release
+
+      - name: Commit verified runtime pin
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add crates/takokit-package/src/runtime_whisper.rs
+          if (git diff --cached --quiet) {
+            Write-Host 'Runtime pin already current.'
+            exit 0
+          }
+          git commit -m 'Pin verified whisper.cpp Windows runtime'
+          git pull --rebase origin main
+          git push origin HEAD:main
