@@ -65,15 +65,16 @@ pub fn load_runtime_rows(
                     }
                 )
             };
+            let runtime_state = if plan.executable {
+                "ready"
+            } else {
+                "needs repair"
+            };
             Ok(ModelRow {
                 id: model.id,
                 title: model.name,
                 model_type: installed.model_type.clone(),
-                state: if plan.executable {
-                    "ready".to_string()
-                } else {
-                    "needs repair".to_string()
-                },
+                state: format!("{} · {runtime_state}", installed.model_type),
                 detail: format!(
                     "{}\n\nType: {}\nFamily: {}\nRunner: {}\nLocal ID: {}\nStored size: {}\nHardware: {}\n\n{}",
                     model.description,
