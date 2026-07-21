@@ -18,6 +18,61 @@ use uuid::Uuid;
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);
 
+#[cfg(windows)]
+mod windows_handle_inheritance {
+    use std::ffi::c_void;
+
+    type Handle = *mut c_void;
+
+    const STD_INPUT_HANDLE: u32 = -10_i32 as u32;
+    const STD_OUTPUT_HANDLE: u32 = -11_i32 as u32;
+    const STD_ERROR_HANDLE: u32 = -12_i32 as u32;
+    const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+    const INVALID_HANDLE_VALUE: Handle = -1_isize as Handle;
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetStdHandle(n_std_handle: u32) -> Handle;
+        fn GetHandleInformation(handle: Handle, flags: *mut u32) -> i32;
+        fn SetHandleInformation(handle: Handle, mask: u32, flags: u32) -> i32;
+    }
+
+    pub struct StandardHandleInheritanceGuard {
+        restored: Vec<(Handle, u32)>,
+    }
+
+    impl Drop for StandardHandleInheritanceGuard {
+        fn drop(&mut self) {
+            for (handle, flags) in self.restored.drain(..) {
+                unsafe {
+                    let _ = SetHandleInformation(handle, HANDLE_FLAG_INHERIT, flags);
+                }
+            }
+        }
+    }
+
+    pub fn suppress() -> StandardHandleInheritanceGuard {
+        let mut restored = Vec::new();
+        for kind in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+            let handle = unsafe { GetStdHandle(kind) };
+            if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+                continue;
+            }
+            let mut flags = 0;
+            if unsafe { GetHandleInformation(handle, &mut flags) } == 0 {
+                continue;
+            }
+            if flags & HANDLE_FLAG_INHERIT == 0 {
+                continue;
+            }
+            if unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) } != 0 {
+                restored.push((handle, flags & HANDLE_FLAG_INHERIT));
+            }
+        }
+        StandardHandleInheritanceGuard { restored }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonInfo {
     pub instance_id: Uuid,
@@ -90,8 +145,12 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0000_0008 | 0x0000_0200);
     }
-    command
-        .spawn()
+    let spawn_result = {
+        #[cfg(windows)]
+        let _guard = windows_handle_inheritance::suppress();
+        command.spawn()
+    };
+    spawn_result
         .with_context(|| format!("spawn managed Takokit daemon with {}", executable.display()))?;
     if let Some(info) = wait_for_verified(store, config)? {
         return Ok(info);
