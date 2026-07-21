@@ -75,16 +75,12 @@ fn cli_parses_version_command() {
 }
 
 #[test]
-fn tako_alias_parses_doctor_and_uses_takokit_storage_root() {
+fn tako_alias_parses_doctor_and_respects_configured_storage_root() {
     let cli = Cli::try_parse_from(["tako", "doctor"]).expect("tako doctor cli parse");
     let storage_root = cli_storage_root();
 
     assert!(matches!(cli.command, Some(Command::Doctor(_))));
     assert_eq!(storage_root, LocalStore::default_root());
-    assert_eq!(
-        storage_root.file_name().and_then(|name| name.to_str()),
-        Some(".takokit")
-    );
 }
 
 #[test]

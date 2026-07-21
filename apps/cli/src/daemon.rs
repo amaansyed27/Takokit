@@ -90,12 +90,9 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0000_0008 | 0x0000_0200);
     }
-    command.spawn().with_context(|| {
-        format!(
-            "spawn managed Takokit daemon with {}",
-            executable.display()
-        )
-    })?;
+    command
+        .spawn()
+        .with_context(|| format!("spawn managed Takokit daemon with {}", executable.display()))?;
     if let Some(info) = wait_for_verified(store, config)? {
         return Ok(info);
     }
