@@ -17,8 +17,8 @@ pub(crate) enum OutputFormat {
 pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) direct: bool,
-    /// Override the output format. When omitted, TAKOKIT_OUTPUT remains supported.
-    #[arg(long, global = true, value_enum)]
+    /// Override the output format. When omitted, terminal output stays human-readable.
+    #[arg(long, global = true, value_enum, default_value = "human")]
     pub(crate) output: Option<OutputFormat>,
     /// Project directory whose `.tako` folder stores sessions and outputs.
     #[arg(long, global = true)]
