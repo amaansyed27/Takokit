@@ -1,8 +1,6 @@
 use super::yes_no;
 
-pub(crate) fn print_serializable<T: serde::Serialize + ?Sized>(
-    value: &T,
-) -> anyhow::Result<()> {
+pub(crate) fn print_serializable<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<()> {
     print_value(&serde_json::to_value(value)?)
 }
 
@@ -172,11 +170,7 @@ fn render_row(value: &serde_json::Value) {
     println!();
 }
 
-fn render_stage(
-    map: &serde_json::Map<String, serde_json::Value>,
-    key: &str,
-    name: &str,
-) {
+fn render_stage(map: &serde_json::Map<String, serde_json::Value>, key: &str, name: &str) {
     let Some(item) = map.get(key) else {
         return;
     };
