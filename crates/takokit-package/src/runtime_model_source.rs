@@ -1,12 +1,12 @@
 //! Transactional installation of repository-backed model snapshots.
 
 use crate::{
-    runtime_command::{run_logged_command, PathOrArg},
+    runtime_command::{configure_managed_command, run_logged_command, PathOrArg},
     runtime_uv::bootstrap_uv,
     *,
 };
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{path::Path, process::Command};
 
 const READY_MARKER: &str = ".takokit-source.json";
 
@@ -32,6 +32,18 @@ pub(crate) fn install_model_source(
     }
 }
 
+pub(crate) fn estimate_model_source_bytes(
+    takokit_root: &Path,
+    manifest: &ModelManifest,
+) -> Option<u64> {
+    let source = manifest.source.as_ref()?;
+    match source.provider {
+        ModelSourceProvider::HuggingFace => {
+            estimate_hugging_face_snapshot_bytes(takokit_root, source)
+        }
+    }
+}
+
 pub(crate) fn snapshot_is_ready(
     record: &InstalledSnapshotRecord,
     source: &ModelSourceManifest,
@@ -49,6 +61,52 @@ pub(crate) fn snapshot_is_ready(
             && marker.repository == source.repository
             && marker.revision == source.revision
     })
+}
+
+fn estimate_hugging_face_snapshot_bytes(
+    takokit_root: &Path,
+    source: &ModelSourceManifest,
+) -> Option<u64> {
+    let uv = bootstrap_uv(takokit_root).ok()?;
+    let cache_root = takokit_root.join("cache").join("huggingface");
+    let mut arguments: Vec<PathOrArg> = vec![
+        "tool".into(),
+        "run".into(),
+        "--from".into(),
+        "huggingface_hub".into(),
+        "hf".into(),
+        "download".into(),
+        source.repository.clone().into(),
+        "--revision".into(),
+        source.revision.clone().into(),
+        "--cache-dir".into(),
+        cache_root.into(),
+        "--dry-run".into(),
+    ];
+    for pattern in &source.allow_patterns {
+        arguments.push("--include".into());
+        arguments.push(pattern.clone().into());
+    }
+    for pattern in &source.ignore_patterns {
+        arguments.push("--exclude".into());
+        arguments.push(pattern.clone().into());
+    }
+
+    let mut command = Command::new(&uv);
+    for argument in &arguments {
+        command.arg(argument.as_os_str());
+    }
+    configure_managed_command(&mut command);
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    parse_dry_run_total(&text)
 }
 
 fn install_hugging_face_snapshot(
@@ -147,6 +205,38 @@ fn install_hugging_face_snapshot(
     })
 }
 
+fn parse_dry_run_total(text: &str) -> Option<u64> {
+    text.lines().find_map(|line| {
+        let (_, tail) = line.split_once("totalling ")?;
+        let token = tail
+            .split_whitespace()
+            .next()?
+            .trim_end_matches(|character: char| character == '.' || character == ',');
+        parse_human_bytes(token)
+    })
+}
+
+fn parse_human_bytes(value: &str) -> Option<u64> {
+    let split = value
+        .find(|character: char| !character.is_ascii_digit() && character != '.')
+        .unwrap_or(value.len());
+    let number = value[..split].parse::<f64>().ok()?;
+    let unit = value[split..].trim().to_ascii_uppercase();
+    let multiplier = match unit.as_str() {
+        "" | "B" => 1_f64,
+        "K" | "KB" => 1_000_f64,
+        "KIB" => 1_024_f64,
+        "M" | "MB" => 1_000_000_f64,
+        "MIB" => 1_048_576_f64,
+        "G" | "GB" => 1_000_000_000_f64,
+        "GIB" => 1_073_741_824_f64,
+        "T" | "TB" => 1_000_000_000_000_f64,
+        "TIB" => 1_099_511_627_776_f64,
+        _ => return None,
+    };
+    Some((number * multiplier).round() as u64)
+}
+
 fn read_marker(path: &Path) -> Option<SourceMarker> {
     let source = std::fs::read(path).ok()?;
     serde_json::from_slice(&source).ok()
@@ -200,5 +290,14 @@ mod tests {
             ready_marker: marker,
         };
         assert!(snapshot_is_ready(&record, &source));
+    }
+
+    #[test]
+    fn dry_run_total_parser_supports_hugging_face_units() {
+        assert_eq!(
+            parse_dry_run_total("Will download 4 files totalling 2.5G."),
+            Some(2_500_000_000)
+        );
+        assert_eq!(parse_human_bytes("148.2M"), Some(148_200_000));
     }
 }
