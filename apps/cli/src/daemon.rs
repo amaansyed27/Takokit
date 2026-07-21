@@ -3,7 +3,7 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, OpenOptions},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -70,7 +70,7 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
     }
     cleanup_proven_stale(store, config)?;
     let instance_id = Uuid::new_v4();
-    let executable = std::env::current_exe()?;
+    let executable = managed_daemon_executable()?;
     let log_path = log_path(store);
     let log = OpenOptions::new()
         .create(true)
@@ -90,7 +90,12 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0000_0008 | 0x0000_0200);
     }
-    command.spawn().context("spawn managed Takokit daemon")?;
+    command.spawn().with_context(|| {
+        format!(
+            "spawn managed Takokit daemon with {}",
+            executable.display()
+        )
+    })?;
     if let Some(info) = wait_for_verified(store, config)? {
         return Ok(info);
     }
@@ -294,7 +299,7 @@ fn daemon_lock_is_held(store: &LocalStore) -> anyhow::Result<bool> {
         Err(_) => Ok(true),
     }
 }
-pub fn write_atomic(path: &std::path::Path, value: &DaemonInfo) -> anyhow::Result<()> {
+pub fn write_atomic(path: &Path, value: &DaemonInfo) -> anyhow::Result<()> {
     let temp = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
     fs::write(&temp, serde_json::to_vec_pretty(value)?)?;
     fs::rename(temp, path)?;
@@ -318,10 +323,29 @@ fn takokit_health_responds(config: &RuntimeConfig) -> bool {
 fn log_path(store: &LocalStore) -> PathBuf {
     store.logs_dir().join("daemon.log")
 }
+fn managed_daemon_executable() -> anyhow::Result<PathBuf> {
+    let current = std::env::current_exe()?;
+    Ok(preferred_daemon_executable(&current))
+}
+fn preferred_daemon_executable(current: &Path) -> PathBuf {
+    if current.file_stem().and_then(|name| name.to_str()) != Some("tako") {
+        return current.to_path_buf();
+    }
+    let mut canonical = current.to_path_buf();
+    canonical.set_file_name("takokit");
+    if let Some(extension) = current.extension() {
+        canonical.set_extension(extension);
+    }
+    if canonical.is_file() {
+        canonical
+    } else {
+        current.to_path_buf()
+    }
+}
 fn canonical_exe() -> anyhow::Result<PathBuf> {
     Ok(fs::canonicalize(std::env::current_exe()?)?)
 }
-fn canonical_root(path: &std::path::Path) -> anyhow::Result<PathBuf> {
+fn canonical_root(path: &Path) -> anyhow::Result<PathBuf> {
     Ok(fs::canonicalize(path)?)
 }
 fn now() -> u64 {
@@ -331,6 +355,5 @@ fn now() -> u64 {
         .as_secs()
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests;
