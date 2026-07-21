@@ -35,7 +35,7 @@ impl Activity {
                 let elapsed = started.elapsed().as_secs();
                 if elapsed != displayed_second {
                     let line = format!("{label}  {elapsed}s");
-                    eprint!("\r{line:<DISPLAY_WIDTH$}");
+                    eprint!("\r{line:<width$}", width = DISPLAY_WIDTH);
                     let _ = io::stderr().flush();
                     displayed_second = elapsed;
                 }
@@ -57,7 +57,7 @@ impl Activity {
             let _ = worker.join();
         }
         if enabled() {
-            eprint!("\r{:<DISPLAY_WIDTH$}\r", "");
+            eprint!("\r{blank:<width$}\r", blank = "", width = DISPLAY_WIDTH);
             let _ = io::stderr().flush();
         }
     }
