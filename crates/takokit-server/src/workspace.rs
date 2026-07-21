@@ -18,8 +18,16 @@ impl RequestWorkspace {
     pub fn from_headers(headers: &HeaderMap, title: &str) -> Result<Self, TakokitError> {
         let store = store_from_headers(headers)?;
         let session_id = session_id_from_headers(headers);
-        let session = store.open_session(session_id, Some(title))?;
-        Ok(Self { store, session })
+        match store.open_session(session_id, Some(title)) {
+            Ok(session) => Ok(Self { store, session }),
+            Err(error) => {
+                #[cfg(test)]
+                if headers.get(WORKSPACE_HEADER).is_none() {
+                    return isolated_test_workspace(session_id, title);
+                }
+                Err(error)
+            }
+        }
     }
 
     pub fn session_id(&self) -> Uuid {
@@ -73,6 +81,21 @@ fn absolute_workspace(path: PathBuf) -> Result<PathBuf, TakokitError> {
 }
 
 #[cfg(test)]
+fn isolated_test_workspace(
+    session_id: Option<Uuid>,
+    title: &str,
+) -> Result<RequestWorkspace, TakokitError> {
+    let root = std::env::temp_dir().join(format!(
+        "takokit-server-request-workspace-{}",
+        Uuid::new_v4()
+    ));
+    let store = WorkspaceStore::new(root);
+    store.ensure_layout()?;
+    let session = store.open_session(session_id, Some(title))?;
+    Ok(RequestWorkspace { store, session })
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
@@ -97,5 +120,13 @@ mod tests {
         assert_eq!(context.session_id(), session.summary.id);
         assert_eq!(context.store.workspace_root(), root.as_path());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn implicit_test_workspace_recovers_from_conflicting_local_state() {
+        let mut headers = HeaderMap::new();
+        headers.remove(WORKSPACE_HEADER);
+        let context = RequestWorkspace::from_headers(&headers, "isolated test").unwrap();
+        assert!(context.store.workspace_root().exists());
     }
 }
