@@ -7,6 +7,7 @@ use takokit_store::LocalStore;
 
 use crate::workspace::{SESSION_ENV, WORKSPACE_ENV};
 
+#[derive(Clone)]
 pub struct Client {
     base: String,
     workspace_header: Option<String>,
