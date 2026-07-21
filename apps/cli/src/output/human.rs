@@ -113,10 +113,7 @@ fn render_installed_models(value: Option<&serde_json::Value>) {
         .clamp(4, 40);
     let type_width = items
         .iter()
-        .filter_map(|item| {
-            item.get("model_type")
-                .and_then(serde_json::Value::as_str)
-        })
+        .filter_map(|item| item.get("model_type").and_then(serde_json::Value::as_str))
         .map(str::len)
         .max()
         .unwrap_or(4)
