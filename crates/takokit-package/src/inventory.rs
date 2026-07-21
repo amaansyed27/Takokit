@@ -1,4 +1,4 @@
-//! Verified local model inventory used by `tako list`.
+//! Verified local model inventory and Ollama-style `tako list` data.
 
 use crate::{
     artifact_reuse, InstalledModelRecord, InstalledModelSummary, InstalledModelsResponse,
