@@ -10,29 +10,26 @@ pub(crate) fn run_sessions_command(
     match command {
         SessionsCommand::List { query } => {
             let sessions = store.list_sessions(query.as_deref())?;
-            println!("{}", serde_json::to_string_pretty(&sessions)?);
+            crate::print_serializable(&sessions)?;
         }
         SessionsCommand::New { title } => {
             let session = store.create_session(title.as_deref())?;
-            println!("{}", serde_json::to_string_pretty(&session)?);
+            crate::print_serializable(&session)?;
         }
         SessionsCommand::Show { id } => {
             let session = store.read_session(id)?;
-            println!("{}", serde_json::to_string_pretty(&session)?);
+            crate::print_serializable(&session)?;
         }
         SessionsCommand::Open { id } => {
             let session = store.read_session(id)?;
             store.set_active_session(id)?;
-            println!("{}", serde_json::to_string_pretty(&session)?);
+            crate::print_serializable(&session)?;
         }
         SessionsCommand::Rm { id } => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&serde_json::json!({
-                    "id": id,
-                    "removed": store.remove_session(id)?
-                }))?
-            );
+            crate::print_value(&serde_json::json!({
+                "id": id,
+                "removed": store.remove_session(id)?
+            }))?;
         }
     }
     Ok(())
