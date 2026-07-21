@@ -78,7 +78,10 @@ fn inventory_digest(manifest: &ModelManifest, record: &InstalledModelRecord) -> 
 }
 
 fn installed_size(record: &InstalledModelRecord) -> u64 {
-    let snapshot_root = record.snapshot.as_ref().map(|snapshot| &snapshot.local_path);
+    let snapshot_root = record
+        .snapshot
+        .as_ref()
+        .map(|snapshot| &snapshot.local_path);
     let mut seen = HashSet::<PathBuf>::new();
     let mut total = 0_u64;
 

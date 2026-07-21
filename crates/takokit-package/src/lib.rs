@@ -4,6 +4,7 @@ mod catalog;
 mod error;
 mod install_support;
 mod installed;
+mod inventory;
 mod model;
 mod orchestrator;
 mod planning;

@@ -390,3 +390,61 @@ async fn transcription_route_reports_metadata_only_whisper_artifact_before_execu
         .unwrap()
         .contains("recorded but not downloaded"));
 }
+
+#[tokio::test]
+async fn installed_models_route_excludes_catalog_and_metadata_only_entries() {
+    let root = std::env::temp_dir().join(format!(
+        "takokit-server-installed-models-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+    let app = server_router(state);
+
+    let empty = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/models/installed")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.status(), StatusCode::OK);
+    let body = to_bytes(empty.into_body(), 1024 * 1024).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["kind"], "installed-models");
+    assert!(json["data"].as_array().unwrap().is_empty());
+
+    let metadata = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/models/pull")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"model":"piper-lessac","metadata_only":true}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(metadata.status(), StatusCode::OK);
+
+    let listed = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/models/installed")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = to_bytes(listed.into_body(), 1024 * 1024).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(json["data"].as_array().unwrap().is_empty());
+}

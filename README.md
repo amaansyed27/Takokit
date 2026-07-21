@@ -97,7 +97,9 @@ tako doctor
 tako status
 tako capabilities
 
-tako models
+tako list                    # verified models installed on this machine
+tako models                  # browse the bundled runtime catalog
+tako library models          # browse the curated discovery catalog
 tako runners
 tako show kokoro
 tako plan whisper-tiny
@@ -128,6 +130,11 @@ tako daemon stop
 
 tako gui
 ```
+
+
+`tako list` is local-only: it shows models whose artifacts or pinned snapshots
+are still present and verified. Metadata-only catalog entries belong to
+`tako models`, not the installed-model list.
 
 ## Pull lifecycle
 

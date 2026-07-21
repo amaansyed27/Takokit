@@ -22,6 +22,17 @@ pub async fn models(State(state): State<AppState>) -> Result<Json<ModelsResponse
     Ok(Json(ModelsResponse { data: models }))
 }
 
+pub async fn installed_models(
+    State(state): State<AppState>,
+) -> Result<Json<InstalledModelsResponse>, ApiError> {
+    let inventory = state
+        .installed_registry
+        .installed_model_inventory(&state.package_registry)
+        .map_err(Into::into)
+        .map_err(ApiError)?;
+    Ok(Json(inventory))
+}
+
 pub async fn model(
     State(state): State<AppState>,
     Path(id): Path<String>,

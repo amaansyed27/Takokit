@@ -19,8 +19,8 @@ use takokit_models::{
 use takokit_package::{
     initialize_runner_runtime, install_model_complete, install_python_adapter,
     model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
-    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, LibraryModelManifest,
-    LibraryRunnerManifest, ModelPlan, RunnerInfo, RunnerLifecycleState,
+    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, InstalledModelsResponse,
+    LibraryModelManifest, LibraryRunnerManifest, ModelPlan, RunnerInfo, RunnerLifecycleState,
 };
 
 use crate::AppState;

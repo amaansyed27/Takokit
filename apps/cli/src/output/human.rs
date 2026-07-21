@@ -20,6 +20,10 @@ fn json_requested() -> bool {
 }
 
 fn render_value(value: &serde_json::Value, depth: usize) {
+    if value.get("kind").and_then(serde_json::Value::as_str) == Some("installed-models") {
+        render_installed_models(value.get("data"));
+        return;
+    }
     if let Some(data) = value.get("data") {
         render_value(data, depth);
         return;
@@ -87,6 +91,66 @@ fn render_value(value: &serde_json::Value, depth: usize) {
             }
         }
         _ => println!("{}", scalar(Some(value))),
+    }
+}
+
+fn render_installed_models(value: Option<&serde_json::Value>) {
+    let items = value
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    if items.is_empty() {
+        println!("No models installed.");
+        return;
+    }
+
+    let name_width = items
+        .iter()
+        .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
+        .map(str::len)
+        .max()
+        .unwrap_or(4)
+        .clamp(4, 40);
+    println!(
+        "{:<name_width$}  {:<12}  {:>10}  {}",
+        "NAME", "ID", "SIZE", "MODIFIED"
+    );
+    for item in items {
+        let name = item
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-");
+        let id = item
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-");
+        let size = item
+            .get("size_bytes")
+            .and_then(serde_json::Value::as_u64)
+            .map(bytes_label)
+            .unwrap_or_else(|| "-".to_string());
+        let modified = item
+            .get("modified_at")
+            .and_then(serde_json::Value::as_u64)
+            .map(modified_label)
+            .unwrap_or_else(|| "-".to_string());
+        println!("{name:<name_width$}  {id:<12}  {size:>10}  {modified}");
+    }
+}
+
+fn modified_label(timestamp: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let seconds = now.saturating_sub(timestamp);
+    match seconds {
+        0..=59 => "just now".to_string(),
+        60..=3_599 => format!("{} minutes ago", seconds / 60),
+        3_600..=86_399 => format!("{} hours ago", seconds / 3_600),
+        86_400..=2_591_999 => format!("{} days ago", seconds / 86_400),
+        2_592_000..=31_535_999 => format!("{} months ago", seconds / 2_592_000),
+        _ => format!("{} years ago", seconds / 31_536_000),
     }
 }
 

@@ -57,7 +57,7 @@ pub(crate) async fn route_daemon_command(
             serde_json::json!({"id":model,"removed":true})
         }
         Command::List { target } => match target {
-            None | Some(ListTarget::Models) => client.get("/v1/models")?,
+            None | Some(ListTarget::Models) => client.get("/v1/models/installed")?,
             Some(ListTarget::Runners) => client.get("/v1/runners")?,
             Some(ListTarget::Voices) => client.get("/v1/voices")?,
         },

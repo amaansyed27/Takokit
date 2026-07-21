@@ -304,3 +304,61 @@ fn installed_registry_lists_installed_model_and_runner_records() {
 
     assert_eq!(runners[0].id, "takokit-onnx");
 }
+
+#[test]
+fn installed_inventory_contains_only_verified_ready_models() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let source = temp.path().join("fixture.onnx");
+    std::fs::write(&source, b"hello").expect("fixture");
+    let manifest = artifact_test_manifest(&source, HELLO_SHA256);
+
+    let registry_root = temp.path().join("registry");
+    std::fs::create_dir_all(registry_root.join("models")).expect("models dir");
+    std::fs::write(
+        registry_root.join("models").join("piper-lessac.toml"),
+        toml::to_string_pretty(&manifest).expect("manifest toml"),
+    )
+    .expect("write manifest");
+    let registry = PackageRegistry::new(&registry_root);
+    let installed = InstalledRegistry::new(temp.path().join("home").join("manifests"));
+
+    installed
+        .install_model_with_options(
+            &manifest,
+            InstallModelOptions {
+                metadata_only: true,
+            },
+        )
+        .expect("metadata install");
+    assert!(installed
+        .installed_model_inventory(&registry)
+        .expect("inventory")
+        .data
+        .is_empty());
+
+    installed.install_model(&manifest).expect("full install");
+    let inventory = installed
+        .installed_model_inventory(&registry)
+        .expect("inventory");
+    assert_eq!(inventory.kind, "installed-models");
+    assert_eq!(inventory.data.len(), 1);
+    assert_eq!(inventory.data[0].name, "piper-lessac");
+    assert_eq!(inventory.data[0].size_bytes, 5);
+    assert_eq!(inventory.data[0].id.len(), 12);
+
+    let record = installed
+        .installed_model_record("piper-lessac")
+        .expect("record");
+    std::fs::remove_file(
+        record.artifacts[0]
+            .local_path
+            .as_ref()
+            .expect("artifact path"),
+    )
+    .expect("remove artifact");
+    assert!(installed
+        .installed_model_inventory(&registry)
+        .expect("inventory")
+        .data
+        .is_empty());
+}

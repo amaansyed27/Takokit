@@ -20,6 +20,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/test/launch", get(handlers::launch_test))
         .route("/v1/capabilities", get(handlers::capabilities))
         .route("/v1/models", get(handlers::models))
+        .route("/v1/models/installed", get(handlers::installed_models))
         .route("/v1/library/models", get(handlers::library_models))
         .route("/v1/library/runners", get(handlers::library_runners))
         .route("/v1/models/:id/plan", get(handlers::model_plan))

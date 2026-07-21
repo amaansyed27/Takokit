@@ -50,6 +50,22 @@ pub struct InstalledModelRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledModelsResponse {
+    pub kind: String,
+    pub data: Vec<InstalledModelSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledModelSummary {
+    pub name: String,
+    pub id: String,
+    pub size_bytes: u64,
+    pub modified_at: u64,
+    pub version: String,
+    pub runner: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstalledSnapshotRecord {
     pub provider: ModelSourceProvider,
     pub repository: String,

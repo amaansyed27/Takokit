@@ -97,6 +97,7 @@ Expected: both aliases report the same version and storage root.
 & $Tako doctor --json | Tee-Object "$Evidence\doctor-clean.json"
 & $Tako status
 & $Tako capabilities
+& $Tako list
 & $Tako models | Tee-Object "$Evidence\models-clean.json"
 & $Tako runners | Tee-Object "$Evidence\runners-clean.json"
 & $Tako library models | Tee-Object "$Evidence\library-models.json"
@@ -247,6 +248,7 @@ Pass criteria:
 & $Tako pull whisper-tiny
 & $Tako pull kokoro
 & $Tako pull kokoro
+& $Tako list
 ```
 
 Pass criteria:
@@ -254,7 +256,8 @@ Pass criteria:
 - verified artifacts and snapshots are reused,
 - ready state is not downgraded,
 - digests or pinned source markers are rechecked,
-- duplicate content-addressed blobs are not created.
+- duplicate content-addressed blobs are not created,
+- `tako list` contains only fully installed, currently verified models; catalog-only metadata is excluded.
 
 Interrupt one large pull and restart it. A partial snapshot must never be treated as ready.
 
