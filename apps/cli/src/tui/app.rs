@@ -10,6 +10,21 @@ use super::catalog::{
     load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
 };
 
+pub const HOME_ACTIONS: [(&str, &str); 6] = [
+    ("Speak", "Generate speech with an installed TTS model"),
+    ("Transcribe", "Turn a local audio file into text"),
+    ("Clone voice", "Create a consented local voice profile"),
+    ("Manage", "Inspect models, runners, and the local service"),
+    ("Sessions", "Open prior work or start a clean session"),
+    ("Activity", "Read the complete result from the latest task"),
+];
+
+pub const MANAGE_ACTIONS: [(&str, &str); 3] = [
+    ("Installed models", "Use, repair, or remove local models"),
+    ("Runners", "Inspect and repair shared execution runtimes"),
+    ("System", "Daemon status, diagnostics, logs, and GUI"),
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuiAction {
     Quit,
@@ -40,47 +55,45 @@ pub enum TuiAction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TuiTab {
-    Models,
+pub enum TuiScreen {
+    Home,
     Speak,
     Transcribe,
     Clone,
-    Sessions,
+    Manage,
+    Models,
     Runners,
     System,
+    Sessions,
+    Activity,
 }
 
-impl TuiTab {
-    pub const ALL: [Self; 7] = [
-        Self::Models,
-        Self::Speak,
-        Self::Transcribe,
-        Self::Clone,
-        Self::Sessions,
-        Self::Runners,
-        Self::System,
-    ];
-
+impl TuiScreen {
     pub fn title(self) -> &'static str {
         match self {
-            Self::Models => "Models",
+            Self::Home => "Home",
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
-            Self::Clone => "Clone",
-            Self::Sessions => "Sessions",
+            Self::Clone => "Clone voice",
+            Self::Manage => "Manage",
+            Self::Models => "Installed models",
             Self::Runners => "Runners",
             Self::System => "System",
+            Self::Sessions => "Sessions",
+            Self::Activity => "Activity",
         }
     }
 
-    pub(super) fn next(self) -> Self {
-        let index = Self::ALL.iter().position(|tab| *tab == self).unwrap_or(0);
-        Self::ALL[(index + 1) % Self::ALL.len()]
+    pub fn parent(self) -> Self {
+        match self {
+            Self::Models | Self::Runners | Self::System => Self::Manage,
+            Self::Home => Self::Home,
+            _ => Self::Home,
+        }
     }
 
-    pub(super) fn previous(self) -> Self {
-        let index = Self::ALL.iter().position(|tab| *tab == self).unwrap_or(0);
-        Self::ALL[(index + Self::ALL.len() - 1) % Self::ALL.len()]
+    pub fn accepts_text(self) -> bool {
+        matches!(self, Self::Speak | Self::Transcribe | Self::Clone)
     }
 }
 
@@ -89,25 +102,25 @@ pub enum SpeakField {
     Model,
     Voice,
     Text,
-    Primary,
+    Submit,
 }
 
 impl SpeakField {
-    pub(super) fn next(self) -> Self {
+    pub fn next(self) -> Self {
         match self {
             Self::Model => Self::Voice,
             Self::Voice => Self::Text,
-            Self::Text => Self::Primary,
-            Self::Primary => Self::Model,
+            Self::Text => Self::Submit,
+            Self::Submit => Self::Model,
         }
     }
 
-    pub(super) fn previous(self) -> Self {
+    pub fn previous(self) -> Self {
         match self {
-            Self::Model => Self::Primary,
+            Self::Model => Self::Submit,
             Self::Voice => Self::Model,
             Self::Text => Self::Voice,
-            Self::Primary => Self::Text,
+            Self::Submit => Self::Text,
         }
     }
 }
@@ -116,29 +129,31 @@ impl SpeakField {
 pub enum TranscribeField {
     Model,
     Audio,
-    Primary,
+    Submit,
 }
 
 impl TranscribeField {
-    pub(super) fn next(self) -> Self {
+    pub fn next(self) -> Self {
         match self {
             Self::Model => Self::Audio,
-            Self::Audio => Self::Primary,
-            Self::Primary => Self::Model,
+            Self::Audio => Self::Submit,
+            Self::Submit => Self::Model,
         }
     }
 
-    pub(super) fn previous(self) -> Self {
+    pub fn previous(self) -> Self {
         match self {
-            Self::Model => Self::Primary,
+            Self::Model => Self::Submit,
             Self::Audio => Self::Model,
-            Self::Primary => Self::Audio,
+            Self::Submit => Self::Audio,
         }
     }
 }
 
 pub struct App {
-    pub tab: TuiTab,
+    pub screen: TuiScreen,
+    pub home_index: usize,
+    pub manage_index: usize,
     pub models: Vec<ModelRow>,
     pub runners: Vec<RunnerRow>,
     pub system: Vec<SystemRow>,
@@ -168,9 +183,6 @@ pub struct App {
     pub output_scroll: u16,
     pub tick: u64,
     pub show_help: bool,
-    pub slash_open: bool,
-    pub slash_input: String,
-    pub slash_cursor: usize,
     workspace_store: WorkspaceStore,
     active_session: Uuid,
 }
@@ -189,8 +201,11 @@ impl App {
         let sessions = workspace.store.list_sessions(None)?;
         let active_session = workspace.session_id();
         let session_index = session_position(&sessions, active_session);
+
         Ok(Self {
-            tab: TuiTab::Models,
+            screen: TuiScreen::Home,
+            home_index: 0,
+            manage_index: 0,
             speak_model_index: find_capability_index(&models, &tts_models, None, "kokoro"),
             transcribe_model_index: find_capability_index(
                 &models,
@@ -229,9 +244,6 @@ impl App {
             output_scroll: 0,
             tick: 0,
             show_help: false,
-            slash_open: false,
-            slash_input: String::new(),
-            slash_cursor: 0,
             workspace_store: workspace.store.clone(),
             active_session,
         })
@@ -252,6 +264,7 @@ impl App {
             .map(|model| model.id.clone());
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
         let (tts_models, stt_models) = capability_indexes(&models);
+
         self.models = models;
         self.runners = runners;
         self.tts_models = tts_models;
@@ -379,9 +392,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tab_cycle_includes_clone_and_sessions() {
-        assert_eq!(TuiTab::Transcribe.next(), TuiTab::Clone);
-        assert_eq!(TuiTab::Clone.next(), TuiTab::Sessions);
-        assert_eq!(TuiTab::Sessions.previous(), TuiTab::Clone);
+    fn nested_screens_have_obvious_parents() {
+        assert_eq!(TuiScreen::Models.parent(), TuiScreen::Manage);
+        assert_eq!(TuiScreen::Speak.parent(), TuiScreen::Home);
+        assert_eq!(TuiScreen::Home.parent(), TuiScreen::Home);
+    }
+
+    #[test]
+    fn home_starts_with_primary_tasks() {
+        assert_eq!(HOME_ACTIONS[0].0, "Speak");
+        assert_eq!(HOME_ACTIONS[1].0, "Transcribe");
+        assert_eq!(HOME_ACTIONS[2].0, "Clone voice");
     }
 }
