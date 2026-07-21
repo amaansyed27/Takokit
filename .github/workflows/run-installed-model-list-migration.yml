@@ -1,0 +1,43 @@
+name: Run installed model list migration
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Execute reviewed migration script
+        shell: python
+        run: |
+          from pathlib import Path
+
+          source = Path(".github/workflows/apply-installed-model-list-v2.yml").read_text()
+          marker = "      - name: Apply migration\n        shell: python\n        run: |\n"
+          tail = "      - run: cargo fmt --all\n"
+          block = source.split(marker, 1)[1].split(tail, 1)[0]
+          code = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in block.splitlines()
+          )
+          exec(compile(code, "installed-model-list-migration", "exec"))
+      - run: cargo fmt --all
+      - run: cargo test --workspace
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/TESTING.md apps/cli/src/daemon_commands.rs apps/cli/src/output/human.rs crates/takokit-package/src/lib.rs crates/takokit-package/src/records.rs crates/takokit-package/src/inventory.rs crates/takokit-package/src/tests/package_records.rs crates/takokit-server/src/handlers.rs crates/takokit-server/src/handlers/packages.rs crates/takokit-server/src/router.rs crates/takokit-server/src/router/tests/models.rs
+          git commit -m "Make tako list show installed models only"
+          git push origin HEAD:main
