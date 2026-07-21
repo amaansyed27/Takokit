@@ -42,7 +42,7 @@ pub(crate) async fn run_speak(
     match result {
         Ok(response) => {
             workspace.record_speech(&request, &response)?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
+            print_serializable(&response)?;
             Ok(())
         }
         Err(error) => {
@@ -128,7 +128,7 @@ pub(crate) async fn run_transcription(
     {
         Ok(response) => {
             let output = workspace.record_transcription(&request, &response)?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
+            print_serializable(&response)?;
             eprintln!("Transcript saved: {}", output.display());
             Ok(())
         }
@@ -217,7 +217,7 @@ pub(crate) fn run_clone(args: CloneArgs, workspace: &CliWorkspace) -> anyhow::Re
             )),
         },
     )?;
-    println!("{}", serde_json::to_string_pretty(&profile)?);
+    print_serializable(&profile)?;
     Ok(())
 }
 
@@ -259,7 +259,7 @@ pub(crate) async fn run_convert(
                     message: Some(format!("Converted {} bytes", response.bytes)),
                 },
             )?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
+            print_serializable(&response)?;
             Ok(())
         }
         Err(error) => {
@@ -313,7 +313,7 @@ pub(crate) async fn run_train(
                     message: Some(format!("Training status: {}", response.status)),
                 },
             )?;
-            println!("{}", serde_json::to_string_pretty(&response)?);
+            print_serializable(&response)?;
             Ok(())
         }
         Err(error) => {

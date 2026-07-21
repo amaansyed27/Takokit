@@ -86,8 +86,15 @@ pub fn bootstrap_uv(takokit_root: &Path) -> PackageResult<PathBuf> {
 }
 
 pub(crate) fn verify_uv_version(path: &Path, log: &Path) -> PackageResult<bool> {
-    let output = Command::new(path)
-        .arg("--version")
+    let mut command = Command::new(path);
+    command.arg("--version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = command
         .output()
         .map_err(|error| PackageError::ArtifactInstallFailed {
             artifact: "uv bootstrap".to_string(),

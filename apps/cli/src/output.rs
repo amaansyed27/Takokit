@@ -2,6 +2,9 @@
 
 use super::*;
 
+mod human;
+pub(crate) use human::{print_serializable, print_value};
+
 pub(crate) fn print_or_json_plan(plan: &ModelPlan, json: bool) -> anyhow::Result<()> {
     if json {
         println!("{}", serde_json::to_string_pretty(plan)?);
@@ -23,8 +26,7 @@ pub(crate) fn print_models(
             model_info_from_plan(package_registry, installed_registry, &model.id).map_err(cli_error)
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    println!("{}", serde_json::to_string_pretty(&models)?);
-    Ok(())
+    print_serializable(&models)
 }
 
 pub(crate) fn print_runners(
@@ -47,20 +49,17 @@ pub(crate) fn print_runners(
             }
         })
         .collect();
-    println!("{}", serde_json::to_string_pretty(&runners)?);
-    Ok(())
+    print_serializable(&runners)
 }
 
 pub(crate) fn print_library_models(package_registry: &PackageRegistry) -> anyhow::Result<()> {
     let models = package_registry.library_models().map_err(cli_error)?;
-    println!("{}", serde_json::to_string_pretty(&models)?);
-    Ok(())
+    print_serializable(&models)
 }
 
 pub(crate) fn print_library_runners(package_registry: &PackageRegistry) -> anyhow::Result<()> {
     let runners = package_registry.library_runners().map_err(cli_error)?;
-    println!("{}", serde_json::to_string_pretty(&runners)?);
-    Ok(())
+    print_serializable(&runners)
 }
 
 pub(crate) fn print_model_plan(plan: &ModelPlan) {

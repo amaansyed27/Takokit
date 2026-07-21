@@ -28,6 +28,7 @@ pub(crate) fn run_logged_command(
     for arg in args {
         command.arg(arg.as_os_str());
     }
+    configure_managed_command(&mut command);
     let output = command
         .output()
         .map_err(|error| PackageError::ArtifactInstallFailed {
@@ -66,6 +67,15 @@ pub(crate) fn run_logged_command(
                 log_path.display()
             ),
         })
+    }
+}
+
+fn configure_managed_command(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
     }
 }
 
