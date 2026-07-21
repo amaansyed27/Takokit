@@ -1,0 +1,292 @@
+name: One-time CLI progress fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-pull-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply progress indicators
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new, count=-1):
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"missing replacement target in {path}: {old[:120]!r}")
+              file.write_text(text.replace(old, new, count), encoding="utf-8")
+
+          replace(
+              "apps/cli/src/lib.rs",
+              "mod gui;\nmod session_commands;",
+              "mod gui;\nmod progress;\nmod session_commands;",
+              1,
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              "use output::*;\nuse session_commands::*;",
+              "use output::*;\nuse progress::Activity;\nuse session_commands::*;",
+              1,
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''        Some(Command::Pull(args)) => {
+            let report = install_model_complete(''',
+              '''        Some(Command::Pull(args)) => {
+            let activity = Activity::start(format!("Pulling {}", args.model));
+            let report = install_model_complete(''',
+              1,
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''            )
+            .map_err(cli_error)?;
+            print_serializable(&report)?;
+        }
+        Some(Command::Show''',
+              '''            )
+            .map_err(cli_error)?;
+            drop(activity);
+            print_serializable(&report)?;
+        }
+        Some(Command::Show''',
+              1,
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''            RunnerCommand::Install { runner } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                let report =
+                    initialize_runner_runtime(store.root(), &installed_registry, &manifest)
+                        .map_err(cli_error)?;
+                print_serializable(&report)?;
+            }''',
+              '''            RunnerCommand::Install { runner } => {
+                let manifest = package_registry.runner(&runner).map_err(cli_error)?;
+                let activity = Activity::start(format!("Installing runner {runner}"));
+                let report =
+                    initialize_runner_runtime(store.root(), &installed_registry, &manifest)
+                        .map_err(cli_error)?;
+                drop(activity);
+                print_serializable(&report)?;
+            }''',
+              1,
+          )
+          replace(
+              "apps/cli/src/lib.rs",
+              '''            AdapterCommand::Install { adapter } => {
+                let adapter = normalize_adapter_id(&adapter);
+                let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
+                print_serializable(&record)?;
+            }''',
+              '''            AdapterCommand::Install { adapter } => {
+                let adapter = normalize_adapter_id(&adapter);
+                let activity = Activity::start(format!("Installing adapter {adapter}"));
+                let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
+                drop(activity);
+                print_serializable(&record)?;
+            }''',
+              1,
+          )
+
+          replace(
+              "apps/cli/src/daemon_commands.rs",
+              '''        Command::Pull(args) => client.post(
+            "/v1/models/pull",
+            &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
+        )?,''',
+              '''        Command::Pull(args) => {
+            let activity = Activity::start(format!("Pulling {}", args.model));
+            let output = client.post(
+                "/v1/models/pull",
+                &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
+            );
+            drop(activity);
+            output?
+        }''',
+              1,
+          )
+          replace(
+              "apps/cli/src/daemon_commands.rs",
+              '''        Command::Speak(args) => client.post(
+            "/v1/audio/speech",
+            &SpeechRequest {
+                model: args.model.clone(),
+                input: args.text.clone(),
+                voice: Some(args.voice.clone()),
+                response_format: Some("wav".to_string()),
+                language: args.language.clone(),
+                instruction: args.instruction.clone(),
+                reference_text: args.reference_text.clone(),
+            },
+        )?,''',
+              '''        Command::Speak(args) => {
+            let activity = Activity::start(format!("Generating speech with {}", args.model));
+            let output = client.post(
+                "/v1/audio/speech",
+                &SpeechRequest {
+                    model: args.model.clone(),
+                    input: args.text.clone(),
+                    voice: Some(args.voice.clone()),
+                    response_format: Some("wav".to_string()),
+                    language: args.language.clone(),
+                    instruction: args.instruction.clone(),
+                    reference_text: args.reference_text.clone(),
+                },
+            );
+            drop(activity);
+            output?
+        }''',
+              1,
+          )
+          replace(
+              "apps/cli/src/daemon_commands.rs",
+              '''        Command::Transcribe { audio, model } => client.post(
+            "/v1/audio/transcriptions",
+            &takokit_core::TranscriptionRequest {
+                file_path: audio.clone(),
+                model: Some(model.clone()),
+            },
+        )?,''',
+              '''        Command::Transcribe { audio, model } => {
+            let activity = Activity::start(format!("Transcribing with {model}"));
+            let output = client.post(
+                "/v1/audio/transcriptions",
+                &takokit_core::TranscriptionRequest {
+                    file_path: audio.clone(),
+                    model: Some(model.clone()),
+                },
+            );
+            drop(activity);
+            output?
+        }''',
+              1,
+          )
+          replace(
+              "apps/cli/src/daemon_commands.rs",
+              '''            RunnerCommand::Install { runner } => {
+                client.post("/v1/runners/install", &serde_json::json!({"runner":runner}))?
+            }''',
+              '''            RunnerCommand::Install { runner } => {
+                let activity = Activity::start(format!("Installing runner {runner}"));
+                let output =
+                    client.post("/v1/runners/install", &serde_json::json!({"runner":runner}));
+                drop(activity);
+                output?
+            }''',
+              1,
+          )
+          replace(
+              "apps/cli/src/daemon_commands.rs",
+              '''            AdapterCommand::Install { adapter } => client.post(
+                "/v1/adapters/install",
+                &serde_json::json!({"adapter":adapter}),
+            )?,''',
+              '''            AdapterCommand::Install { adapter } => {
+                let activity = Activity::start(format!("Installing adapter {adapter}"));
+                let output = client.post(
+                    "/v1/adapters/install",
+                    &serde_json::json!({"adapter":adapter}),
+                );
+                drop(activity);
+                output?
+            }''',
+              1,
+          )
+
+          replace(
+              "apps/cli/src/direct_inference.rs",
+              '''    let result = if request.model != "mock-tts" {''',
+              '''    let activity = Activity::start(format!("Generating speech with {}", request.model));
+    let result = if request.model != "mock-tts" {''',
+              1,
+          )
+          replace(
+              "apps/cli/src/direct_inference.rs",
+              '''    };
+    match result {
+        Ok(response) => {
+            workspace.record_speech''',
+              '''    };
+    drop(activity);
+    match result {
+        Ok(response) => {
+            workspace.record_speech''',
+              1,
+          )
+          replace(
+              "apps/cli/src/direct_inference.rs",
+              '''    match execute_transcription(&plan, request.clone())
+        .await
+        .map_err(runtime_error)
+    {''',
+              '''    let activity = Activity::start(format!("Transcribing with {model}"));
+    let result = execute_transcription(&plan, request.clone())
+        .await
+        .map_err(runtime_error);
+    drop(activity);
+    match result {''',
+              1,
+          )
+          replace(
+              "apps/cli/src/direct_inference.rs",
+              '''    match execute_voice_conversion(&plan, request.clone(), &workspace.outputs_dir())
+        .await
+        .map_err(runtime_error)
+    {''',
+              '''    let activity = Activity::start(format!("Converting voice with {}", args.model));
+    let result = execute_voice_conversion(&plan, request.clone(), &workspace.outputs_dir())
+        .await
+        .map_err(runtime_error);
+    drop(activity);
+    match result {''',
+              1,
+          )
+          replace(
+              "apps/cli/src/direct_inference.rs",
+              '''    match execute_voice_training(&plan, request.clone())
+        .await
+        .map_err(runtime_error)
+    {''',
+              '''    let activity = Activity::start(format!("Training voice with {}", args.model));
+    let result = execute_voice_training(&plan, request.clone())
+        .await
+        .map_err(runtime_error);
+    drop(activity);
+    match result {''',
+              1,
+          )
+
+          workflow = Path(".github/workflows/one-time-pull-progress.yml")
+          workflow.unlink()
+      - name: Verify exact release gates
+        shell: pwsh
+        run: |
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo test --workspace
+          cargo build --release
+      - name: Commit verified fix
+        shell: pwsh
+        run: |
+          git config user.name "Takokit CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Show progress for long-running CLI operations"
+          git pull --rebase origin main
+          git push origin HEAD:main
