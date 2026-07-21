@@ -111,13 +111,27 @@ fn render_installed_models(value: Option<&serde_json::Value>) {
         .max()
         .unwrap_or(4)
         .clamp(4, 40);
+    let type_width = items
+        .iter()
+        .filter_map(|item| {
+            item.get("model_type")
+                .and_then(serde_json::Value::as_str)
+        })
+        .map(str::len)
+        .max()
+        .unwrap_or(4)
+        .clamp(4, 24);
     println!(
-        "{:<name_width$}  {:<12}  {:>10}  {}",
-        "NAME", "ID", "SIZE", "MODIFIED"
+        "{:<name_width$}  {:<type_width$}  {:<12}  {:>10}  {}",
+        "NAME", "TYPE", "ID", "SIZE", "MODIFIED"
     );
     for item in items {
         let name = item
             .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-");
+        let model_type = item
+            .get("model_type")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("-");
         let id = item
@@ -134,7 +148,9 @@ fn render_installed_models(value: Option<&serde_json::Value>) {
             .and_then(serde_json::Value::as_u64)
             .map(modified_label)
             .unwrap_or_else(|| "-".to_string());
-        println!("{name:<name_width$}  {id:<12}  {size:>10}  {modified}");
+        println!(
+            "{name:<name_width$}  {model_type:<type_width$}  {id:<12}  {size:>10}  {modified}"
+        );
     }
 }
 
