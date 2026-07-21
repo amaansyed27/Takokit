@@ -2,6 +2,10 @@
 
 use super::*;
 
+#[path = "progress.rs"]
+mod progress;
+use progress::Activity;
+
 pub(crate) fn normalize_adapter_id(adapter: &str) -> String {
     adapter.trim().replace('-', "_")
 }
@@ -39,7 +43,9 @@ pub(crate) async fn route_daemon_command(
         Command::Status => client.get("/v1/status")?,
         Command::Doctor(_) => client.get("/v1/doctor")?,
         Command::Capabilities => client.get("/v1/capabilities")?,
-        Command::Pull(args) => client.post(
+        Command::Pull(args) => post_with_activity(
+            &client,
+            format!("Pulling {}", args.model),
             "/v1/models/pull",
             &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
         )?,
@@ -54,7 +60,9 @@ pub(crate) async fn route_daemon_command(
             Some(ListTarget::Runners) => client.get("/v1/runners")?,
             Some(ListTarget::Voices) => client.get("/v1/voices")?,
         },
-        Command::Speak(args) => client.post(
+        Command::Speak(args) => post_with_activity(
+            &client,
+            format!("Generating speech with {}", args.model),
             "/v1/audio/speech",
             &SpeechRequest {
                 model: args.model.clone(),
@@ -66,7 +74,9 @@ pub(crate) async fn route_daemon_command(
                 reference_text: args.reference_text.clone(),
             },
         )?,
-        Command::Transcribe { audio, model } => client.post(
+        Command::Transcribe { audio, model } => post_with_activity(
+            &client,
+            format!("Transcribing with {model}"),
             "/v1/audio/transcriptions",
             &takokit_core::TranscriptionRequest {
                 file_path: audio.clone(),
@@ -86,7 +96,9 @@ pub(crate) async fn route_daemon_command(
                     .any(|item| item.as_str() == Some(capability))
             };
             match (&args.text, &args.file) {
-                (Some(text), None) if supports("text_to_speech") => client.post(
+                (Some(text), None) if supports("text_to_speech") => post_with_activity(
+                    &client,
+                    format!("Generating speech with {}", args.model),
                     "/v1/audio/speech",
                     &SpeechRequest {
                         model: args.model.clone(),
@@ -98,7 +110,9 @@ pub(crate) async fn route_daemon_command(
                         reference_text: args.reference_text.clone(),
                     },
                 )?,
-                (None, Some(file)) if supports("speech_to_text") => client.post(
+                (None, Some(file)) if supports("speech_to_text") => post_with_activity(
+                    &client,
+                    format!("Transcribing with {}", args.model),
                     "/v1/audio/transcriptions",
                     &takokit_core::TranscriptionRequest {
                         file_path: file.clone(),
@@ -129,9 +143,12 @@ pub(crate) async fn route_daemon_command(
             RunnerCommand::Pull { runner } => {
                 client.post("/v1/runners/pull", &serde_json::json!({"runner":runner}))?
             }
-            RunnerCommand::Install { runner } => {
-                client.post("/v1/runners/install", &serde_json::json!({"runner":runner}))?
-            }
+            RunnerCommand::Install { runner } => post_with_activity(
+                &client,
+                format!("Installing runner {runner}"),
+                "/v1/runners/install",
+                &serde_json::json!({"runner":runner}),
+            )?,
             RunnerCommand::Doctor { runner, .. } => {
                 client.get(&format!("/v1/runners/{runner}/doctor"))?
             }
@@ -143,7 +160,9 @@ pub(crate) async fn route_daemon_command(
         },
         Command::Adapter { command } => match command {
             AdapterCommand::List => client.get("/v1/adapters")?,
-            AdapterCommand::Install { adapter } => client.post(
+            AdapterCommand::Install { adapter } => post_with_activity(
+                &client,
+                format!("Installing adapter {adapter}"),
                 "/v1/adapters/install",
                 &serde_json::json!({"adapter":adapter}),
             )?,
@@ -160,6 +179,18 @@ pub(crate) async fn route_daemon_command(
         print_value(&output)?;
     }
     Ok(true)
+}
+
+fn post_with_activity<B: serde::Serialize>(
+    client: &daemon_client::Client,
+    label: String,
+    path: &str,
+    body: &B,
+) -> anyhow::Result<serde_json::Value> {
+    let activity = Activity::start(label);
+    let result = client.post(path, body);
+    drop(activity);
+    result
 }
 
 fn command_requests_json(command: &Command) -> bool {
