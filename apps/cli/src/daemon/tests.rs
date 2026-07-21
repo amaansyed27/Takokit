@@ -24,6 +24,39 @@ fn atomic_runtime_record_round_trips() {
 }
 
 #[test]
+fn alias_prefers_sibling_canonical_daemon_binary() {
+    let temp = tempfile::tempdir().unwrap();
+    let alias = temp.path().join(if cfg!(windows) { "tako.exe" } else { "tako" });
+    let canonical = temp
+        .path()
+        .join(if cfg!(windows) { "takokit.exe" } else { "takokit" });
+    fs::write(&alias, b"").unwrap();
+    fs::write(&canonical, b"").unwrap();
+
+    assert_eq!(preferred_daemon_executable(&alias), canonical);
+}
+
+#[test]
+fn alias_falls_back_to_itself_when_canonical_binary_is_missing() {
+    let temp = tempfile::tempdir().unwrap();
+    let alias = temp.path().join(if cfg!(windows) { "tako.exe" } else { "tako" });
+    fs::write(&alias, b"").unwrap();
+
+    assert_eq!(preferred_daemon_executable(&alias), alias);
+}
+
+#[test]
+fn canonical_binary_keeps_itself_as_daemon_executable() {
+    let temp = tempfile::tempdir().unwrap();
+    let canonical = temp
+        .path()
+        .join(if cfg!(windows) { "takokit.exe" } else { "takokit" });
+    fs::write(&canonical, b"").unwrap();
+
+    assert_eq!(preferred_daemon_executable(&canonical), canonical);
+}
+
+#[test]
 fn atomic_runtime_record_replaces_previous_value() {
     let temp = tempfile::tempdir().unwrap();
     let store = LocalStore::new(temp.path().to_path_buf());
