@@ -70,7 +70,7 @@ pub(crate) fn run_logged_command(
     }
 }
 
-fn configure_managed_command(command: &mut Command) {
+pub(crate) fn configure_managed_command(command: &mut Command) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
