@@ -221,22 +221,27 @@ fn format_duration(duration: Duration) -> String {
 }
 
 fn compact_message(value: &str, maximum: usize) -> String {
-    let mut output = String::new();
-    for character in value.chars() {
-        if output.chars().count() >= maximum {
-            break;
-        }
-        output.push(if character.is_control() {
-            ' '
-        } else {
-            character
-        });
+    let clean = value
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect::<Vec<_>>();
+    if clean.len() <= maximum {
+        return clean.into_iter().collect();
     }
-    if value.chars().count() > maximum && maximum >= 3 {
-        output.truncate(output.len().saturating_sub(3));
-        output.push_str("...");
+    if maximum < 3 {
+        return clean.into_iter().take(maximum).collect();
     }
-    output
+    clean
+        .into_iter()
+        .take(maximum - 3)
+        .chain(['.', '.', '.'])
+        .collect()
 }
 
 fn timestamp_ms() -> u128 {

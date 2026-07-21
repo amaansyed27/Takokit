@@ -38,6 +38,7 @@ pub struct InstallProgress {
 pub struct InstallProgressReporter {
     path: Arc<PathBuf>,
     snapshot: Arc<Mutex<InstallProgress>>,
+    persist_lock: Arc<Mutex<()>>,
 }
 
 impl InstallProgressReporter {
@@ -56,6 +57,7 @@ impl InstallProgressReporter {
                 started_at_ms: now,
                 updated_at_ms: now,
             })),
+            persist_lock: Arc::new(Mutex::new(())),
         };
         reporter.persist();
         reporter
@@ -105,6 +107,10 @@ impl InstallProgressReporter {
     }
 
     fn persist(&self) {
+        let _persist_guard = match self.persist_lock.lock() {
+            Ok(guard) => guard,
+            Err(_) => return,
+        };
         let snapshot = match self.snapshot.lock() {
             Ok(snapshot) => snapshot.clone(),
             Err(_) => return,

@@ -3,7 +3,7 @@
 use crate::{
     artifact_reuse::{self, ArtifactReuseState},
     planning::has_verified_executor,
-    runtime_model_source::estimate_model_source_bytes,
+    runtime_model_source::{estimate_model_source_bytes, model_source_staging_path},
     transaction::ModelInstallSnapshot,
     *,
 };
@@ -247,8 +247,7 @@ fn install_model_complete_inner(
         progress.clone(),
         vec![
             takokit_root.join("cache").join("downloads"),
-            takokit_root.join("blobs").join("sha256"),
-            takokit_root.join("models"),
+            model_source_staging_path(takokit_root, &model.id),
         ],
         if reuse_state == ArtifactReuseState::Verified {
             "verifying-cache"
