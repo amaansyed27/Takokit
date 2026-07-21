@@ -2,7 +2,8 @@
 
 use crate::{
     artifact_reuse, InstalledModelRecord, InstalledModelSummary, InstalledModelsResponse,
-    InstalledPackageStatus, InstalledRegistry, ModelManifest, PackageRegistry, PackageResult,
+    InstalledPackageStatus, InstalledRegistry, ModelKind, ModelManifest, PackageRegistry,
+    PackageResult,
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -30,6 +31,7 @@ impl InstalledRegistry {
 
             data.push(InstalledModelSummary {
                 name: record.id.clone(),
+                model_type: model_type_label(&manifest),
                 id: inventory_digest(&manifest, &record),
                 size_bytes: installed_size(&record),
                 modified_at: record.installed_at.parse::<u64>().unwrap_or_default(),
@@ -50,6 +52,38 @@ impl InstalledRegistry {
             data,
         })
     }
+}
+
+fn model_type_label(manifest: &ModelManifest) -> String {
+    let mut labels = Vec::new();
+    if manifest.capabilities.tts {
+        labels.push("TTS");
+    }
+    if manifest.capabilities.stt {
+        labels.push("STT");
+    }
+    if manifest.capabilities.voice_cloning {
+        labels.push("CLONING");
+    }
+    if manifest.capabilities.voice_conversion {
+        labels.push("CONVERSION");
+    }
+    if manifest.capabilities.voice_training {
+        labels.push("TRAINING");
+    }
+    if !labels.is_empty() {
+        return labels.join("/");
+    }
+
+    match manifest.kind {
+        ModelKind::Tts => "TTS",
+        ModelKind::Stt => "STT",
+        ModelKind::VoiceClone | ModelKind::VoiceCloning => "CLONING",
+        ModelKind::VoiceTrain => "TRAINING",
+        ModelKind::VoiceConvert => "CONVERSION",
+        ModelKind::OmniAudio => "OMNI",
+    }
+    .to_string()
 }
 
 fn inventory_digest(manifest: &ModelManifest, record: &InstalledModelRecord) -> String {
