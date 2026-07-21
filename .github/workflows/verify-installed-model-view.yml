@@ -1,6 +1,7 @@
 name: Verify installed model view
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
