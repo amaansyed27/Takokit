@@ -8,6 +8,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+const DISPLAY_WIDTH: usize = 96;
+const POLL_INTERVAL: Duration = Duration::from_millis(200);
+
 pub(crate) struct Activity {
     running: Option<Arc<AtomicBool>>,
     worker: Option<JoinHandle<()>>,
@@ -26,19 +29,17 @@ impl Activity {
         let running = Arc::new(AtomicBool::new(true));
         let worker_running = Arc::clone(&running);
         let worker = thread::spawn(move || {
-            const FRAMES: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
             let started = Instant::now();
-            let mut frame = 0usize;
+            let mut displayed_second = u64::MAX;
             while worker_running.load(Ordering::Relaxed) {
-                eprint!(
-                    "\r\x1b[2K{} {}  {:.1}s",
-                    FRAMES[frame % FRAMES.len()],
-                    label,
-                    started.elapsed().as_secs_f32()
-                );
-                let _ = io::stderr().flush();
-                frame += 1;
-                thread::sleep(Duration::from_millis(120));
+                let elapsed = started.elapsed().as_secs();
+                if elapsed != displayed_second {
+                    let line = format!("{label}  {elapsed}s");
+                    eprint!("\r{line:<DISPLAY_WIDTH$}");
+                    let _ = io::stderr().flush();
+                    displayed_second = elapsed;
+                }
+                thread::sleep(POLL_INTERVAL);
             }
         });
 
@@ -56,7 +57,7 @@ impl Activity {
             let _ = worker.join();
         }
         if enabled() {
-            eprint!("\r\x1b[2K");
+            eprint!("\r{:<DISPLAY_WIDTH$}\r", "");
             let _ = io::stderr().flush();
         }
     }
