@@ -154,6 +154,6 @@ pub(crate) async fn route_daemon_command(
         },
         _ => return Ok(false),
     };
-    println!("{}", serde_json::to_string_pretty(&output)?);
+    print_value(&output)?;
     Ok(true)
 }
