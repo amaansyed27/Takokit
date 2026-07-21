@@ -6,6 +6,7 @@ import { mockRuntime } from "../lib/mockData";
 import { loadRuntimeSnapshot } from "../lib/api";
 import { withVerifiedInstalledModels } from "../lib/installedModels";
 import { initializeWorkspaceSession } from "../lib/sessions";
+import type { RuntimeSnapshot } from "../lib/types";
 
 const routeIds = new Set<PageId>(routes.map((route) => route.id));
 
@@ -16,7 +17,7 @@ function pageFromHash(): PageId {
 
 export function App() {
   const [activePage, setActivePage] = useState<PageId>(() => pageFromHash());
-  const [runtime, setRuntime] = useState(() => ({ ...mockRuntime, models: [] }));
+  const [runtime, setRuntime] = useState<RuntimeSnapshot>(() => ({ ...mockRuntime, models: [] }));
   const route = routes.find((item) => item.id === activePage) ?? routes[0];
   const Page = route.component;
 
