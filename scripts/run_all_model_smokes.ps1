@@ -61,9 +61,22 @@ function Invoke-Tako {
     $safePhase = $Phase -replace '[^a-zA-Z0-9._-]', '_'
     $log = Join-Path $RunRoot "$safeModel-$safePhase.log"
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
-    & $Tako @Arguments *>&1 | Tee-Object -FilePath $log
-    $exitCode = $LASTEXITCODE
-    $watch.Stop()
+
+    # Windows PowerShell 5.1 converts native stderr into ErrorRecord objects.
+    # Keep stderr in the evidence log without letting ErrorActionPreference=Stop
+    # terminate the complete catalog run.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & $Tako @Arguments 2>&1 |
+            ForEach-Object { "$_" } |
+            Tee-Object -FilePath $log
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        $watch.Stop()
+    }
+
     if ($exitCode -eq 0) {
         Add-Result $Model $Phase "passed" $watch.ElapsedMilliseconds $log "exit code 0"
         return $true
