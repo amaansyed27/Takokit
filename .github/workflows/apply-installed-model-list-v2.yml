@@ -1,0 +1,384 @@
+name: Apply installed model list v2
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply migration
+        shell: python
+        run: |
+          from pathlib import Path
+          import textwrap
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              old = textwrap.dedent(old)
+              new = textwrap.dedent(new)
+              if old not in text:
+                  raise SystemExit(f"marker not found in {path}: {old[:100]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "crates/takokit-package/src/lib.rs",
+              "mod installed;\n",
+              "mod installed;\nmod inventory;\n",
+          )
+
+          replace_once(
+              "crates/takokit-package/src/records.rs",
+              '''
+              #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+              pub struct InstalledSnapshotRecord {
+              ''',
+              '''
+              #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+              pub struct InstalledModelsResponse {
+                  pub kind: String,
+                  pub data: Vec<InstalledModelSummary>,
+              }
+
+              #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+              pub struct InstalledModelSummary {
+                  pub name: String,
+                  pub id: String,
+                  pub size_bytes: u64,
+                  pub modified_at: u64,
+                  pub version: String,
+                  pub runner: String,
+              }
+
+              #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+              pub struct InstalledSnapshotRecord {
+              ''',
+          )
+
+          replace_once(
+              "crates/takokit-server/src/handlers.rs",
+              "InstallModelOptions, LibraryModelManifest,\n",
+              "InstallModelOptions, InstalledModelsResponse, LibraryModelManifest,\n",
+          )
+
+          replace_once(
+              "crates/takokit-server/src/handlers/packages.rs",
+              '''
+              pub async fn model(
+              ''',
+              '''
+              pub async fn installed_models(
+                  State(state): State<AppState>,
+              ) -> Result<Json<InstalledModelsResponse>, ApiError> {
+                  let inventory = state
+                      .installed_registry
+                      .installed_model_inventory(&state.package_registry)
+                      .map_err(Into::into)
+                      .map_err(ApiError)?;
+                  Ok(Json(inventory))
+              }
+
+              pub async fn model(
+              ''',
+          )
+
+          replace_once(
+              "crates/takokit-server/src/router.rs",
+              '        .route("/v1/models", get(handlers::models))\n',
+              '        .route("/v1/models", get(handlers::models))\n        .route("/v1/models/installed", get(handlers::installed_models))\n',
+          )
+
+          replace_once(
+              "apps/cli/src/daemon_commands.rs",
+              '            None | Some(ListTarget::Models) => client.get("/v1/models")?,\n',
+              '            None | Some(ListTarget::Models) => client.get("/v1/models/installed")?,\n',
+          )
+
+          replace_once(
+              "apps/cli/src/output/human.rs",
+              '''
+              fn render_value(value: &serde_json::Value, depth: usize) {
+                  if let Some(data) = value.get("data") {
+              ''',
+              '''
+              fn render_value(value: &serde_json::Value, depth: usize) {
+                  if value.get("kind").and_then(serde_json::Value::as_str)
+                      == Some("installed-models")
+                  {
+                      render_installed_models(value.get("data"));
+                      return;
+                  }
+                  if let Some(data) = value.get("data") {
+              ''',
+          )
+
+          replace_once(
+              "apps/cli/src/output/human.rs",
+              "fn render_pull(map: &serde_json::Map<String, serde_json::Value>) {\n",
+              '''
+              fn render_installed_models(value: Option<&serde_json::Value>) {
+                  let items = value
+                      .and_then(serde_json::Value::as_array)
+                      .map(Vec::as_slice)
+                      .unwrap_or_default();
+                  if items.is_empty() {
+                      println!("No models installed.");
+                      return;
+                  }
+
+                  let name_width = items
+                      .iter()
+                      .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
+                      .map(str::len)
+                      .max()
+                      .unwrap_or(4)
+                      .clamp(4, 40);
+                  println!(
+                      "{:<name_width$}  {:<12}  {:>10}  {}",
+                      "NAME", "ID", "SIZE", "MODIFIED"
+                  );
+                  for item in items {
+                      let name = item
+                          .get("name")
+                          .and_then(serde_json::Value::as_str)
+                          .unwrap_or("-");
+                      let id = item
+                          .get("id")
+                          .and_then(serde_json::Value::as_str)
+                          .unwrap_or("-");
+                      let size = item
+                          .get("size_bytes")
+                          .and_then(serde_json::Value::as_u64)
+                          .map(bytes_label)
+                          .unwrap_or_else(|| "-".to_string());
+                      let modified = item
+                          .get("modified_at")
+                          .and_then(serde_json::Value::as_u64)
+                          .map(modified_label)
+                          .unwrap_or_else(|| "-".to_string());
+                      println!("{name:<name_width$}  {id:<12}  {size:>10}  {modified}");
+                  }
+              }
+
+              fn modified_label(timestamp: u64) -> String {
+                  let now = std::time::SystemTime::now()
+                      .duration_since(std::time::UNIX_EPOCH)
+                      .unwrap_or_default()
+                      .as_secs();
+                  let seconds = now.saturating_sub(timestamp);
+                  match seconds {
+                      0..=59 => "just now".to_string(),
+                      60..=3_599 => format!("{} minutes ago", seconds / 60),
+                      3_600..=86_399 => format!("{} hours ago", seconds / 3_600),
+                      86_400..=2_591_999 => format!("{} days ago", seconds / 86_400),
+                      2_592_000..=31_535_999 => format!("{} months ago", seconds / 2_592_000),
+                      _ => format!("{} years ago", seconds / 31_536_000),
+                  }
+              }
+
+              fn render_pull(map: &serde_json::Map<String, serde_json::Value>) {
+              ''',
+          )
+
+          replace_once(
+              "README.md",
+              '''
+              tako models
+              tako runners
+              tako show kokoro
+              ''',
+              '''
+              tako list                    # verified models installed on this machine
+              tako models                  # browse the bundled runtime catalog
+              tako library models          # browse the curated discovery catalog
+              tako runners
+              tako show kokoro
+              ''',
+          )
+
+          replace_once(
+              "README.md",
+              "## Pull lifecycle\n",
+              '''
+              `tako list` is local-only: it shows models whose artifacts or pinned snapshots
+              are still present and verified. Metadata-only catalog entries belong to
+              `tako models`, not the installed-model list.
+
+              ## Pull lifecycle
+              ''',
+          )
+
+          replace_once(
+              "docs/TESTING.md",
+              '& $Tako models | Tee-Object "$Evidence\\models-clean.json"\n',
+              '& $Tako list\n& $Tako models | Tee-Object "$Evidence\\models-clean.json"\n',
+          )
+
+          replace_once(
+              "docs/TESTING.md",
+              '''
+              & $Tako pull kokoro
+              & $Tako pull kokoro
+              ```
+              ''',
+              '''
+              & $Tako pull kokoro
+              & $Tako pull kokoro
+              & $Tako list
+              ```
+              ''',
+          )
+
+          replace_once(
+              "docs/TESTING.md",
+              "- duplicate content-addressed blobs are not created.\n",
+              "- duplicate content-addressed blobs are not created,\n- `tako list` contains only fully installed, currently verified models; catalog-only metadata is excluded.\n",
+          )
+
+          package_tests = Path("crates/takokit-package/src/tests/package_records.rs")
+          if "installed_inventory_contains_only_verified_ready_models" not in package_tests.read_text():
+              package_tests.write_text(package_tests.read_text() + textwrap.dedent(r'''
+
+              #[test]
+              fn installed_inventory_contains_only_verified_ready_models() {
+                  let temp = tempfile::tempdir().expect("tempdir");
+                  let source = temp.path().join("fixture.onnx");
+                  std::fs::write(&source, b"hello").expect("fixture");
+                  let manifest = artifact_test_manifest(&source, HELLO_SHA256);
+
+                  let registry_root = temp.path().join("registry");
+                  std::fs::create_dir_all(registry_root.join("models")).expect("models dir");
+                  std::fs::write(
+                      registry_root.join("models").join("piper-lessac.toml"),
+                      toml::to_string_pretty(&manifest).expect("manifest toml"),
+                  )
+                  .expect("write manifest");
+                  let registry = PackageRegistry::new(&registry_root);
+                  let installed = InstalledRegistry::new(temp.path().join("home").join("manifests"));
+
+                  installed
+                      .install_model_with_options(
+                          &manifest,
+                          InstallModelOptions {
+                              metadata_only: true,
+                          },
+                      )
+                      .expect("metadata install");
+                  assert!(installed
+                      .installed_model_inventory(&registry)
+                      .expect("inventory")
+                      .data
+                      .is_empty());
+
+                  installed.install_model(&manifest).expect("full install");
+                  let inventory = installed
+                      .installed_model_inventory(&registry)
+                      .expect("inventory");
+                  assert_eq!(inventory.kind, "installed-models");
+                  assert_eq!(inventory.data.len(), 1);
+                  assert_eq!(inventory.data[0].name, "piper-lessac");
+                  assert_eq!(inventory.data[0].size_bytes, 5);
+                  assert_eq!(inventory.data[0].id.len(), 12);
+
+                  let record = installed
+                      .installed_model_record("piper-lessac")
+                      .expect("record");
+                  std::fs::remove_file(
+                      record.artifacts[0]
+                          .local_path
+                          .as_ref()
+                          .expect("artifact path"),
+                  )
+                  .expect("remove artifact");
+                  assert!(installed
+                      .installed_model_inventory(&registry)
+                      .expect("inventory")
+                      .data
+                      .is_empty());
+              }
+              '''))
+
+          server_tests = Path("crates/takokit-server/src/router/tests/models.rs")
+          if "installed_models_route_excludes_catalog_and_metadata_only_entries" not in server_tests.read_text():
+              server_tests.write_text(server_tests.read_text() + textwrap.dedent(r'''
+
+              #[tokio::test]
+              async fn installed_models_route_excludes_catalog_and_metadata_only_entries() {
+                  let root = std::env::temp_dir().join(format!(
+                      "takokit-server-installed-models-test-{}",
+                      std::time::SystemTime::now()
+                          .duration_since(std::time::UNIX_EPOCH)
+                          .unwrap()
+                          .as_nanos()
+                  ));
+                  let state = AppState::new(RuntimeConfig::local(root.clone()), LocalStore::new(root));
+                  let app = server_router(state);
+
+                  let empty = app
+                      .clone()
+                      .oneshot(
+                          Request::builder()
+                              .uri("/v1/models/installed")
+                              .body(Body::empty())
+                              .unwrap(),
+                      )
+                      .await
+                      .unwrap();
+                  assert_eq!(empty.status(), StatusCode::OK);
+                  let body = to_bytes(empty.into_body(), 1024 * 1024).await.unwrap();
+                  let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                  assert_eq!(json["kind"], "installed-models");
+                  assert!(json["data"].as_array().unwrap().is_empty());
+
+                  let metadata = app
+                      .clone()
+                      .oneshot(
+                          Request::builder()
+                              .method("POST")
+                              .uri("/v1/models/pull")
+                              .header("content-type", "application/json")
+                              .body(Body::from(
+                                  r#"{"model":"piper-lessac","metadata_only":true}"#,
+                              ))
+                              .unwrap(),
+                      )
+                      .await
+                      .unwrap();
+                  assert_eq!(metadata.status(), StatusCode::OK);
+
+                  let listed = app
+                      .oneshot(
+                          Request::builder()
+                              .uri("/v1/models/installed")
+                              .body(Body::empty())
+                              .unwrap(),
+                      )
+                      .await
+                      .unwrap();
+                  let body = to_bytes(listed.into_body(), 1024 * 1024).await.unwrap();
+                  let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                  assert!(json["data"].as_array().unwrap().is_empty());
+              }
+              '''))
+      - run: cargo fmt --all
+      - run: cargo test --workspace
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/TESTING.md apps/cli/src/daemon_commands.rs apps/cli/src/output/human.rs crates/takokit-package/src/lib.rs crates/takokit-package/src/records.rs crates/takokit-package/src/inventory.rs crates/takokit-package/src/tests/package_records.rs crates/takokit-server/src/handlers.rs crates/takokit-server/src/handlers/packages.rs crates/takokit-server/src/router.rs crates/takokit-server/src/router/tests/models.rs
+          git commit -m "Make tako list show installed models only"
+          git push origin HEAD:main
