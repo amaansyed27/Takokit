@@ -65,11 +65,8 @@ pub(super) fn handle_transcribe(app: &mut App, key: KeyEvent) -> Option<TuiActio
     match app.transcribe_field {
         TranscribeField::Model => match key.code {
             KeyCode::Left | KeyCode::Up => {
-                app.transcribe_model_index = shifted_index(
-                    app.transcribe_model_index,
-                    app.stt_models.len(),
-                    -1,
-                )
+                app.transcribe_model_index =
+                    shifted_index(app.transcribe_model_index, app.stt_models.len(), -1)
             }
             KeyCode::Right | KeyCode::Down => {
                 app.transcribe_model_index =

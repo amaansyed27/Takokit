@@ -41,13 +41,7 @@ pub fn render_home(frame: &mut Frame<'_>, area: Rect, app: &App) {
         ]),
         rows[0],
     );
-    render_menu(
-        frame,
-        rows[1],
-        "Tasks",
-        &HOME_ACTIONS,
-        app.home_index,
-    );
+    render_menu(frame, rows[1], "Tasks", &HOME_ACTIONS, app.home_index);
 }
 
 pub fn render_manage(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -71,11 +65,5 @@ pub fn render_manage(frame: &mut Frame<'_>, area: Rect, app: &App) {
         ]),
         rows[0],
     );
-    render_menu(
-        frame,
-        rows[1],
-        "Manage",
-        &MANAGE_ACTIONS,
-        app.manage_index,
-    );
+    render_menu(frame, rows[1], "Manage", &MANAGE_ACTIONS, app.manage_index);
 }

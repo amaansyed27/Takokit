@@ -64,7 +64,11 @@ fn render_list(
 ) {
     let has_items = !items.is_empty();
     let list = List::new(items)
-        .block(Block::default().title(format!(" {title} ")).borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(format!(" {title} "))
+                .borders(Borders::ALL),
+        )
         .highlight_symbol("› ")
         .highlight_style(
             Style::default()
@@ -107,9 +111,11 @@ pub fn primary_button<'a>(label: &'a str, focused: bool) -> Paragraph<'a> {
 }
 
 pub fn detail_panel<'a>(title: &'a str, detail: impl Into<Text<'a>>) -> Paragraph<'a> {
-    Paragraph::new(detail)
-        .wrap(Wrap { trim: false })
-        .block(Block::default().title(format!(" {title} ")).borders(Borders::ALL))
+    Paragraph::new(detail).wrap(Wrap { trim: false }).block(
+        Block::default()
+            .title(format!(" {title} "))
+            .borders(Borders::ALL),
+    )
 }
 
 pub fn empty_state(frame: &mut Frame<'_>, area: Rect, title: &str, detail: &str) {

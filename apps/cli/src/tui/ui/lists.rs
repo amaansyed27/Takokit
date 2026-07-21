@@ -167,7 +167,11 @@ pub fn render_activity(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .running_label
         .as_deref()
         .map(|label| format!("Running · {label}"))
-        .or_else(|| app.last_label.as_deref().map(|label| format!("Last result · {label}")))
+        .or_else(|| {
+            app.last_label
+                .as_deref()
+                .map(|label| format!("Last result · {label}"))
+        })
         .unwrap_or_else(|| "Activity".to_string());
     frame.render_widget(
         Paragraph::new(app.status.as_str())

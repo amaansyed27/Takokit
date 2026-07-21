@@ -36,9 +36,7 @@ pub(super) fn open_home_item(app: &mut App, index: usize) {
 
 pub(super) fn handle_manage(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => {
-            app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), -1)
-        }
+        KeyCode::Up => app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), -1),
         KeyCode::Down | KeyCode::Tab => {
             app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), 1)
         }
@@ -86,9 +84,7 @@ pub(super) fn handle_models(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 pub(super) fn handle_runners(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
         KeyCode::Up => app.runner_index = shifted_index(app.runner_index, app.runners.len(), -1),
-        KeyCode::Down => {
-            app.runner_index = shifted_index(app.runner_index, app.runners.len(), 1)
-        }
+        KeyCode::Down => app.runner_index = shifted_index(app.runner_index, app.runners.len(), 1),
         KeyCode::Enter => return runner_primary_action(app),
         KeyCode::Char('p') => {
             return app
@@ -133,9 +129,7 @@ pub(super) fn handle_system(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 
 pub(super) fn handle_sessions(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => {
-            app.session_index = shifted_index(app.session_index, app.sessions.len(), -1)
-        }
+        KeyCode::Up => app.session_index = shifted_index(app.session_index, app.sessions.len(), -1),
         KeyCode::Down => {
             app.session_index = shifted_index(app.session_index, app.sessions.len(), 1)
         }
@@ -153,9 +147,7 @@ pub(super) fn handle_sessions(app: &mut App, key: KeyEvent) -> Option<TuiAction>
 
 pub(super) fn handle_activity(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::PageUp | KeyCode::Up => {
-            app.output_scroll = app.output_scroll.saturating_sub(3)
-        }
+        KeyCode::PageUp | KeyCode::Up => app.output_scroll = app.output_scroll.saturating_sub(3),
         KeyCode::PageDown | KeyCode::Down => {
             app.output_scroll = app.output_scroll.saturating_add(3)
         }

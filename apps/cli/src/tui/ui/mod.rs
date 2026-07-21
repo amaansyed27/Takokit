@@ -105,8 +105,12 @@ fn render_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
 fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let text = match app.screen {
-        TuiScreen::Home => "↑/↓ choose · Enter open · 1–6 shortcut · R refresh · F1 help · Esc quit",
-        TuiScreen::Speak => "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home",
+        TuiScreen::Home => {
+            "↑/↓ choose · Enter open · 1–6 shortcut · R refresh · F1 help · Esc quit"
+        }
+        TuiScreen::Speak => {
+            "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home"
+        }
         TuiScreen::Transcribe => {
             "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home"
         }
@@ -114,7 +118,9 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             "Tab next field · ↑/↓ model · Space consent · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Manage => "↑/↓ choose · Enter open · 1–3 shortcut · R refresh · Esc home",
-        TuiScreen::Models => "↑/↓ select · Enter use/repair · P repair · X remove · R refresh · Esc back",
+        TuiScreen::Models => {
+            "↑/↓ select · Enter use/repair · P repair · X remove · R refresh · Esc back"
+        }
         TuiScreen::Runners => {
             "↑/↓ select · Enter next action · D check · I install · X remove · Esc back"
         }
