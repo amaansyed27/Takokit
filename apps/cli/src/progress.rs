@@ -226,7 +226,11 @@ fn compact_message(value: &str, maximum: usize) -> String {
         if output.chars().count() >= maximum {
             break;
         }
-        output.push(if character.is_control() { ' ' } else { character });
+        output.push(if character.is_control() {
+            ' '
+        } else {
+            character
+        });
     }
     if value.chars().count() > maximum && maximum >= 3 {
         output.truncate(output.len().saturating_sub(3));

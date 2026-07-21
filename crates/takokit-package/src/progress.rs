@@ -118,7 +118,9 @@ impl InstallProgressReporter {
         let Ok(bytes) = serde_json::to_vec(&snapshot) else {
             return;
         };
-        let temporary = self.path.with_extension(format!("json.tmp-{}", std::process::id()));
+        let temporary = self
+            .path
+            .with_extension(format!("json.tmp-{}", std::process::id()));
         if std::fs::write(&temporary, bytes).is_err() {
             return;
         }

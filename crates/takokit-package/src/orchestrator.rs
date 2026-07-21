@@ -240,12 +240,7 @@ fn install_model_complete_inner(
     let download_total = if reuse_state == ArtifactReuseState::Verified {
         None
     } else {
-        progress.update(
-            "planning-download",
-            "Calculating download size",
-            0,
-            None,
-        );
+        progress.update("planning-download", "Calculating download size", 0, None);
         estimated_download_total(takokit_root, &model)
     };
     let monitor = InstallProgressMonitor::start(
@@ -329,18 +324,17 @@ fn install_model_complete_inner(
 }
 
 fn estimated_download_total(takokit_root: &Path, model: &ModelManifest) -> Option<u64> {
-    let artifact_total = model
-        .artifacts
-        .all()
-        .try_fold(0_u64, |total, artifact| {
-            artifact.bytes.and_then(|bytes| total.checked_add(bytes))
-        })?;
+    let artifact_total = model.artifacts.all().try_fold(0_u64, |total, artifact| {
+        artifact.bytes.and_then(|bytes| total.checked_add(bytes))
+    })?;
     let source_total = if model.source.is_some() {
         estimate_model_source_bytes(takokit_root, model)?
     } else {
         0
     };
-    artifact_total.checked_add(source_total).filter(|total| *total > 0)
+    artifact_total
+        .checked_add(source_total)
+        .filter(|total| *total > 0)
 }
 
 fn rollback_final_verification(

@@ -36,10 +36,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/adapters/install", post(handlers::install_adapter))
         .route("/v1/adapters/:id/doctor", get(handlers::adapter_doctor))
         .route("/v1/adapters/:id", get(handlers::adapter))
-        .route(
-            "/v1/models/pull",
-            post(handlers::model_pull_with_progress),
-        )
+        .route("/v1/models/pull", post(handlers::model_pull_with_progress))
         .route("/v1/runners/pull", post(handlers::pull_runner))
         .route("/v1/runners/install", post(handlers::install_runner))
         .route("/v1/runners/:id/doctor", get(handlers::runner_doctor))
