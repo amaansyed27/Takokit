@@ -43,9 +43,10 @@ pub(crate) async fn route_daemon_command(
         Command::Status => client.get("/v1/status")?,
         Command::Doctor(_) => client.get("/v1/doctor")?,
         Command::Capabilities => client.get("/v1/capabilities")?,
-        Command::Pull(args) => post_retryable_with_activity(
+        Command::Pull(args) => post_model_pull_with_activity(
             &client,
             format!("Pulling {}", args.model),
+            &args.model,
             "/v1/models/pull",
             &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
         )?,
@@ -203,6 +204,19 @@ fn post_retryable_with_activity<B: serde::Serialize>(
     body: &B,
 ) -> anyhow::Result<serde_json::Value> {
     let activity = Activity::start(label);
+    let result = client.post_retryable(path, body);
+    drop(activity);
+    result
+}
+
+fn post_model_pull_with_activity<B: serde::Serialize>(
+    client: &daemon_client::Client,
+    label: String,
+    model: &str,
+    path: &str,
+    body: &B,
+) -> anyhow::Result<serde_json::Value> {
+    let activity = Activity::start_model_pull(label, client.clone(), model.to_string());
     let result = client.post_retryable(path, body);
     drop(activity);
     result
