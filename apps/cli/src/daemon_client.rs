@@ -88,7 +88,7 @@ impl Client {
                 Err(ureq::Error::Status(status, response)) => {
                     let body = response.into_string().unwrap_or_default();
                     let message = format_status_error(status, &body);
-                    if attempt < attempts && retryable_status(status) {
+                    if attempt < attempts && response_retryable(status, &body) {
                         thread::sleep(retry_delay(attempt));
                         continue;
                     }
@@ -135,6 +135,14 @@ fn retryable_status(status: u16) -> bool {
     matches!(status, 408 | 425 | 429 | 500 | 502 | 503 | 504)
 }
 
+fn response_retryable(status: u16, body: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| value.pointer("/error/retryable").cloned())
+        .and_then(|value| value.as_bool())
+        .unwrap_or_else(|| retryable_status(status))
+}
+
 fn retry_delay(attempt: usize) -> Duration {
     Duration::from_millis(500 * (1_u64 << attempt.saturating_sub(1).min(4)))
 }
@@ -149,11 +157,7 @@ fn format_status_error(status: u16, body: &str) -> String {
         .as_ref()
         .and_then(|value| value.pointer("/error/message"))
         .and_then(serde_json::Value::as_str);
-    let retryable = parsed
-        .as_ref()
-        .and_then(|value| value.pointer("/error/retryable"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or_else(|| retryable_status(status));
+    let retryable = response_retryable(status, body);
 
     let suffix = if retryable {
         " (temporary; Takokit retried automatically)"
@@ -172,7 +176,7 @@ fn format_status_error(status: u16, body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_status_error, retryable_status};
+    use super::{format_status_error, response_retryable, retryable_status};
 
     #[test]
     fn structured_api_error_preserves_code_and_message() {
@@ -199,5 +203,13 @@ mod tests {
         assert!(retryable_status(503));
         assert!(!retryable_status(400));
         assert!(!retryable_status(404));
+    }
+
+    #[test]
+    fn explicit_retryable_flag_overrides_status_classification() {
+        let body = r#"{"error":{"retryable":false}}"#;
+        assert!(!response_retryable(500, body));
+        let body = r#"{"error":{"retryable":true}}"#;
+        assert!(response_retryable(400, body));
     }
 }
