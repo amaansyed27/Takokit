@@ -8,7 +8,7 @@ mod ui;
 
 use std::{io, time::Duration};
 
-use app::{App, TuiAction};
+use app::{App, TuiAction, TuiScreen};
 use catalog::SystemAction;
 use crossterm::event::{self, Event, KeyEventKind};
 use job::CommandJob;
@@ -38,9 +38,10 @@ pub async fn run_launcher(
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
+                let success = result.success;
                 state.running_label = None;
                 state.last_label = Some(result.label.clone());
-                state.set_status(if result.success {
+                state.set_status(if success {
                     result.output
                 } else {
                     format!("Task failed.\n\n{}", result.output)
@@ -51,6 +52,9 @@ pub async fn run_launcher(
                     state.status.push_str(&format!(
                         "\n\nThe task finished, but refreshing local state failed: {error:#}"
                     ));
+                }
+                if !success {
+                    state.screen = TuiScreen::Activity;
                 }
                 active_job = None;
             }
@@ -99,7 +103,7 @@ pub async fn run_launcher(
                     } else if let Err(error) = state.create_session() {
                         state.set_status(format!("Could not create session: {error:#}"));
                     } else {
-                        state.tab = app::TuiTab::Sessions;
+                        state.screen = TuiScreen::Sessions;
                     }
                 }
                 action => {
