@@ -4,7 +4,6 @@ import {
   Boxes,
   History,
   House,
-  Library,
   Server,
   Settings,
   Speech,
@@ -16,7 +15,6 @@ export type PageId =
   | "home"
   | "models"
   | "runners"
-  | "library"
   | "voices"
   | "speak"
   | "transcribe"
@@ -34,7 +32,6 @@ export const navItems: NavItem[] = [
   { id: "home", label: "Home", icon: House },
   { id: "models", label: "Models", icon: Box },
   { id: "runners", label: "Runners", icon: Boxes },
-  { id: "library", label: "Library", icon: Library },
   { id: "voices", label: "Voices", icon: User },
   { id: "speak", label: "Speak", icon: AudioLines },
   { id: "transcribe", label: "Transcribe", icon: Speech },
