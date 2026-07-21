@@ -1,16 +1,25 @@
 //! CLI argument and subcommand definitions.
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use uuid::Uuid;
 
 pub(crate) use takokit_core::SpeechRequest;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum OutputFormat {
+    Human,
+    Json,
+}
 
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) direct: bool,
+    /// Output format for commands that support structured responses.
+    #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Human)]
+    pub(crate) output: OutputFormat,
     /// Project directory whose `.tako` folder stores sessions and outputs.
     #[arg(long, global = true)]
     pub(crate) workspace: Option<PathBuf>,
