@@ -5,17 +5,19 @@ pub struct ApiError(pub TakokitError);
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
-        let status = match self.0 {
+        let status = match &self.0 {
             TakokitError::Resolution { code, .. } => match code {
                 ErrorCode::CapabilityUnsupported => StatusCode::BAD_REQUEST,
                 ErrorCode::ArtifactUrlMissing
                 | ErrorCode::ArtifactChecksumMissing
-                | ErrorCode::ArtifactChecksumMismatch
                 | ErrorCode::ArtifactInstallFailed
-                | ErrorCode::ArtifactMissing
-                | ErrorCode::ArtifactNotDownloaded
-                | ErrorCode::ArtifactConfigInvalid => StatusCode::BAD_REQUEST,
-                ErrorCode::ArtifactDownloadFailed => StatusCode::BAD_GATEWAY,
+                | ErrorCode::ArtifactConfigInvalid => StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::ArtifactChecksumMismatch | ErrorCode::ArtifactDownloadFailed => {
+                    StatusCode::BAD_GATEWAY
+                }
+                ErrorCode::ArtifactMissing | ErrorCode::ArtifactNotDownloaded => {
+                    StatusCode::BAD_REQUEST
+                }
                 ErrorCode::ModelNotFound
                 | ErrorCode::ModelNotInstalled
                 | ErrorCode::RunnerNotFound => StatusCode::NOT_FOUND,
@@ -39,10 +41,23 @@ impl IntoResponse for ApiError {
             TakokitError::Execution(_) => "execution_error",
             TakokitError::Audio(_) => "audio_error",
         };
+        let retryable = matches!(
+            &self.0,
+            TakokitError::Resolution {
+                code: ErrorCode::ArtifactDownloadFailed,
+                ..
+            }
+        ) || matches!(
+            status,
+            StatusCode::BAD_GATEWAY
+                | StatusCode::SERVICE_UNAVAILABLE
+                | StatusCode::GATEWAY_TIMEOUT
+        );
         let body = Json(serde_json::json!({
             "error": {
                 "code": code,
-                "message": self.0.to_string()
+                "message": self.0.to_string(),
+                "retryable": retryable
             }
         }));
 
