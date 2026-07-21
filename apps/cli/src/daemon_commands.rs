@@ -154,6 +154,24 @@ pub(crate) async fn route_daemon_command(
         },
         _ => return Ok(false),
     };
-    print_value(&output)?;
+    if command_requests_json(command) {
+        println!("{}", serde_json::to_string_pretty(&output)?);
+    } else {
+        print_value(&output)?;
+    }
     Ok(true)
+}
+
+fn command_requests_json(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Doctor(DoctorArgs { json: true })
+            | Command::Plan(PlanArgs { json: true, .. })
+            | Command::Runner {
+                command: RunnerCommand::Doctor { json: true, .. }
+            }
+            | Command::Adapter {
+                command: AdapterCommand::Doctor { json: true, .. }
+            }
+    )
 }
