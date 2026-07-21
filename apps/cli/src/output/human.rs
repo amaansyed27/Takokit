@@ -1,6 +1,8 @@
 use super::yes_no;
 
-pub(crate) fn print_serializable<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
+pub(crate) fn print_serializable<T: serde::Serialize + ?Sized>(
+    value: &T,
+) -> anyhow::Result<()> {
     print_value(&serde_json::to_value(value)?)
 }
 
