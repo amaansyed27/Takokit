@@ -1,0 +1,212 @@
+name: Apply installed model types
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message != 'Show installed model types in CLI and TUI'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply UI and test updates
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f"marker not found in {path}: {old[:120]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "apps/cli/src/output/human.rs",
+              '''    println!(
+                  "{:<name_width$}  {:<12}  {:>10}  {}",
+                  "NAME", "ID", "SIZE", "MODIFIED"
+              );
+              for item in items {
+                  let name = item
+                      .get("name")
+                      .and_then(serde_json::Value::as_str)
+                      .unwrap_or("-");
+                  let id = item
+              ''',
+              '''    let type_width = items
+                  .iter()
+                  .filter_map(|item| item.get("model_type").and_then(serde_json::Value::as_str))
+                  .map(str::len)
+                  .max()
+                  .unwrap_or(4)
+                  .clamp(4, 24);
+              println!(
+                  "{:<name_width$}  {:<type_width$}  {:<12}  {:>10}  {}",
+                  "NAME", "TYPE", "ID", "SIZE", "MODIFIED"
+              );
+              for item in items {
+                  let name = item
+                      .get("name")
+                      .and_then(serde_json::Value::as_str)
+                      .unwrap_or("-");
+                  let model_type = item
+                      .get("model_type")
+                      .and_then(serde_json::Value::as_str)
+                      .unwrap_or("-");
+                  let id = item
+              ''',
+          )
+          replace_once(
+              "apps/cli/src/output/human.rs",
+              '        println!("{name:<name_width$}  {id:<12}  {size:>10}  {modified}");\n',
+              '        println!("{name:<name_width$}  {model_type:<type_width$}  {id:<12}  {size:>10}  {modified}");\n',
+          )
+
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              'use super::app::{App, SpeakField, TranscribeField, TuiTab};\n',
+              'use super::{\n    app::{App, SpeakField, TranscribeField, TuiTab},\n    catalog::ModelRow,\n};\n',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '''    let items = app
+                  .models
+                  .iter()
+                  .map(|model| row_item(&model.title, &model.state))
+                  .collect::<Vec<_>>();
+              render_list(frame, columns[0], " Models ", items, app.model_index);
+              let detail = app
+                  .selected_model()
+                  .map(|model| model.detail.as_str())
+                  .unwrap_or("No models are available.");
+              ''',
+              '''    let items = app.models.iter().map(model_row_item).collect::<Vec<_>>();
+              render_list(
+                  frame,
+                  columns[0],
+                  " Installed models ",
+                  items,
+                  app.model_index,
+              );
+              let detail = app.selected_model().map(|model| model.detail.as_str()).unwrap_or(
+                  "No models are installed and verified. Pull a model from the CLI or GUI, then press R to refresh. Browse the catalog with `tako models`.",
+              );
+              ''',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Generate speech "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Generate speech ",
+                  Some(_) => " Repair selected model ",
+                  None => " No TTS model installed ",
+              };
+              ''',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Transcribe audio "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Transcribe audio ",
+                  Some(_) => " Repair selected model ",
+                  None => " No STT model installed ",
+              };
+              ''',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · /sessions · F1 help · Ctrl+C exit",\n',
+              '        TuiTab::Models => "↑/↓ select · Enter use/repair · P verify/repair · X remove · R refresh · F1 help · Ctrl+C exit",\n',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '''fn row_item<'a>(title: &'a str, state: &'a str) -> ListItem<'a> {
+              ''',
+              '''fn model_row_item(model: &ModelRow) -> ListItem<'static> {
+                  ListItem::new(Line::from(vec![
+                      Span::raw(format!("{}  ", model.title)),
+                      Span::styled(
+                          format!("{} · {}", model.model_type, model.state),
+                          Style::default().add_modifier(Modifier::DIM),
+                      ),
+                  ]))
+              }
+
+              fn row_item<'a>(title: &'a str, state: &'a str) -> ListItem<'a> {
+              ''',
+          )
+          replace_once(
+              "apps/cli/src/tui/ui.rs",
+              '''Models
+                Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.
+              ''',
+              '''Models
+                Shows only models installed and verified on this machine. Type badges identify TTS, STT, cloning, conversion, training, or combined capabilities. Press Enter to use a ready model or repair its runtime. Browse the catalog with `tako models` or the GUI.
+              ''',
+          )
+
+          replace_once(
+              "apps/cli/src/tui/clone.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Create voice profile "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Create voice profile ",
+                  Some(_) => " Repair selected model ",
+                  None => " No cloning model installed ",
+              };
+              ''',
+          )
+
+          replace_once(
+              "crates/takokit-package/src/tests/package_records.rs",
+              '    assert_eq!(inventory.data[0].name, "piper-lessac");\n    assert_eq!(inventory.data[0].size_bytes, 5);\n',
+              '    assert_eq!(inventory.data[0].name, "piper-lessac");\n    assert_eq!(inventory.data[0].model_type, "TTS");\n    assert_eq!(inventory.data[0].size_bytes, 5);\n',
+          )
+
+          replace_once(
+              "README.md",
+              '''`tako list` is local-only: it shows models whose artifacts or pinned snapshots
+              are still present and verified. Metadata-only catalog entries belong to
+              `tako models`, not the installed-model list.
+              ''',
+              '''`tako list` is local-only: it shows models whose artifacts or pinned snapshots
+              are still present and verified. The TYPE column identifies TTS, STT, cloning,
+              conversion, training, or combined capabilities. Metadata-only catalog entries
+              belong to `tako models`, not the installed-model list. The TUI Models screen uses
+              the same verified local inventory.
+              ''',
+          )
+      - run: cargo fmt --all
+      - run: cargo test --workspace
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md apps/cli/src/output/human.rs apps/cli/src/tui/ui.rs apps/cli/src/tui/clone.rs crates/takokit-package/src/tests/package_records.rs
+          git commit -m "Show installed model types in CLI and TUI"
+          git push origin HEAD:main
