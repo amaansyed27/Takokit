@@ -6,11 +6,15 @@ use crate::{
     *,
 };
 use serde::{Deserialize, Serialize};
-use std::{path::Path, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 const READY_MARKER: &str = ".takokit-source.json";
+const PARTIAL_MARKER: &str = ".takokit-partial-source.json";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct SourceMarker {
     provider: ModelSourceProvider,
     repository: String,
@@ -44,6 +48,12 @@ pub(crate) fn estimate_model_source_bytes(
     }
 }
 
+pub(crate) fn model_source_staging_path(takokit_root: &Path, model_id: &str) -> PathBuf {
+    takokit_root
+        .join("models")
+        .join(format!(".{model_id}.download"))
+}
+
 pub(crate) fn snapshot_is_ready(
     record: &InstalledSnapshotRecord,
     source: &ModelSourceManifest,
@@ -56,11 +66,7 @@ pub(crate) fn snapshot_is_ready(
     {
         return false;
     }
-    read_marker(&record.ready_marker).is_some_and(|marker| {
-        marker.provider == source.provider
-            && marker.repository == source.repository
-            && marker.revision == source.revision
-    })
+    read_marker(&record.ready_marker).is_some_and(|marker| marker_matches(&marker, source))
 }
 
 fn estimate_hugging_face_snapshot_bytes(
@@ -83,14 +89,7 @@ fn estimate_hugging_face_snapshot_bytes(
         cache_root.into(),
         "--dry-run".into(),
     ];
-    for pattern in &source.allow_patterns {
-        arguments.push("--include".into());
-        arguments.push(pattern.clone().into());
-    }
-    for pattern in &source.ignore_patterns {
-        arguments.push("--exclude".into());
-        arguments.push(pattern.clone().into());
-    }
+    append_source_filters(&mut arguments, source);
 
     let mut command = Command::new(&uv);
     for argument in &arguments {
@@ -129,11 +128,10 @@ fn install_hugging_face_snapshot(
     std::fs::create_dir_all(&logs_root)?;
 
     let destination = models_root.join(&manifest.id);
-    let temporary = models_root.join(format!(".{}.download-{}", manifest.id, timestamp_suffix()));
+    let temporary = model_source_staging_path(takokit_root, &manifest.id);
     let backup = models_root.join(format!(".{}.backup", manifest.id));
-    remove_dir_if_exists(&temporary)?;
+    prepare_staging_dir(&temporary, source)?;
     remove_dir_if_exists(&backup)?;
-    std::fs::create_dir_all(&temporary)?;
 
     let uv = bootstrap_uv(takokit_root)?;
     let log = logs_root.join(format!("model-{}-download.log", manifest.id));
@@ -152,48 +150,34 @@ fn install_hugging_face_snapshot(
         "--cache-dir".into(),
         cache_root.into(),
     ];
-    for pattern in &source.allow_patterns {
-        arguments.push("--include".into());
-        arguments.push(pattern.clone().into());
-    }
-    for pattern in &source.ignore_patterns {
-        arguments.push("--exclude".into());
-        arguments.push(pattern.clone().into());
-    }
+    append_source_filters(&mut arguments, source);
 
     if let Err(error) = run_logged_command(&log, &uv, &arguments) {
-        let _ = remove_dir_if_exists(&temporary);
-        return Err(PackageError::ArtifactInstallFailed {
+        return Err(PackageError::ArtifactDownloadFailed {
             artifact: manifest.id.clone(),
             reason: format!(
-                "Hugging Face snapshot download failed for {}@{}: {error}; see {}",
+                "Hugging Face snapshot download failed for {}@{}: {error}; partial data was retained at {} for resume; see {}",
                 source.repository,
                 source.revision,
+                temporary.display(),
                 log.display()
             ),
         });
     }
 
     let marker = temporary.join(READY_MARKER);
-    std::fs::write(
-        &marker,
-        serde_json::to_vec_pretty(&SourceMarker {
-            provider: source.provider,
-            repository: source.repository.clone(),
-            revision: source.revision.clone(),
-        })?,
-    )?;
+    std::fs::write(&marker, serde_json::to_vec_pretty(&source_marker(source))?)?;
 
     if destination.exists() {
         std::fs::rename(&destination, &backup)?;
     }
     if let Err(error) = std::fs::rename(&temporary, &destination) {
-        let _ = remove_dir_if_exists(&temporary);
         if backup.exists() {
             let _ = std::fs::rename(&backup, &destination);
         }
         return Err(PackageError::Io(error));
     }
+    let _ = std::fs::remove_file(destination.join(PARTIAL_MARKER));
     remove_dir_if_exists(&backup)?;
 
     Ok(InstalledSnapshotRecord {
@@ -205,9 +189,53 @@ fn install_hugging_face_snapshot(
     })
 }
 
+fn prepare_staging_dir(path: &Path, source: &ModelSourceManifest) -> PackageResult<()> {
+    if path.exists() {
+        let matches = read_marker(&path.join(PARTIAL_MARKER))
+            .is_some_and(|marker| marker_matches(&marker, source));
+        if !matches {
+            remove_dir_if_exists(path)?;
+        }
+    }
+    std::fs::create_dir_all(path)?;
+    std::fs::write(
+        path.join(PARTIAL_MARKER),
+        serde_json::to_vec_pretty(&source_marker(source))?,
+    )?;
+    Ok(())
+}
+
+fn append_source_filters(arguments: &mut Vec<PathOrArg>, source: &ModelSourceManifest) {
+    for pattern in &source.allow_patterns {
+        arguments.push("--include".into());
+        arguments.push(pattern.clone().into());
+    }
+    for pattern in &source.ignore_patterns {
+        arguments.push("--exclude".into());
+        arguments.push(pattern.clone().into());
+    }
+}
+
+fn source_marker(source: &ModelSourceManifest) -> SourceMarker {
+    SourceMarker {
+        provider: source.provider,
+        repository: source.repository.clone(),
+        revision: source.revision.clone(),
+    }
+}
+
+fn marker_matches(marker: &SourceMarker, source: &ModelSourceManifest) -> bool {
+    marker.provider == source.provider
+        && marker.repository == source.repository
+        && marker.revision == source.revision
+}
+
 fn parse_dry_run_total(text: &str) -> Option<u64> {
     text.lines().find_map(|line| {
-        let (_, tail) = line.split_once("totalling ")?;
+        let tail = line
+            .split_once("totalling ")
+            .or_else(|| line.split_once("totaling "))?
+            .1;
         let token = tail
             .split_whitespace()
             .next()?
@@ -250,13 +278,6 @@ fn remove_dir_if_exists(path: &Path) -> PackageResult<()> {
     }
 }
 
-fn timestamp_suffix() -> String {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_nanos().to_string())
-        .unwrap_or_else(|_| "0".to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,12 +295,7 @@ mod tests {
         };
         std::fs::write(
             &marker,
-            serde_json::to_vec(&SourceMarker {
-                provider: source.provider,
-                repository: source.repository.clone(),
-                revision: source.revision.clone(),
-            })
-            .expect("marker"),
+            serde_json::to_vec(&source_marker(&source)).expect("marker"),
         )
         .expect("write marker");
         let record = InstalledSnapshotRecord {
@@ -298,6 +314,26 @@ mod tests {
             parse_dry_run_total("Will download 4 files totalling 2.5G."),
             Some(2_500_000_000)
         );
-        assert_eq!(parse_human_bytes("148.2M"), Some(148_200_000));
+        assert_eq!(
+            parse_dry_run_total("Will download 4 files totaling 148.2M."),
+            Some(148_200_000)
+        );
+    }
+
+    #[test]
+    fn matching_partial_snapshot_is_kept_for_resume() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let path = root.path().join(".model.download");
+        let source = ModelSourceManifest {
+            provider: ModelSourceProvider::HuggingFace,
+            repository: "owner/model".into(),
+            revision: "revision-a".into(),
+            allow_patterns: Vec::new(),
+            ignore_patterns: Vec::new(),
+        };
+        prepare_staging_dir(&path, &source).expect("prepare");
+        std::fs::write(path.join("partial.bin"), b"partial").expect("partial");
+        prepare_staging_dir(&path, &source).expect("resume");
+        assert!(path.join("partial.bin").is_file());
     }
 }
