@@ -1,0 +1,109 @@
+name: Apply lightweight runtime UI cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-lightweight-runtime-ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Update TUI wording
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new):
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"marker not found in {path}: {old[:100]!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              '    render_list(frame, columns[0], " Models ", items, app.model_index);\n',
+              '    render_list(frame, columns[0], " Installed models ", items, app.model_index);\n',
+          )
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              '        .unwrap_or("No models are available.");\n',
+              '        .unwrap_or("No models are installed. Install one through the companion library site or CLI, then press R to refresh.");\n',
+          )
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Generate speech "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Generate speech ",
+                  Some(_) => " Repair selected model ",
+                  None => " No TTS model installed ",
+              };
+              ''',
+          )
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Transcribe audio "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Transcribe audio ",
+                  Some(_) => " Repair selected model ",
+                  None => " No STT model installed ",
+              };
+              ''',
+          )
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              '        TuiTab::Models => "↑/↓ select · Enter install/use · P install · X remove · /sessions · F1 help · Ctrl+C exit",\n',
+              '        TuiTab::Models => "↑/↓ select · Enter use/repair · P repair · X remove · R refresh · F1 help · Ctrl+C exit",\n',
+          )
+          replace(
+              "apps/cli/src/tui/ui.rs",
+              'Takokit TUI\\n\\nThis interface is task-based; no CLI syntax is required.\\n\\nModels\\n  Select a model and press Enter. Takokit installs it when needed, or opens Speak/Transcribe when ready.',
+              'Takokit TUI\\n\\nThis interface is task-based; no CLI syntax is required.\\n\\nModels\\n  Shows installed models only. Press Enter to use a ready model or repair its local runtime. Press R to refresh.',
+          )
+          replace(
+              "apps/cli/src/tui/clone.rs",
+              '''    let label = if model.is_some_and(|model| model.executable) {
+                  " Create voice profile "
+              } else {
+                  " Install selected model "
+              };
+              ''',
+              '''    let label = match model {
+                  Some(model) if model.executable => " Create voice profile ",
+                  Some(_) => " Repair selected model ",
+                  None => " No cloning model installed ",
+              };
+              ''',
+          )
+      - run: cargo fmt --all
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          rm .github/workflows/apply-lightweight-runtime-ui.yml
+          git config user.name "Takokit automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/cli/src/tui/ui.rs apps/cli/src/tui/clone.rs .github/workflows/apply-lightweight-runtime-ui.yml
+          git commit -m "Keep TUI focused on installed models"
+          git pull --rebase origin main
+          git push origin HEAD:main
