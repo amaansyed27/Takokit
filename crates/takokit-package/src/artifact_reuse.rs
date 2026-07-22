@@ -2,8 +2,8 @@
 
 use crate::{
     artifact_io::sha256_file, runtime_model_source::snapshot_is_ready,
-    runtime_python_specs::model_prefetch_required, ArtifactEntry,
-    InstalledArtifactRecord, InstalledModelRecord, InstalledPackageStatus, ModelManifest,
+    runtime_python_specs::model_prefetch_required, ArtifactEntry, InstalledArtifactRecord,
+    InstalledModelRecord, InstalledPackageStatus, ModelManifest,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,10 +67,7 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
     })
 }
 
-fn runtime_prefetch_is_ready(
-    record: &InstalledModelRecord,
-    manifest: &ModelManifest,
-) -> bool {
+fn runtime_prefetch_is_ready(record: &InstalledModelRecord, manifest: &ModelManifest) -> bool {
     if !model_prefetch_required(&manifest.id) {
         return false;
     }
@@ -88,9 +85,7 @@ fn runtime_prefetch_is_ready(
         return false;
     };
     marker.get("model_id").and_then(|value| value.as_str()) == Some(manifest.id.as_str())
-        && marker
-            .get("model_version")
-            .and_then(|value| value.as_str())
+        && marker.get("model_version").and_then(|value| value.as_str())
             == Some(manifest.version.as_str())
         && marker.get("adapter").and_then(|value| value.as_str())
             == manifest.required_adapter.as_deref()
