@@ -427,11 +427,15 @@ fn run_adapter(
     let output = child.wait_with_output().map_err(|error| {
         TakokitError::Audio(format!("could not wait for {adapter} adapter: {error}"))
     })?;
-    let response: ManagedAdapterResponse =
-        serde_json::from_slice(&output.stdout).map_err(|error| {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let response: ManagedAdapterResponse = stdout
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str(line.trim()).ok())
+        .ok_or_else(|| {
             TakokitError::Audio(format!(
-                "{adapter} returned invalid JSON ({error}): {}{}",
-                String::from_utf8_lossy(&output.stdout).trim(),
+                "{adapter} returned no valid JSON response: {}{}",
+                stdout.trim(),
                 stderr_suffix(&output.stderr)
             ))
         })?;
