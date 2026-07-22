@@ -5,7 +5,7 @@ const HF_AUDIO_PACKAGES: &[&str] = &[
     "torchaudio",
     "transformers",
     "accelerate",
-    "huggingface_hub[hf_xet]",
+    "huggingface_hub>=1.2",
     "soundfile",
     "scipy",
 ];
