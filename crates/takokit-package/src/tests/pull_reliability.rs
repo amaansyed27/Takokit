@@ -38,6 +38,23 @@ fn planner_rechecks_local_artifact_bytes() {
 }
 
 #[test]
+fn runtime_managed_model_without_static_artifacts_verifies_as_ready() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let registry = PackageRegistry::bundled();
+    let manifest = registry.model("bark-small").expect("runtime-managed model");
+    let installed = InstalledRegistry::new(temp.path().join("manifests"));
+
+    installed.install_model(&manifest).expect("install model");
+    let record = installed
+        .installed_model_record("bark-small")
+        .expect("installed record");
+
+    assert_eq!(record.status, InstalledPackageStatus::Ready);
+    assert!(record.artifacts.is_empty());
+    assert!(crate::artifact_reuse::all_verified(&record, &manifest));
+}
+
+#[test]
 fn metadata_only_pull_preserves_verified_ready_install() {
     let temp = tempfile::tempdir().expect("tempdir");
     let source = temp.path().join("fixture.onnx");
