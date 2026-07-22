@@ -9,6 +9,13 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
+    checkpoint = "mistralai/Voxtral-Mini-3B-2507"
+    if request.get("operation") == "prefetch":
+        from huggingface_hub import snapshot_download
+
+        snapshot = snapshot_download(repo_id=checkpoint)
+        respond(ok=True, detail=f"Prefetched {checkpoint} at {snapshot}")
+        return
     if request.get("operation") != "transcribe":
         raise ValueError("Voxtral adapter only supports transcription")
     audio_path = Path(request["audio_path"]).expanduser().resolve()
@@ -17,7 +24,6 @@ def main():
 
     from transformers import AutoProcessor, VoxtralForConditionalGeneration
 
-    checkpoint = "mistralai/Voxtral-Mini-3B-2507"
     processor = AutoProcessor.from_pretrained(checkpoint)
     model = VoxtralForConditionalGeneration.from_pretrained(
         checkpoint,
