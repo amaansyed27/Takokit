@@ -393,9 +393,22 @@ fn run_adapter(
     let encoded = serde_json::to_vec(payload).map_err(|error| {
         TakokitError::Audio(format!("could not encode {adapter} request: {error}"))
     })?;
+    let hf_cache = payload.cache_dir.join("huggingface");
+    let torch_cache = payload.cache_dir.join("torch");
+    let tts_cache = payload.cache_dir.join("coqui");
+    let modelscope_cache = payload.cache_dir.join("modelscope");
+    for path in [&hf_cache, &torch_cache, &tts_cache, &modelscope_cache] {
+        std::fs::create_dir_all(path)
+            .map_err(|error| TakokitError::Storage(error.to_string()))?;
+    }
+
     let mut command = Command::new(&layout.python);
     command
         .arg(&layout.script)
+        .env("HF_HOME", &hf_cache)
+        .env("TORCH_HOME", &torch_cache)
+        .env("TTS_HOME", &tts_cache)
+        .env("MODELSCOPE_CACHE", &modelscope_cache)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
