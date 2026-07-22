@@ -285,14 +285,20 @@ impl InstalledRegistry {
         let artifacts = manifest.artifacts.all().collect::<Vec<_>>();
         let metadata_only = options.metadata_only || manifest.artifacts.metadata_only;
         if artifacts.is_empty() || metadata_only {
+            let runtime_managed = artifacts.is_empty() && !metadata_only;
             return Ok(InstalledArtifactSet {
                 records: installed_artifacts(&manifest.artifacts),
                 snapshot: None,
-                status: InstalledPackageStatus::MetadataOnly,
+                status: if runtime_managed {
+                    InstalledPackageStatus::Ready
+                } else {
+                    InstalledPackageStatus::MetadataOnly
+                },
                 note: if manifest.source.is_some() && !metadata_only {
                     "Model source is ready for snapshot installation.".to_string()
-                } else if artifacts.is_empty() {
-                    "Installed model metadata only. No model files were declared.".to_string()
+                } else if runtime_managed {
+                    "No external artifact files were declared; the verified managed adapter owns model acquisition."
+                        .to_string()
                 } else {
                     "Installed model metadata; downloads were skipped by the manifest or request."
                         .to_string()
