@@ -38,7 +38,7 @@ fn planner_rechecks_local_artifact_bytes() {
 }
 
 #[test]
-fn runtime_managed_model_without_static_artifacts_verifies_as_ready() {
+fn runtime_managed_model_requires_verified_prefetch_marker() {
     let temp = tempfile::tempdir().expect("tempdir");
     let registry = PackageRegistry::bundled();
     let manifest = registry.model("bark-small").expect("runtime-managed model");
@@ -49,8 +49,30 @@ fn runtime_managed_model_without_static_artifacts_verifies_as_ready() {
         .installed_model_record("bark-small")
         .expect("installed record");
 
-    assert_eq!(record.status, InstalledPackageStatus::Ready);
+    assert_eq!(record.status, InstalledPackageStatus::MetadataOnly);
     assert!(record.artifacts.is_empty());
+    assert!(!crate::artifact_reuse::all_verified(&record, &manifest));
+
+    let model_dir = temp.path().join("models").join("bark-small");
+    std::fs::create_dir_all(&model_dir).unwrap();
+    std::fs::write(
+        model_dir.join(".takokit-prefetch.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "model_id": manifest.id,
+            "model_version": manifest.version,
+            "adapter": manifest.runner.required_adapter,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    installed
+        .mark_runtime_model_ready("bark-small", "verified checkpoint")
+        .unwrap();
+
+    let record = installed
+        .installed_model_record("bark-small")
+        .expect("ready record");
+    assert_eq!(record.status, InstalledPackageStatus::Ready);
     assert!(crate::artifact_reuse::all_verified(&record, &manifest));
 }
 
