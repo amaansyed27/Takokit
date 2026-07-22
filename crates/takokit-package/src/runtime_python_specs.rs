@@ -52,3 +52,22 @@ pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
         .find(|spec| spec.model_family == model_id)
         .map(|spec| spec.id)
 }
+
+pub(crate) fn model_prefetch_required(model_id: &str) -> bool {
+    matches!(
+        model_id,
+        "bark-small"
+            | "canary"
+            | "parakeet"
+            | "dia"
+            | "distil-whisper-large-v3"
+            | "f5-tts"
+            | "kyutai-tts-1.6b"
+            | "mms-tts-eng"
+            | "sensevoice"
+            | "voxtral"
+            | "wav2vec2-base-960h"
+            | "xtts-v2"
+            | "yourtts"
+    )
+}
