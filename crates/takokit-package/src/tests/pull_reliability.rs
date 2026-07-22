@@ -60,7 +60,7 @@ fn runtime_managed_model_requires_verified_prefetch_marker() {
         serde_json::to_vec_pretty(&serde_json::json!({
             "model_id": manifest.id.clone(),
             "model_version": manifest.version.clone(),
-            "adapter": manifest.runner.required_adapter.clone(),
+            "adapter": manifest.required_adapter.clone(),
         }))
         .unwrap(),
     )
