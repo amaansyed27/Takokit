@@ -15,6 +15,15 @@ use self::onnx::OnnxRunner;
 use self::python_managed::PythonManagedRunner;
 use self::whispercpp::WhisperCppRunner;
 
+pub(crate) fn configure_runner_command(command: &mut std::process::Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
 #[async_trait]
 pub trait SpeechRunner: Send + Sync {
     async fn speak(
