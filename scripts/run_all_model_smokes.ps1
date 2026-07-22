@@ -204,6 +204,26 @@ function Get-LastUsefulLine {
     return ""
 }
 
+function Get-TakokitLiveLogPaths {
+    param([datetime]$Since)
+
+    if (-not $env:TAKOKIT_HOME) { return @() }
+    $patterns = @(
+        (Join-Path $env:TAKOKIT_HOME "logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\install.log")
+    )
+    $files = foreach ($pattern in $patterns) {
+        Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -ge $Since.AddSeconds(-2) }
+    }
+    return @(
+        $files |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 5 -ExpandProperty FullName
+    )
+}
+
 function Invoke-Tako {
     param(
         [string]$Model,
@@ -216,6 +236,7 @@ function Invoke-Tako {
     $stdoutLog = Join-Path $RunRoot "$safeModel-$safePhase.stdout.tmp"
     $stderrLog = Join-Path $RunRoot "$safeModel-$safePhase.stderr.tmp"
     Start-Step $Model $Phase $log
+    $stepStartedAt = Get-Date
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
 
     try {
@@ -228,7 +249,8 @@ function Invoke-Tako {
             -RedirectStandardError $stderrLog
 
         while (-not $process.HasExited) {
-            $tail = Get-LastUsefulLine @($stderrLog, $stdoutLog)
+            $liveLogs = @(Get-TakokitLiveLogPaths -Since $stepStartedAt)
+            $tail = Get-LastUsefulLine (@($stderrLog, $stdoutLog) + $liveLogs)
             $status = "elapsed {0:hh\:mm\:ss}" -f $watch.Elapsed
             if ($tail) { $status += " | $tail" }
             Write-StepProgress $status
