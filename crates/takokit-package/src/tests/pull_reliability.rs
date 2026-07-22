@@ -58,9 +58,9 @@ fn runtime_managed_model_requires_verified_prefetch_marker() {
     std::fs::write(
         model_dir.join(".takokit-prefetch.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
-            "model_id": manifest.id,
-            "model_version": manifest.version,
-            "adapter": manifest.runner.required_adapter,
+            "model_id": manifest.id.clone(),
+            "model_version": manifest.version.clone(),
+            "adapter": manifest.runner.required_adapter.clone(),
         }))
         .unwrap(),
     )
