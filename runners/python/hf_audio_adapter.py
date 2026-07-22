@@ -1,12 +1,33 @@
 import json
 import sys
+import time
 from pathlib import Path
 
+
+DEFAULT_RUNTIME_FILES = [
+    "*.json",
+    "*.txt",
+    "*.model",
+    "*.spm",
+    "*.bin",
+    "*.safetensors",
+]
 
 MODELS = {
     "bark-small": {
         "operation": "speech",
         "checkpoint": "suno/bark-small",
+        "revision": "1dbd7a128513b8ae4a4e2130fed57b7ac9da5bcd",
+        "runtime_files": [
+            "config.json",
+            "generation_config.json",
+            "pytorch_model.bin",
+            "speaker_embeddings/**",
+            "speaker_embeddings_path.json",
+            "special_tokens_map.json",
+            "tokenizer.json",
+            "tokenizer_config.json",
+        ],
         "kind": "bark",
     },
     "mms-tts-eng": {
@@ -49,6 +70,62 @@ def device_detail(torch):
     return f"{device} (torch {torch.__version__})"
 
 
+def snapshot_options(spec):
+    return {
+        "repo_id": spec["checkpoint"],
+        "revision": spec.get("revision"),
+        "allow_patterns": spec.get("runtime_files", DEFAULT_RUNTIME_FILES),
+    }
+
+
+def is_retryable_download(error):
+    message = f"{type(error).__name__}: {error}".lower()
+    return any(
+        marker in message
+        for marker in (
+            "429",
+            "too many requests",
+            "connection",
+            "timeout",
+            "timed out",
+            "502",
+            "503",
+            "504",
+        )
+    )
+
+
+def prefetch_checkpoint(spec):
+    from huggingface_hub import snapshot_download
+
+    last_error = None
+    for attempt in range(1, 6):
+        try:
+            return snapshot_download(**snapshot_options(spec), max_workers=4)
+        except Exception as error:
+            last_error = error
+            if attempt == 5 or not is_retryable_download(error):
+                raise
+            delay = min(2**attempt, 30)
+            print(
+                f"Checkpoint download attempt {attempt} failed; "
+                f"retrying in {delay}s: {type(error).__name__}: {error}",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
+    raise last_error
+
+
+def local_checkpoint(spec):
+    from huggingface_hub import snapshot_download
+
+    return snapshot_download(
+        **snapshot_options(spec),
+        local_files_only=True,
+    )
+
+
 def speech(request, spec):
     text = str(request.get("input") or "").strip()
     if not text:
@@ -61,13 +138,17 @@ def speech(request, spec):
     from scipy.io.wavfile import write as write_wav
 
     device = device_name(torch)
-    checkpoint = spec["checkpoint"]
+    checkpoint = local_checkpoint(spec)
     if spec["kind"] == "bark":
         from transformers import AutoProcessor, BarkModel
 
-        processor = AutoProcessor.from_pretrained(checkpoint)
+        processor = AutoProcessor.from_pretrained(checkpoint, local_files_only=True)
         dtype = torch.float16 if device == "cuda" else torch.float32
-        model = BarkModel.from_pretrained(checkpoint, torch_dtype=dtype).to(device)
+        model = BarkModel.from_pretrained(
+            checkpoint,
+            torch_dtype=dtype,
+            local_files_only=True,
+        ).to(device)
         inputs = processor(text).to(device)
         with torch.inference_mode():
             waveform = model.generate(**inputs)
@@ -76,8 +157,11 @@ def speech(request, spec):
     elif spec["kind"] == "mms":
         from transformers import AutoTokenizer, VitsModel
 
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-        model = VitsModel.from_pretrained(checkpoint).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint, local_files_only=True)
+        model = VitsModel.from_pretrained(
+            checkpoint,
+            local_files_only=True,
+        ).to(device)
         inputs = tokenizer(text, return_tensors="pt").to(device)
         with torch.inference_mode():
             waveform = model(**inputs).waveform
@@ -108,11 +192,13 @@ def transcribe(request, spec):
     import torch
     from transformers import pipeline
 
+    checkpoint = local_checkpoint(spec)
     device = 0 if torch.cuda.is_available() else -1
     recognizer = pipeline(
         "automatic-speech-recognition",
-        model=spec["checkpoint"],
+        model=checkpoint,
         device=device,
+        model_kwargs={"local_files_only": True},
     )
     result = recognizer(str(audio_path))
     text = str(result.get("text") or "").strip()
@@ -130,13 +216,12 @@ def main():
     operation = request.get("operation")
     if operation == "prefetch":
         import torch
-        from huggingface_hub import snapshot_download
 
-        snapshot = snapshot_download(repo_id=spec["checkpoint"])
+        snapshot = prefetch_checkpoint(spec)
         respond(
             ok=True,
             detail=(
-                f"Prefetched {spec['checkpoint']} at {snapshot}; "
+                f"Prefetched runtime files for {spec['checkpoint']} at {snapshot}; "
                 f"{device_detail(torch)}"
             ),
         )
