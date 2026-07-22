@@ -1,4 +1,5 @@
 use crate::daemon_client::Client;
+use crossterm::terminal;
 use std::{
     io::{self, IsTerminal, Write},
     sync::{
@@ -10,10 +11,12 @@ use std::{
 };
 use takokit_package::InstallProgress;
 
-const DISPLAY_WIDTH: usize = 132;
+const FALLBACK_DISPLAY_WIDTH: usize = 100;
+const MAX_DISPLAY_WIDTH: usize = 160;
+const MIN_BAR_WIDTH: usize = 12;
+const MAX_BAR_WIDTH: usize = 40;
 const POLL_INTERVAL: Duration = Duration::from_millis(250);
 const REDRAW_INTERVAL: Duration = Duration::from_secs(1);
-const BAR_WIDTH: usize = 22;
 
 pub(crate) struct Activity {
     running: Option<Arc<AtomicBool>>,
@@ -75,9 +78,14 @@ impl Activity {
                                 previous_bytes = progress.downloaded_bytes;
                                 previous_sample = now;
                             }
-                            format_progress_line(&label, &progress, speed)
+                            format_progress_line(
+                                &label,
+                                &progress,
+                                speed,
+                                display_width(),
+                            )
                         }
-                        None => format!("{label}  {}", format_duration(started.elapsed())),
+                        None => format_waiting_line(&label, started.elapsed(), display_width()),
                     };
                     if line != last_line {
                         draw_line(&line);
@@ -136,7 +144,8 @@ impl Activity {
             let _ = worker.join();
         }
         if enabled() {
-            eprint!("\r{blank:<width$}\r", blank = "", width = DISPLAY_WIDTH);
+            let width = display_width();
+            eprint!("\r{blank:<width$}\r", blank = "", width = width);
             let _ = io::stderr().flush();
         }
     }
@@ -148,16 +157,26 @@ impl Drop for Activity {
     }
 }
 
-fn format_progress_line(label: &str, progress: &InstallProgress, speed: f64) -> String {
+fn format_progress_line(
+    label: &str,
+    progress: &InstallProgress,
+    speed: f64,
+    width: usize,
+) -> String {
     let elapsed = timestamp_ms().saturating_sub(progress.started_at_ms);
     let elapsed = Duration::from_millis(elapsed.min(u64::MAX as u128) as u64);
-    let stage = compact_message(&progress.message, 34);
+    let bar_width = progress_bar_width(width);
+    let stage = compact_message(&progress.message, 42);
     match progress.total_bytes.filter(|total| *total > 0) {
         Some(total) => {
             let downloaded = progress.downloaded_bytes.min(total);
             let ratio = downloaded as f64 / total as f64;
-            let filled = ((ratio * BAR_WIDTH as f64).round() as usize).min(BAR_WIDTH);
-            let bar = format!("{}{}", "#".repeat(filled), "-".repeat(BAR_WIDTH - filled));
+            let filled = ((ratio * bar_width as f64).round() as usize).min(bar_width);
+            let bar = format!(
+                "{}{}",
+                "#".repeat(filled),
+                "-".repeat(bar_width.saturating_sub(filled))
+            );
             let percent = (ratio * 100.0).round() as u64;
             let eta = if speed > 1.0 && downloaded < total {
                 Some(Duration::from_secs_f64((total - downloaded) as f64 / speed))
@@ -165,25 +184,71 @@ fn format_progress_line(label: &str, progress: &InstallProgress, speed: f64) -> 
                 None
             };
             format!(
-                "{label} [{bar}] {}/{} {percent:>3}%  {}/s  ETA {}  {stage}",
+                "{label} [{bar}] {percent:>3}%  {}/{}  {}  ETA {}  {stage}",
                 format_bytes(downloaded),
                 format_bytes(total),
-                format_bytes(speed.max(0.0) as u64),
+                format_speed(speed),
                 eta.map(format_duration).unwrap_or_else(|| "--".to_string())
             )
         }
-        None => format!(
-            "{label} [size pending] {}  {}/s  {}  {stage}",
-            format_bytes(progress.downloaded_bytes),
-            format_bytes(speed.max(0.0) as u64),
-            format_duration(elapsed)
-        ),
+        None => {
+            let bar = indeterminate_bar(bar_width, elapsed);
+            format!(
+                "{label} [{bar}] {} cached  {}  {}  {stage}",
+                format_bytes(progress.downloaded_bytes),
+                format_speed(speed),
+                format_duration(elapsed)
+            )
+        }
     }
 }
 
+fn format_waiting_line(label: &str, elapsed: Duration, width: usize) -> String {
+    let bar = indeterminate_bar(progress_bar_width(width), elapsed);
+    format!("{label} [{bar}] working  {}", format_duration(elapsed))
+}
+
+fn progress_bar_width(display_width: usize) -> usize {
+    (display_width / 4).clamp(MIN_BAR_WIDTH, MAX_BAR_WIDTH)
+}
+
+fn indeterminate_bar(width: usize, elapsed: Duration) -> String {
+    let pulse_width = width.clamp(3, 7);
+    let travel = width.saturating_sub(pulse_width);
+    let cycle = travel.saturating_mul(2).max(1);
+    let step = (elapsed.as_millis() / 250) as usize % cycle;
+    let start = if step <= travel { step } else { cycle - step };
+    let mut bar = vec!['-'; width];
+    for cell in bar.iter_mut().skip(start).take(pulse_width) {
+        *cell = '=';
+    }
+    if let Some(head) = bar.get_mut((start + pulse_width).saturating_sub(1)) {
+        *head = '>';
+    }
+    bar.into_iter().collect()
+}
+
+fn format_speed(speed: f64) -> String {
+    if speed > 1.0 {
+        format!("{}/s", format_bytes(speed as u64))
+    } else {
+        "working".to_string()
+    }
+}
+
+fn display_width() -> usize {
+    terminal::size()
+        .ok()
+        .map(|(columns, _)| usize::from(columns).saturating_sub(1))
+        .filter(|width| *width >= 20)
+        .unwrap_or(FALLBACK_DISPLAY_WIDTH)
+        .min(MAX_DISPLAY_WIDTH)
+}
+
 fn draw_line(line: &str) {
-    let line = compact_message(line, DISPLAY_WIDTH);
-    eprint!("\r{line:<width$}", width = DISPLAY_WIDTH);
+    let width = display_width();
+    let line = compact_message(line, width);
+    eprint!("\r{line:<width$}", width = width);
     let _ = io::stderr().flush();
 }
 
@@ -276,9 +341,40 @@ mod tests {
             started_at_ms: timestamp_ms(),
             updated_at_ms: timestamp_ms(),
         };
-        let line = format_progress_line("Pulling qwen3-tts", &progress, 100.0);
+        let line = format_progress_line("Pulling qwen3-tts", &progress, 100.0, 120);
         assert!(line.contains("50%"));
         assert!(line.contains("ETA"));
         assert!(line.contains("500 B/1000 B"));
+    }
+
+    #[test]
+    fn unknown_total_line_has_an_indeterminate_bar_without_false_zero_speed() {
+        let progress = InstallProgress {
+            operation: "model-pull".into(),
+            id: "bark-small".into(),
+            stage: "model-prefetch".into(),
+            message: "Acquiring bark-small checkpoint".into(),
+            downloaded_bytes: 4 * 1024 * 1024 * 1024,
+            total_bytes: None,
+            state: InstallProgressState::Running,
+            started_at_ms: timestamp_ms().saturating_sub(3_000),
+            updated_at_ms: timestamp_ms(),
+        };
+        let line = format_progress_line("Pulling bark-small", &progress, 0.0, 120);
+        assert!(line.contains("["));
+        assert!(line.contains(">"));
+        assert!(line.contains("working"));
+        assert!(!line.contains("size pending"));
+        assert!(!line.contains("0 B/s"));
+    }
+
+    #[test]
+    fn formatted_progress_is_compacted_to_the_terminal_width() {
+        let line = format_waiting_line(
+            "Pulling a-model-with-a-very-long-name",
+            Duration::from_secs(5),
+            60,
+        );
+        assert!(compact_message(&line, 60).chars().count() <= 60);
     }
 }
