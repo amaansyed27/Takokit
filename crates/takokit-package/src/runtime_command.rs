@@ -86,6 +86,19 @@ pub(crate) fn configure_managed_command(command: &mut Command) {
         }
     }
 
+    if let Some(root) = std::env::var_os("TAKOKIT_HOME").map(PathBuf::from) {
+        for (name, path) in [
+            ("UV_CACHE_DIR", root.join("cache").join("uv")),
+            ("UV_PYTHON_INSTALL_DIR", root.join("tools").join("python")),
+            ("UV_TOOL_DIR", root.join("tools").join("uv-tools")),
+            ("UV_TOOL_BIN_DIR", root.join("tools").join("bin")),
+        ] {
+            if std::env::var_os(name).is_none() {
+                command.env(name, path);
+            }
+        }
+    }
+
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
