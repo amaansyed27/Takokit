@@ -428,17 +428,13 @@ fn run_adapter(
         TakokitError::Audio(format!("could not wait for {adapter} adapter: {error}"))
     })?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let response: ManagedAdapterResponse = stdout
-        .lines()
-        .rev()
-        .find_map(|line| serde_json::from_str(line.trim()).ok())
-        .ok_or_else(|| {
-            TakokitError::Audio(format!(
-                "{adapter} returned no valid JSON response: {}{}",
-                stdout.trim(),
-                stderr_suffix(&output.stderr)
-            ))
-        })?;
+    let response = decode_adapter_response(&output.stdout).ok_or_else(|| {
+        TakokitError::Audio(format!(
+            "{adapter} returned no valid JSON response: {}{}",
+            stdout.trim(),
+            stderr_suffix(&output.stderr)
+        ))
+    })?;
     if !output.status.success() || !response.ok {
         return Err(TakokitError::Audio(format!(
             "{adapter} failed: {}{}",
@@ -449,6 +445,13 @@ fn run_adapter(
         )));
     }
     Ok(response)
+}
+
+fn decode_adapter_response(stdout: &[u8]) -> Option<ManagedAdapterResponse> {
+    String::from_utf8_lossy(stdout)
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str(line.trim()).ok())
 }
 
 fn validate_file_output(
@@ -516,5 +519,20 @@ fn stderr_suffix(stderr: &[u8]) -> String {
         String::new()
     } else {
         format!("; {stderr}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adapter_response_uses_final_json_after_library_logs() {
+        let stdout = b"[NeMo I 00:00:00] loading checkpoint\n                        Transcribing: 100%\n                        {\"ok\":true,\"text\":\"hello from noisy adapter\"}\n";
+
+        let response = decode_adapter_response(stdout).expect("final JSON response");
+
+        assert!(response.ok);
+        assert_eq!(response.text.as_deref(), Some("hello from noisy adapter"));
     }
 }
