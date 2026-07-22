@@ -2,17 +2,14 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Audio,
-
     [string]$ReferenceAudio,
     [string]$ReferenceText = "Hello from Takokit.",
     [string]$TrainingSamples,
     [string]$RvcTarget,
     [string]$Tako = ".\target\release\tako.exe",
     [string]$EvidenceRoot = "$HOME\takokit-test-evidence",
-
     [ValidateSet("all", "tts", "stt", "clone", "convert", "train", "omni")]
     [string]$Category = "all",
-
     [switch]$SkipPull,
     [switch]$PlanOnly,
     [switch]$IncludeWorkstation
@@ -68,7 +65,7 @@ function Copy-TakokitDiagnostics {
     $groups = @(
         @{ Pattern = (Join-Path $env:TAKOKIT_HOME "logs\*.log"); Prefix = "core" },
         @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"); Prefix = "runner" },
-        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\install.log"); Prefix = "adapter" }
+        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log"); Prefix = "adapter" }
     )
 
     foreach ($group in $groups) {
@@ -211,7 +208,7 @@ function Get-TakokitLiveLogPaths {
     $patterns = @(
         (Join-Path $env:TAKOKIT_HOME "logs\*.log"),
         (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"),
-        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\install.log")
+        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log")
     )
     $files = foreach ($pattern in $patterns) {
         Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
