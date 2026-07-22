@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$SmokeRoot = "$HOME\Downloads\takokit-smoke-inputs",
+    [string]$StorageRoot = (Join-Path $env:TEMP "takokit-all-model-smoke"),
     [string]$RvcTarget = ""
 )
 
@@ -56,10 +57,21 @@ if ($RvcTarget) {
 Write-Host "Audio:            $Audio"
 Write-Host "Reference audio:  $ReferenceAudio"
 Write-Host "Reference text:   $ReferenceTextFile"
+$StorageRoot = [System.IO.Path]::GetFullPath(
+    [Environment]::ExpandEnvironmentVariables($StorageRoot)
+)
 Write-Host "Training samples: $TrainingSamples"
+Write-Host "Smoke storage:    $StorageRoot"
 if (-not $RvcTarget) {
     Write-Host "RVC:              skipped as blocked-input"
 }
 
-& $SmokeRunner @Arguments
-exit $LASTEXITCODE
+$PreviousTakokitHome = $env:TAKOKIT_HOME
+$env:TAKOKIT_HOME = $StorageRoot
+try {
+    & $SmokeRunner @Arguments
+    $ExitCode = $LASTEXITCODE
+} finally {
+    $env:TAKOKIT_HOME = $PreviousTakokitHome
+}
+exit $ExitCode
