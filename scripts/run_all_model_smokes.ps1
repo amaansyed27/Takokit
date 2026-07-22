@@ -287,7 +287,7 @@ function Invoke-Tako {
     else { $detail = "exit code $exitCode`: $detail" }
     Add-Result $Model $Phase "failed" $watch.ElapsedMilliseconds $log $detail
     Copy-TakokitDiagnostics
-    Save-StorageSnapshot "failure:$Model:$Phase"
+    Save-StorageSnapshot "failure:${Model}:${Phase}"
     Complete-Step "failed" $watch.ElapsedMilliseconds
     return $false
 }
