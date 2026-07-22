@@ -1,6 +1,7 @@
 //! Checkpoint acquisition for managed Python model adapters.
 
 use crate::{
+    artifact_io::sha256_file,
     runtime_command::{configure_managed_command, runner_python_path},
     runtime_python_specs::model_prefetch_required,
     *,
@@ -32,6 +33,7 @@ struct ModelPrefetchMarker {
     model_id: String,
     model_version: String,
     adapter: String,
+    adapter_script_sha256: String,
 }
 
 pub(crate) fn prefetch_python_adapter_model(
@@ -45,29 +47,15 @@ pub(crate) fn prefetch_python_adapter_model(
 
     let model_dir = takokit_root.join("models").join(&model.id);
     let marker_path = model_dir.join(".takokit-prefetch.json");
-    let expected = ModelPrefetchMarker {
-        model_id: model.id.clone(),
-        model_version: model.version.clone(),
-        adapter: adapter.to_string(),
-    };
-    if std::fs::read(&marker_path)
-        .ok()
-        .and_then(|source| serde_json::from_slice::<ModelPrefetchMarker>(&source).ok())
-        .is_some_and(|marker| {
-            marker.model_id == expected.model_id
-                && marker.model_version == expected.model_version
-                && marker.adapter == expected.adapter
-        })
-    {
-        return Ok(Some(format!(
-            "Verified managed checkpoint prefetch marker at {}.",
-            marker_path.display()
-        )));
-    }
-
     let layout = python_managed_runner_layout(takokit_root);
     let adapter_dir = layout.adapters.join(adapter);
     let script = adapter_dir.join(format!("{adapter}.py"));
+    if !script.is_file() {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: model.id.clone(),
+            reason: format!("adapter script is missing: {}", script.display()),
+        });
+    }
     let python = runner_python_path(&adapter_dir.join("venv")).ok_or_else(|| {
         PackageError::ArtifactInstallFailed {
             artifact: model.id.clone(),
@@ -77,11 +65,21 @@ pub(crate) fn prefetch_python_adapter_model(
             ),
         }
     })?;
-    if !script.is_file() {
-        return Err(PackageError::ArtifactInstallFailed {
-            artifact: model.id.clone(),
-            reason: format!("adapter script is missing: {}", script.display()),
-        });
+    let expected = ModelPrefetchMarker {
+        model_id: model.id.clone(),
+        model_version: model.version.clone(),
+        adapter: adapter.to_string(),
+        adapter_script_sha256: sha256_file(&script)?,
+    };
+    if std::fs::read(&marker_path)
+        .ok()
+        .and_then(|source| serde_json::from_slice::<ModelPrefetchMarker>(&source).ok())
+        .is_some_and(|marker| marker == expected)
+    {
+        return Ok(Some(format!(
+            "Verified managed checkpoint prefetch marker at {}.",
+            marker_path.display()
+        )));
     }
 
     std::fs::create_dir_all(&model_dir)?;
