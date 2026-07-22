@@ -232,10 +232,7 @@ impl InstalledRegistry {
         record.status = InstalledPackageStatus::Ready;
         record.note = note.into();
         record.installed_at = timestamp_now();
-        std::fs::write(
-            self.model_record_path(id),
-            toml::to_string_pretty(&record)?,
-        )?;
+        std::fs::write(self.model_record_path(id), toml::to_string_pretty(&record)?)?;
         Ok(())
     }
 
@@ -318,8 +315,7 @@ impl InstalledRegistry {
                 } else if runtime_ready {
                     "Verified the managed checkpoint prefetch marker.".to_string()
                 } else if runtime_managed {
-                    "Installed model metadata; managed checkpoint prefetch is required."
-                        .to_string()
+                    "Installed model metadata; managed checkpoint prefetch is required.".to_string()
                 } else {
                     "Installed model metadata; downloads were skipped by the manifest or request."
                         .to_string()
