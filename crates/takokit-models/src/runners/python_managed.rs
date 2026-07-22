@@ -14,7 +14,10 @@ use takokit_package::{adapter_for_model, ExecutionPlan};
 use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
-use super::{SpeechRunner, TranscriptionRunner, VoiceConversionRunner, VoiceTrainingRunner};
+use super::{
+    configure_runner_command, SpeechRunner, TranscriptionRunner, VoiceConversionRunner,
+    VoiceTrainingRunner,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct PythonManagedRunner;
@@ -396,7 +399,7 @@ fn run_adapter(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    configure_adapter_command(&mut command);
+    configure_runner_command(&mut command);
     let mut child = command.spawn().map_err(|error| {
         TakokitError::Audio(format!("could not start {adapter} adapter: {error}"))
     })?;
@@ -429,15 +432,6 @@ fn run_adapter(
         )));
     }
     Ok(response)
-}
-
-fn configure_adapter_command(command: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
 }
 
 fn validate_file_output(
