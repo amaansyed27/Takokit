@@ -1,7 +1,8 @@
 //! Verification and classification of artifacts and snapshots from previous pulls.
 
 use crate::{
-    artifact_io::sha256_file, runtime_model_source::snapshot_is_ready, ArtifactEntry,
+    artifact_io::sha256_file, runtime_model_source::snapshot_is_ready,
+    runtime_python_specs::model_prefetch_required, ArtifactEntry,
     InstalledArtifactRecord, InstalledModelRecord, InstalledPackageStatus, ModelManifest,
 };
 
@@ -49,9 +50,10 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
 
     let expected = manifest.artifacts.all().collect::<Vec<_>>();
     if expected.is_empty() {
-        // Runtime-managed adapters may acquire their upstream checkpoint inside
-        // Takokit's managed cache instead of declaring static artifact URLs.
-        return true;
+        if manifest.source.is_some() {
+            return true;
+        }
+        return runtime_prefetch_is_ready(record, manifest);
     }
     if record.artifacts.len() != expected.len() {
         return false;
@@ -63,6 +65,35 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
             .find(|candidate| candidate.name == artifact.name && candidate.role == artifact.role)
             .is_some_and(|candidate| is_verified(candidate, artifact))
     })
+}
+
+fn runtime_prefetch_is_ready(
+    record: &InstalledModelRecord,
+    manifest: &ModelManifest,
+) -> bool {
+    if !model_prefetch_required(&manifest.id) {
+        return false;
+    }
+    let Some(storage_root) = record.manifest_path.ancestors().nth(3) else {
+        return false;
+    };
+    let marker = storage_root
+        .join("models")
+        .join(&manifest.id)
+        .join(".takokit-prefetch.json");
+    let Ok(source) = std::fs::read(marker) else {
+        return false;
+    };
+    let Ok(marker) = serde_json::from_slice::<serde_json::Value>(&source) else {
+        return false;
+    };
+    marker.get("model_id").and_then(|value| value.as_str()) == Some(manifest.id.as_str())
+        && marker
+            .get("model_version")
+            .and_then(|value| value.as_str())
+            == Some(manifest.version.as_str())
+        && marker.get("adapter").and_then(|value| value.as_str())
+            == manifest.required_adapter.as_deref()
 }
 
 /// Blob-path existence is deliberately insufficient: every manifest field and
