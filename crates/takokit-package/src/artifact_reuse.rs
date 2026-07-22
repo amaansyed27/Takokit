@@ -49,7 +49,9 @@ pub(crate) fn all_verified(record: &InstalledModelRecord, manifest: &ModelManife
 
     let expected = manifest.artifacts.all().collect::<Vec<_>>();
     if expected.is_empty() {
-        return manifest.source.is_some();
+        // Runtime-managed adapters may acquire their upstream checkpoint inside
+        // Takokit's managed cache instead of declaring static artifact URLs.
+        return true;
     }
     if record.artifacts.len() != expected.len() {
         return false;
