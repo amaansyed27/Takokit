@@ -270,7 +270,10 @@ fn install_model_complete_inner(
         let prefetch_monitor = InstallProgressMonitor::start(
             progress.clone(),
             vec![
-                takokit_root.join("cache"),
+                takokit_root.join("cache").join("huggingface"),
+                takokit_root.join("cache").join("torch"),
+                takokit_root.join("cache").join("coqui"),
+                takokit_root.join("cache").join("modelscope"),
                 takokit_root.join("models").join(&model.id),
             ],
             "model-prefetch",
