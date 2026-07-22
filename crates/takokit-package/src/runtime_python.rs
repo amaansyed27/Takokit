@@ -214,7 +214,7 @@ pub(crate) fn prefetch_python_adapter_model(
         .env("MODELSCOPE_CACHE", &modelscope_cache)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::from(std::fs::File::create(&log_path)?));
     configure_managed_command(&mut command);
     let mut child = command
         .spawn()
@@ -243,13 +243,15 @@ pub(crate) fn prefetch_python_adapter_model(
             ),
         })?;
 
-    let mut log = Vec::new();
-    log.extend_from_slice(&output.stdout);
-    if !output.stdout.ends_with(b"\n") {
-        log.push(b'\n');
+    let mut log = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)?;
+    if !output.stdout.is_empty() {
+        if !output.stdout.ends_with(b"\n") {
+            log.write_all(b"\n")?;
+        }
+        log.write_all(&output.stdout)?;
     }
-    log.extend_from_slice(&output.stderr);
-    std::fs::write(&log_path, log)?;
 
     let response = String::from_utf8_lossy(&output.stdout)
         .lines()
@@ -506,6 +508,7 @@ fn uv_pip_install(
         "--python".into(),
         python.to_path_buf().into(),
         "--no-progress".into(),
+        "--torch-backend=auto".into(),
     ];
     arguments.extend(dependencies);
     run_logged_command(log, uv, &arguments)
