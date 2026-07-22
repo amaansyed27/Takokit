@@ -109,6 +109,10 @@ pub(crate) fn prefetch_python_adapter_model(
     command
         .arg(&script)
         .env("HF_HOME", &hf_cache)
+        .env("HF_HUB_DISABLE_XET", "1")
+        .env("HF_HUB_DISABLE_TELEMETRY", "1")
+        .env("HF_HUB_DOWNLOAD_TIMEOUT", "60")
+        .env("HF_HUB_ETAG_TIMEOUT", "30")
         .env("TORCH_HOME", &torch_cache)
         .env("TTS_HOME", &tts_cache)
         .env("MODELSCOPE_CACHE", &modelscope_cache)
