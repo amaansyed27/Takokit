@@ -4,8 +4,14 @@ from pathlib import Path
 
 
 CHECKPOINTS = {
-    "canary": "nvidia/canary-1b-v2",
-    "parakeet": "nvidia/parakeet-tdt-0.6b-v3",
+    "canary": {
+        "repo": "nvidia/canary-1b-v2",
+        "file": "canary-1b-v2.nemo",
+    },
+    "parakeet": {
+        "repo": "nvidia/parakeet-tdt-0.6b-v3",
+        "file": "parakeet-tdt-0.6b-v3.nemo",
+    },
 }
 
 
@@ -13,18 +19,37 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def cuda_device(torch):
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA is unavailable to the managed PyTorch environment. "
+            f"torch={torch.__version__}; rebuild this adapter with Takokit's "
+            "automatic PyTorch accelerator selection."
+        )
+    return f"cuda ({torch.cuda.get_device_name(0)}; torch {torch.__version__}; CUDA {torch.version.cuda})"
+
+
 def main():
     request = json.load(sys.stdin)
     model_id = request.get("model_id")
-    checkpoint = CHECKPOINTS.get(model_id)
-    if not checkpoint:
+    spec = CHECKPOINTS.get(model_id)
+    if not spec:
         raise ValueError(f"unsupported NeMo ASR model: {model_id}")
 
-    if request.get("operation") == "prefetch":
-        from huggingface_hub import snapshot_download
+    import torch
 
-        snapshot = snapshot_download(repo_id=checkpoint)
-        respond(ok=True, detail=f"Prefetched {checkpoint} at {snapshot}")
+    device_detail = cuda_device(torch)
+    if request.get("operation") == "prefetch":
+        from huggingface_hub import hf_hub_download
+
+        checkpoint_path = hf_hub_download(
+            repo_id=spec["repo"],
+            filename=spec["file"],
+        )
+        respond(
+            ok=True,
+            detail=f"Prefetched {spec['repo']}/{spec['file']} at {checkpoint_path}; {device_detail}",
+        )
         return
     if request.get("operation") != "transcribe":
         raise ValueError("NeMo ASR adapter only supports transcription")
@@ -33,11 +58,9 @@ def main():
     if not audio_path.is_file():
         raise FileNotFoundError(f"audio file does not exist: {audio_path}")
 
-    import torch
     from nemo.collections.asr.models import ASRModel
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = ASRModel.from_pretrained(model_name=checkpoint).to(device)
+    model = ASRModel.from_pretrained(model_name=spec["repo"]).to("cuda")
     results = model.transcribe([str(audio_path)])
     if not results:
         raise RuntimeError("NeMo returned no transcription result")
@@ -46,7 +69,7 @@ def main():
     text = text.strip()
     if not text:
         raise RuntimeError("NeMo returned an empty transcript")
-    respond(ok=True, text=text, device=device)
+    respond(ok=True, text=text, device=device_detail)
 
 
 if __name__ == "__main__":
