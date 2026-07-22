@@ -9,6 +9,13 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
+    checkpoint = "nari-labs/Dia-1.6B-0626"
+    if request.get("operation") == "prefetch":
+        from huggingface_hub import snapshot_download
+
+        snapshot = snapshot_download(repo_id=checkpoint)
+        respond(ok=True, detail=f"Prefetched {checkpoint} at {snapshot}")
+        return
     if request.get("operation") != "speech":
         raise ValueError("Dia adapter only supports speech")
     text = str(request.get("input") or "").strip()
@@ -28,7 +35,6 @@ def main():
         device = "mps"
     else:
         device = "cpu"
-    checkpoint = "nari-labs/Dia-1.6B-0626"
     processor = AutoProcessor.from_pretrained(checkpoint)
     inputs = processor(text=[text], padding=True, return_tensors="pt").to(device)
     model = DiaForConditionalGeneration.from_pretrained(checkpoint).to(device)
