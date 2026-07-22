@@ -56,7 +56,8 @@ def speech(request, spec):
         from transformers import AutoProcessor, BarkModel
 
         processor = AutoProcessor.from_pretrained(checkpoint)
-        model = BarkModel.from_pretrained(checkpoint).to(device)
+        dtype = torch.float16 if device == "cuda" else torch.float32
+        model = BarkModel.from_pretrained(checkpoint, torch_dtype=dtype).to(device)
         inputs = processor(text).to(device)
         with torch.inference_mode():
             waveform = model.generate(**inputs)
@@ -85,6 +86,7 @@ def speech(request, spec):
         bytes=output_path.stat().st_size,
         sample_rate=sample_rate,
         voice=request.get("voice") or "default",
+        device=device,
     )
 
 
@@ -116,6 +118,15 @@ def main():
     if not spec:
         raise ValueError(f"unsupported Hugging Face audio model: {model_id}")
     operation = request.get("operation")
+    if operation == "prefetch":
+        from huggingface_hub import snapshot_download
+
+        snapshot = snapshot_download(repo_id=spec["checkpoint"])
+        respond(
+            ok=True,
+            detail=f"Prefetched {spec['checkpoint']} at {snapshot}",
+        )
+        return
     if operation != spec["operation"]:
         raise ValueError(f"{model_id} does not support {operation}")
     if operation == "speech":
