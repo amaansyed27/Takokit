@@ -32,6 +32,14 @@ def main() -> None:
     if not config_path.is_file():
         raise FileNotFoundError(f"Piper voice config is missing below {model_dir}")
 
+    # This adapter is installed as piper.py, so remove its directory from
+    # module lookup before importing the separately installed piper package.
+    adapter_dir = Path(__file__).resolve().parent
+    sys.path = [
+        entry
+        for entry in sys.path
+        if Path(entry or ".").resolve() != adapter_dir
+    ]
     from piper import PiperVoice
 
     voice = PiperVoice.load(str(model_path), config_path=str(config_path))
