@@ -13,11 +13,23 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
-    if request.get("operation") != "speech":
-        raise ValueError("Kyutai DSM adapter only supports speech generation")
     if request.get("model_id") != "kyutai-tts-1.6b":
         raise ValueError(f"unsupported Kyutai TTS model: {request.get('model_id')}")
+    if request.get("operation") == "prefetch":
+        from huggingface_hub import hf_hub_download, snapshot_download
 
+        model_path = snapshot_download(repo_id=MODEL_REPO)
+        voice_path = hf_hub_download(
+            repo_id="kyutai/tts-voices",
+            filename=DEFAULT_VOICE,
+        )
+        respond(
+            ok=True,
+            detail=f"Prefetched {MODEL_REPO} at {model_path}; voice at {voice_path}",
+        )
+        return
+    if request.get("operation") != "speech":
+        raise ValueError("Kyutai DSM adapter only supports speech generation")
     text = str(request.get("input") or "").strip()
     if not text:
         raise ValueError("speech input cannot be empty")
