@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -14,6 +13,10 @@ use takokit_package::{adapter_for_model, ExecutionPlan};
 use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
+mod protocol;
+
+use protocol::{decode_adapter_response, ManagedAdapterRequest, ManagedAdapterResponse};
+
 use super::{
     configure_runner_command, SpeechRunner, TranscriptionRunner, VoiceConversionRunner,
     VoiceTrainingRunner,
@@ -21,40 +24,6 @@ use super::{
 
 #[derive(Debug, Default, Clone)]
 pub struct PythonManagedRunner;
-
-#[derive(Debug, Serialize)]
-struct ManagedAdapterRequest<'a> {
-    operation: &'a str,
-    model_id: &'a str,
-    model_dir: &'a Path,
-    cache_dir: &'a Path,
-    input: Option<&'a str>,
-    voice: Option<&'a str>,
-    language: Option<&'a str>,
-    instruction: Option<&'a str>,
-    reference_text: Option<&'a str>,
-    output_path: Option<&'a Path>,
-    output_dir: Option<&'a Path>,
-    audio_path: Option<&'a Path>,
-    target_voice: Option<&'a str>,
-    dataset_path: Option<&'a Path>,
-    name: Option<&'a str>,
-    pitch_shift: Option<i32>,
-    epochs: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ManagedAdapterResponse {
-    ok: bool,
-    output_path: Option<PathBuf>,
-    bytes: Option<u64>,
-    sample_rate: Option<u32>,
-    voice: Option<String>,
-    text: Option<String>,
-    status: Option<String>,
-    log_path: Option<PathBuf>,
-    error: Option<String>,
-}
 
 #[async_trait]
 impl SpeechRunner for PythonManagedRunner {
@@ -447,13 +416,6 @@ fn run_adapter(
     Ok(response)
 }
 
-fn decode_adapter_response(stdout: &[u8]) -> Option<ManagedAdapterResponse> {
-    String::from_utf8_lossy(stdout)
-        .lines()
-        .rev()
-        .find_map(|line| serde_json::from_str(line.trim()).ok())
-}
-
 fn validate_file_output(
     adapter: &str,
     expected: &Path,
@@ -522,17 +484,3 @@ fn stderr_suffix(stderr: &[u8]) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn adapter_response_uses_final_json_after_library_logs() {
-        let stdout = b"[NeMo I 00:00:00] loading checkpoint\n                        Transcribing: 100%\n                        {\"ok\":true,\"text\":\"hello from noisy adapter\"}\n";
-
-        let response = decode_adapter_response(stdout).expect("final JSON response");
-
-        assert!(response.ok);
-        assert_eq!(response.text.as_deref(), Some("hello from noisy adapter"));
-    }
-}
