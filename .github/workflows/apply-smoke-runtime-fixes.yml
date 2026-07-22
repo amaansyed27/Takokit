@@ -1,0 +1,138 @@
+name: Apply smoke runtime fixes
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch smoke wrapper and NeMo dependency resolution
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          smoke = Path('scripts/run_all_model_smokes.ps1')
+          source = smoke.read_text(encoding='utf-8')
+          old = '''    try {
+                  $argumentLine = (@($Arguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
+                  $process = Start-Process -FilePath $Tako `
+                      -ArgumentList $argumentLine `
+                      -NoNewWindow `
+                      -PassThru `
+                      -RedirectStandardOutput $stdoutLog `
+                      -RedirectStandardError $stderrLog
+          
+                  while (-not $process.HasExited) {
+                      $liveLogs = @(Get-TakokitLiveLogPaths -Since $stepStartedAt)
+                      $tail = Get-LastUsefulLine (@($stderrLog, $stdoutLog) + $liveLogs)
+                      $status = "elapsed {0:hh\\:mm\\:ss}" -f $watch.Elapsed
+                      if ($tail) { $status += " | $tail" }
+                      Write-StepProgress $status
+                      Start-Sleep -Milliseconds 750
+                      $process.Refresh()
+                  }
+                  $process.WaitForExit()
+                  $exitCode = $process.ExitCode
+              } catch {
+                  $exitCode = -1
+                  $_.Exception.Message | Out-File $stderrLog -Append -Encoding utf8
+              } finally {
+                  $watch.Stop()
+              }
+          '''
+          new = '''    try {
+                  $argumentLine = (@($Arguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
+                  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+                  $startInfo.FileName = $Tako
+                  $startInfo.Arguments = $argumentLine
+                  $startInfo.WorkingDirectory = (Get-Location).Path
+                  $startInfo.UseShellExecute = $false
+                  $startInfo.CreateNoWindow = $true
+                  $startInfo.RedirectStandardOutput = $true
+                  $startInfo.RedirectStandardError = $true
+          
+                  $process = New-Object System.Diagnostics.Process
+                  $process.StartInfo = $startInfo
+                  if (-not $process.Start()) {
+                      throw "Failed to start Takokit process."
+                  }
+                  $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+                  $stderrTask = $process.StandardError.ReadToEndAsync()
+          
+                  while (-not $process.WaitForExit(750)) {
+                      $liveLogs = @(Get-TakokitLiveLogPaths -Since $stepStartedAt)
+                      $tail = Get-LastUsefulLine $liveLogs
+                      $status = "elapsed {0:hh\\:mm\\:ss}" -f $watch.Elapsed
+                      if ($tail) { $status += " | $tail" }
+                      Write-StepProgress $status
+                  }
+                  $process.WaitForExit()
+                  $stdoutTask.Wait()
+                  $stderrTask.Wait()
+                  $stdoutTask.Result | Set-Content -LiteralPath $stdoutLog -Encoding utf8
+                  $stderrTask.Result | Set-Content -LiteralPath $stderrLog -Encoding utf8
+                  $process.Refresh()
+                  $exitCode = [int]$process.ExitCode
+                  "[smoke-wrapper exit code: $exitCode]" |
+                      Add-Content -LiteralPath $stderrLog -Encoding utf8
+              } catch {
+                  $exitCode = -1
+                  $_.Exception.Message | Out-File $stderrLog -Append -Encoding utf8
+              } finally {
+                  $watch.Stop()
+                  if ($process) { $process.Dispose() }
+              }
+          '''
+          if old not in source:
+              raise SystemExit('Expected Start-Process block was not found')
+          smoke.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          catalog = Path('crates/takokit-package/src/runtime_python_specs/catalog.rs')
+          source = catalog.read_text(encoding='utf-8')
+          old = 'const NEMO_PACKAGES: &[&str] = &["torch", "nemo-toolkit[asr]"];'
+          new = '''const NEMO_PACKAGES: &[&str] = &[
+              "torch",
+              "Cython",
+              "packaging",
+              "numba==0.62.1",
+              "nemo-toolkit[asr]==2.7.3",
+          ];'''
+          if old not in source:
+              raise SystemExit('Expected NeMo package definition was not found')
+          catalog.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          Path('.github/workflows/apply-smoke-runtime-fixes.yml').unlink()
+          PY
+
+      - name: Validate PowerShell parsing
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/run_all_model_smokes.ps1'),
+            [ref]$null,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add scripts/run_all_model_smokes.ps1 crates/takokit-package/src/runtime_python_specs/catalog.rs .github/workflows/apply-smoke-runtime-fixes.yml
+          git commit -m "Fix smoke exit capture and NeMo Python resolution"
+          git push origin HEAD:main
