@@ -53,6 +53,18 @@ fn runtime_managed_model_requires_verified_prefetch_marker() {
     assert!(record.artifacts.is_empty());
     assert!(!crate::artifact_reuse::all_verified(&record, &manifest));
 
+    let adapter = manifest.required_adapter.as_deref().unwrap();
+    let adapter_script = temp
+        .path()
+        .join("runners")
+        .join("python-managed")
+        .join("adapters")
+        .join(adapter)
+        .join(format!("{adapter}.py"));
+    std::fs::create_dir_all(adapter_script.parent().unwrap()).unwrap();
+    std::fs::write(&adapter_script, b"test adapter").unwrap();
+    let adapter_script_sha256 = crate::artifact_io::sha256_file(&adapter_script).unwrap();
+
     let model_dir = temp.path().join("models").join("bark-small");
     std::fs::create_dir_all(&model_dir).unwrap();
     std::fs::write(
@@ -61,6 +73,7 @@ fn runtime_managed_model_requires_verified_prefetch_marker() {
             "model_id": manifest.id.clone(),
             "model_version": manifest.version.clone(),
             "adapter": manifest.required_adapter.clone(),
+            "adapter_script_sha256": adapter_script_sha256,
         }))
         .unwrap(),
     )
