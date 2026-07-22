@@ -185,4 +185,3 @@ pub(crate) fn prefetch_python_adapter_model(
         )
     })))
 }
-
