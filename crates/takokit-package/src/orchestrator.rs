@@ -4,6 +4,7 @@ use crate::{
     artifact_reuse::{self, ArtifactReuseState},
     planning::has_verified_executor,
     runtime_model_source::{estimate_model_source_bytes, model_source_staging_path},
+    runtime_python::prefetch_python_adapter_model,
     transaction::ModelInstallSnapshot,
     *,
 };
@@ -266,6 +267,30 @@ fn install_model_complete_inner(
         .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error));
     drop(monitor);
     let artifact_report = artifact_result?;
+    let mut artifact_detail = artifact_report.note;
+    if let Some(adapter_id) = model.required_adapter.as_deref() {
+        let prefetch_monitor = InstallProgressMonitor::start(
+            progress.clone(),
+            vec![
+                takokit_root.join("cache"),
+                takokit_root.join("models").join(&model.id),
+            ],
+            "model-prefetch",
+            format!("Acquiring {} checkpoint files", model.id),
+            None,
+        );
+        let prefetch = prefetch_python_adapter_model(takokit_root, &model, adapter_id)
+            .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error));
+        drop(prefetch_monitor);
+        if let Some(note) = prefetch? {
+            installed_registry
+                .mark_runtime_model_ready(&model.id, &note)
+                .map_err(|error| {
+                    PackageError::at_stage(InstallFailureStage::Artifacts, error)
+                })?;
+            artifact_detail = note;
+        }
+    }
     let artifacts = InstallStep {
         state: match reuse_state {
             ArtifactReuseState::Verified => InstallStepState::AlreadyReady,
@@ -273,7 +298,7 @@ fn install_model_complete_inner(
             ArtifactReuseState::Missing => InstallStepState::Installed,
         },
         newly_installed: reuse_state != ArtifactReuseState::Verified && artifact_report.installed,
-        detail: artifact_report.note,
+        detail: artifact_detail,
     };
 
     progress.update(
