@@ -5,6 +5,7 @@ const HF_AUDIO_PACKAGES: &[&str] = &[
     "torchaudio",
     "transformers",
     "accelerate",
+    "huggingface_hub[hf_xet]",
     "soundfile",
     "scipy",
 ];
@@ -13,6 +14,7 @@ const NEMO_PACKAGES: &[&str] = &[
     "torch",
     "Cython",
     "packaging",
+    "huggingface_hub[hf_xet]",
     "numba==0.62.1",
     "nemo-toolkit[asr]==2.7.3",
 ];
@@ -136,7 +138,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "f5_tts",
         "f5-tts",
         "3.11",
-        &["f5-tts"],
+        &["f5-tts", "huggingface_hub[hf_xet]"],
         F5_TTS_ADAPTER,
         None,
         "F5-TTS."
@@ -149,6 +151,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
             "git+https://github.com/huggingface/transformers.git",
             "torch",
             "accelerate",
+            "huggingface_hub[hf_xet]",
             "soundfile"
         ],
         DIA_ADAPTER,
@@ -172,6 +175,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
             "git+https://github.com/huggingface/transformers.git",
             "torch",
             "accelerate",
+            "huggingface_hub[hf_xet]",
             "soundfile",
             "mistral-common[audio]"
         ],
@@ -255,7 +259,13 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "kyutai_tts",
         "kyutai-tts-1.6b",
         "3.12",
-        &["moshi==0.2.11", "torch", "sphn", "numpy"],
+        &[
+            "moshi==0.2.11",
+            "torch",
+            "sphn",
+            "numpy",
+            "huggingface_hub[hf_xet]"
+        ],
         KYUTAI_TTS_ADAPTER,
         None,
         "Kyutai DSM TTS."
