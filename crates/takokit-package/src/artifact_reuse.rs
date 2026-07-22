@@ -89,6 +89,21 @@ fn runtime_prefetch_is_ready(record: &InstalledModelRecord, manifest: &ModelMani
             == Some(manifest.version.as_str())
         && marker.get("adapter").and_then(|value| value.as_str())
             == manifest.required_adapter.as_deref()
+        && manifest.required_adapter.as_deref().is_some_and(|adapter| {
+            let script = storage_root
+                .join("runners")
+                .join("python-managed")
+                .join("adapters")
+                .join(adapter)
+                .join(format!("{adapter}.py"));
+            marker
+                .get("adapter_script_sha256")
+                .and_then(|value| value.as_str())
+                .is_some_and(|expected| {
+                    sha256_file(&script)
+                        .is_ok_and(|actual| actual.eq_ignore_ascii_case(expected))
+                })
+        })
 }
 
 /// Blob-path existence is deliberately insufficient: every manifest field and
