@@ -71,6 +71,21 @@ pub(crate) fn run_logged_command(
 }
 
 pub(crate) fn configure_managed_command(command: &mut Command) {
+    // Managed installs often download multi-gigabyte model/runtime files. The
+    // upstream defaults are too short for slower links, so use conservative
+    // retry/timeout values unless the user explicitly configured their own.
+    for (name, value) in [
+        ("UV_HTTP_TIMEOUT", "120"),
+        ("UV_HTTP_CONNECT_TIMEOUT", "30"),
+        ("UV_HTTP_RETRIES", "8"),
+        ("HF_HUB_DOWNLOAD_TIMEOUT", "120"),
+        ("HF_HUB_ETAG_TIMEOUT", "30"),
+    ] {
+        if std::env::var_os(name).is_none() {
+            command.env(name, value);
+        }
+    }
+
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
