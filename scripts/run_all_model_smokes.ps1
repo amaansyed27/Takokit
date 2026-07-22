@@ -32,6 +32,55 @@ function Resolve-ExistingPath {
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
+function Save-StorageSnapshot {
+    param([string]$Label)
+
+    $rows = foreach ($path in @($env:TAKOKIT_HOME, $script:RunRoot)) {
+        if (-not $path) { continue }
+        $root = [System.IO.Path]::GetPathRoot($path)
+        if (-not $root) { continue }
+        $driveName = $root.TrimEnd([char[]]"\\/").TrimEnd(":")
+        $drive = Get-PSDrive -Name $driveName -PSProvider FileSystem -ErrorAction SilentlyContinue
+        if ($drive) {
+            [pscustomobject]@{
+                captured_at = (Get-Date).ToString("o")
+                label       = $Label
+                path        = $path
+                drive       = $drive.Name
+                free_bytes  = [long]$drive.Free
+                used_bytes  = [long]$drive.Used
+            }
+        }
+    }
+    if (@($rows).Count -gt 0) {
+        $storageCsv = Join-Path $script:RunRoot "storage.csv"
+        @($rows) | Export-Csv $storageCsv -NoTypeInformation -Append
+    }
+}
+
+function Copy-TakokitDiagnostics {
+    if (-not $env:TAKOKIT_HOME -or -not (Test-Path -LiteralPath $env:TAKOKIT_HOME)) {
+        return
+    }
+
+    $destination = Join-Path $script:RunRoot "takokit-logs"
+    New-Item -ItemType Directory -Force $destination | Out-Null
+    $groups = @(
+        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "logs\*.log"); Prefix = "core" },
+        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"); Prefix = "runner" },
+        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\install.log"); Prefix = "adapter" }
+    )
+
+    foreach ($group in $groups) {
+        Get-ChildItem -Path $group.Pattern -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $parent = Split-Path $_.DirectoryName -Leaf
+                $name = "$($group.Prefix)-$parent-$($_.Name)" -replace '[^a-zA-Z0-9._-]', '_'
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destination $name) -Force -ErrorAction SilentlyContinue
+            }
+    }
+}
+
 function Save-Reports {
     param([bool]$Complete = $false, [string]$FatalError = "")
     if (-not $script:RunRoot -or -not $script:Results) { return }
@@ -215,6 +264,8 @@ function Invoke-Tako {
     if (-not $detail) { $detail = "exit code $exitCode" }
     else { $detail = "exit code $exitCode`: $detail" }
     Add-Result $Model $Phase "failed" $watch.ElapsedMilliseconds $log $detail
+    Copy-TakokitDiagnostics
+    Save-StorageSnapshot "failure:$Model:$Phase"
     Complete-Step "failed" $watch.ElapsedMilliseconds
     return $false
 }
@@ -321,6 +372,7 @@ Write-Host "Models:   $($SelectedCases.Count)"
 Write-Host "Steps:    $TotalSteps"
 Write-Host "Evidence: $RunRoot"
 Write-Host "Storage:  $env:TAKOKIT_HOME"
+Save-StorageSnapshot "start"
 
 $RunComplete = $false
 $FatalError = ""
@@ -393,6 +445,8 @@ try {
     $FatalError = $_.Exception.Message
     throw
 } finally {
+    Copy-TakokitDiagnostics
+    Save-StorageSnapshot "finish"
     Save-Reports -Complete $RunComplete -FatalError $FatalError
     Write-Progress -Id 1 -Activity "Takokit all-model smoke tests" -Completed
 }
