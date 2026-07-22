@@ -390,15 +390,16 @@ fn run_adapter(
     let encoded = serde_json::to_vec(payload).map_err(|error| {
         TakokitError::Audio(format!("could not encode {adapter} request: {error}"))
     })?;
-    let mut child = Command::new(&layout.python)
+    let mut command = Command::new(&layout.python);
+    command
         .arg(&layout.script)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            TakokitError::Audio(format!("could not start {adapter} adapter: {error}"))
-        })?;
+        .stderr(Stdio::piped());
+    configure_adapter_command(&mut command);
+    let mut child = command.spawn().map_err(|error| {
+        TakokitError::Audio(format!("could not start {adapter} adapter: {error}"))
+    })?;
     child
         .stdin
         .as_mut()
@@ -428,6 +429,15 @@ fn run_adapter(
         )));
     }
     Ok(response)
+}
+
+fn configure_adapter_command(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 fn validate_file_output(
