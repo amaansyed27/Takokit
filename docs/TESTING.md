@@ -276,20 +276,36 @@ The suite must synthesize actual speech and use that speech for transcription. S
 
 ## 12. Complete model and voice-runtime pass
 
-Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md) or run:
+Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md). With the prepared input folder at
+`$HOME\Downloads\takokit-smoke-inputs`, run the repository helper:
 
 ```powershell
-.\scripts\run_all_model_smokes.ps1 `
-  -Audio C:\path\to\test01_20s.wav `
-  -ReferenceAudio C:\path\to\owned-reference.wav `
-  -ReferenceText "Exact reference transcript" `
-  -TrainingSamples C:\path\to\gpt-sovits-dataset `
-  -RvcTarget C:\path\to\owned-rvc-checkpoint
+.\scripts\run_takokit_all_smokes.ps1
 ```
 
-The runner covers all 31 model IDs. It records separate `passed`, `failed`, `blocked-input` and `blocked-hardware` states.
+The helper uses isolated storage at `$env:TEMP\takokit-all-model-smoke`. The runner covers
+all 31 model IDs and displays the current model, phase, step count, elapsed time, latest
+child-install activity and exact log path. Results and progress are saved incrementally,
+including child adapter/download logs and free-space snapshots.
 
-Do not run multiple large GPU models concurrently. Qwen3-Omni requires workstation-class hardware and is expected to be `blocked-hardware` on the primary laptop.
+It records separate `passed`, `failed`, `skipped-dependency`, `blocked-input` and
+`blocked-hardware` states. A failed pull must skip dependent planning and inference
+instead of producing misleading cascade failures.
+
+Do not run multiple large GPU models concurrently. Qwen3-Omni requires workstation-class
+hardware and is expected to be `blocked-hardware` on the primary laptop. RVC is expected
+to be `blocked-input` unless a consent-backed checkpoint is supplied.
+
+After preserving the evidence, preview and remove the isolated smoke storage with:
+
+```powershell
+.\scripts\clear_takokit_smoke_storage.ps1 `
+  -StorageRoot "$env:TEMP\takokit-all-model-smoke"
+
+.\scripts\clear_takokit_smoke_storage.ps1 `
+  -StorageRoot "$env:TEMP\takokit-all-model-smoke" `
+  -Force
+```
 
 ## 13. TUI
 
@@ -300,13 +316,15 @@ Push-Location $ProjectA
 
 Verify:
 
-- Models, Speak, Transcribe, Clone, Sessions, Runners and System are reachable,
+- Home exposes Speak, Transcribe, Clone voice, Manage, Sessions and Activity,
+- Manage exposes installed Models, Runners and System without a catalog browser,
+- number keys open the visible Home and Manage actions,
 - Windows and Unicode paths edit correctly,
-- Enter runs the visible primary action,
+- `Ctrl+Enter` submits task forms and `Esc` consistently returns to the previous screen,
 - model state refreshes after pulls,
 - actions save to the active session,
 - clone requires name, sample and consent,
-- `/sessions`, `/new` and `/clone` work,
+- failed tasks automatically open Activity with the actual error,
 - progress and errors remain visible,
 - Ctrl+C does not orphan installation work,
 - small terminals do not panic.
