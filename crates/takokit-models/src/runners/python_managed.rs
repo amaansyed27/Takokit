@@ -367,8 +367,7 @@ fn run_adapter(
     let tts_cache = payload.cache_dir.join("coqui");
     let modelscope_cache = payload.cache_dir.join("modelscope");
     for path in [&hf_cache, &torch_cache, &tts_cache, &modelscope_cache] {
-        std::fs::create_dir_all(path)
-            .map_err(|error| TakokitError::Storage(error.to_string()))?;
+        std::fs::create_dir_all(path).map_err(|error| TakokitError::Storage(error.to_string()))?;
     }
 
     let mut command = Command::new(&layout.python);
