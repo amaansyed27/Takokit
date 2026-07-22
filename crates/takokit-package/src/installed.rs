@@ -223,6 +223,22 @@ impl InstalledRegistry {
         })
     }
 
+    pub(crate) fn mark_runtime_model_ready(
+        &self,
+        id: &str,
+        note: impl Into<String>,
+    ) -> PackageResult<()> {
+        let mut record = self.installed_model_record(id)?;
+        record.status = InstalledPackageStatus::Ready;
+        record.note = note.into();
+        record.installed_at = timestamp_now();
+        std::fs::write(
+            self.model_record_path(id),
+            toml::to_string_pretty(&record)?,
+        )?;
+        Ok(())
+    }
+
     pub fn remove_model(&self, id: &str) -> PackageResult<bool> {
         let manifest_path = self.model_manifest_path(id);
         let record_path = self.model_record_path(id);
@@ -285,19 +301,24 @@ impl InstalledRegistry {
         let artifacts = manifest.artifacts.all().collect::<Vec<_>>();
         let metadata_only = options.metadata_only || manifest.artifacts.metadata_only;
         if artifacts.is_empty() || metadata_only {
-            let runtime_managed = artifacts.is_empty() && !metadata_only;
+            let runtime_managed =
+                artifacts.is_empty() && !metadata_only && manifest.source.is_none();
+            let runtime_ready = runtime_managed
+                && previous.is_some_and(|record| artifact_reuse::all_verified(record, manifest));
             return Ok(InstalledArtifactSet {
                 records: installed_artifacts(&manifest.artifacts),
                 snapshot: None,
-                status: if runtime_managed {
+                status: if runtime_ready {
                     InstalledPackageStatus::Ready
                 } else {
                     InstalledPackageStatus::MetadataOnly
                 },
                 note: if manifest.source.is_some() && !metadata_only {
                     "Model source is ready for snapshot installation.".to_string()
+                } else if runtime_ready {
+                    "Verified the managed checkpoint prefetch marker.".to_string()
                 } else if runtime_managed {
-                    "No external artifact files were declared; the verified managed adapter owns model acquisition."
+                    "Installed model metadata; managed checkpoint prefetch is required."
                         .to_string()
                 } else {
                     "Installed model metadata; downloads were skipped by the manifest or request."
