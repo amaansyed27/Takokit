@@ -39,6 +39,16 @@ def device_name(torch):
     return "cpu"
 
 
+def device_detail(torch):
+    device = device_name(torch)
+    if device == "cuda":
+        return (
+            f"cuda ({torch.cuda.get_device_name(0)}; "
+            f"torch {torch.__version__}; CUDA {torch.version.cuda})"
+        )
+    return f"{device} (torch {torch.__version__})"
+
+
 def speech(request, spec):
     text = str(request.get("input") or "").strip()
     if not text:
@@ -86,7 +96,7 @@ def speech(request, spec):
         bytes=output_path.stat().st_size,
         sample_rate=sample_rate,
         voice=request.get("voice") or "default",
-        device=device,
+        device=device_detail(torch),
     )
 
 
@@ -108,7 +118,7 @@ def transcribe(request, spec):
     text = str(result.get("text") or "").strip()
     if not text:
         raise RuntimeError("the ASR model returned an empty transcript")
-    respond(ok=True, text=text)
+    respond(ok=True, text=text, device=device_detail(torch))
 
 
 def main():
@@ -119,12 +129,16 @@ def main():
         raise ValueError(f"unsupported Hugging Face audio model: {model_id}")
     operation = request.get("operation")
     if operation == "prefetch":
+        import torch
         from huggingface_hub import snapshot_download
 
         snapshot = snapshot_download(repo_id=spec["checkpoint"])
         respond(
             ok=True,
-            detail=f"Prefetched {spec['checkpoint']} at {snapshot}",
+            detail=(
+                f"Prefetched {spec['checkpoint']} at {snapshot}; "
+                f"{device_detail(torch)}"
+            ),
         )
         return
     if operation != spec["operation"]:
