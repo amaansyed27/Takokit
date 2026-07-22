@@ -1,0 +1,11 @@
+{
+  "id": "8f185517-2c8c-4c15-bb07-04cd7795add4",
+  "title": "Transcription",
+  "workspace_root": "D:\\TheDawnlightGroup\\DawnlightLabs\\Takokit\\crates\\takokit-server",
+  "created_at": 1784628418,
+  "updated_at": 1784628418,
+  "event_count": 1,
+  "output_count": 0,
+  "last_task": "speech_to_text",
+  "last_model": "whisper-base"
+}

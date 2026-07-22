@@ -1,0 +1,1 @@
+{"id":"cff92f56-1914-4b68-9bd4-5d5f181e989b","session_id":"1d7d868c-b1e4-4cd3-bc5f-dc1fa1595332","timestamp":1784628543,"task":"speech_to_text","state":"failed","model":"kokoro","source_path":"audio.wav","message":"kokoro does not support STT."}
