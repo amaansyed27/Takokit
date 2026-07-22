@@ -9,7 +9,13 @@ const HF_AUDIO_PACKAGES: &[&str] = &[
     "scipy",
 ];
 const COQUI_PACKAGES: &[&str] = &["coqui-tts", "torch", "torchaudio"];
-const NEMO_PACKAGES: &[&str] = &["torch", "nemo-toolkit[asr]"];
+const NEMO_PACKAGES: &[&str] = &[
+    "torch",
+    "Cython",
+    "packaging",
+    "numba==0.62.1",
+    "nemo-toolkit[asr]==2.7.3",
+];
 const QWEN3_PACKAGES: &[&str] = &["qwen-tts==0.1.1", "soundfile"];
 const QWEN_OMNI_PACKAGES: &[&str] = &[
     "git+https://github.com/huggingface/transformers.git",

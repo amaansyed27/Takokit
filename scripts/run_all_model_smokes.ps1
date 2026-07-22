@@ -241,29 +241,45 @@ function Invoke-Tako {
 
     try {
         $argumentLine = (@($Arguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
-        $process = Start-Process -FilePath $Tako `
-            -ArgumentList $argumentLine `
-            -NoNewWindow `
-            -PassThru `
-            -RedirectStandardOutput $stdoutLog `
-            -RedirectStandardError $stderrLog
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $Tako
+        $startInfo.Arguments = $argumentLine
+        $startInfo.WorkingDirectory = (Get-Location).Path
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
 
-        while (-not $process.HasExited) {
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "Failed to start Takokit process."
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+
+        while (-not $process.WaitForExit(750)) {
             $liveLogs = @(Get-TakokitLiveLogPaths -Since $stepStartedAt)
-            $tail = Get-LastUsefulLine (@($stderrLog, $stdoutLog) + $liveLogs)
+            $tail = Get-LastUsefulLine $liveLogs
             $status = "elapsed {0:hh\:mm\:ss}" -f $watch.Elapsed
             if ($tail) { $status += " | $tail" }
             Write-StepProgress $status
-            Start-Sleep -Milliseconds 750
-            $process.Refresh()
         }
         $process.WaitForExit()
-        $exitCode = $process.ExitCode
+        $stdoutTask.Wait()
+        $stderrTask.Wait()
+        $stdoutTask.Result | Set-Content -LiteralPath $stdoutLog -Encoding utf8
+        $stderrTask.Result | Set-Content -LiteralPath $stderrLog -Encoding utf8
+        $process.Refresh()
+        $exitCode = [int]$process.ExitCode
+        "[smoke-wrapper exit code: $exitCode]" |
+            Add-Content -LiteralPath $stderrLog -Encoding utf8
     } catch {
         $exitCode = -1
         $_.Exception.Message | Out-File $stderrLog -Append -Encoding utf8
     } finally {
         $watch.Stop()
+        if ($process) { $process.Dispose() }
     }
 
     $captured = @()
