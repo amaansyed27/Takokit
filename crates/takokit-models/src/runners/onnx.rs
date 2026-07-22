@@ -144,13 +144,7 @@ pub fn speak_with_kokoro(
         ));
     }
     let artifacts = resolve_kokoro_artifacts(plan)?;
-    let takokit_root = output_dir.parent().ok_or_else(|| {
-        inference_missing(format!(
-            "could not infer Takokit root from output directory {}",
-            output_dir.display()
-        ))
-    })?;
-    let runner_root = takokit_root.join("runners").join("onnx");
+    let runner_root = plan.storage_root.join("runners").join("onnx");
     let python = runner_python_path(&runner_root).ok_or_else(|| {
         inference_missing(format!(
             "Kokoro ONNX runtime is not ready at {}; run `takokit runner install takokit-onnx`",
