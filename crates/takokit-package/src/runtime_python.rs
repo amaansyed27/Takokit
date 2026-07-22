@@ -68,8 +68,7 @@ pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> b
         .join(format!("{adapter}.py"));
     python_adapter_record(takokit_root, adapter)
         .is_ok_and(|record| record.state == AdapterLifecycleState::Ready)
-        && std::fs::read_to_string(deployed_script)
-            .is_ok_and(|script| script == expected_script)
+        && std::fs::read_to_string(deployed_script).is_ok_and(|script| script == expected_script)
 }
 
 pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
