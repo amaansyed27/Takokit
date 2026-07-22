@@ -1,0 +1,56 @@
+name: Patch smoke script parser
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix interpolation and validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $path = 'scripts/run_all_model_smokes.ps1'
+          $source = Get-Content -LiteralPath $path -Raw
+          $before = 'Save-StorageSnapshot "failure:$Model:$Phase"'
+          $after = 'Save-StorageSnapshot "failure:${Model}:${Phase}"'
+
+          if ($source.Contains($before)) {
+            $source = $source.Replace($before, $after)
+            Set-Content -LiteralPath $path -Value $source -Encoding utf8 -NoNewline
+          } elseif (-not $source.Contains($after)) {
+            throw 'Expected smoke storage label was not found.'
+          }
+
+          Get-ChildItem scripts -Filter *.ps1 -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $messages = $errors | ForEach-Object { "$($_.Extent.File):$($_.Extent.StartLineNumber): $($_.Message)" }
+              throw ($messages -join [Environment]::NewLine)
+            }
+          }
+
+      - name: Commit parser fix
+        shell: pwsh
+        run: |
+          if (-not (git status --porcelain)) {
+            Write-Host 'No changes required.'
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/run_all_model_smokes.ps1
+          git commit -m 'Fix PowerShell smoke failure label interpolation'
+          git push origin HEAD:main
