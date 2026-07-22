@@ -10,6 +10,12 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
+    if request.get("operation") == "prefetch":
+        from f5_tts.api import F5TTS
+
+        F5TTS(model="F5TTS_v1_Base")
+        respond(ok=True, detail="Prefetched F5TTS_v1_Base")
+        return
     if request.get("operation") != "speech":
         raise ValueError("F5-TTS adapter only supports speech")
     text = str(request.get("input") or "").strip()
