@@ -4,7 +4,7 @@ use crate::{
     artifact_reuse::{self, ArtifactReuseState},
     planning::has_verified_executor,
     runtime_model_source::{estimate_model_source_bytes, model_source_staging_path},
-    runtime_python::prefetch_python_adapter_model,
+    runtime_python::{prefetch_python_adapter_model, python_adapter_is_current},
     transaction::ModelInstallSnapshot,
     *,
 };
@@ -160,9 +160,7 @@ fn install_model_complete_inner(
     };
 
     let (adapter, adapter_ready) = if let Some(adapter_id) = model.required_adapter.as_deref() {
-        let ready_before = python_adapter_record(takokit_root, adapter_id)
-            .ok()
-            .is_some_and(|record| record.state == AdapterLifecycleState::Ready);
+        let ready_before = python_adapter_is_current(takokit_root, adapter_id);
         if !ready_before {
             let adapter_path = python_managed_runner_layout(takokit_root)
                 .adapters
