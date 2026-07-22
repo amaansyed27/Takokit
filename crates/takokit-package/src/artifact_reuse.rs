@@ -100,8 +100,7 @@ fn runtime_prefetch_is_ready(record: &InstalledModelRecord, manifest: &ModelMani
                 .get("adapter_script_sha256")
                 .and_then(|value| value.as_str())
                 .is_some_and(|expected| {
-                    sha256_file(&script)
-                        .is_ok_and(|actual| actual.eq_ignore_ascii_case(expected))
+                    sha256_file(&script).is_ok_and(|actual| actual.eq_ignore_ascii_case(expected))
                 })
         })
 }
