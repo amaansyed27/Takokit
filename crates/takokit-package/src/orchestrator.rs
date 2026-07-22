@@ -285,9 +285,7 @@ fn install_model_complete_inner(
         if let Some(note) = prefetch? {
             installed_registry
                 .mark_runtime_model_ready(&model.id, &note)
-                .map_err(|error| {
-                    PackageError::at_stage(InstallFailureStage::Artifacts, error)
-                })?;
+                .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error))?;
             artifact_detail = note;
         }
     }
