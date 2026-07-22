@@ -23,14 +23,30 @@ pub(crate) fn run_logged_command(
     program: impl AsRef<Path>,
     args: &[PathOrArg],
 ) -> PackageResult<()> {
+    use std::io::Write as _;
+
     let program = program.as_ref();
+    let mut log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)?;
+    write!(log, "$ {}", program.display())?;
+    for arg in args {
+        write!(log, " {}", arg.as_os_str().to_string_lossy())?;
+    }
+    writeln!(log)?;
+    log.flush()?;
+
+    let stdout = log.try_clone()?;
+    let stderr = log.try_clone()?;
     let mut command = Command::new(program);
     for arg in args {
         command.arg(arg.as_os_str());
     }
+    command.stdout(stdout).stderr(stderr);
     configure_managed_command(&mut command);
-    let output = command
-        .output()
+    let status = command
+        .status()
         .map_err(|error| PackageError::ArtifactInstallFailed {
             artifact: "managed runtime command".to_string(),
             reason: format!(
@@ -39,23 +55,9 @@ pub(crate) fn run_logged_command(
                 log_path.display()
             ),
         })?;
-    let mut log = String::new();
-    log.push_str(&format!("$ {}", program.display()));
-    for arg in args {
-        log.push(' ');
-        log.push_str(&arg.as_os_str().to_string_lossy());
-    }
-    log.push('\n');
-    log.push_str(&String::from_utf8_lossy(&output.stdout));
-    log.push_str(&String::from_utf8_lossy(&output.stderr));
-    log.push('\n');
-    use std::io::Write as _;
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)?
-        .write_all(log.as_bytes())?;
-    if output.status.success() {
+    writeln!(log, "\n[exit status: {status}]")?;
+
+    if status.success() {
         Ok(())
     } else {
         Err(PackageError::ArtifactInstallFailed {
@@ -63,7 +65,7 @@ pub(crate) fn run_logged_command(
             reason: format!(
                 "{} exited with {}; see {}",
                 program.display(),
-                output.status,
+                status,
                 log_path.display()
             ),
         })
