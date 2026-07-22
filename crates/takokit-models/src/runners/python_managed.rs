@@ -482,4 +482,3 @@ fn stderr_suffix(stderr: &[u8]) -> String {
         format!("; {stderr}")
     }
 }
-
