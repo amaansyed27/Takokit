@@ -149,6 +149,8 @@ fn install_hugging_face_snapshot(
         temporary.clone().into(),
         "--cache-dir".into(),
         cache_root.into(),
+        "--max-workers".into(),
+        "4".into(),
     ];
     append_source_filters(&mut arguments, source);
 
