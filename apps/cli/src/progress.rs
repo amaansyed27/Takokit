@@ -78,12 +78,7 @@ impl Activity {
                                 previous_bytes = progress.downloaded_bytes;
                                 previous_sample = now;
                             }
-                            format_progress_line(
-                                &label,
-                                &progress,
-                                speed,
-                                display_width(),
-                            )
+                            format_progress_line(&label, &progress, speed, display_width())
                         }
                         None => format_waiting_line(&label, started.elapsed(), display_width()),
                     };
