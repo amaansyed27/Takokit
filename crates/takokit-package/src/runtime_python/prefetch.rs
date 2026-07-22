@@ -145,9 +145,7 @@ pub(crate) fn prefetch_python_adapter_model(
             ),
         })?;
 
-    let mut log = std::fs::OpenOptions::new()
-        .append(true)
-        .open(&log_path)?;
+    let mut log = std::fs::OpenOptions::new().append(true).open(&log_path)?;
     if !output.stdout.is_empty() {
         if !output.stdout.ends_with(b"\n") {
             log.write_all(b"\n")?;
