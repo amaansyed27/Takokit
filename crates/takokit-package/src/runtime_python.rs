@@ -55,6 +55,23 @@ pub fn python_adapter_records(takokit_root: &Path) -> PackageResult<Vec<AdapterR
     Ok(records)
 }
 
+pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> bool {
+    let Some(spec) = adapter_spec(adapter) else {
+        return false;
+    };
+    let Some(expected_script) = spec.script else {
+        return false;
+    };
+    let deployed_script = python_managed_runner_layout(takokit_root)
+        .adapters
+        .join(adapter)
+        .join(format!("{adapter}.py"));
+    python_adapter_record(takokit_root, adapter)
+        .is_ok_and(|record| record.state == AdapterLifecycleState::Ready)
+        && std::fs::read_to_string(deployed_script)
+            .is_ok_and(|script| script == expected_script)
+}
+
 pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
     let path = python_managed_runner_layout(takokit_root)
         .adapters
