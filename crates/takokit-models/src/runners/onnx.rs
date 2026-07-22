@@ -12,7 +12,10 @@ use takokit_core::{
 use takokit_package::{ArtifactRole, ExecutionPlan, InstalledArtifactRecord};
 use uuid::Uuid;
 
-use super::{onnx_not_implemented, piper_not_implemented, SpeechRunner, TranscriptionRunner};
+use super::{
+    configure_runner_command, onnx_not_implemented, piper_not_implemented, SpeechRunner,
+    TranscriptionRunner,
+};
 
 pub const PIPER_LESSAC_MODEL_ARTIFACT: &str = "en_US-lessac-medium.onnx";
 pub const PIPER_LESSAC_CONFIG_ARTIFACT: &str = "en_US-lessac-medium.onnx.json";
@@ -177,11 +180,14 @@ pub fn speak_with_kokoro(
         TakokitError::Audio(format!("could not encode Kokoro adapter request: {error}"))
     })?;
 
-    let mut child = Command::new(&python)
+    let mut command = Command::new(&python);
+    command
         .arg(&adapter)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_runner_command(&mut command);
+    let mut child = command
         .spawn()
         .map_err(|error| TakokitError::Audio(format!("could not start Kokoro adapter: {error}")))?;
     child
@@ -396,6 +402,5 @@ fn stderr_suffix(stderr: &[u8]) -> String {
     }
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests;
