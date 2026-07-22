@@ -7,7 +7,7 @@ use takokit_core::{
 use takokit_package::{ArtifactRole, ExecutionPlan, InstalledArtifactRecord};
 use uuid::Uuid;
 
-use super::TranscriptionRunner;
+use super::{configure_runner_command, TranscriptionRunner};
 
 #[derive(Debug, Default, Clone)]
 pub struct WhisperCppRunner;
@@ -59,7 +59,8 @@ pub fn transcribe_with_whispercpp(
         .map_err(|error| TakokitError::Storage(error.to_string()))?;
     let id = Uuid::new_v4();
     let output_prefix = output_dir.join(format!("transcription-{id}"));
-    let output = Command::new(&binary)
+    let mut command = Command::new(&binary);
+    command
         .arg("-m")
         .arg(&model_path)
         .arg("-f")
@@ -67,7 +68,9 @@ pub fn transcribe_with_whispercpp(
         .arg("-otxt")
         .arg("-of")
         .arg(&output_prefix)
-        .arg("-nt")
+        .arg("-nt");
+    configure_runner_command(&mut command);
+    let output = command
         .output()
         .map_err(|error| TakokitError::Audio(format!("failed to start whisper.cpp: {error}")))?;
 
