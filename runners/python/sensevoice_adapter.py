@@ -9,6 +9,12 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
+    if request.get("operation") == "prefetch":
+        from funasr import AutoModel
+
+        AutoModel(model="iic/SenseVoiceSmall", vad_model="fsmn-vad", device="cpu")
+        respond(ok=True, detail="Prefetched iic/SenseVoiceSmall and fsmn-vad")
+        return
     if request.get("operation") != "transcribe":
         raise ValueError("SenseVoice adapter only supports transcription")
     audio_path = Path(request["audio_path"]).expanduser().resolve()
