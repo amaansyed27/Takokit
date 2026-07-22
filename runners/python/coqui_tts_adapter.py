@@ -15,12 +15,18 @@ def respond(**payload):
 
 def main():
     request = json.load(sys.stdin)
-    if request.get("operation") != "speech":
-        raise ValueError("Coqui adapter only supports speech")
     model_id = request.get("model_id")
     checkpoint = MODELS.get(model_id)
     if not checkpoint:
         raise ValueError(f"unsupported Coqui model: {model_id}")
+    if request.get("operation") == "prefetch":
+        from TTS.api import TTS
+
+        TTS(checkpoint)
+        respond(ok=True, detail=f"Prefetched {checkpoint}")
+        return
+    if request.get("operation") != "speech":
+        raise ValueError("Coqui adapter only supports speech")
     text = str(request.get("input") or "").strip()
     if not text:
         raise ValueError("speech input cannot be empty")
