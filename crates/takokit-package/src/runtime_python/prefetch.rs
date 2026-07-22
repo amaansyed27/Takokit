@@ -28,7 +28,7 @@ struct ModelPrefetchResponse {
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct ModelPrefetchMarker {
     model_id: String,
     model_version: String,
