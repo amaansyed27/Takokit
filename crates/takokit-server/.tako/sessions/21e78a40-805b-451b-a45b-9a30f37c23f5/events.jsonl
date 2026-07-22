@@ -1,1 +1,0 @@
-{"id":"5fc3fc88-aecf-4b24-bf2a-1d7e314a69be","session_id":"21e78a40-805b-451b-a45b-9a30f37c23f5","timestamp":1784628543,"task":"text_to_speech","state":"failed","model":"kokoro","input":"Hello","message":"model is not installed: kokoro"}
