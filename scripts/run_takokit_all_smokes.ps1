@@ -2,10 +2,16 @@
 param(
     [string]$SmokeRoot = "$HOME\Downloads\takokit-smoke-inputs",
     [string]$StorageRoot = (Join-Path $env:TEMP "takokit-all-model-smoke"),
-    [string]$RvcTarget = ""
+    [string]$RvcTarget = "",
+    [switch]$PullOnly,
+    [switch]$SkipPull
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($PullOnly -and $SkipPull) {
+    throw "-PullOnly and -SkipPull cannot be used together."
+}
 
 $Audio = Join-Path $SmokeRoot "test01_20s.wav"
 $ReferenceAudio = Join-Path $SmokeRoot "owned-reference.wav"
@@ -47,6 +53,12 @@ $Arguments = @{
     TrainingSamples = $TrainingSamples
 }
 
+if ($PullOnly) {
+    $Arguments.PlanOnly = $true
+}
+if ($SkipPull) {
+    $Arguments.SkipPull = $true
+}
 if ($RvcTarget) {
     if (-not (Test-Path -LiteralPath $RvcTarget)) {
         throw "RVC target does not exist: $RvcTarget"
@@ -62,6 +74,13 @@ $StorageRoot = [System.IO.Path]::GetFullPath(
 )
 Write-Host "Training samples: $TrainingSamples"
 Write-Host "Smoke storage:    $StorageRoot"
+if ($PullOnly) {
+    Write-Host "Mode:             pull and readiness verification only" -ForegroundColor Cyan
+} elseif ($SkipPull) {
+    Write-Host "Mode:             cached plan and inference tests only" -ForegroundColor Cyan
+} else {
+    Write-Host "Mode:             interleaved pull and inference" -ForegroundColor Cyan
+}
 if (-not $RvcTarget) {
     Write-Host "RVC:              skipped as blocked-input"
 }
