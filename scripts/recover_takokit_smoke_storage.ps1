@@ -11,7 +11,6 @@ $PSNativeCommandUseErrorActionPreference = $false
 
 function Resolve-ExistingFile {
     param([string]$Path, [string]$Label)
-
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "$Label does not exist: $Path"
     }
@@ -20,60 +19,81 @@ function Resolve-ExistingFile {
 
 function Get-PortOwnerIds {
     param([int]$Port)
-
     return @(
         Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
             Select-Object -ExpandProperty OwningProcess -Unique
     )
 }
 
+function Get-ProcessRecord {
+    param([int]$ProcessId)
+    Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+}
+
 function Get-ProcessDescription {
     param([int]$ProcessId)
-
-    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
-    if (-not $process) {
-        return "PID $ProcessId"
-    }
+    $process = Get-ProcessRecord $ProcessId
+    if (-not $process) { return "PID $ProcessId" }
     return "PID $ProcessId ($($process.Name)) $($process.CommandLine)"
 }
 
 function Stop-ProcessTree {
     param([int]$ProcessId)
-
-    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
-        return
-    }
-
-    if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }
+    if ($env:OS -eq "Windows_NT") {
         & taskkill.exe /PID $ProcessId /T /F 2>&1 | Out-Null
     } else {
         Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
     }
 }
 
-function Read-SmokeDaemonInfo {
-    param([string]$Root)
+function Test-TakokitDaemonProcess {
+    param([int]$ProcessId)
+    $process = Get-ProcessRecord $ProcessId
+    if (-not $process) { return $false }
+    return $process.Name -match '^takokit(\.exe)?$' -and
+        $process.CommandLine -match '(?i)\bserve\b' -and
+        $process.CommandLine -match '(?i)--daemon-child'
+}
 
-    $path = Join-Path $Root "runtime\daemon.json"
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        return $null
-    }
+function Invoke-TakoDirectList {
+    param([string]$LogPath)
 
-    try {
-        return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -ErrorAction Stop
-    } catch {
-        Write-Warning "Could not parse $path; it will be preserved in the recovery evidence."
-        return $null
+    $stdoutLog = "$LogPath.stdout.tmp"
+    $stderrLog = "$LogPath.stderr.tmp"
+    Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+
+    $process = Start-Process -FilePath $Tako `
+        -ArgumentList @("--direct", "list") `
+        -WorkingDirectory (Get-Location).Path `
+        -RedirectStandardOutput $stdoutLog `
+        -RedirectStandardError $stderrLog `
+        -NoNewWindow `
+        -PassThru `
+        -Wait
+
+    $stdout = if (Test-Path -LiteralPath $stdoutLog) { Get-Content -LiteralPath $stdoutLog -Raw } else { "" }
+    $stderr = if (Test-Path -LiteralPath $stderrLog) { Get-Content -LiteralPath $stderrLog -Raw } else { "" }
+    @(
+        "=== command ===",
+        "$Tako --direct list",
+        "=== stdout ===",
+        $stdout,
+        "=== stderr ===",
+        $stderr,
+        "[exit code: $($process.ExitCode)]"
+    ) | Set-Content -LiteralPath $LogPath -Encoding utf8
+    Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+
+    if ($process.ExitCode -ne 0 -or "$stdout`n$stderr" -match '(?im)^\s*(Failed after|Error:)') {
+        throw "direct inventory failed; see $LogPath"
     }
+    return $stdout
 }
 
 $Tako = Resolve-ExistingFile $Tako "Takokit executable"
-$StorageRoot = [System.IO.Path]::GetFullPath(
-    [Environment]::ExpandEnvironmentVariables($StorageRoot)
-)
-$EvidenceRoot = [System.IO.Path]::GetFullPath(
-    [Environment]::ExpandEnvironmentVariables($EvidenceRoot)
-)
+$StorageRoot = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($StorageRoot))
+$EvidenceRoot = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($EvidenceRoot))
 New-Item -ItemType Directory -Force $StorageRoot, $EvidenceRoot | Out-Null
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -85,7 +105,7 @@ Write-Host "Takokit smoke storage recovery" -ForegroundColor Cyan
 Write-Host "Storage:  $StorageRoot"
 Write-Host "Evidence: $RecoveryRoot"
 Write-Host ""
-Write-Host "This helper preserves model files, caches, environments and partial downloads." -ForegroundColor DarkGray
+Write-Host "Models, caches, environments and partial downloads are preserved." -ForegroundColor DarkGray
 
 $PreviousTakokitHome = $env:TAKOKIT_HOME
 $env:TAKOKIT_HOME = $StorageRoot
@@ -98,64 +118,35 @@ try {
         }
     }
 
-    $daemonInfo = Read-SmokeDaemonInfo $StorageRoot
-    $portOwners = @(Get-PortOwnerIds 5050)
-
-    if ($portOwners.Count -gt 0) {
+    $owners = @(Get-PortOwnerIds 5050)
+    if ($owners.Count -gt 0) {
         Write-Host "Port 5050 owners:" -ForegroundColor Yellow
-        $portOwners | ForEach-Object { Write-Host "  $(Get-ProcessDescription $_)" }
-    }
+        $owners | ForEach-Object { Write-Host "  $(Get-ProcessDescription $_)" }
 
-    $ownedPid = $null
-    if ($daemonInfo) {
-        $recordedRoot = [System.IO.Path]::GetFullPath("$($daemonInfo.storage_root)")
-        if ($recordedRoot -eq $StorageRoot -and $portOwners -contains [int]$daemonInfo.pid) {
-            $ownedPid = [int]$daemonInfo.pid
-            Write-Host "Stopping the managed smoke daemon PID $ownedPid..." -ForegroundColor Cyan
-
-            try {
-                $stopOutput = @(& $Tako daemon stop 2>&1)
-                $stopOutput | Set-Content -LiteralPath (Join-Path $RecoveryRoot "daemon-stop.log") -Encoding utf8
-            } catch {
-                $_.Exception.Message | Set-Content -LiteralPath (Join-Path $RecoveryRoot "daemon-stop.log") -Encoding utf8
+        foreach ($processId in $owners) {
+            if (Test-TakokitDaemonProcess $processId) {
+                Write-Host "Stopping orphaned Takokit daemon tree PID $processId..." -ForegroundColor Cyan
+                Stop-ProcessTree $processId
+                continue
             }
-
-            Start-Sleep -Milliseconds 750
-            if (Get-Process -Id $ownedPid -ErrorAction SilentlyContinue) {
-                Write-Host "Graceful stop did not finish; terminating the verified smoke daemon tree." -ForegroundColor Yellow
-                Stop-ProcessTree $ownedPid
+            if (-not $ForceForeignPortOwner) {
+                throw "Port 5050 is owned by an unverified process: $(Get-ProcessDescription $processId). Use -ForceForeignPortOwner only after reviewing it."
             }
-        }
-    }
-
-    Start-Sleep -Milliseconds 500
-    $remainingOwners = @(Get-PortOwnerIds 5050)
-    if ($remainingOwners.Count -gt 0) {
-        $foreign = @($remainingOwners | Where-Object { $_ -ne $ownedPid })
-        if ($foreign.Count -gt 0 -and -not $ForceForeignPortOwner) {
-            $descriptions = $foreign | ForEach-Object { Get-ProcessDescription $_ }
-            throw "Port 5050 is still owned by a process not proven to belong to this smoke storage: $($descriptions -join '; '). Rerun with -ForceForeignPortOwner only after reviewing it."
-        }
-        foreach ($processId in $remainingOwners) {
-            Write-Host "Terminating port owner $(Get-ProcessDescription $processId)" -ForegroundColor Yellow
+            Write-Host "Stopping explicitly approved foreign port owner PID $processId..." -ForegroundColor Yellow
             Stop-ProcessTree $processId
         }
     }
 
     Start-Sleep -Milliseconds 500
     if ((Get-PortOwnerIds 5050).Count -gt 0) {
-        throw "Port 5050 is still occupied after recovery."
+        throw "Port 5050 is still occupied after cleanup."
     }
 
-    $runtime = Join-Path $StorageRoot "runtime"
     foreach ($name in @("daemon.json", "daemon.pid")) {
-        $path = Join-Path $runtime $name
-        if (Test-Path -LiteralPath $path) {
-            Remove-Item -LiteralPath $path -Force
-        }
+        Remove-Item -LiteralPath (Join-Path $StorageRoot "runtime\$name") -Force -ErrorAction SilentlyContinue
     }
 
-    $incomplete = @(
+    $partial = @(
         Get-ChildItem -LiteralPath $StorageRoot -Recurse -Force -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.Name -match '\.part$' -or
@@ -164,7 +155,7 @@ try {
             } |
             Select-Object FullName, Length, LastWriteTime
     )
-    $incomplete | Export-Csv (Join-Path $RecoveryRoot "incomplete-paths.csv") -NoTypeInformation
+    $partial | Export-Csv (Join-Path $RecoveryRoot "incomplete-paths.csv") -NoTypeInformation
 
     $markers = @(
         Get-ChildItem -LiteralPath (Join-Path $StorageRoot "models") -Filter ".takokit-prefetch.json" -Recurse -File -ErrorAction SilentlyContinue |
@@ -174,35 +165,40 @@ try {
 
     $records = @(
         Get-ChildItem -LiteralPath (Join-Path $StorageRoot "manifests\installed-models") -Filter "*.toml" -File -ErrorAction SilentlyContinue |
-            Select-Object BaseName, FullName, Length, LastWriteTime
+            ForEach-Object {
+                $source = Get-Content -LiteralPath $_.FullName -Raw
+                [pscustomobject]@{
+                    model = $_.BaseName
+                    ready = $source -match '(?im)^\s*status\s*=\s*"ready"\s*$'
+                    path = $_.FullName
+                    modified = $_.LastWriteTime
+                }
+            }
     )
     $records | Export-Csv (Join-Path $RecoveryRoot "installed-records.csv") -NoTypeInformation
 
     Write-Host ""
     Write-Host "Recovered storage inventory" -ForegroundColor Cyan
-    Write-Host "Installed records: $($records.Count)"
+    Write-Host "Install records:   $($records.Count)"
+    Write-Host "Ready records:     $(@($records | Where-Object ready).Count)"
     Write-Host "Prefetch markers:  $($markers.Count)"
-    Write-Host "Partial paths kept: $($incomplete.Count)"
+    Write-Host "Partial paths kept: $($partial.Count)"
 
-    $listLog = Join-Path $RecoveryRoot "tako-list.log"
-    $listOutput = @(& $Tako list 2>&1)
-    $listExitCode = $LASTEXITCODE
-    $listOutput | Set-Content -LiteralPath $listLog -Encoding utf8
-    $listOutput | ForEach-Object { Write-Host $_ }
+    Write-Host ""
+    Write-Host "Ready model records" -ForegroundColor Cyan
+    @($records | Where-Object ready | Sort-Object model) | ForEach-Object { Write-Host "  $($_.model)" }
 
-    if ($listExitCode -ne 0 -or ($listOutput -join "`n") -match '(?im)^\s*(Failed after|Error:)') {
-        throw "tako list failed against the recovered smoke storage. See $listLog"
+    $listLog = Join-Path $RecoveryRoot "direct-list.log"
+    $listOutput = Invoke-TakoDirectList -LogPath $listLog
+    if (-not [string]::IsNullOrWhiteSpace($listOutput)) {
+        Write-Host ""
+        Write-Host "Direct CLI inventory" -ForegroundColor Cyan
+        Write-Host $listOutput
     }
 
     Write-Host ""
-    Write-Host "Storage recovery completed without deleting downloads." -ForegroundColor Green
-    Write-Host "Use this storage in the current shell:" -ForegroundColor Cyan
-    Write-Host '$env:TAKOKIT_HOME = $SmokeStorage'
-    Write-Host '& $Tako list'
+    Write-Host "Recovery completed. No download data was removed." -ForegroundColor Green
+    Write-Host "Future prefetch and smoke scripts use --direct and do not use port 5050." -ForegroundColor Green
 } finally {
-    try {
-        $env:TAKOKIT_HOME = $StorageRoot
-        $null = @(& $Tako daemon stop 2>&1)
-    } catch {}
     $env:TAKOKIT_HOME = $PreviousTakokitHome
 }
