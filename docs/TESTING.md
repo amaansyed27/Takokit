@@ -276,34 +276,72 @@ The suite must synthesize actual speech and use that speech for transcription. S
 
 ## 12. Complete model and voice-runtime pass
 
-Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md). With the prepared input folder at
-`$HOME\Downloads\takokit-smoke-inputs`, run the repository helper:
+Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md). Prepare the input folder at
+`$HOME\Downloads\takokit-smoke-inputs`, then perform Section 12 in two stages from the
+repository root. Both commands must use the same isolated storage directory.
+
+### 12A. Pull and verify every model first
 
 ```powershell
-.\scripts\run_takokit_all_smokes.ps1
+$SmokeStorage = "$env:TEMP\takokit-all-model-smoke"
+
+.\scripts\pull_takokit_all_models.ps1 `
+  -StorageRoot $SmokeStorage
 ```
 
-The helper uses isolated storage at `$env:TEMP\takokit-all-model-smoke`. The runner covers
-all 31 model IDs and displays the current model, phase, step count, elapsed time, latest
-child-install activity and exact log path. Results and progress are saved incrementally,
-including child adapter/download logs and free-space snapshots.
+The prefetch helper pulls models sequentially, verifies each model with `tako plan`, saves
+per-model logs under `$HOME\takokit-test-evidence`, and continues after an individual
+failure so the final report shows every model. It is safe to rerun: already verified
+artifacts are reused and failed or interrupted pulls are retried.
+
+On the primary RTX 5060 Laptop GPU machine, Qwen3-Omni is recorded as
+`blocked-hardware` and is not downloaded. Only on a workstation with suitable memory,
+run the prefetch with:
+
+```powershell
+.\scripts\pull_takokit_all_models.ps1 `
+  -StorageRoot $SmokeStorage `
+  -IncludeWorkstation
+```
+
+Do not delete or change `$SmokeStorage` after the pull completes.
+
+### 12B. Run all smoke tests from the prefetched cache
+
+```powershell
+.\scripts\run_takokit_all_smokes.ps1 `
+  -StorageRoot $SmokeStorage `
+  -SkipPull
+```
+
+If the workstation-only model was prefetched, include it in the smoke pass as well:
+
+```powershell
+.\scripts\run_takokit_all_smokes.ps1 `
+  -StorageRoot $SmokeStorage `
+  -SkipPull `
+  -IncludeWorkstation
+```
+
+The smoke runner covers all 31 model IDs and displays the current model, phase, step
+count, elapsed time, latest child-install activity and exact log path. Results and
+progress are saved incrementally, including child adapter/download logs and free-space
+snapshots.
 
 It records separate `passed`, `failed`, `skipped-dependency`, `blocked-input` and
-`blocked-hardware` states. A failed pull must skip dependent planning and inference
-instead of producing misleading cascade failures.
-
-Do not run multiple large GPU models concurrently. Qwen3-Omni requires workstation-class
-hardware and is expected to be `blocked-hardware` on the primary laptop. RVC is expected
-to be `blocked-input` unless a consent-backed checkpoint is supplied.
+`blocked-hardware` states. A model that failed during prefetch should fail its cached
+plan and skip dependent inference instead of producing misleading cascade failures.
+RVC is expected to be `blocked-input` unless a consent-backed checkpoint is supplied.
+Do not run multiple large GPU models concurrently.
 
 After preserving the evidence, preview and remove the isolated smoke storage with:
 
 ```powershell
 .\scripts\clear_takokit_smoke_storage.ps1 `
-  -StorageRoot "$env:TEMP\takokit-all-model-smoke"
+  -StorageRoot $SmokeStorage
 
 .\scripts\clear_takokit_smoke_storage.ps1 `
-  -StorageRoot "$env:TEMP\takokit-all-model-smoke" `
+  -StorageRoot $SmokeStorage `
   -Force
 ```
 
