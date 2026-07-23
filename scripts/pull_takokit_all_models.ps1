@@ -45,35 +45,238 @@ function Save-Results {
         Out-File (Join-Path $RunRoot "progress.json") -Encoding utf8
 }
 
+function Get-LastUsefulLine {
+    param([string[]]$Paths)
+
+    foreach ($path in $Paths) {
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            continue
+        }
+
+        $line = Get-Content -LiteralPath $path -Tail 30 -ErrorAction SilentlyContinue |
+            ForEach-Object { "$_" -split "`r" } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Last 1
+
+        if ($line) {
+            $line = "$line".Trim()
+            if ($line.Length -gt 150) {
+                $line = $line.Substring(0, 147) + "..."
+            }
+            return $line
+        }
+    }
+
+    return ""
+}
+
+function Get-ReportedPercent {
+    param([string[]]$Paths)
+
+    $matches = foreach ($path in $Paths) {
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            continue
+        }
+
+        Get-Content -LiteralPath $path -Tail 40 -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                foreach ($match in [regex]::Matches("$_", '(?<!\d)(\d{1,3}(?:\.\d+)?)\s*%')) {
+                    [double]$match.Groups[1].Value
+                }
+            }
+    }
+
+    if (@($matches).Count -eq 0) {
+        return $null
+    }
+
+    return [Math]::Max(0, [Math]::Min(100, [double]@($matches)[-1]))
+}
+
+function New-PulseBar {
+    param(
+        [long]$ElapsedMilliseconds,
+        [int]$Width = 28
+    )
+
+    $marker = "====>"
+    $travel = [Math]::Max(1, $Width - $marker.Length)
+    $cycle = $travel * 2
+    $step = [int]([Math]::Floor($ElapsedMilliseconds / 180) % $cycle)
+    $position = if ($step -gt $travel) { $cycle - $step } else { $step }
+    $chars = [char[]]("." * $Width)
+
+    for ($offset = 0; $offset -lt $marker.Length; $offset++) {
+        $chars[$position + $offset] = $marker[$offset]
+    }
+
+    return "[" + (-join $chars) + "]"
+}
+
+function Get-TakokitLiveLogPaths {
+    param([datetime]$Since)
+
+    if (-not $env:TAKOKIT_HOME) {
+        return @()
+    }
+
+    $patterns = @(
+        (Join-Path $env:TAKOKIT_HOME "logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log")
+    )
+
+    $files = foreach ($pattern in $patterns) {
+        Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -ge $Since.AddSeconds(-2) }
+    }
+
+    return @(
+        $files |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 5 -ExpandProperty FullName
+    )
+}
+
+function Write-ModelProgress {
+    param(
+        [string]$Model,
+        [string]$Phase,
+        [int]$ModelNumber,
+        [int]$ModelCount,
+        [System.Diagnostics.Stopwatch]$Watch,
+        [string[]]$OutputPaths,
+        [datetime]$StartedAt
+    )
+
+    $reportedPercent = Get-ReportedPercent $OutputPaths
+    $completedBefore = $ModelNumber - 1
+    $phaseFraction = if ($null -ne $reportedPercent) { $reportedPercent / 100.0 } else { 0.0 }
+    $overallPercent = [Math]::Min(
+        99,
+        [Math]::Floor((($completedBefore + $phaseFraction) / $ModelCount) * 100)
+    )
+
+    Write-Progress `
+        -Id 1 `
+        -Activity "Takokit all-model prefetch" `
+        -Status "[$ModelNumber/$ModelCount] $Model - $Phase" `
+        -PercentComplete $overallPercent
+
+    $liveLogs = @(Get-TakokitLiveLogPaths -Since $StartedAt)
+    $latest = Get-LastUsefulLine @($OutputPaths + $liveLogs)
+    $elapsed = "{0:hh\:mm\:ss}" -f $Watch.Elapsed
+
+    if ($null -ne $reportedPercent) {
+        $phasePercent = [Math]::Floor($reportedPercent)
+        $status = "$phasePercent% | elapsed $elapsed"
+        if ($latest) {
+            $status += " | $latest"
+        }
+
+        Write-Progress `
+            -Id 2 `
+            -ParentId 1 `
+            -Activity "$Phase $Model" `
+            -Status $status `
+            -PercentComplete $phasePercent
+    } else {
+        $pulse = New-PulseBar -ElapsedMilliseconds $Watch.ElapsedMilliseconds
+        $status = "$pulse elapsed $elapsed"
+        if ($latest) {
+            $status += " | $latest"
+        }
+
+        Write-Progress `
+            -Id 2 `
+            -ParentId 1 `
+            -Activity "$Phase $Model" `
+            -Status $status `
+            -PercentComplete -1
+    }
+}
+
 function Invoke-TakoCaptured {
     param(
         [string]$Executable,
         [string[]]$Arguments,
-        [string]$LogPath
+        [string]$LogPath,
+        [string]$Model,
+        [string]$Phase,
+        [int]$ModelNumber,
+        [int]$ModelCount
     )
 
     $started = Get-Date
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    $stdoutLog = "$LogPath.stdout.tmp"
+    $stderrLog = "$LogPath.stderr.tmp"
+    $process = $null
+    $exitCode = -1
+
+    Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+
     try {
-        $captured = @(& $Executable @Arguments 2>&1)
-        $exitCode = $LASTEXITCODE
+        $process = Start-Process `
+            -FilePath $Executable `
+            -ArgumentList $Arguments `
+            -WorkingDirectory (Get-Location).Path `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
+            -NoNewWindow `
+            -PassThru
+
+        while (-not $process.HasExited) {
+            Write-ModelProgress `
+                -Model $Model `
+                -Phase $Phase `
+                -ModelNumber $ModelNumber `
+                -ModelCount $ModelCount `
+                -Watch $watch `
+                -OutputPaths @($stderrLog, $stdoutLog) `
+                -StartedAt $started
+            Start-Sleep -Milliseconds 350
+            $process.Refresh()
+        }
+
+        $process.WaitForExit()
+        $process.Refresh()
+        $exitCode = [int]$process.ExitCode
     } catch {
-        $captured = @($_.Exception.Message)
+        $_.Exception.Message | Set-Content -LiteralPath $stderrLog -Encoding utf8
         $exitCode = -1
     } finally {
         $watch.Stop()
+        Write-Progress -Id 2 -ParentId 1 -Activity "$Phase $Model" -Completed
+
+        if ($process) {
+            try {
+                if (-not $process.HasExited) {
+                    $process.Kill()
+                }
+            } catch {}
+            $process.Dispose()
+        }
     }
 
-    $captured | Set-Content -LiteralPath $LogPath -Encoding utf8
-    foreach ($line in $captured) {
-        Write-Host "  $line"
+    "=== stdout ===" | Set-Content -LiteralPath $LogPath -Encoding utf8
+    if (Test-Path -LiteralPath $stdoutLog) {
+        Get-Content -LiteralPath $stdoutLog | Add-Content -LiteralPath $LogPath -Encoding utf8
     }
+    "=== stderr ===" | Add-Content -LiteralPath $LogPath -Encoding utf8
+    if (Test-Path -LiteralPath $stderrLog) {
+        Get-Content -LiteralPath $stderrLog | Add-Content -LiteralPath $LogPath -Encoding utf8
+    }
+    "[exit code: $exitCode]" | Add-Content -LiteralPath $LogPath -Encoding utf8
+
+    $detail = Get-LastUsefulLine @($stderrLog, $stdoutLog, $LogPath)
+    Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
 
     return [pscustomobject]@{
         exit_code   = [int]$exitCode
         duration_ms = [long]$watch.ElapsedMilliseconds
         started_at  = $started.ToString("o")
-        detail      = if ($captured.Count -gt 0) { "$($captured[-1])" } else { "" }
+        detail      = $detail
     }
 }
 
@@ -140,9 +343,22 @@ Write-Host "Storage:  $StorageRoot"
 Write-Host "Evidence: $RunRoot"
 Write-Host ""
 Write-Host "Already verified models are reused, so this script is safe to rerun." -ForegroundColor DarkGray
+Write-Host "Live progress and complete logs remain visible during long installs." -ForegroundColor DarkGray
 
 $PreviousTakokitHome = $env:TAKOKIT_HOME
+$PreviousProgressPreference = $ProgressPreference
+$ProgressPreference = "Continue"
+$PreviousProgressView = $null
+$ProgressViewChanged = $false
+$ProgressStyleVariable = Get-Variable -Name PSStyle -ErrorAction SilentlyContinue
+if ($ProgressStyleVariable) {
+    $PreviousProgressView = $PSStyle.Progress.View
+    $PSStyle.Progress.View = "Classic"
+    $ProgressViewChanged = $true
+}
+
 $env:TAKOKIT_HOME = $StorageRoot
+$RunComplete = $false
 
 try {
     for ($index = 0; $index -lt $Models.Count; $index++) {
@@ -151,6 +367,12 @@ try {
         $number = $index + 1
         Write-Host ""
         Write-Host "[$number/$($Models.Count)] $model" -ForegroundColor Cyan
+
+        Write-Progress `
+            -Id 1 `
+            -Activity "Takokit all-model prefetch" `
+            -Status "[$number/$($Models.Count)] $model" `
+            -PercentComplete ([Math]::Floor(($index / $Models.Count) * 100))
 
         if ($entry.WorkstationOnly -and -not $IncludeWorkstation) {
             Write-Host "  blocked-hardware: use -IncludeWorkstation only on suitable hardware." -ForegroundColor Yellow
@@ -169,10 +391,19 @@ try {
         $safeModel = $model -replace '[^a-zA-Z0-9._-]', '_'
         $pullLog = Join-Path $RunRoot "$safeModel-pull.log"
         Write-Host "  Pulling..."
-        $pull = Invoke-TakoCaptured $Tako @("pull", $model) $pullLog
+        Write-Host "  Log: $pullLog" -ForegroundColor DarkGray
+        $pull = Invoke-TakoCaptured `
+            -Executable $Tako `
+            -Arguments @("pull", $model) `
+            -LogPath $pullLog `
+            -Model $model `
+            -Phase "Pulling" `
+            -ModelNumber $number `
+            -ModelCount $Models.Count
 
         if ($pull.exit_code -ne 0) {
             Write-Host "  failed: pull exited with $($pull.exit_code)." -ForegroundColor Red
+            Write-Host "  $($pull.detail)" -ForegroundColor Red
             $Results.Add([pscustomobject]@{
                 model       = $model
                 status      = "failed"
@@ -187,15 +418,24 @@ try {
 
         $planLog = Join-Path $RunRoot "$safeModel-plan.log"
         Write-Host "  Verifying readiness..."
-        $plan = Invoke-TakoCaptured $Tako @("plan", $model, "--json") $planLog
+        $plan = Invoke-TakoCaptured `
+            -Executable $Tako `
+            -Arguments @("plan", $model, "--json") `
+            -LogPath $planLog `
+            -Model $model `
+            -Phase "Verifying readiness" `
+            -ModelNumber $number `
+            -ModelCount $Models.Count
         $duration = $pull.duration_ms + $plan.duration_ms
 
         if ($plan.exit_code -eq 0) {
-            Write-Host "  passed" -ForegroundColor Green
+            $elapsed = [TimeSpan]::FromMilliseconds($duration)
+            Write-Host ("  passed in {0:hh\:mm\:ss}" -f $elapsed) -ForegroundColor Green
             $status = "passed"
             $detail = "Pull and readiness plan succeeded."
         } else {
             Write-Host "  failed: readiness plan exited with $($plan.exit_code)." -ForegroundColor Red
+            Write-Host "  $($plan.detail)" -ForegroundColor Red
             $status = "failed"
             $detail = $plan.detail
         }
@@ -211,16 +451,32 @@ try {
         Save-Results $Results $RunRoot
     }
 
+    Write-Progress -Id 1 -Activity "Takokit all-model prefetch" -Status "Preparing installed model list" -PercentComplete 99
     Write-Host ""
     Write-Host "Installed model list" -ForegroundColor Cyan
     $installedLog = Join-Path $RunRoot "installed-models.log"
-    $installed = Invoke-TakoCaptured $Tako @("list") $installedLog
+    $installed = Invoke-TakoCaptured `
+        -Executable $Tako `
+        -Arguments @("list") `
+        -LogPath $installedLog `
+        -Model "catalog" `
+        -Phase "Listing installed models" `
+        -ModelNumber $Models.Count `
+        -ModelCount $Models.Count
     if ($installed.exit_code -ne 0) {
         Write-Warning "tako list failed; see $installedLog"
     }
+
+    $RunComplete = $true
 } finally {
+    Write-Progress -Id 2 -ParentId 1 -Activity "Takokit model operation" -Completed
+    Write-Progress -Id 1 -Activity "Takokit all-model prefetch" -Completed
     $env:TAKOKIT_HOME = $PreviousTakokitHome
-    Save-Results $Results $RunRoot -Complete $true
+    $ProgressPreference = $PreviousProgressPreference
+    if ($ProgressViewChanged) {
+        $PSStyle.Progress.View = $PreviousProgressView
+    }
+    Save-Results $Results $RunRoot -Complete $RunComplete
 }
 
 Write-Host ""
