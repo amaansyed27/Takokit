@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
+$script:ActiveProcess = $null
 
 function Resolve-ExistingFile {
     param([string]$Path, [string]$Label)
@@ -37,7 +38,7 @@ function Save-Results {
         [string]$FatalError = ""
     )
 
-    @($Results) | ConvertTo-Json -Depth 5 |
+    @($Results) | ConvertTo-Json -Depth 6 |
         Out-File (Join-Path $RunRoot "results.json") -Encoding utf8
     @($Results) | Export-Csv (Join-Path $RunRoot "results.csv") -NoTypeInformation
 
@@ -55,13 +56,106 @@ function Save-Results {
         Out-File (Join-Path $RunRoot "progress.json") -Encoding utf8
 }
 
+function Get-PortOwnerIds {
+    param([int]$Port)
+
+    return @(
+        Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique
+    )
+}
+
+function Get-ProcessDescription {
+    param([int]$ProcessId)
+
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    if (-not $process) { return "PID $ProcessId" }
+    return "PID $ProcessId ($($process.Name)) $($process.CommandLine)"
+}
+
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }
+
+    try {
+        if ($IsWindows -or $env:OS -eq "Windows_NT") {
+            & taskkill.exe /PID $ProcessId /T /F 2>&1 | Out-Null
+        } else {
+            Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    } catch {}
+}
+
+function Read-SmokeDaemonInfo {
+    param([string]$Root)
+
+    $path = Join-Path $Root "runtime\daemon.json"
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+
+    try {
+        return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        return $null
+    }
+}
+
+function Stop-SmokeDaemon {
+    param(
+        [string]$Root,
+        [string]$Executable,
+        [switch]$Quiet
+    )
+
+    $owners = @(Get-PortOwnerIds 5050)
+    if ($owners.Count -eq 0) {
+        foreach ($name in @("daemon.json", "daemon.pid")) {
+            Remove-Item -LiteralPath (Join-Path $Root "runtime\$name") -Force -ErrorAction SilentlyContinue
+        }
+        return
+    }
+
+    $info = Read-SmokeDaemonInfo $Root
+    if (-not $info) {
+        $details = $owners | ForEach-Object { Get-ProcessDescription $_ }
+        throw "Port 5050 is occupied, but this smoke storage has no verifiable daemon identity: $($details -join '; ')"
+    }
+
+    $recordedRoot = [System.IO.Path]::GetFullPath("$($info.storage_root)")
+    $daemonPid = [int]$info.pid
+    if ($recordedRoot -ne $Root -or $owners -notcontains $daemonPid) {
+        $details = $owners | ForEach-Object { Get-ProcessDescription $_ }
+        throw "Port 5050 is not owned by the daemon recorded for this smoke storage: $($details -join '; ')"
+    }
+
+    if (-not $Quiet) {
+        Write-Host "Stopping previous smoke daemon PID $daemonPid..." -ForegroundColor DarkGray
+    }
+
+    try {
+        $null = @(& $Executable daemon stop 2>&1)
+    } catch {}
+
+    Start-Sleep -Milliseconds 600
+    if (Get-Process -Id $daemonPid -ErrorAction SilentlyContinue) {
+        Stop-ProcessTree $daemonPid
+    }
+
+    Start-Sleep -Milliseconds 400
+    if ((Get-PortOwnerIds 5050).Count -gt 0) {
+        throw "The verified smoke daemon did not release port 5050."
+    }
+
+    foreach ($name in @("daemon.json", "daemon.pid")) {
+        Remove-Item -LiteralPath (Join-Path $Root "runtime\$name") -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-LastUsefulLine {
     param([string[]]$Paths)
 
     foreach ($path in $Paths) {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            continue
-        }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
 
         $line = Get-Content -LiteralPath $path -Tail 30 -ErrorAction SilentlyContinue |
             ForEach-Object { "$_" -split "`r" } |
@@ -70,13 +164,10 @@ function Get-LastUsefulLine {
 
         if ($line) {
             $line = "$line".Trim()
-            if ($line.Length -gt 160) {
-                $line = $line.Substring(0, 157) + "..."
-            }
+            if ($line.Length -gt 160) { $line = $line.Substring(0, 157) + "..." }
             return $line
         }
     }
-
     return ""
 }
 
@@ -116,7 +207,6 @@ function New-PulseBar {
     for ($offset = 0; $offset -lt $marker.Length; $offset++) {
         $chars[$position + $offset] = $marker[$offset]
     }
-
     return "[" + (-join $chars) + "]"
 }
 
@@ -130,39 +220,23 @@ function Write-ModelProgress {
         [datetime]$StartedAt
     )
 
-    $overallPercent = [Math]::Min(
-        99,
-        [Math]::Floor((($ModelNumber - 1) / $ModelCount) * 100)
-    )
+    $overallPercent = [Math]::Min(99, [Math]::Floor((($ModelNumber - 1) / $ModelCount) * 100))
+    Write-Progress -Id 1 -Activity "Takokit all-model prefetch" -Status "[$ModelNumber/$ModelCount] $Model - $Phase" -PercentComplete $overallPercent
 
-    Write-Progress `
-        -Id 1 `
-        -Activity "Takokit all-model prefetch" `
-        -Status "[$ModelNumber/$ModelCount] $Model - $Phase" `
-        -PercentComplete $overallPercent
-
-    $liveLogs = @(Get-TakokitLiveLogPaths -Since $StartedAt)
-    $latest = Get-LastUsefulLine $liveLogs
+    $latest = Get-LastUsefulLine @(Get-TakokitLiveLogPaths -Since $StartedAt)
     $elapsed = "{0:hh\:mm\:ss}" -f $Watch.Elapsed
     $status = "$(New-PulseBar -ElapsedMilliseconds $Watch.ElapsedMilliseconds) elapsed $elapsed"
     if ($latest) { $status += " | $latest" }
 
-    Write-Progress `
-        -Id 2 `
-        -ParentId 1 `
-        -Activity "$Phase $Model" `
-        -Status $status `
-        -PercentComplete -1
+    Write-Progress -Id 2 -ParentId 1 -Activity "$Phase $Model" -Status $status -PercentComplete -1
 }
 
 function Test-TakokitFailureText {
     param([string]$Text)
 
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
-
     return $Text -match '(?im)^\s*Failed after\b' -or
         $Text -match '(?im)^\s*Error:\s+' -or
-        $Text -match '(?i)port\s+5050\s+is\s+occupied' -or
         $Text -match '(?i)managed daemon will not take ownership'
 }
 
@@ -175,7 +249,8 @@ function Invoke-TakoLive {
         [string]$Phase,
         [int]$ModelNumber,
         [int]$ModelCount,
-        [switch]$RequireJson
+        [switch]$RequireJson,
+        [switch]$RequireExecutable
     )
 
     $started = Get-Date
@@ -184,12 +259,10 @@ function Invoke-TakoLive {
     $exitCode = -1
     $stdout = ""
     $stderr = ""
+    $json = $null
 
     try {
-        $argumentLine = (@($Arguments | ForEach-Object {
-            ConvertTo-ProcessArgument "$_"
-        })) -join ' '
-
+        $argumentLine = (@($Arguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
         $startInfo = New-Object System.Diagnostics.ProcessStartInfo
         $startInfo.FileName = $Executable
         $startInfo.Arguments = $argumentLine
@@ -201,39 +274,35 @@ function Invoke-TakoLive {
 
         $process = New-Object System.Diagnostics.Process
         $process.StartInfo = $startInfo
-
-        if (-not $process.Start()) {
-            throw "Failed to start Takokit process."
-        }
+        if (-not $process.Start()) { throw "Failed to start Takokit process." }
+        $script:ActiveProcess = $process
 
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
 
         while (-not $process.WaitForExit(500)) {
-            Write-ModelProgress `
-                -Model $Model `
-                -Phase $Phase `
-                -ModelNumber $ModelNumber `
-                -ModelCount $ModelCount `
-                -Watch $watch `
-                -StartedAt $started
+            Write-ModelProgress -Model $Model -Phase $Phase -ModelNumber $ModelNumber -ModelCount $ModelCount -Watch $watch -StartedAt $started
         }
 
         $process.WaitForExit()
         $stdoutTask.Wait()
         $stderrTask.Wait()
         $process.Refresh()
-
         $stdout = "$($stdoutTask.Result)"
         $stderr = "$($stderrTask.Result)"
         $exitCode = [int]$process.ExitCode
     } catch {
         $stderr = $_.Exception.Message
         $exitCode = -1
+        throw
     } finally {
         $watch.Stop()
         Write-Progress -Id 2 -ParentId 1 -Activity "$Phase $Model" -Completed
+        if ($process -and -not $process.HasExited) {
+            Stop-ProcessTree $process.Id
+        }
         if ($process) { $process.Dispose() }
+        $script:ActiveProcess = $null
     }
 
     $combined = @(
@@ -247,20 +316,23 @@ function Invoke-TakoLive {
     ) -join [Environment]::NewLine
 
     $semanticFailure = Test-TakokitFailureText $combined
-    $jsonFailure = $false
-
+    $validationFailure = $false
     if ($RequireJson -and -not $semanticFailure -and $exitCode -eq 0) {
         try {
-            $null = $stdout | ConvertFrom-Json -ErrorAction Stop
+            $json = $stdout | ConvertFrom-Json -ErrorAction Stop
+            if ($RequireExecutable -and $json.executable -ne $true) {
+                $validationFailure = $true
+                $combined += [Environment]::NewLine + "[validation error: plan is not executable]"
+            }
         } catch {
-            $jsonFailure = $true
+            $validationFailure = $true
             $combined += [Environment]::NewLine + "[validation error: expected valid JSON output]"
         }
     }
 
     $effectiveExitCode = if ($exitCode -ne 0) {
         $exitCode
-    } elseif ($semanticFailure -or $jsonFailure) {
+    } elseif ($semanticFailure -or $validationFailure) {
         1
     } else {
         0
@@ -271,8 +343,8 @@ function Invoke-TakoLive {
 
     $detail = if ($semanticFailure) {
         "Takokit emitted failure output despite reporting exit code $exitCode."
-    } elseif ($jsonFailure) {
-        "Takokit did not return valid JSON."
+    } elseif ($validationFailure) {
+        "Takokit readiness validation failed."
     } elseif (-not [string]::IsNullOrWhiteSpace($stderr)) {
         ($stderr -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
     } elseif (-not [string]::IsNullOrWhiteSpace($stdout)) {
@@ -287,30 +359,21 @@ function Invoke-TakoLive {
         duration_ms        = [long]$watch.ElapsedMilliseconds
         stdout             = $stdout
         stderr             = $stderr
+        json               = $json
         detail             = "$detail"
     }
 }
 
-function Assert-PortAvailable {
-    param([int]$Port)
+function Test-ReadyInstallRecord {
+    param([string]$Root, [string]$Model)
 
-    $listeners = @(
-        Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-    )
+    $record = Join-Path $Root "manifests\installed-models\$Model.toml"
+    $manifest = Join-Path $Root "manifests\models\$Model.toml"
+    if (-not (Test-Path -LiteralPath $record -PathType Leaf)) { return $false }
+    if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) { return $false }
 
-    if ($listeners.Count -eq 0) { return }
-
-    $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)
-    $details = foreach ($processId in $owners) {
-        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        if ($process) {
-            "PID $processId ($($process.ProcessName))"
-        } else {
-            "PID $processId"
-        }
-    }
-
-    throw "Port $Port is already occupied by $($details -join ', '). Stop that process before starting the isolated prefetch run."
+    $source = Get-Content -LiteralPath $record -Raw
+    return $source -match '(?im)^\s*status\s*=\s*"ready"\s*$'
 }
 
 $Models = @(
@@ -348,12 +411,8 @@ $Models = @(
 )
 
 $Tako = Resolve-ExistingFile $Tako "Takokit executable"
-$StorageRoot = [System.IO.Path]::GetFullPath(
-    [Environment]::ExpandEnvironmentVariables($StorageRoot)
-)
-$EvidenceRoot = [System.IO.Path]::GetFullPath(
-    [Environment]::ExpandEnvironmentVariables($EvidenceRoot)
-)
+$StorageRoot = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($StorageRoot))
+$EvidenceRoot = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($EvidenceRoot))
 New-Item -ItemType Directory -Force $StorageRoot, $EvidenceRoot | Out-Null
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -377,24 +436,23 @@ Write-Host "Models:   $($Models.Count)"
 Write-Host "Storage:  $StorageRoot"
 Write-Host "Evidence: $RunRoot"
 Write-Host ""
-Write-Host "The run fails closed on daemon conflicts and invalid Takokit output." -ForegroundColor DarkGray
-Write-Host "Already verified models are reused when the same storage root is valid." -ForegroundColor DarkGray
+Write-Host "Interrupted downloads remain cached and are resumed, but never marked ready without a completed prefetch marker and ready install record." -ForegroundColor DarkGray
+Write-Host "Ctrl+C terminates the active command and the verified smoke daemon tree." -ForegroundColor DarkGray
 
 $PreviousTakokitHome = $env:TAKOKIT_HOME
 $PreviousProgressPreference = $ProgressPreference
-$ProgressPreference = "Continue"
 $PreviousProgressView = $null
 $ProgressViewChanged = $false
-$ProgressStyleVariable = Get-Variable -Name PSStyle -ErrorAction SilentlyContinue
-if ($ProgressStyleVariable) {
+$ProgressPreference = "Continue"
+if (Get-Variable -Name PSStyle -ErrorAction SilentlyContinue) {
     $PreviousProgressView = $PSStyle.Progress.View
     $PSStyle.Progress.View = "Classic"
     $ProgressViewChanged = $true
 }
 
 try {
-    Assert-PortAvailable -Port 5050
     $env:TAKOKIT_HOME = $StorageRoot
+    Stop-SmokeDaemon -Root $StorageRoot -Executable $Tako -Quiet
 
     for ($index = 0; $index -lt $Models.Count; $index++) {
         $entry = $Models[$index]
@@ -407,12 +465,8 @@ try {
         if ($entry.WorkstationOnly -and -not $IncludeWorkstation) {
             Write-Host "  blocked-hardware: use -IncludeWorkstation only on suitable hardware." -ForegroundColor Yellow
             $Results.Add([pscustomobject]@{
-                model       = $model
-                status      = "blocked-hardware"
-                duration_ms = 0
-                pull_log    = ""
-                plan_log    = ""
-                detail      = "Workstation-only model omitted on the primary 8 GB test machine."
+                model = $model; status = "blocked-hardware"; duration_ms = 0
+                pull_log = ""; plan_log = ""; detail = "Workstation-only model omitted on this machine."
             }) | Out-Null
             Save-Results $Results $RunRoot
             continue
@@ -423,25 +477,13 @@ try {
         Write-Host "  Pulling..."
         Write-Host "  Log: $pullLog" -ForegroundColor DarkGray
 
-        $pull = Invoke-TakoLive `
-            -Executable $Tako `
-            -Arguments @("pull", $model) `
-            -LogPath $pullLog `
-            -Model $model `
-            -Phase "Pulling" `
-            -ModelNumber $number `
-            -ModelCount $Models.Count
-
+        $pull = Invoke-TakoLive -Executable $Tako -Arguments @("pull", $model) -LogPath $pullLog -Model $model -Phase "Pulling" -ModelNumber $number -ModelCount $Models.Count
         if ($pull.exit_code -ne 0) {
             Write-Host "  failed: pull did not complete." -ForegroundColor Red
             Write-Host "  $($pull.detail)" -ForegroundColor Red
             $Results.Add([pscustomobject]@{
-                model       = $model
-                status      = "failed"
-                duration_ms = $pull.duration_ms
-                pull_log    = $pullLog
-                plan_log    = ""
-                detail      = $pull.detail
+                model = $model; status = "failed"; duration_ms = $pull.duration_ms
+                pull_log = $pullLog; plan_log = ""; detail = $pull.detail
             }) | Out-Null
             Save-Results $Results $RunRoot
             continue
@@ -449,61 +491,43 @@ try {
 
         $planLog = Join-Path $RunRoot "$safeModel-plan.log"
         Write-Host "  Verifying readiness..."
-
-        $plan = Invoke-TakoLive `
-            -Executable $Tako `
-            -Arguments @("plan", $model, "--json") `
-            -LogPath $planLog `
-            -Model $model `
-            -Phase "Verifying readiness" `
-            -ModelNumber $number `
-            -ModelCount $Models.Count `
-            -RequireJson
-
+        $plan = Invoke-TakoLive -Executable $Tako -Arguments @("plan", $model, "--json") -LogPath $planLog -Model $model -Phase "Verifying readiness" -ModelNumber $number -ModelCount $Models.Count -RequireJson -RequireExecutable
         $duration = $pull.duration_ms + $plan.duration_ms
-        if ($plan.exit_code -eq 0) {
+
+        if ($plan.exit_code -eq 0 -and (Test-ReadyInstallRecord -Root $StorageRoot -Model $model)) {
             $elapsed = [TimeSpan]::FromMilliseconds($duration)
             Write-Host ("  passed in {0:hh\:mm\:ss}" -f $elapsed) -ForegroundColor Green
             $status = "passed"
-            $detail = "Pull and readiness plan succeeded."
+            $detail = "Pull, executable plan and ready install record verified."
         } else {
-            Write-Host "  failed: readiness verification did not complete." -ForegroundColor Red
-            Write-Host "  $($plan.detail)" -ForegroundColor Red
+            Write-Host "  failed: no trustworthy ready installation was produced." -ForegroundColor Red
             $status = "failed"
-            $detail = $plan.detail
+            $detail = if ($plan.exit_code -ne 0) { $plan.detail } else { "Ready model record or manifest is missing." }
         }
 
         $Results.Add([pscustomobject]@{
-            model       = $model
-            status      = $status
-            duration_ms = $duration
-            pull_log    = $pullLog
-            plan_log    = $planLog
-            detail      = $detail
+            model = $model; status = $status; duration_ms = $duration
+            pull_log = $pullLog; plan_log = $planLog; detail = $detail
         }) | Out-Null
         Save-Results $Results $RunRoot
     }
 
-    Write-Progress -Id 1 -Activity "Takokit all-model prefetch" -Status "Listing installed models" -PercentComplete 99
     Write-Host ""
-    Write-Host "Installed model list" -ForegroundColor Cyan
-
+    Write-Host "Installed model list from smoke storage" -ForegroundColor Cyan
     $installedLog = Join-Path $RunRoot "installed-models.log"
-    $installed = Invoke-TakoLive `
-        -Executable $Tako `
-        -Arguments @("list") `
-        -LogPath $installedLog `
-        -Model "catalog" `
-        -Phase "Listing installed models" `
-        -ModelNumber $Models.Count `
-        -ModelCount $Models.Count
+    $installed = Invoke-TakoLive -Executable $Tako -Arguments @("list") -LogPath $installedLog -Model "catalog" -Phase "Listing installed models" -ModelNumber $Models.Count -ModelCount $Models.Count
+    if ($installed.exit_code -ne 0) { throw "tako list failed after prefetch. See $installedLog" }
 
-    if ($installed.exit_code -ne 0) {
-        throw "tako list failed after prefetch. See $installedLog"
-    }
+    if (-not [string]::IsNullOrWhiteSpace($installed.stdout)) { Write-Host $installed.stdout }
 
-    if (-not [string]::IsNullOrWhiteSpace($installed.stdout)) {
-        Write-Host $installed.stdout
+    $missingFromList = @(
+        $Results |
+            Where-Object { $_.status -eq "passed" } |
+            Where-Object { $installed.stdout -notmatch "(?m)(^|\s)$([regex]::Escape($_.model))(\s|$)" } |
+            Select-Object -ExpandProperty model
+    )
+    if ($missingFromList.Count -gt 0) {
+        throw "Models passed internal checks but are absent from tako list: $($missingFromList -join ', ')"
     }
 
     $RunComplete = $true
@@ -511,15 +535,24 @@ try {
     $FatalError = $_.Exception.Message
     Write-Host ""
     Write-Host "Prefetch aborted: $FatalError" -ForegroundColor Red
-    Write-Host "Evidence: $RunRoot" -ForegroundColor DarkGray
+    Write-Host "No model/cache directories were deleted. Evidence: $RunRoot" -ForegroundColor DarkGray
 } finally {
+    if ($script:ActiveProcess -and -not $script:ActiveProcess.HasExited) {
+        Stop-ProcessTree $script:ActiveProcess.Id
+    }
+    try {
+        $env:TAKOKIT_HOME = $StorageRoot
+        Stop-SmokeDaemon -Root $StorageRoot -Executable $Tako -Quiet
+    } catch {
+        if (-not $FatalError) { $FatalError = $_.Exception.Message }
+        Write-Warning $_.Exception.Message
+    }
+
     Write-Progress -Id 2 -ParentId 1 -Activity "Takokit model operation" -Completed
     Write-Progress -Id 1 -Activity "Takokit all-model prefetch" -Completed
     $env:TAKOKIT_HOME = $PreviousTakokitHome
     $ProgressPreference = $PreviousProgressPreference
-    if ($ProgressViewChanged) {
-        $PSStyle.Progress.View = $PreviousProgressView
-    }
+    if ($ProgressViewChanged) { $PSStyle.Progress.View = $PreviousProgressView }
     Save-Results $Results $RunRoot -Complete $RunComplete -FatalError $FatalError
 }
 
@@ -529,9 +562,6 @@ Write-Host ""
 }) | Format-Table -AutoSize
 Write-Host "Evidence: $RunRoot"
 
-if ($FatalError -or $Results.status -contains "failed") {
-    exit 1
-}
-
-Write-Host "Next: .\scripts\run_takokit_all_smokes.ps1 -SkipPull" -ForegroundColor Cyan
+if ($FatalError -or $Results.status -contains "failed") { exit 1 }
+Write-Host "Next: .\scripts\run_takokit_all_smokes.ps1 -StorageRoot `"$StorageRoot`" -SkipPull" -ForegroundColor Cyan
 exit 0
