@@ -71,18 +71,19 @@ pub(crate) fn prefetch_python_adapter_model(
         adapter: adapter.to_string(),
         adapter_script_sha256: sha256_file(&script)?,
     };
-    if std::fs::read(&marker_path)
+    let previously_marked = std::fs::read(&marker_path)
         .ok()
         .and_then(|source| serde_json::from_slice::<ModelPrefetchMarker>(&source).ok())
-        .is_some_and(|marker| marker == expected)
-    {
-        return Ok(Some(format!(
-            "Verified managed checkpoint prefetch marker at {}.",
-            marker_path.display()
-        )));
-    }
+        .is_some_and(|marker| marker == expected);
 
     std::fs::create_dir_all(&model_dir)?;
+
+    // A marker is only a record of a previous successful prefetch. It is not
+    // proof that an external cache still contains every checkpoint byte. Make
+    // the model non-reusable while the adapter revalidates/resumes its cache,
+    // then publish a fresh marker atomically after a successful response.
+    remove_file_if_exists(&marker_path)?;
+
     let cache_dir = takokit_root.join("cache");
     let hf_cache = cache_dir.join("huggingface");
     let torch_cache = cache_dir.join("torch");
@@ -179,11 +180,44 @@ pub(crate) fn prefetch_python_adapter_model(
         });
     }
 
-    std::fs::write(&marker_path, serde_json::to_vec_pretty(&expected)?)?;
+    write_marker_atomic(&marker_path, &expected)?;
     Ok(Some(response.detail.unwrap_or_else(|| {
         format!(
-            "Managed checkpoint prefetch completed; marker: {}",
+            "{} managed checkpoint prefetch; marker: {}",
+            if previously_marked {
+                "Revalidated"
+            } else {
+                "Completed"
+            },
             marker_path.display()
         )
     })))
+}
+
+fn write_marker_atomic(path: &Path, marker: &ModelPrefetchMarker) -> PackageResult<()> {
+    let temporary = path.with_extension(format!(
+        "json.tmp-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::write(&temporary, serde_json::to_vec_pretty(marker)?)?;
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    std::fs::rename(&temporary, path).map_err(|error| {
+        let _ = std::fs::remove_file(&temporary);
+        PackageError::Io(error)
+    })?;
+    Ok(())
+}
+
+fn remove_file_if_exists(path: &Path) -> PackageResult<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(PackageError::Io(error)),
+    }
 }
