@@ -4,7 +4,8 @@ param(
     [string]$StorageRoot = (Join-Path $env:TEMP "takokit-all-model-smoke"),
     [string]$RvcTarget = "",
     [switch]$PullOnly,
-    [switch]$SkipPull
+    [switch]$SkipPull,
+    [switch]$IncludeWorkstation
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,6 +60,9 @@ if ($PullOnly) {
 if ($SkipPull) {
     $Arguments.SkipPull = $true
 }
+if ($IncludeWorkstation) {
+    $Arguments.IncludeWorkstation = $true
+}
 if ($RvcTarget) {
     if (-not (Test-Path -LiteralPath $RvcTarget)) {
         throw "RVC target does not exist: $RvcTarget"
@@ -80,6 +84,11 @@ if ($PullOnly) {
     Write-Host "Mode:             cached plan and inference tests only" -ForegroundColor Cyan
 } else {
     Write-Host "Mode:             interleaved pull and inference" -ForegroundColor Cyan
+}
+if ($IncludeWorkstation) {
+    Write-Host "Workstation:      included" -ForegroundColor Yellow
+} else {
+    Write-Host "Workstation:      skipped as blocked-hardware"
 }
 if (-not $RvcTarget) {
     Write-Host "RVC:              skipped as blocked-input"
