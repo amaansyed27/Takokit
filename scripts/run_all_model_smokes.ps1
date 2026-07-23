@@ -17,98 +17,97 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
+$script:ActiveProcess = $null
 
 function Resolve-ExistingPath {
     param([string]$Path, [string]$Label)
-    if (-not $Path) {
-        throw "$Label was not provided."
-    }
-    if (-not (Test-Path -LiteralPath $Path)) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) {
         throw "$Label does not exist: $Path"
     }
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
-function Save-StorageSnapshot {
-    param([string]$Label)
+function ConvertTo-ProcessArgument {
+    param([AllowEmptyString()][string]$Value)
+    if ($Value.Length -eq 0) { return '""' }
+    if ($Value -notmatch '[\s"]') { return $Value }
+    $escaped = $Value -replace '(\\*)"', '$1$1\"'
+    $escaped = $escaped -replace '(\\+)$', '$1$1'
+    return '"' + $escaped + '"'
+}
 
-    $rows = foreach ($path in @($env:TAKOKIT_HOME, $script:RunRoot)) {
-        if (-not $path) { continue }
-        $root = [System.IO.Path]::GetPathRoot($path)
-        if (-not $root) { continue }
-        $driveName = $root.TrimEnd([char[]]"\\/").TrimEnd(":")
-        $drive = Get-PSDrive -Name $driveName -PSProvider FileSystem -ErrorAction SilentlyContinue
-        if ($drive) {
-            [pscustomobject]@{
-                captured_at = (Get-Date).ToString("o")
-                label       = $Label
-                path        = $path
-                drive       = $drive.Name
-                free_bytes  = [long]$drive.Free
-                used_bytes  = [long]$drive.Used
-            }
-        }
-    }
-    if (@($rows).Count -gt 0) {
-        $storageCsv = Join-Path $script:RunRoot "storage.csv"
-        @($rows) | Export-Csv $storageCsv -NoTypeInformation -Append
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }
+    if ($env:OS -eq "Windows_NT") {
+        & taskkill.exe /PID $ProcessId /T /F 2>&1 | Out-Null
+    } else {
+        Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
     }
 }
 
-function Copy-TakokitDiagnostics {
-    if (-not $env:TAKOKIT_HOME -or -not (Test-Path -LiteralPath $env:TAKOKIT_HOME)) {
-        return
+function Get-LastUsefulLine {
+    param([string[]]$Paths)
+    foreach ($path in $Paths) {
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
+        $line = Get-Content -LiteralPath $path -Tail 30 -ErrorAction SilentlyContinue |
+            ForEach-Object { "$_" -split "`r" } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Last 1
+        if ($line) {
+            $line = "$line".Trim()
+            if ($line.Length -gt 180) { $line = $line.Substring(0, 177) + "..." }
+            return $line
+        }
     }
+    return ""
+}
 
-    $destination = Join-Path $script:RunRoot "takokit-logs"
-    New-Item -ItemType Directory -Force $destination | Out-Null
-    $groups = @(
-        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "logs\*.log"); Prefix = "core" },
-        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"); Prefix = "runner" },
-        @{ Pattern = (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log"); Prefix = "adapter" }
+function Get-TakokitLogPaths {
+    param([datetime]$Since)
+    if (-not $env:TAKOKIT_HOME) { return @() }
+    $patterns = @(
+        (Join-Path $env:TAKOKIT_HOME "logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"),
+        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log")
     )
+    return @(
+        foreach ($pattern in $patterns) {
+            Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.LastWriteTime -ge $Since.AddSeconds(-2) }
+        } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 6 -ExpandProperty FullName
+    )
+}
 
-    foreach ($group in $groups) {
-        Get-ChildItem -Path $group.Pattern -File -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                $parent = Split-Path $_.DirectoryName -Leaf
-                $name = "$($group.Prefix)-$parent-$($_.Name)" -replace '[^a-zA-Z0-9._-]', '_'
-                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destination $name) -Force -ErrorAction SilentlyContinue
-            }
-    }
+function Test-FailureText {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    return $Text -match '(?im)^\s*Failed after\b' -or
+        $Text -match '(?im)^\s*Error:\s+' -or
+        $Text -match '(?im)^\s*thread .* panicked'
 }
 
 function Save-Reports {
     param([bool]$Complete = $false, [string]$FatalError = "")
-    if (-not $script:RunRoot -or -not $script:Results) { return }
+    if (-not $script:RunRoot) { return }
 
-    $resultsJson = Join-Path $script:RunRoot "results.json"
-    $resultsCsv = Join-Path $script:RunRoot "results.csv"
-    $summaryJson = Join-Path $script:RunRoot "summary.json"
-    $failuresCsv = Join-Path $script:RunRoot "failures.csv"
-
-    @($script:Results) | ConvertTo-Json -Depth 5 | Out-File $resultsJson -Encoding utf8
-    @($script:Results) | Export-Csv $resultsCsv -NoTypeInformation
-
-    $summary = @($script:Results | Group-Object status | Sort-Object Name | ForEach-Object {
+    @($script:Results) | ConvertTo-Json -Depth 6 | Out-File (Join-Path $script:RunRoot "results.json") -Encoding utf8
+    @($script:Results) | Export-Csv (Join-Path $script:RunRoot "results.csv") -NoTypeInformation
+    @($script:Results | Group-Object status | Sort-Object Name | ForEach-Object {
         [pscustomobject]@{ status = $_.Name; count = $_.Count }
-    })
-    $summary | ConvertTo-Json | Out-File $summaryJson -Encoding utf8
-
-    $failures = @($script:Results | Where-Object { $_.status -eq "failed" })
-    if ($failures.Count -gt 0) {
-        $failures | Export-Csv $failuresCsv -NoTypeInformation
-    }
-
+    }) | ConvertTo-Json | Out-File (Join-Path $script:RunRoot "summary.json") -Encoding utf8
+    @($script:Results | Where-Object status -eq "failed") |
+        Export-Csv (Join-Path $script:RunRoot "failures.csv") -NoTypeInformation
     [pscustomobject]@{
-        state           = if ($Complete) { "complete" } else { "in-progress" }
+        state = if ($Complete) { "complete" } else { "in-progress" }
         completed_steps = $script:CompletedSteps
-        total_steps     = $script:TotalSteps
-        current_model   = $script:CurrentModel
-        current_phase   = $script:CurrentPhase
-        started_at      = $script:RunStartedAt.ToString("o")
-        updated_at      = (Get-Date).ToString("o")
-        fatal_error     = $FatalError
+        total_steps = $script:TotalSteps
+        current_model = $script:CurrentModel
+        current_phase = $script:CurrentPhase
+        updated_at = (Get-Date).ToString("o")
+        fatal_error = $FatalError
     } | ConvertTo-Json | Out-File (Join-Path $script:RunRoot "progress.json") -Encoding utf8
 }
 
@@ -122,24 +121,14 @@ function Add-Result {
         [string]$Detail
     )
     $script:Results.Add([pscustomobject]@{
-        model       = $Model
-        phase       = $Phase
-        status      = $Status
+        model = $Model
+        phase = $Phase
+        status = $Status
         duration_ms = $DurationMs
-        log         = $Log
-        detail      = $Detail
+        log = $Log
+        detail = $Detail
     }) | Out-Null
     Save-Reports
-}
-
-function ConvertTo-ProcessArgument {
-    param([AllowEmptyString()][string]$Value)
-    if ($Value.Length -eq 0) { return '""' }
-    if ($Value -notmatch '[\s"]') { return $Value }
-
-    $escaped = $Value -replace '(\\*)"', '$1$1\"'
-    $escaped = $escaped -replace '(\\+)$', '$1$1'
-    return '"' + $escaped + '"'
 }
 
 function Write-StepProgress {
@@ -152,162 +141,136 @@ function Write-StepProgress {
     Write-Progress -Id 1 -Activity "Takokit all-model smoke tests" -Status $status -PercentComplete $percent
 }
 
-function Start-Step {
-    param([string]$Model, [string]$Phase, [string]$Log = "")
-    $script:CurrentModel = $Model
-    $script:CurrentPhase = $Phase
-    $step = [Math]::Min($script:CompletedSteps + 1, $script:TotalSteps)
-    Write-Host ""
-    Write-Host "[$step/$($script:TotalSteps)] $Model :: $Phase" -ForegroundColor Cyan
-    if ($Log) { Write-Host "Log: $Log" -ForegroundColor DarkGray }
-    Write-StepProgress "starting"
-    Save-Reports
-}
-
 function Complete-Step {
-    param([string]$Status, [long]$DurationMs = 0)
+    param([string]$Status, [long]$DurationMs)
     $script:CompletedSteps++
     $elapsed = [TimeSpan]::FromMilliseconds($DurationMs)
-    $duration = if ($DurationMs -lt 1000) {
-        "${DurationMs}ms"
-    } elseif ($elapsed.TotalHours -ge 1) {
-        "{0:h\h\ mm\m\ ss\s}" -f $elapsed
-    } else {
-        "{0:m\m\ ss\s}" -f $elapsed
-    }
-    $color = switch ($Status) {
-        "passed" { "Green" }
-        "failed" { "Red" }
-        default { "Yellow" }
-    }
+    $duration = if ($DurationMs -lt 1000) { "${DurationMs}ms" } else { "{0:hh\:mm\:ss}" -f $elapsed }
+    $color = if ($Status -eq "passed") { "Green" } elseif ($Status -eq "failed") { "Red" } else { "Yellow" }
     Write-Host "Result: $Status ($duration)" -ForegroundColor $color
-    Write-StepProgress "$Status"
+    Write-StepProgress $Status
     Save-Reports
 }
 
-function Get-LastUsefulLine {
-    param([string[]]$Paths)
-    foreach ($path in $Paths) {
-        if (-not (Test-Path -LiteralPath $path)) { continue }
-        $line = Get-Content -LiteralPath $path -Tail 20 -ErrorAction SilentlyContinue |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Select-Object -Last 1
-        if ($line) {
-            $line = "$line".Trim()
-            if ($line.Length -gt 180) { $line = $line.Substring(0, 177) + "..." }
-            return $line
-        }
-    }
-    return ""
-}
-
-function Get-TakokitLiveLogPaths {
-    param([datetime]$Since)
-
-    if (-not $env:TAKOKIT_HOME) { return @() }
-    $patterns = @(
-        (Join-Path $env:TAKOKIT_HOME "logs\*.log"),
-        (Join-Path $env:TAKOKIT_HOME "runners\*\logs\*.log"),
-        (Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\*\*.log")
-    )
-    $files = foreach ($pattern in $patterns) {
-        Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.LastWriteTime -ge $Since.AddSeconds(-2) }
-    }
-    return @(
-        $files |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 5 -ExpandProperty FullName
-    )
-}
-
-function Invoke-Tako {
+function Invoke-TakoDirect {
     param(
         [string]$Model,
         [string]$Phase,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [switch]$RequireExecutablePlan
     )
+
+    $script:CurrentModel = $Model
+    $script:CurrentPhase = $Phase
     $safeModel = $Model -replace '[^a-zA-Z0-9._-]', '_'
     $safePhase = $Phase -replace '[^a-zA-Z0-9._-]', '_'
-    $log = Join-Path $RunRoot "$safeModel-$safePhase.log"
-    $stdoutLog = Join-Path $RunRoot "$safeModel-$safePhase.stdout.tmp"
-    $stderrLog = Join-Path $RunRoot "$safeModel-$safePhase.stderr.tmp"
-    Start-Step $Model $Phase $log
-    $stepStartedAt = Get-Date
+    $log = Join-Path $script:RunRoot "$safeModel-$safePhase.log"
+    Write-Host ""
+    Write-Host "[$([Math]::Min($script:CompletedSteps + 1, $script:TotalSteps))/$($script:TotalSteps)] $Model :: $Phase" -ForegroundColor Cyan
+    Write-Host "Log: $log" -ForegroundColor DarkGray
+    Write-StepProgress "starting"
+
+    $allArguments = @("--direct") + $Arguments
+    $argumentLine = (@($allArguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $Tako
+    $startInfo.Arguments = $argumentLine
+    $startInfo.WorkingDirectory = (Get-Location).Path
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    $startedAt = Get-Date
+    $reportedExitCode = -1
+    $stdout = ""
+    $stderr = ""
+    $json = $null
 
     try {
-        $argumentLine = (@($Arguments | ForEach-Object { ConvertTo-ProcessArgument "$_" })) -join ' '
-        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $startInfo.FileName = $Tako
-        $startInfo.Arguments = $argumentLine
-        $startInfo.WorkingDirectory = (Get-Location).Path
-        $startInfo.UseShellExecute = $false
-        $startInfo.CreateNoWindow = $true
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-
-        $process = New-Object System.Diagnostics.Process
-        $process.StartInfo = $startInfo
-        if (-not $process.Start()) {
-            throw "Failed to start Takokit process."
-        }
+        if (-not $process.Start()) { throw "Failed to start Takokit process." }
+        $script:ActiveProcess = $process
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
 
         while (-not $process.WaitForExit(750)) {
-            $liveLogs = @(Get-TakokitLiveLogPaths -Since $stepStartedAt)
-            $tail = Get-LastUsefulLine $liveLogs
+            $tail = Get-LastUsefulLine @(Get-TakokitLogPaths -Since $startedAt)
             $status = "elapsed {0:hh\:mm\:ss}" -f $watch.Elapsed
             if ($tail) { $status += " | $tail" }
             Write-StepProgress $status
         }
+
         $process.WaitForExit()
         $stdoutTask.Wait()
         $stderrTask.Wait()
-        $stdoutTask.Result | Set-Content -LiteralPath $stdoutLog -Encoding utf8
-        $stderrTask.Result | Set-Content -LiteralPath $stderrLog -Encoding utf8
         $process.Refresh()
-        $exitCode = [int]$process.ExitCode
-        "[smoke-wrapper exit code: $exitCode]" |
-            Add-Content -LiteralPath $stderrLog -Encoding utf8
-    } catch {
-        $exitCode = -1
-        $_.Exception.Message | Out-File $stderrLog -Append -Encoding utf8
+        $stdout = "$($stdoutTask.Result)"
+        $stderr = "$($stderrTask.Result)"
+        $reportedExitCode = [int]$process.ExitCode
     } finally {
         $watch.Stop()
-        if ($process) { $process.Dispose() }
+        if ($process -and -not $process.HasExited) { Stop-ProcessTree $process.Id }
+        $script:ActiveProcess = $null
+        $process.Dispose()
     }
 
-    $captured = @()
-    if (Test-Path -LiteralPath $stdoutLog) { $captured += Get-Content -LiteralPath $stdoutLog }
-    if (Test-Path -LiteralPath $stderrLog) { $captured += Get-Content -LiteralPath $stderrLog }
-    $captured | Out-File -LiteralPath $log -Encoding utf8
-    Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+    $combined = @(
+        "=== command ===",
+        "$Tako $($allArguments -join ' ')",
+        "=== stdout ===",
+        $stdout,
+        "=== stderr ===",
+        $stderr,
+        "[reported exit code: $reportedExitCode]"
+    ) -join [Environment]::NewLine
 
-    if ($captured.Count -gt 0) {
-        $captured | ForEach-Object { Write-Host "  $_" }
+    $failed = $reportedExitCode -ne 0 -or (Test-FailureText $combined)
+    if ($RequireExecutablePlan -and -not $failed) {
+        try {
+            $json = $stdout | ConvertFrom-Json -ErrorAction Stop
+            if ($json.executable -ne $true) {
+                $failed = $true
+                $combined += [Environment]::NewLine + "[validation error: plan executable was not true]"
+            }
+        } catch {
+            $failed = $true
+            $combined += [Environment]::NewLine + "[validation error: invalid plan JSON]"
+        }
     }
 
-    if ($exitCode -eq 0) {
-        Add-Result $Model $Phase "passed" $watch.ElapsedMilliseconds $log "exit code 0"
-        Complete-Step "passed" $watch.ElapsedMilliseconds
-        return $true
+    $effectiveExitCode = if ($failed) { 1 } else { 0 }
+    $combined += [Environment]::NewLine + "[effective exit code: $effectiveExitCode]"
+    $combined | Set-Content -LiteralPath $log -Encoding utf8
+
+    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+        $stdout.TrimEnd() -split "`r?`n" | ForEach-Object { Write-Host "  $_" }
+    }
+    if ($failed -and -not [string]::IsNullOrWhiteSpace($stderr)) {
+        $stderr.TrimEnd() -split "`r?`n" | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
     }
 
-    $detail = Get-LastUsefulLine @($log)
-    if (-not $detail) { $detail = "exit code $exitCode" }
-    else { $detail = "exit code $exitCode`: $detail" }
-    Add-Result $Model $Phase "failed" $watch.ElapsedMilliseconds $log $detail
-    Copy-TakokitDiagnostics
-    Save-StorageSnapshot "failure:${Model}:${Phase}"
-    Complete-Step "failed" $watch.ElapsedMilliseconds
-    return $false
+    if ($failed) {
+        $detail = Get-LastUsefulLine @($log)
+        if (-not $detail) { $detail = "command failed" }
+        Add-Result $Model $Phase "failed" $watch.ElapsedMilliseconds $log $detail
+        Complete-Step "failed" $watch.ElapsedMilliseconds
+        return $false
+    }
+
+    Add-Result $Model $Phase "passed" $watch.ElapsedMilliseconds $log "Direct command completed and validated."
+    Complete-Step "passed" $watch.ElapsedMilliseconds
+    return $true
 }
 
 function Add-SkippedStep {
     param([string]$Model, [string]$Phase, [string]$Status, [string]$Detail)
-    Start-Step $Model $Phase
+    $script:CurrentModel = $Model
+    $script:CurrentPhase = $Phase
+    Write-Host ""
+    Write-Host "[$([Math]::Min($script:CompletedSteps + 1, $script:TotalSteps))/$($script:TotalSteps)] $Model :: $Phase" -ForegroundColor Cyan
     Add-Result $Model $Phase $Status 0 "" $Detail
     Complete-Step $Status 0
 }
@@ -325,23 +288,17 @@ $ReferenceAudio = Resolve-ExistingPath $ReferenceAudio "Reference audio"
 if ($TrainingSamples) { $TrainingSamples = Resolve-ExistingPath $TrainingSamples "Training dataset" }
 if ($RvcTarget) { $RvcTarget = Resolve-ExistingPath $RvcTarget "RVC target checkpoint or directory" }
 $Tako = Resolve-ExistingPath $Tako "Takokit executable"
+$EvidenceRoot = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($EvidenceRoot))
+New-Item -ItemType Directory -Force $EvidenceRoot | Out-Null
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$RunRoot = Join-Path $EvidenceRoot "all-models-$stamp"
-New-Item -ItemType Directory -Force $RunRoot | Out-Null
-$Results = [System.Collections.Generic.List[object]]::new()
-$RunStartedAt = Get-Date
-$CompletedSteps = 0
-$CurrentModel = "initializing"
-$CurrentPhase = "environment"
-$TotalSteps = 0
-
-try {
-    git rev-parse HEAD | Out-File (Join-Path $RunRoot "commit.txt")
-} catch {
-    "unknown" | Out-File (Join-Path $RunRoot "commit.txt")
-}
-try { nvidia-smi | Out-File (Join-Path $RunRoot "nvidia-smi.txt") } catch {}
+$script:RunRoot = Join-Path $EvidenceRoot "all-models-$stamp"
+New-Item -ItemType Directory -Force $script:RunRoot | Out-Null
+$script:Results = [System.Collections.Generic.List[object]]::new()
+$script:CompletedSteps = 0
+$script:CurrentModel = "initializing"
+$script:CurrentPhase = "environment"
+$script:TotalSteps = 0
 
 $Cases = @(
     @{ Id = "bark-small"; Modes = @("tts"); Voice = "default" },
@@ -380,34 +337,31 @@ $Cases = @(
 $SelectedCases = @($Cases | Where-Object { Test-Category $_ })
 foreach ($case in $SelectedCases) {
     if ($case.WorkstationOnly -and -not $IncludeWorkstation) {
-        $TotalSteps++
+        $script:TotalSteps++
         continue
     }
-    if (-not $SkipPull) { $TotalSteps++ }
-    $TotalSteps++
-    if (-not $PlanOnly) { $TotalSteps += $case.Modes.Count }
+    if (-not $SkipPull) { $script:TotalSteps++ }
+    $script:TotalSteps++
+    if (-not $PlanOnly) { $script:TotalSteps += $case.Modes.Count }
 }
 
 [pscustomobject]@{
-    started_at        = $RunStartedAt.ToString("o")
-    category          = $Category
-    models            = $SelectedCases.Count
-    planned_steps     = $TotalSteps
-    audio             = $Audio
-    reference_audio   = $ReferenceAudio
-    training_samples  = $TrainingSamples
-    rvc_target        = $RvcTarget
-    takokit_home      = $env:TAKOKIT_HOME
+    started_at = (Get-Date).ToString("o")
+    category = $Category
+    models = $SelectedCases.Count
+    planned_steps = $script:TotalSteps
+    takokit_home = $env:TAKOKIT_HOME
     takokit_executable = $Tako
-} | ConvertTo-Json | Out-File (Join-Path $RunRoot "run.json") -Encoding utf8
+    mode = "direct"
+} | ConvertTo-Json | Out-File (Join-Path $script:RunRoot "run.json") -Encoding utf8
 
 Write-Host ""
 Write-Host "Takokit all-model smoke run" -ForegroundColor Cyan
 Write-Host "Models:   $($SelectedCases.Count)"
-Write-Host "Steps:    $TotalSteps"
-Write-Host "Evidence: $RunRoot"
+Write-Host "Steps:    $($script:TotalSteps)"
+Write-Host "Evidence: $($script:RunRoot)"
 Write-Host "Storage:  $env:TAKOKIT_HOME"
-Save-StorageSnapshot "start"
+Write-Host "Mode:     direct; port 5050 and managed daemons are not used" -ForegroundColor Green
 
 $RunComplete = $false
 $FatalError = ""
@@ -416,26 +370,23 @@ try {
         $model = $case.Id
 
         if ($case.WorkstationOnly -and -not $IncludeWorkstation) {
-            Add-SkippedStep $model "hardware" "blocked-hardware" "Requires workstation-class memory; rerun with -IncludeWorkstation on suitable hardware."
+            Add-SkippedStep $model "hardware" "blocked-hardware" "Requires workstation-class memory."
             continue
         }
 
         if (-not $SkipPull) {
-            if (-not (Invoke-Tako $model "pull" @("pull", $model))) {
+            if (-not (Invoke-TakoDirect $model "pull" @("pull", $model))) {
                 Add-SkippedStep $model "plan" "skipped-dependency" "Pull failed."
                 if (-not $PlanOnly) {
-                    foreach ($mode in $case.Modes) {
-                        Add-SkippedStep $model $mode "skipped-dependency" "Pull failed."
-                    }
+                    foreach ($mode in $case.Modes) { Add-SkippedStep $model $mode "skipped-dependency" "Pull failed." }
                 }
                 continue
             }
         }
-        if (-not (Invoke-Tako $model "plan" @("plan", $model, "--json"))) {
+
+        if (-not (Invoke-TakoDirect $model "plan" @("plan", $model, "--json") -RequireExecutablePlan)) {
             if (-not $PlanOnly) {
-                foreach ($mode in $case.Modes) {
-                    Add-SkippedStep $model $mode "skipped-dependency" "Plan failed."
-                }
+                foreach ($mode in $case.Modes) { Add-SkippedStep $model $mode "skipped-dependency" "Plan was not executable." }
             }
             continue
         }
@@ -448,28 +399,28 @@ try {
                     $arguments = @("speak", $text, "--model", $model, "--voice", [string]$case.Voice)
                     if ($case.ReferenceText) { $arguments += @("--reference-text", [string]$case.ReferenceText) }
                     if ($case.Instruction) { $arguments += @("--instruction", [string]$case.Instruction) }
-                    Invoke-Tako $model "tts" $arguments | Out-Null
+                    Invoke-TakoDirect $model "tts" $arguments | Out-Null
                 }
                 "stt" {
-                    Invoke-Tako $model "stt" @("transcribe", $Audio, "--model", $model) | Out-Null
+                    Invoke-TakoDirect $model "stt" @("transcribe", $Audio, "--model", $model) | Out-Null
                 }
                 "clone" {
                     $profileName = "Smoke $model $stamp"
-                    Invoke-Tako $model "clone" @("clone", $ReferenceAudio, "--name", $profileName, "--model", $model, "--consent") | Out-Null
+                    Invoke-TakoDirect $model "clone" @("clone", $ReferenceAudio, "--name", $profileName, "--model", $model, "--consent") | Out-Null
                 }
                 "convert" {
                     if ($model -eq "rvc" -and -not $RvcTarget) {
-                        Add-SkippedStep $model "convert" "blocked-input" "Provide -RvcTarget pointing to a user-owned .pth checkpoint or directory."
+                        Add-SkippedStep $model "convert" "blocked-input" "Provide -RvcTarget with a user-owned checkpoint."
                     } else {
                         $target = if ($model -eq "rvc") { $RvcTarget } else { $ReferenceAudio }
-                        Invoke-Tako $model "convert" @("convert", $Audio, "--target-voice", $target, "--model", $model, "--consent") | Out-Null
+                        Invoke-TakoDirect $model "convert" @("convert", $Audio, "--target-voice", $target, "--model", $model, "--consent") | Out-Null
                     }
                 }
                 "train" {
                     if (-not $TrainingSamples) {
                         Add-SkippedStep $model "train" "blocked-input" "Provide -TrainingSamples containing train.list and wavs/."
                     } else {
-                        Invoke-Tako $model "train" @("train", $TrainingSamples, "--name", "smoke-$stamp", "--model", $model, "--epochs", "1", "--consent") | Out-Null
+                        Invoke-TakoDirect $model "train" @("train", $TrainingSamples, "--name", "smoke-$stamp", "--model", $model, "--epochs", "1", "--consent") | Out-Null
                     }
                 }
             }
@@ -478,21 +429,20 @@ try {
     $RunComplete = $true
 } catch {
     $FatalError = $_.Exception.Message
-    throw
+    Write-Host "Smoke run aborted: $FatalError" -ForegroundColor Red
 } finally {
-    Copy-TakokitDiagnostics
-    Save-StorageSnapshot "finish"
-    Save-Reports -Complete $RunComplete -FatalError $FatalError
+    if ($script:ActiveProcess -and -not $script:ActiveProcess.HasExited) {
+        Stop-ProcessTree $script:ActiveProcess.Id
+    }
     Write-Progress -Id 1 -Activity "Takokit all-model smoke tests" -Completed
+    Save-Reports -Complete $RunComplete -FatalError $FatalError
 }
 
-$summary = @($Results | Group-Object status | Sort-Object Name | ForEach-Object {
+Write-Host ""
+@($script:Results | Group-Object status | Sort-Object Name | ForEach-Object {
     [pscustomobject]@{ status = $_.Name; count = $_.Count }
-})
-$summary | Format-Table -AutoSize
-Write-Host "Evidence: $RunRoot"
-Write-Host "Failures: $(Join-Path $RunRoot 'failures.csv')"
+}) | Format-Table -AutoSize
+Write-Host "Evidence: $($script:RunRoot)"
 
-if ($Results.status -contains "failed") {
-    exit 1
-}
+if ($FatalError -or $script:Results.status -contains "failed") { exit 1 }
+exit 0
