@@ -3,6 +3,26 @@ import sys
 from pathlib import Path
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -14,7 +34,11 @@ def main():
         from huggingface_hub import snapshot_download
 
         snapshot = snapshot_download(repo_id=checkpoint)
-        respond(ok=True, detail=f"Prefetched {checkpoint} at {snapshot}")
+        respond(
+            ok=True,
+            detail=f"Prefetched {checkpoint} at {snapshot}",
+            size_bytes=path_size(snapshot),
+        )
         return
     if request.get("operation") != "speech":
         raise ValueError("Dia adapter only supports speech")
