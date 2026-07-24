@@ -1,7 +1,9 @@
 //! Transactional installation of repository-backed model snapshots.
 
 use crate::{
-    runtime_command::{configure_managed_command, run_logged_command, PathOrArg},
+    runtime_command::{
+        configure_managed_command, run_logged_command, run_logged_command_with_env, PathOrArg,
+    },
     runtime_uv::bootstrap_uv,
     *,
 };
@@ -154,17 +156,31 @@ fn install_hugging_face_snapshot(
     ];
     append_source_filters(&mut arguments, source);
 
-    if let Err(error) = run_logged_command(&log, &uv, &arguments) {
-        return Err(PackageError::ArtifactDownloadFailed {
-            artifact: manifest.id.clone(),
-            reason: format!(
-                "Hugging Face snapshot download failed for {}@{}: {error}; partial data was retained at {} for resume; see {}",
-                source.repository,
-                source.revision,
-                temporary.display(),
-                log.display()
-            ),
-        });
+    if let Err(primary_error) = run_logged_command(&log, &uv, &arguments) {
+        let mut fallback_arguments = arguments.clone();
+        if let Some(index) = fallback_arguments
+            .iter()
+            .position(|argument| argument.as_os_str() == "--max-workers")
+        {
+            fallback_arguments[index + 1] = "1".into();
+        }
+        if let Err(fallback_error) = run_logged_command_with_env(
+            &log,
+            &uv,
+            &fallback_arguments,
+            &[("HF_HUB_DISABLE_XET", "1")],
+        ) {
+            return Err(PackageError::ArtifactDownloadFailed {
+                artifact: manifest.id.clone(),
+                reason: format!(
+                    "Hugging Face snapshot download failed for {}@{} using Xet ({primary_error}) and the single-worker HTTP fallback ({fallback_error}); partial data was retained at {} for resume; see {}",
+                    source.repository,
+                    source.revision,
+                    temporary.display(),
+                    log.display()
+                ),
+            });
+        }
     }
 
     let marker = temporary.join(READY_MARKER);
