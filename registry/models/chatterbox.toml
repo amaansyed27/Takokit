@@ -27,8 +27,14 @@ min_vram = "4gb"
 [source]
 provider = "hugging-face"
 repository = "ResembleAI/chatterbox"
-revision = "a19a7c880ce4f7d461e049cd561db0a0a5ec4593"
-ignore_patterns = ["README.md", "*.png", "*.jpg", "Cangjie5_TC.json"]
+revision = "05e904af2b5c7f8e482687a9d7336c5c824467d9"
+allow_patterns = [
+    "conds.pt",
+    "s3gen.safetensors",
+    "t3_cfg.safetensors",
+    "tokenizer.json",
+    "ve.safetensors",
+]
 
 [artifacts]
 metadata_only = false
