@@ -4,6 +4,26 @@ from importlib.resources import files
 from pathlib import Path
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -14,7 +34,21 @@ def main():
         from f5_tts.api import F5TTS
 
         F5TTS(model="F5TTS_v1_Base")
-        respond(ok=True, detail="Prefetched F5TTS_v1_Base")
+        hub = Path(request["cache_dir"]) / "huggingface" / "hub"
+        model_roots = (
+            [
+                item
+                for item in hub.iterdir()
+                if item.is_dir() and "f5" in item.name.lower()
+            ]
+            if hub.is_dir()
+            else []
+        )
+        respond(
+            ok=True,
+            detail="Prefetched F5TTS_v1_Base",
+            size_bytes=sum(path_size(item) for item in model_roots),
+        )
         return
     if request.get("operation") != "speech":
         raise ValueError("F5-TTS adapter only supports speech")
