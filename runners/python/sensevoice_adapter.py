@@ -3,6 +3,26 @@ import sys
 from pathlib import Path
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -13,7 +33,12 @@ def main():
         from funasr import AutoModel
 
         AutoModel(model="iic/SenseVoiceSmall", vad_model="fsmn-vad", device="cpu")
-        respond(ok=True, detail="Prefetched iic/SenseVoiceSmall and fsmn-vad")
+        modelscope_cache = Path(request["cache_dir"]) / "modelscope"
+        respond(
+            ok=True,
+            detail="Prefetched iic/SenseVoiceSmall and fsmn-vad",
+            size_bytes=path_size(modelscope_cache),
+        )
         return
     if request.get("operation") != "transcribe":
         raise ValueError("SenseVoice adapter only supports transcription")
