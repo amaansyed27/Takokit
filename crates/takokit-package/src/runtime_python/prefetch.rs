@@ -26,6 +26,8 @@ struct ModelPrefetchResponse {
     ok: bool,
     detail: Option<String>,
     error: Option<String>,
+    #[serde(default)]
+    size_bytes: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,6 +36,17 @@ struct ModelPrefetchMarker {
     model_version: String,
     adapter: String,
     adapter_script_sha256: String,
+    #[serde(default)]
+    size_bytes: u64,
+}
+
+impl ModelPrefetchMarker {
+    fn same_install(&self, other: &Self) -> bool {
+        self.model_id == other.model_id
+            && self.model_version == other.model_version
+            && self.adapter == other.adapter
+            && self.adapter_script_sha256 == other.adapter_script_sha256
+    }
 }
 
 pub(crate) fn prefetch_python_adapter_model(
@@ -70,11 +83,14 @@ pub(crate) fn prefetch_python_adapter_model(
         model_version: model.version.clone(),
         adapter: adapter.to_string(),
         adapter_script_sha256: sha256_file(&script)?,
+        size_bytes: 0,
     };
-    let previously_marked = std::fs::read(&marker_path)
+    let previous_marker = std::fs::read(&marker_path)
         .ok()
-        .and_then(|source| serde_json::from_slice::<ModelPrefetchMarker>(&source).ok())
-        .is_some_and(|marker| marker == expected);
+        .and_then(|source| serde_json::from_slice::<ModelPrefetchMarker>(&source).ok());
+    let previously_marked = previous_marker
+        .as_ref()
+        .is_some_and(|marker| marker.same_install(&expected));
 
     std::fs::create_dir_all(&model_dir)?;
 
@@ -180,7 +196,19 @@ pub(crate) fn prefetch_python_adapter_model(
         });
     }
 
-    write_marker_atomic(&marker_path, &expected)?;
+    let mut completed_marker = expected;
+    completed_marker.size_bytes = response
+        .size_bytes
+        .filter(|bytes| *bytes > 0)
+        .or_else(|| {
+            previous_marker
+                .as_ref()
+                .filter(|marker| marker.same_install(&completed_marker))
+                .map(|marker| marker.size_bytes)
+                .filter(|bytes| *bytes > 0)
+        })
+        .unwrap_or_default();
+    write_marker_atomic(&marker_path, &completed_marker)?;
     Ok(Some(response.detail.unwrap_or_else(|| {
         format!(
             "{} managed checkpoint prefetch; marker: {}",
