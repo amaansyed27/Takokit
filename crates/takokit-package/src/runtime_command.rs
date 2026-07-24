@@ -23,6 +23,15 @@ pub(crate) fn run_logged_command(
     program: impl AsRef<Path>,
     args: &[PathOrArg],
 ) -> PackageResult<()> {
+    run_logged_command_with_env(log_path, program, args, &[])
+}
+
+pub(crate) fn run_logged_command_with_env(
+    log_path: &Path,
+    program: impl AsRef<Path>,
+    args: &[PathOrArg],
+    environment: &[(&str, &str)],
+) -> PackageResult<()> {
     use std::io::Write as _;
 
     let program = program.as_ref();
@@ -45,6 +54,9 @@ pub(crate) fn run_logged_command(
     }
     command.stdout(stdout).stderr(stderr);
     configure_managed_command(&mut command);
+    for (name, value) in environment {
+        command.env(name, value);
+    }
     let status = command
         .status()
         .map_err(|error| PackageError::ArtifactInstallFailed {
@@ -86,6 +98,14 @@ pub(crate) fn configure_managed_command(command: &mut Command) {
         if std::env::var_os(name).is_none() {
             command.env(name, value);
         }
+    }
+
+    #[cfg(windows)]
+    if std::env::var_os("UV_LINK_MODE").is_none() {
+        // All managed environments and the uv cache live on the same volume.
+        // Hard links keep adapter isolation without storing identical package
+        // files (notably Torch and CUDA libraries) more than once.
+        command.env("UV_LINK_MODE", "hardlink");
     }
 
     if let Some(root) = std::env::var_os("TAKOKIT_HOME").map(PathBuf::from) {
