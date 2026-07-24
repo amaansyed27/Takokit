@@ -48,6 +48,26 @@ MODELS = {
 }
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -224,6 +244,7 @@ def main():
                 f"Prefetched runtime files for {spec['checkpoint']} at {snapshot}; "
                 f"{device_detail(torch)}"
             ),
+            size_bytes=path_size(snapshot),
         )
         return
     if operation != spec["operation"]:
