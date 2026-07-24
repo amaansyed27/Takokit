@@ -148,11 +148,7 @@ fn prefetched_runtime_size(record: &InstalledModelRecord) -> u64 {
     std::fs::read(marker)
         .ok()
         .and_then(|source| serde_json::from_slice::<serde_json::Value>(&source).ok())
-        .and_then(|marker| {
-            marker
-                .get("size_bytes")
-                .and_then(serde_json::Value::as_u64)
-        })
+        .and_then(|marker| marker.get("size_bytes").and_then(serde_json::Value::as_u64))
         .unwrap_or_default()
 }
 
@@ -199,8 +195,7 @@ mod tests {
             .join("models")
             .join("bark-small")
             .join(".takokit-prefetch.json");
-        std::fs::create_dir_all(marker.parent().expect("marker parent"))
-            .expect("marker directory");
+        std::fs::create_dir_all(marker.parent().expect("marker parent")).expect("marker directory");
         std::fs::write(
             marker,
             serde_json::to_vec(&serde_json::json!({
