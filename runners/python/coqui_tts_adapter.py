@@ -9,6 +9,26 @@ MODELS = {
 }
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -23,7 +43,23 @@ def main():
         from TTS.api import TTS
 
         TTS(checkpoint)
-        respond(ok=True, detail=f"Prefetched {checkpoint}")
+        tts_home = Path(request["cache_dir"]) / "coqui"
+        needle = checkpoint.rsplit("/", 1)[-1].replace("_", "").lower()
+        model_roots = (
+            [
+                item
+                for item in tts_home.iterdir()
+                if item.is_dir()
+                and needle in item.name.replace("_", "").lower()
+            ]
+            if tts_home.is_dir()
+            else []
+        )
+        respond(
+            ok=True,
+            detail=f"Prefetched {checkpoint}",
+            size_bytes=sum(path_size(item) for item in model_roots),
+        )
         return
     if request.get("operation") != "speech":
         raise ValueError("Coqui adapter only supports speech")
