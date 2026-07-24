@@ -196,17 +196,16 @@ pub(crate) fn prefetch_python_adapter_model(
         });
     }
 
+    let previous_size_bytes = previous_marker
+        .as_ref()
+        .filter(|marker| marker.same_install(&expected))
+        .map(|marker| marker.size_bytes)
+        .filter(|bytes| *bytes > 0);
     let mut completed_marker = expected;
     completed_marker.size_bytes = response
         .size_bytes
         .filter(|bytes| *bytes > 0)
-        .or_else(|| {
-            previous_marker
-                .as_ref()
-                .filter(|marker| marker.same_install(&completed_marker))
-                .map(|marker| marker.size_bytes)
-                .filter(|bytes| *bytes > 0)
-        })
+        .or(previous_size_bytes)
         .unwrap_or_default();
     write_marker_atomic(&marker_path, &completed_marker)?;
     Ok(Some(response.detail.unwrap_or_else(|| {
