@@ -19,6 +19,19 @@ const NEMO_PACKAGES: &[&str] = &[
     "nemo-toolkit[asr]==2.7.3",
 ];
 const QWEN3_PACKAGES: &[&str] = &["qwen-tts==0.1.1", "soundfile"];
+const CHATTERBOX_PACKAGES: &[&str] = &[
+    "torch",
+    "torchaudio",
+    "numpy>=1.26",
+    "librosa==0.11.0",
+    "s3tokenizer",
+    "transformers==4.46.3",
+    "diffusers==0.29.0",
+    "resemble-perth==1.0.1",
+    "conformer==0.3.2",
+    "safetensors==0.5.3",
+    "huggingface_hub[hf_xet]",
+];
 const QWEN_OMNI_PACKAGES: &[&str] = &[
     "git+https://github.com/huggingface/transformers.git",
     "qwen-omni-utils[decord]",
@@ -47,8 +60,8 @@ const OPENVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     repository: "https://github.com/myshell-ai/OpenVoice.git",
     revision: "74a1d147b17a8c3092dd5430504bd83ef6c7eb23",
     recursive: false,
-    requirement_files: &["requirements.txt"],
-    editable: true,
+    requirement_files: &[],
+    editable: false,
 };
 const GPT_SOVITS_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     repository: "https://github.com/RVC-Boss/GPT-SoVITS.git",
@@ -72,6 +85,22 @@ macro_rules! adapter {
             model_family: $family,
             python: $python,
             packages: $packages,
+            no_deps_packages: &[],
+            script: Some($script),
+            source: $source,
+            note: $note,
+        }
+    };
+}
+
+macro_rules! adapter_with_no_deps {
+    ($id:literal, $family:literal, $python:literal, $packages:expr, $no_deps:expr, $script:expr, $source:expr, $note:literal) => {
+        AdapterSpec {
+            id: $id,
+            model_family: $family,
+            python: $python,
+            packages: $packages,
+            no_deps_packages: $no_deps,
             script: Some($script),
             source: $source,
             note: $note,
@@ -125,11 +154,12 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         None,
         "Qwen3-TTS 1.7B VoiceDesign."
     ),
-    adapter!(
+    adapter_with_no_deps!(
         "chatterbox",
         "chatterbox",
         "3.11",
-        &["chatterbox-tts", "torchaudio"],
+        CHATTERBOX_PACKAGES,
+        &["chatterbox-tts==0.1.2"],
         CHATTERBOX_ADAPTER,
         None,
         "Chatterbox TTS."
@@ -300,12 +330,14 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     adapter!(
         "openvoice",
         "openvoice",
-        "3.10",
+        "3.11",
         &[
             "torch",
             "torchaudio",
             "huggingface_hub",
-            "git+https://github.com/myshell-ai/MeloTTS.git"
+            "soundfile",
+            "wavmark==0.0.3",
+            "git+https://github.com/myshell-ai/MeloTTS.git@209145371cff8fc3bd60d7be902ea69cbdb7965a"
         ],
         OPENVOICE_ADAPTER,
         Some(OPENVOICE_SOURCE),

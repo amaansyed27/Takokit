@@ -94,6 +94,7 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     write_python_adapter_manifests(&layout)?;
     let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
     let mut record = python_adapter_record(takokit_root, adapter)?;
+    let reset_environment = record.state == AdapterLifecycleState::Failed;
     record.state = AdapterLifecycleState::Installing;
     record.notes = "Takokit is installing this adapter in an isolated environment.".to_string();
     write_adapter_record(&manifest_path, &record)?;
@@ -103,7 +104,7 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
             artifact: adapter.to_string(),
             reason: "unknown managed adapter".to_string(),
         })
-        .and_then(|spec| install_adapter_spec(takokit_root, &layout, spec));
+        .and_then(|spec| install_adapter_spec(takokit_root, &layout, spec, reset_environment));
     match result {
         Ok(note) => {
             record.state = AdapterLifecycleState::Ready;
@@ -178,6 +179,7 @@ fn install_adapter_spec(
     takokit_root: &Path,
     layout: &PythonManagedRunnerLayout,
     spec: &AdapterSpec,
+    reset_environment: bool,
 ) -> PackageResult<String> {
     let script = spec
         .script
@@ -196,6 +198,9 @@ fn install_adapter_spec(
     std::fs::create_dir_all(&adapter_dir)?;
     let venv = adapter_dir.join("venv");
     let log = adapter_dir.join("install.log");
+    if reset_environment && venv.exists() {
+        std::fs::remove_dir_all(&venv)?;
+    }
     let uv = bootstrap_uv(takokit_root)?;
     run_logged_command(
         &log,
@@ -226,6 +231,15 @@ fn install_adapter_spec(
             &python,
             &log,
             spec.packages.iter().map(|item| (*item).into()),
+        )?;
+    }
+    if !spec.no_deps_packages.is_empty() {
+        uv_pip_install(
+            &uv,
+            &python,
+            &log,
+            std::iter::once("--no-deps".into())
+                .chain(spec.no_deps_packages.iter().map(|item| (*item).into())),
         )?;
     }
     if let (Some(source), Some(source_dir)) = (spec.source.as_ref(), source_dir.as_ref()) {

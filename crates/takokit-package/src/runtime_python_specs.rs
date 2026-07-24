@@ -33,6 +33,7 @@ pub(crate) struct AdapterSpec {
     pub model_family: &'static str,
     pub python: &'static str,
     pub packages: &'static [&'static str],
+    pub no_deps_packages: &'static [&'static str],
     pub script: Option<&'static str>,
     pub source: Option<AdapterSourceSpec>,
     pub note: &'static str,

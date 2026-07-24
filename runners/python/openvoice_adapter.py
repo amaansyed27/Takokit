@@ -16,7 +16,6 @@ def load_runtime(model_dir: Path):
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
     import torch
-    from openvoice import se_extractor
     from openvoice.api import ToneColorConverter
 
     checkpoint_root = model_dir / "checkpoints_v2"
@@ -32,20 +31,20 @@ def load_runtime(model_dir: Path):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     converter = ToneColorConverter(str(config), device=device)
     converter.load_ckpt(str(checkpoint))
-    return checkpoint_root, converter, se_extractor, device
+    return checkpoint_root, converter, device
 
 
-def target_embedding(reference: Path, converter, se_extractor, cache_dir: Path):
+def speaker_embedding(reference: Path, converter, cache_dir: Path):
     if not reference.is_file():
-        raise FileNotFoundError(f"target voice reference does not exist: {reference}")
-    embedding, _ = se_extractor.get_se(
-        str(reference), converter, target_dir=str(cache_dir), vad=True
+        raise FileNotFoundError(f"voice reference does not exist: {reference}")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return converter.extract_se(
+        [str(reference)], se_save_path=str(cache_dir / "se.pth")
     )
-    return embedding
 
 
 def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, str]:
-    checkpoint_root, converter, se_extractor, device = load_runtime(model_dir)
+    checkpoint_root, converter, device = load_runtime(model_dir)
     text = str(request.get("input") or "").strip()
     reference = request.get("voice")
     if not text:
@@ -65,7 +64,7 @@ def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, 
     speaker_id = speaker_ids.get(speaker_key, next(iter(speaker_ids.values())))
     cache_dir = Path(request["cache_dir"]).expanduser().resolve() / "openvoice"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    target_se = target_embedding(reference_path, converter, se_extractor, cache_dir)
+    target_se = speaker_embedding(reference_path, converter, cache_dir / "target")
     source_se_path = (
         checkpoint_root
         / "base_speakers"
@@ -95,17 +94,15 @@ def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, 
 
 
 def run_conversion(request: dict, model_dir: Path, output_path: Path) -> tuple[int, str]:
-    _, converter, se_extractor, _ = load_runtime(model_dir)
+    _, converter, _ = load_runtime(model_dir)
     source_audio = Path(request["audio_path"]).expanduser().resolve()
     target_audio = Path(request["target_voice"]).expanduser().resolve()
     if not source_audio.is_file():
         raise FileNotFoundError(f"source audio does not exist: {source_audio}")
     cache_dir = Path(request["cache_dir"]).expanduser().resolve() / "openvoice"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    source_se, _ = se_extractor.get_se(
-        str(source_audio), converter, target_dir=str(cache_dir / "source"), vad=True
-    )
-    target_se = target_embedding(target_audio, converter, se_extractor, cache_dir / "target")
+    source_se = speaker_embedding(source_audio, converter, cache_dir / "source")
+    target_se = speaker_embedding(target_audio, converter, cache_dir / "target")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     converter.convert(
         audio_src_path=str(source_audio),
