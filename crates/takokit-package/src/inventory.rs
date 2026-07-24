@@ -148,7 +148,11 @@ fn prefetched_runtime_size(record: &InstalledModelRecord) -> u64 {
     std::fs::read(marker)
         .ok()
         .and_then(|source| serde_json::from_slice::<serde_json::Value>(&source).ok())
-        .and_then(|marker| marker.get("size_bytes").and_then(serde_json::Value::as_u64))
+        .and_then(|marker| {
+            marker
+                .get("size_bytes")
+                .and_then(serde_json::Value::as_u64)
+        })
         .unwrap_or_default()
 }
 
@@ -174,7 +178,6 @@ fn path_size(path: &Path) -> u64 {
         .map(|entry| path_size(&entry.path()))
         .fold(0_u64, u64::saturating_add)
 }
-
 
 #[cfg(test)]
 mod tests {
