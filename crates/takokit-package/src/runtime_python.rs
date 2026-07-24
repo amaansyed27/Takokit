@@ -104,9 +104,7 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
             artifact: adapter.to_string(),
             reason: "unknown managed adapter".to_string(),
         })
-        .and_then(|spec| {
-            install_adapter_spec(takokit_root, &layout, spec, reset_environment)
-        });
+        .and_then(|spec| install_adapter_spec(takokit_root, &layout, spec, reset_environment));
     match result {
         Ok(note) => {
             record.state = AdapterLifecycleState::Ready;
@@ -240,11 +238,8 @@ fn install_adapter_spec(
             &uv,
             &python,
             &log,
-            std::iter::once("--no-deps".into()).chain(
-                spec.no_deps_packages
-                    .iter()
-                    .map(|item| (*item).into()),
-            ),
+            std::iter::once("--no-deps".into())
+                .chain(spec.no_deps_packages.iter().map(|item| (*item).into())),
         )?;
     }
     if let (Some(source), Some(source_dir)) = (spec.source.as_ref(), source_dir.as_ref()) {
