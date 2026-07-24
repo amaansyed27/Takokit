@@ -134,7 +134,22 @@ fn installed_size(record: &InstalledModelRecord) -> u64 {
         total = total.saturating_add(path_size(path));
     }
 
-    total
+    total.saturating_add(prefetched_runtime_size(record))
+}
+
+fn prefetched_runtime_size(record: &InstalledModelRecord) -> u64 {
+    let Some(storage_root) = record.manifest_path.ancestors().nth(3) else {
+        return 0;
+    };
+    let marker = storage_root
+        .join("models")
+        .join(&record.id)
+        .join(".takokit-prefetch.json");
+    std::fs::read(marker)
+        .ok()
+        .and_then(|source| serde_json::from_slice::<serde_json::Value>(&source).ok())
+        .and_then(|marker| marker.get("size_bytes").and_then(serde_json::Value::as_u64))
+        .unwrap_or_default()
 }
 
 fn path_size(path: &Path) -> u64 {
@@ -158,4 +173,57 @@ fn path_size(path: &Path) -> u64 {
         .flatten()
         .map(|entry| path_size(&entry.path()))
         .fold(0_u64, u64::saturating_add)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cache_backed_model_uses_prefetch_marker_size() {
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let root = temporary.path();
+        let manifest_path = root
+            .join("manifests")
+            .join("models")
+            .join("bark-small.toml");
+        std::fs::create_dir_all(manifest_path.parent().expect("manifest parent"))
+            .expect("manifest directory");
+        std::fs::write(&manifest_path, "").expect("manifest fixture");
+
+        let marker = root
+            .join("models")
+            .join("bark-small")
+            .join(".takokit-prefetch.json");
+        std::fs::create_dir_all(marker.parent().expect("marker parent"))
+            .expect("marker directory");
+        std::fs::write(
+            marker,
+            serde_json::to_vec(&serde_json::json!({
+                "model_id": "bark-small",
+                "model_version": "0.1.0",
+                "adapter": "hf_audio",
+                "adapter_script_sha256": "fixture",
+                "size_bytes": 1_234_567_u64
+            }))
+            .expect("marker JSON"),
+        )
+        .expect("marker fixture");
+
+        let record = InstalledModelRecord {
+            id: "bark-small".to_string(),
+            version: "0.1.0".to_string(),
+            source: "bundled".to_string(),
+            manifest_path,
+            runner: "takokit-python-managed".to_string(),
+            installed_at: "0".to_string(),
+            artifacts: Vec::new(),
+            snapshot: None,
+            status: InstalledPackageStatus::Ready,
+            note: "ready".to_string(),
+        };
+
+        assert_eq!(installed_size(&record), 1_234_567);
+    }
 }
