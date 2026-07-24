@@ -7,6 +7,26 @@ DEFAULT_VOICE = "expresso/ex03-ex01_happy_001_channel1_334s.wav"
 MODEL_REPO = "kyutai/tts-1.6b-en_fr"
 
 
+def path_size(path):
+    root = Path(path)
+    try:
+        if root.is_file():
+            return root.stat().st_size
+        if not root.is_dir():
+            return 0
+    except OSError:
+        return 0
+
+    total = 0
+    for item in root.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -26,6 +46,7 @@ def main():
         respond(
             ok=True,
             detail=f"Prefetched {MODEL_REPO} at {model_path}; voice at {voice_path}",
+            size_bytes=path_size(model_path) + path_size(voice_path),
         )
         return
     if request.get("operation") != "speech":
