@@ -11,6 +11,7 @@ mod planning;
 mod progress;
 mod records;
 mod registry;
+mod registry_index;
 mod resolution;
 mod runner;
 mod runtime;
@@ -34,6 +35,7 @@ pub use progress::{
 };
 pub use records::*;
 pub use registry::PackageRegistry;
+pub use registry_index::*;
 pub use resolution::{
     current_platform_id, model_info_from_plan, plan_model, resolve_execution_plan, resolve_runner,
 };
