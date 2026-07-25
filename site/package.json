@@ -1,9 +1,18 @@
 {
   "name": "takokit-library",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "dev": "vite",
+    "build": "vite build",
     "test": "node scripts/validate-site.mjs"
-  }
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {}
 }
