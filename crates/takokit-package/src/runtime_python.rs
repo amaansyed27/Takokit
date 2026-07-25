@@ -159,16 +159,14 @@ pub(crate) fn install_python_managed_runtime(
         std::fs::create_dir_all(path)?;
     }
     write_python_adapter_manifests(&layout)?;
-    let python = ensure_shared_python_runtime(takokit_root, &layout, "3.11")?;
-    let log = shared_runtime_dir(&layout, "3.11").join("install.log");
+    let uv = bootstrap_uv(takokit_root)?;
     installed_registry.install_runner_runtime(
         manifest,
         RunnerLifecycleState::Ready,
         format!(
-            "Managed Python runtime is ready at {} using shared base {}. Adapter environments inherit common packages instead of copying them. Log: {}",
+            "Managed Python runtime is ready at {} using {}. A shared dependency base is installed once for each Python ABI when its first adapter is pulled.",
             layout.root.display(),
-            python.display(),
-            log.display()
+            uv.display()
         ),
     )
 }
