@@ -288,8 +288,6 @@ fn install_adapter_spec(
     ))
 }
 
-
-
 fn install_adapter_source(
     adapter_dir: &Path,
     log: &Path,
@@ -388,5 +386,3 @@ pub(crate) fn write_adapter_record(path: &Path, record: &AdapterRecord) -> Packa
     std::fs::write(path, toml::to_string_pretty(record)?)?;
     Ok(())
 }
-
-
