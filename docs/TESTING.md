@@ -292,11 +292,14 @@ pass, run the guarded reset from the repository root:
 ```powershell
 .\scripts\reset_takokit_scratch.ps1 `
   -CleanGlobalUvCache `
+  -CleanGlobalUvPython `
   -Confirm:$false
 ```
 
-`-CleanGlobalUvCache` also clears uv's machine-wide package cache, which may be shared
-with non-Takokit Python projects. Omit that switch if those projects should retain it.
+`-CleanGlobalUvCache` clears uv's machine-wide package cache, and
+`-CleanGlobalUvPython` removes every uv-managed Python interpreter. Both may be shared
+with non-Takokit Python projects; omit either switch when those projects must retain its
+state.
 
 ### 12A. Pull and verify every model first
 

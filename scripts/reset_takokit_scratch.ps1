@@ -1,6 +1,7 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
 param(
-    [switch]$CleanGlobalUvCache
+    [switch]$CleanGlobalUvCache,
+    [switch]$CleanGlobalUvPython
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +88,15 @@ if ($CleanGlobalUvCache -and (Test-Path -LiteralPath $ManagedUv)) {
     }
 }
 
+if ($CleanGlobalUvPython -and (Test-Path -LiteralPath $ManagedUv)) {
+    if ($PSCmdlet.ShouldProcess("uv-managed Python interpreters for all projects", "Run uv python uninstall --all")) {
+        & $ManagedUv python uninstall --all
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv python uninstall --all failed with exit code $LASTEXITCODE"
+        }
+    }
+}
+
 $Roots = @(
     $ConfiguredHome
     $DefaultHome
@@ -139,5 +149,8 @@ Write-Host "Takokit scratch reset complete."
 Write-Host "Removed model stores, managed Python runtimes, Takokit caches, partial downloads, logs and test evidence."
 if (-not $CleanGlobalUvCache) {
     Write-Host "The global uv cache was preserved. Use -CleanGlobalUvCache to reclaim it too (this affects other uv projects)."
+}
+if (-not $CleanGlobalUvPython) {
+    Write-Host "Globally managed uv Python interpreters were preserved. Use -CleanGlobalUvPython to remove them too (this affects other uv projects)."
 }
 Write-Host "Open a new PowerShell window before rebuilding and pulling models."
