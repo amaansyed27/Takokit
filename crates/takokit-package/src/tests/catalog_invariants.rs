@@ -79,10 +79,7 @@ fn registry_index_maps_all_legacy_ids_to_canonical_tags() {
             .unwrap_or_else(|error| panic!("failed to resolve {legacy}: {error}"));
         assert_eq!(resolved.canonical, canonical);
         assert_eq!(
-            registry
-                .model(canonical)
-                .expect("canonical manifest")
-                .id,
+            registry.model(canonical).expect("canonical manifest").id,
             resolved.target
         );
     }
