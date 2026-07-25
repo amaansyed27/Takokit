@@ -280,6 +280,24 @@ Follow [MODEL_SMOKE_TESTS.md](MODEL_SMOKE_TESTS.md). Prepare the input folder at
 `$HOME\Downloads\takokit-smoke-inputs`, then perform Section 12 in two stages from the
 repository root. Both commands must use the same isolated storage directory.
 
+Managed-Python models reuse one Takokit-owned base dependency set per required Python ABI.
+Adapter environments inherit that base and contain only model-specific packages or genuine
+version-conflict overrides. Python 3.10, 3.11 and 3.12 binary packages cannot safely share
+one installation, so compiled packages such as Torch may be installed once for each ABI
+that the selected models require, but not once for every model.
+
+To intentionally erase every previous test/model/runtime download before a from-scratch
+pass, run the guarded reset from the repository root:
+
+```powershell
+.\scripts\reset_takokit_scratch.ps1 `
+  -CleanGlobalUvCache `
+  -Confirm:$false
+```
+
+`-CleanGlobalUvCache` also clears uv's machine-wide package cache, which may be shared
+with non-Takokit Python projects. Omit that switch if those projects should retain it.
+
 ### 12A. Pull and verify every model first
 
 ```powershell
