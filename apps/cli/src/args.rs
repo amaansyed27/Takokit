@@ -268,6 +268,10 @@ pub(crate) enum ListTarget {
 pub(crate) enum LibraryTarget {
     Models,
     Runners,
+    Sync,
+    Show {
+        model: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
