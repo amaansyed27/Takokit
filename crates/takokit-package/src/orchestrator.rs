@@ -306,7 +306,7 @@ fn install_model_complete_inner(
         download_total.unwrap_or(0),
         download_total,
     );
-    let plan = match plan_model(package_registry, installed_registry, model_id) {
+    let plan = match plan_model(package_registry, installed_registry, &model.id) {
         Ok(plan) => plan,
         Err(error) => {
             return Err(rollback_final_verification(
