@@ -7,7 +7,7 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
-const SHARED_RUNTIME_VERSION: &str = "shared-python-v1";
+const SHARED_RUNTIME_VERSION: &str = "shared-python-v2";
 const SHARED_RUNTIME_PACKAGES: &[&str] = &[
     "torch",
     "torchaudio",
@@ -84,6 +84,21 @@ fn managed_base_python(venv: &Path, takokit_root: &Path) -> PackageResult<PathBu
         })
 }
 
+fn shared_package_install_arguments(base_python: &Path) -> Vec<PathOrArg> {
+    let mut arguments: Vec<PathOrArg> = vec![
+        "pip".into(),
+        "install".into(),
+        "--python".into(),
+        base_python.to_path_buf().into(),
+        "--system".into(),
+        "--break-system-packages".into(),
+        "--no-progress".into(),
+        "--torch-backend=auto".into(),
+    ];
+    arguments.extend(SHARED_RUNTIME_PACKAGES.iter().map(|item| (*item).into()));
+    arguments
+}
+
 pub(super) fn ensure_shared_python_runtime(
     takokit_root: &Path,
     layout: &PythonManagedRunnerLayout,
@@ -117,16 +132,7 @@ pub(super) fn ensure_shared_python_runtime(
         return Ok(base_python);
     }
 
-    let mut arguments: Vec<PathOrArg> = vec![
-        "pip".into(),
-        "install".into(),
-        "--python".into(),
-        base_python.clone().into(),
-        "--system".into(),
-        "--no-progress".into(),
-        "--torch-backend=auto".into(),
-    ];
-    arguments.extend(SHARED_RUNTIME_PACKAGES.iter().map(|item| (*item).into()));
+    let arguments = shared_package_install_arguments(&base_python);
     run_logged_uv_command(takokit_root, &log, &uv, &arguments)?;
     std::fs::write(&marker, identity)?;
     Ok(base_python)
@@ -177,11 +183,24 @@ mod tests {
 
     #[test]
     fn shared_runtime_identity_tracks_python_abi() {
-        assert_eq!(shared_runtime_identity("3.11"), "shared-python-v1-py3.11");
+        assert_eq!(shared_runtime_identity("3.11"), "shared-python-v2-py3.11");
         assert_ne!(
             shared_runtime_identity("3.10"),
             shared_runtime_identity("3.12")
         );
+    }
+
+    #[test]
+    fn shared_install_explicitly_allows_the_verified_managed_base() {
+        let arguments = shared_package_install_arguments(Path::new("managed-python"));
+        let arguments = arguments
+            .iter()
+            .map(|argument| argument.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>();
+        assert!(arguments.iter().any(|argument| argument == "--system"));
+        assert!(arguments
+            .iter()
+            .any(|argument| argument == "--break-system-packages"));
     }
 
     #[test]
