@@ -55,9 +55,7 @@ pub(crate) enum Command {
     },
     Speak(SpeakArgs),
     Pull(PullArgs),
-    Show {
-        model: String,
-    },
+    Show { model: String },
     Plan(PlanArgs),
     Rm {
         model: String,
