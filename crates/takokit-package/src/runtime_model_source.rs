@@ -138,12 +138,9 @@ fn install_hugging_face_snapshot(
     let arguments = snapshot_download_arguments(source, &temporary, 4);
     let hf_home = cache_root.to_string_lossy().into_owned();
 
-    if let Err(primary_error) = run_logged_command_with_env(
-        &log,
-        &uv,
-        &arguments,
-        &[("HF_HOME", hf_home.as_str())],
-    ) {
+    if let Err(primary_error) =
+        run_logged_command_with_env(&log, &uv, &arguments, &[("HF_HOME", hf_home.as_str())])
+    {
         let mut fallback_arguments = arguments.clone();
         if let Some(index) = fallback_arguments
             .iter()
@@ -155,10 +152,7 @@ fn install_hugging_face_snapshot(
             &log,
             &uv,
             &fallback_arguments,
-            &[
-                ("HF_HOME", hf_home.as_str()),
-                ("HF_HUB_DISABLE_XET", "1"),
-            ],
+            &[("HF_HOME", hf_home.as_str()), ("HF_HUB_DISABLE_XET", "1")],
         ) {
             return Err(PackageError::ArtifactDownloadFailed {
                 artifact: manifest.id.clone(),
@@ -196,7 +190,6 @@ fn install_hugging_face_snapshot(
         ready_marker: destination.join(READY_MARKER),
     })
 }
-
 
 fn snapshot_download_arguments(
     source: &ModelSourceManifest,
@@ -314,7 +307,6 @@ fn remove_dir_if_exists(path: &Path) -> PackageResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn local_snapshot_download_does_not_mix_cache_and_destination_options() {
