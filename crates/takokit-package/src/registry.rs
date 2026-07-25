@@ -2,7 +2,10 @@
 
 use crate::*;
 use serde::Deserialize;
-use std::{path::{Path, PathBuf}, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 const DEFAULT_REGISTRY_URL: &str =
     "https://raw.githubusercontent.com/amaansyed27/Takokit/main/registry/index.json";
@@ -37,11 +40,7 @@ impl PackageRegistry {
             .unwrap_or_else(|| DEFAULT_REGISTRY_URL.to_string());
         Self {
             root,
-            cache_path: home.map(|home| {
-                home.join("manifests")
-                    .join("registry")
-                    .join("index.json")
-            }),
+            cache_path: home.map(|home| home.join("manifests").join("registry").join("index.json")),
             remote_url: Some(remote_url),
         }
     }
@@ -53,9 +52,9 @@ impl PackageRegistry {
     pub fn model(&self, reference: &str) -> PackageResult<ModelManifest> {
         if let Ok(index) = self.registry_index() {
             if let Ok(resolved) = index.resolve(reference) {
-                let release = index.release(&resolved).ok_or_else(|| {
-                    PackageError::ModelNotFound(reference.to_string())
-                })?;
+                let release = index
+                    .release(&resolved)
+                    .ok_or_else(|| PackageError::ModelNotFound(reference.to_string()))?;
                 if let Some(source) = release.manifest_toml.as_deref() {
                     let manifest: ModelManifest = toml::from_str(source)?;
                     return Ok(manifest);
@@ -123,12 +122,13 @@ impl PackageRegistry {
                 artifact: "takokit-registry".to_string(),
                 reason: error.to_string(),
             })?;
-        let source = response
-            .into_string()
-            .map_err(|error| PackageError::ArtifactDownloadFailed {
-                artifact: "takokit-registry".to_string(),
-                reason: error.to_string(),
-            })?;
+        let source =
+            response
+                .into_string()
+                .map_err(|error| PackageError::ArtifactDownloadFailed {
+                    artifact: "takokit-registry".to_string(),
+                    reason: error.to_string(),
+                })?;
         if source.len() > MAX_REGISTRY_BYTES {
             return Err(PackageError::ArtifactDownloadFailed {
                 artifact: "takokit-registry".to_string(),
@@ -140,10 +140,12 @@ impl PackageRegistry {
         }
         let index: RegistryIndex = serde_json::from_str(&source)?;
         index.validate()?;
-        let parent = cache_path.parent().ok_or_else(|| PackageError::ArtifactInstallFailed {
-            artifact: "takokit-registry".to_string(),
-            reason: "registry cache path has no parent".to_string(),
-        })?;
+        let parent = cache_path
+            .parent()
+            .ok_or_else(|| PackageError::ArtifactInstallFailed {
+                artifact: "takokit-registry".to_string(),
+                reason: "registry cache path has no parent".to_string(),
+            })?;
         std::fs::create_dir_all(parent)?;
         let temporary = cache_path.with_extension("json.tmp");
         std::fs::write(&temporary, source)?;
