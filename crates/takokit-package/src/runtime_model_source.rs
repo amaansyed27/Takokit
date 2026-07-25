@@ -1,9 +1,7 @@
 //! Transactional installation of repository-backed model snapshots.
 
 use crate::{
-    runtime_command::{
-        configure_managed_command, run_logged_command, run_logged_command_with_env, PathOrArg,
-    },
+    runtime_command::{configure_managed_command, run_logged_command_with_env, PathOrArg},
     runtime_uv::bootstrap_uv,
     *,
 };
