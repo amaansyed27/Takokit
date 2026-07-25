@@ -423,15 +423,9 @@ fn runtime_resolution_errors_include_code_prefix() {
 #[test]
 fn cli_parses_registry_sync_show_and_tagged_pull() {
     let sync = Cli::try_parse_from(["takokit", "library", "sync"]).expect("registry sync");
-    let show = Cli::try_parse_from([
-        "takokit",
-        "library",
-        "show",
-        "qwen3-tts:0.6b-base",
-    ])
-    .expect("registry show");
-    let pull =
-        Cli::try_parse_from(["takokit", "pull", "whisper:small"]).expect("tagged pull");
+    let show = Cli::try_parse_from(["takokit", "library", "show", "qwen3-tts:0.6b-base"])
+        .expect("registry show");
+    let pull = Cli::try_parse_from(["takokit", "pull", "whisper:small"]).expect("tagged pull");
 
     assert!(matches!(
         sync.command,
