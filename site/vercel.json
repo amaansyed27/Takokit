@@ -10,7 +10,7 @@
     },
     {
       "source": "/library/:name",
-      "destination": "/model.html?name=:name"
+      "destination": "/model?name=:name"
     }
   ],
   "headers": [
