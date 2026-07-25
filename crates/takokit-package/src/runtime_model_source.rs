@@ -137,26 +137,15 @@ fn install_hugging_face_snapshot(
 
     let uv = bootstrap_uv(takokit_root)?;
     let log = logs_root.join(format!("model-{}-download.log", manifest.id));
-    let mut arguments: Vec<PathOrArg> = vec![
-        "tool".into(),
-        "run".into(),
-        "--from".into(),
-        "huggingface_hub[hf_xet]".into(),
-        "hf".into(),
-        "download".into(),
-        source.repository.clone().into(),
-        "--revision".into(),
-        source.revision.clone().into(),
-        "--local-dir".into(),
-        temporary.clone().into(),
-        "--cache-dir".into(),
-        cache_root.into(),
-        "--max-workers".into(),
-        "4".into(),
-    ];
-    append_source_filters(&mut arguments, source);
+    let arguments = snapshot_download_arguments(source, &temporary, 4);
+    let hf_home = cache_root.to_string_lossy().into_owned();
 
-    if let Err(primary_error) = run_logged_command(&log, &uv, &arguments) {
+    if let Err(primary_error) = run_logged_command_with_env(
+        &log,
+        &uv,
+        &arguments,
+        &[("HF_HOME", hf_home.as_str())],
+    ) {
         let mut fallback_arguments = arguments.clone();
         if let Some(index) = fallback_arguments
             .iter()
@@ -168,7 +157,10 @@ fn install_hugging_face_snapshot(
             &log,
             &uv,
             &fallback_arguments,
-            &[("HF_HUB_DISABLE_XET", "1")],
+            &[
+                ("HF_HOME", hf_home.as_str()),
+                ("HF_HUB_DISABLE_XET", "1"),
+            ],
         ) {
             return Err(PackageError::ArtifactDownloadFailed {
                 artifact: manifest.id.clone(),
@@ -205,6 +197,31 @@ fn install_hugging_face_snapshot(
         local_path: destination.clone(),
         ready_marker: destination.join(READY_MARKER),
     })
+}
+
+
+fn snapshot_download_arguments(
+    source: &ModelSourceManifest,
+    temporary: &Path,
+    max_workers: u8,
+) -> Vec<PathOrArg> {
+    let mut arguments: Vec<PathOrArg> = vec![
+        "tool".into(),
+        "run".into(),
+        "--from".into(),
+        "huggingface_hub[hf_xet]".into(),
+        "hf".into(),
+        "download".into(),
+        source.repository.clone().into(),
+        "--revision".into(),
+        source.revision.clone().into(),
+        "--local-dir".into(),
+        temporary.to_path_buf().into(),
+        "--max-workers".into(),
+        max_workers.to_string().into(),
+    ];
+    append_source_filters(&mut arguments, source);
+    arguments
 }
 
 fn prepare_staging_dir(path: &Path, source: &ModelSourceManifest) -> PackageResult<()> {
@@ -299,6 +316,27 @@ fn remove_dir_if_exists(path: &Path) -> PackageResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn local_snapshot_download_does_not_mix_cache_and_destination_options() {
+        let source = ModelSourceManifest {
+            provider: ModelSourceProvider::HuggingFace,
+            repository: "owner/model".into(),
+            revision: "revision-a".into(),
+            allow_patterns: vec!["*.safetensors".into()],
+            ignore_patterns: vec!["README.md".into()],
+        };
+        let arguments = snapshot_download_arguments(&source, Path::new("staging"), 4);
+        let arguments = arguments
+            .iter()
+            .map(|argument| argument.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>();
+        assert!(arguments.iter().any(|argument| argument == "--local-dir"));
+        assert!(!arguments.iter().any(|argument| argument == "--cache-dir"));
+        assert!(arguments.iter().any(|argument| argument == "--include"));
+        assert!(arguments.iter().any(|argument| argument == "--exclude"));
+    }
 
     #[test]
     fn snapshot_readiness_requires_matching_marker() {
