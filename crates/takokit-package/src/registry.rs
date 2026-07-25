@@ -8,7 +8,7 @@ use std::{
 };
 
 const DEFAULT_REGISTRY_URL: &str =
-    "https://raw.githubusercontent.com/amaansyed27/Takokit/main/registry/index.json";
+    "https://takokit-library.vercel.app/v1/registry.json";
 const MAX_REGISTRY_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
