@@ -108,7 +108,9 @@ Expected: both aliases report the same version and storage root.
 
 Verify:
 
-- all 31 model IDs parse,
+- all 24 families and 31 immutable releases parse,
+- canonical tags, legacy aliases and omitted defaults resolve to the expected stored model ID,
+- every embedded manifest digest validates before use,
 - every model names an existing runner,
 - each model reports a lifecycle, artifact and runner-runtime state,
 - executable-path models are not ready before installation,
@@ -244,7 +246,7 @@ Pass criteria:
 ## 10. Pull idempotency and recovery
 
 ```powershell
-& $Tako pull whisper-tiny
+& $Tako pull whisper:tiny
 & $Tako pull whisper-tiny
 & $Tako pull kokoro
 & $Tako pull kokoro
@@ -256,7 +258,7 @@ Pass criteria:
 - verified artifacts and snapshots are reused,
 - ready state is not downgraded,
 - digests or pinned source markers are rechecked,
-- duplicate content-addressed blobs are not created,
+- canonical and legacy aliases share one installed record and do not create duplicate content-addressed blobs,
 - `tako list` contains only fully installed, currently verified models; catalog-only metadata is excluded.
 
 Interrupt one large pull and restart it. A partial snapshot must never be treated as ready.

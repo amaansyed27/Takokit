@@ -30,7 +30,7 @@ impl InstalledRegistry {
             }
 
             data.push(InstalledModelSummary {
-                name: record.id.clone(),
+                name: package_registry.canonical_reference_for_id(&record.id),
                 model_type: model_type_label(&manifest),
                 id: inventory_digest(&manifest, &record),
                 size_bytes: installed_size(&record),

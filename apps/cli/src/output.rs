@@ -67,8 +67,32 @@ pub(crate) fn print_runners(
 }
 
 pub(crate) fn print_library_models(package_registry: &PackageRegistry) -> anyhow::Result<()> {
-    let models = package_registry.library_models().map_err(cli_error)?;
+    let models = package_registry.registry_models().map_err(cli_error)?;
     print_serializable(&models)
+}
+
+pub(crate) fn print_library_model(
+    package_registry: &PackageRegistry,
+    reference: &str,
+) -> anyhow::Result<()> {
+    let resolved = package_registry
+        .resolve_model_reference(reference)
+        .map_err(cli_error)?;
+    let models = package_registry.registry_models().map_err(cli_error)?;
+    let family = models
+        .into_iter()
+        .find(|model| model.name == resolved.name)
+        .ok_or_else(|| anyhow::anyhow!("resolved registry family disappeared"))?;
+    let release = family
+        .tags
+        .iter()
+        .find(|release| release.tag == resolved.tag)
+        .ok_or_else(|| anyhow::anyhow!("resolved registry tag disappeared"))?;
+    print_value(&serde_json::json!({
+        "reference": resolved,
+        "model": family,
+        "release": release
+    }))
 }
 
 pub(crate) fn print_library_runners(package_registry: &PackageRegistry) -> anyhow::Result<()> {

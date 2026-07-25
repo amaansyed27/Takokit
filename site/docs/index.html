@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documentation · Takokit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/base.css" />
+    <link rel="stylesheet" href="/assets/pages.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="shell nav-inner">
+        <a class="brand" href="/"><span class="brand-mark"></span>TAKOKIT</a>
+        <div class="nav-links">
+          <a href="/library">Library</a>
+          <a aria-current="page" href="/docs">Docs</a>
+          <a href="https://github.com/amaansyed27/Takokit">GitHub</a>
+          <a class="github-link" href="#install">Get Takokit</a>
+        </div>
+      </div>
+    </nav>
+    <main class="shell">
+      <header class="page-head">
+        <p class="eyebrow">Takokit documentation</p>
+        <h1>One command to a working voice model.</h1>
+      </header>
+      <div class="docs-layout">
+        <aside class="docs-nav">
+          <a href="#install">Install</a>
+          <a href="#references">Model references</a>
+          <a href="#pull">Pull models</a>
+          <a href="#run">Run models</a>
+          <a href="#registry">Registry behavior</a>
+          <a href="#storage">Storage</a>
+        </aside>
+        <article class="doc-panel">
+          <h2 id="install">Build the current beta</h2>
+          <p>Until signed installers are published, build Takokit from source with Rust stable and Node.js LTS.</p>
+          <pre><code>git clone https://github.com/amaansyed27/Takokit.git
+cd Takokit
+cd apps/gui && npm ci && npm run build && cd ../..
+cargo build --release
+.\target\release\tako.exe doctor</code></pre>
+
+          <h2 id="references">Model references</h2>
+          <p>References follow <code>[namespace/]name[:tag][@digest]</code>. The namespace defaults to <code>library</code>, and an omitted tag resolves to the Takokit-tested default.</p>
+          <pre><code>tako pull kokoro
+tako pull whisper:small
+tako pull qwen3-tts:0.6b-base
+tako pull library/openvoice:2
+tako pull kokoro@sha256:&lt;manifest-digest&gt;</code></pre>
+          <p>Legacy IDs remain aliases. For example, <code>whisper-small</code> and <code>whisper:small</code> resolve to the same storage identity and never create duplicate model files.</p>
+
+          <h2 id="pull">Pull and inspect</h2>
+          <pre><code>tako library sync
+tako library models
+tako library show qwen3-tts
+tako pull qwen3-tts:0.6b-base
+tako show qwen3-tts:0.6b-base
+tako list</code></pre>
+
+          <h2 id="run">Run locally</h2>
+          <pre><code>tako speak "Hello from Takokit" --model kokoro
+tako transcribe sample.wav --model whisper:base
+tako clone reference.wav --name "My Voice" --model chatterbox --consent</code></pre>
+
+          <h2 id="registry">Registry behavior</h2>
+          <p>The companion library publishes small versioned manifests. The CLI validates the manifest digest and then downloads pinned checkpoint files directly from their upstream source. <code>latest</code> never means an unreviewed upstream commit; it means the newest release promoted by Takokit after compatibility checks.</p>
+          <ul>
+            <li>Registry updates are cached under the Takokit home.</li>
+            <li>Pulls fall back to the last verified cached or bundled index when offline.</li>
+            <li>Set <code>TAKOKIT_REGISTRY_OFFLINE=1</code> to disable network registry refreshes.</li>
+            <li>Set <code>TAKOKIT_REGISTRY_URL</code> to test another compatible registry.</li>
+          </ul>
+
+          <h2 id="storage">Storage and deduplication</h2>
+          <pre><code>~/.takokit/
+├── blobs/sha256/
+├── cache/
+├── manifests/registry/
+├── models/
+└── runners/</code></pre>
+          <p>Model artifacts are content-addressed. Compatible Python models share one Takokit-owned dependency base per Python ABI, while model-specific adapters remain lightweight overlays.</p>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="shell footer-inner"><span>Takokit Docs</span><span>Local-first voice infrastructure</span></div></footer>
+  </body>
+</html>

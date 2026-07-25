@@ -142,6 +142,26 @@ jobs:
           path: apps/gui/gui-build.log
           if-no-files-found: ignore
 
+  site:
+    name: Library site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate registry-backed site
+        working-directory: site
+        run: npm test
+
+      - name: Build library site
+        working-directory: site
+        run: npm run build
+
   publish-status:
     name: Publish aggregate status
     if: always() && github.event_name == 'push'
@@ -149,6 +169,7 @@ jobs:
       - quality
       - rust
       - gui
+      - site
     runs-on: ubuntu-latest
     steps:
       - name: Publish classic commit status
@@ -157,12 +178,14 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           RUST_RESULT: ${{ needs.rust.result }}
           GUI_RESULT: ${{ needs.gui.result }}
+          SITE_RESULT: ${{ needs.site.result }}
         with:
           script: |
             const results = {
               quality: process.env.QUALITY_RESULT,
               rust: process.env.RUST_RESULT,
               gui: process.env.GUI_RESULT,
+              site: process.env.SITE_RESULT,
             };
             const passed = Object.values(results).every((result) => result === 'success');
             const description = Object.entries(results)

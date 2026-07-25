@@ -13,7 +13,7 @@ CLI, TUI, GUI and API share the same registry, installed records, runners, voice
 
 ## Release status
 
-Takokit is preparing for a `v0.1.0` public beta. The bundled catalog currently contains **31 model IDs** across:
+Takokit is preparing for a `v0.1.0` public beta. The bundled registry currently publishes **24 model families and 31 immutable releases** across:
 
 - local TTS,
 - speech-to-text,
@@ -99,12 +99,15 @@ tako capabilities
 
 tako list                    # verified models installed on this machine
 tako models                  # browse the bundled runtime catalog
-tako library models          # browse the curated discovery catalog
+tako library sync            # refresh the signed/pinned registry cache
+tako library models          # browse versioned model families
+tako library show whisper:small
 tako runners
 tako show kokoro
-tako plan whisper-tiny
+tako plan whisper:tiny
 tako pull kokoro
-tako rm kokoro
+tako pull whisper:tiny
+tako rm whisper:tiny
 
 tako speak "Hello from Takokit" --model kokoro
 tako transcribe ./sample.wav --model whisper-tiny
@@ -136,13 +139,35 @@ tako gui
 are still present and verified. Metadata-only catalog entries belong to
 `tako models`, not the installed-model list.
 
+## Model library and versioned references
+
+Takokit's curated registry is the control plane between upstream model sources and local storage. References use:
+
+```text
+[namespace/]model[:tag][@sha256:digest]
+```
+
+The default namespace is `library`, and an omitted tag resolves to the family's Takokit-verified default. `latest` means the latest default Takokit has tested and published; it does not silently chase an upstream branch.
+
+```bash
+tako library sync
+tako library models
+tako library show whisper:small
+
+tako pull whisper:small
+tako pull qwen3-tts:0.6b-base
+tako pull library/openvoice:2
+```
+
+Legacy names remain aliases. For example, `whisper-tiny` and `whisper:tiny` resolve to the same pinned manifest, install ID and content-addressed files. The registry carries metadata and verified manifests; model bytes still download directly from the pinned upstream source. See [docs/registry.md](docs/registry.md).
+
 ## Pull lifecycle
 
 `tako pull <model>` owns setup. Users should not clone upstream repositories, launch Gradio applications or install random Python dependencies globally.
 
 A pull resolves:
 
-1. the model manifest and capabilities,
+1. a versioned registry reference, pinned manifest and capabilities,
 2. the required runner contract,
 3. the runner runtime,
 4. an isolated adapter environment when required,
@@ -283,7 +308,8 @@ Major workspace components:
 - `takokit-store` — global resources, voices and project sessions,
 - `takokit-audio` — audio utilities,
 - `apps/cli` — CLI and Ratatui interface,
-- `apps/gui` — React/Vite local GUI.
+- `apps/gui` — React/Vite local GUI,
+- `site` — public companion library, model pages, docs and registry endpoint.
 
 ## Test the complete catalog
 

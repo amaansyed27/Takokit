@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Pull, run, and build with open voice models locally through one trusted runtime."
+    />
+    <title>Takokit · Open voice models, locally</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/base.css" />
+    <link rel="stylesheet" href="/assets/pages.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="shell nav-inner">
+        <a class="brand" href="/"><span class="brand-mark"></span>TAKOKIT</a>
+        <div class="nav-links">
+          <a href="/library">Library</a>
+          <a href="/docs">Docs</a>
+          <a href="https://github.com/amaansyed27/Takokit">GitHub</a>
+          <a class="github-link" href="/docs#install">Get Takokit</a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <section class="shell hero">
+        <div>
+          <p class="eyebrow">The local voice runtime</p>
+          <h1>Open voice models. <span>One clean runtime.</span></h1>
+          <p class="hero-copy">
+            Pull, run, and inspect speech models without hand-building Python
+            environments. Takokit resolves trusted manifests, reuses runners and
+            dependencies, and keeps your audio on your machine.
+          </p>
+          <div class="copy-row">
+            <code>tako pull kokoro</code>
+            <button class="copy-button" data-copy="tako pull kokoro">Copy</button>
+          </div>
+        </div>
+        <div class="terminal" aria-label="Takokit terminal demonstration">
+          <div class="terminal-bar"><span>PowerShell</span><span>local / verified</span></div>
+          <div class="terminal-body">
+            <div><span class="prompt">PS&gt;</span> tako pull whisper:small</div>
+            <div class="terminal-muted">resolving library/whisper:small</div>
+            <div class="terminal-muted">manifest sha256:ea8e7a1f2eff…</div>
+            <div class="terminal-muted">runner takokit-whispercpp · already ready</div>
+            <div class="terminal-good">model files verified · 465.0 MiB</div>
+            <div class="terminal-good">ready yes</div>
+            <br />
+            <div><span class="prompt">PS&gt;</span> tako transcribe sample.wav --model whisper:small</div>
+            <div class="terminal-good">Transcription complete</div>
+            <div class="terminal-muted">Saved to .tako/sessions/…/outputs/</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="stat-strip">
+            <div class="stat"><strong id="family-count">24</strong><span>model families</span></div>
+            <div class="stat"><strong id="release-count">31</strong><span>verified manifests</span></div>
+            <div class="stat"><strong>5</strong><span>shared runner contracts</span></div>
+            <div class="stat"><strong>Local</strong><span>audio and outputs</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="section-heading">
+            <h2>Start with a voice.</h2>
+            <p>
+              Browse curated speech-to-text, text-to-speech, cloning, conversion,
+              and audio-language families. Tags select variants; immutable digests
+              make every pull reproducible.
+            </p>
+          </div>
+          <div class="model-grid" id="featured-models">
+            <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="section-heading">
+            <h2>A library, not another cache.</h2>
+            <p>
+              Takokit is the trusted control plane. Large checkpoints still travel
+              directly from their pinned upstream source into content-addressed
+              local storage.
+            </p>
+          </div>
+          <div class="architecture">
+            <article>
+              <span class="number">01 / RESOLVE</span>
+              <h3>Name → manifest</h3>
+              <p><code>kokoro</code> resolves to the current Takokit-tested tag and an immutable manifest digest.</p>
+            </article>
+            <article>
+              <span class="number">02 / ACQUIRE</span>
+              <h3>Source → local blobs</h3>
+              <p>Files resume from pinned Hugging Face or release sources and verify before becoming ready.</p>
+            </article>
+            <article>
+              <span class="number">03 / REUSE</span>
+              <h3>Runner → execution</h3>
+              <p>Compatible models share runners, Python bases, Torch packages, caches, and verified adapters.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer-inner">
+        <span>Takokit by Dawnlight Labs</span>
+        <span>Rust-first · local-first · open source</span>
+      </div>
+    </footer>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

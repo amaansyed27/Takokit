@@ -172,6 +172,16 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Library { target }) => match target {
             LibraryTarget::Models => print_library_models(&package_registry)?,
             LibraryTarget::Runners => print_library_runners(&package_registry)?,
+            LibraryTarget::Sync => {
+                let updated = package_registry.sync_remote().map_err(cli_error)?;
+                print_value(&serde_json::json!({
+                    "updated": updated,
+                    "models": package_registry.registry_models().map_err(cli_error)?.len()
+                }))?;
+            }
+            LibraryTarget::Show { model } => {
+                print_library_model(&package_registry, &model)?;
+            }
         },
         Some(Command::Speak(args)) => {
             run_speak(
@@ -208,9 +218,15 @@ pub async fn run() -> anyhow::Result<()> {
             print_or_json_plan(&plan, args.json || json_output_requested())?;
         }
         Some(Command::Rm { model }) => {
-            let removed = installed_registry.remove_model(&model).map_err(cli_error)?;
+            let resolved = package_registry
+                .resolve_model_reference(&model)
+                .map_err(cli_error)?;
+            let removed = installed_registry
+                .remove_model(&resolved.target)
+                .map_err(cli_error)?;
             print_value(&serde_json::json!({
-                "id": model,
+                "id": resolved.canonical,
+                "target": resolved.target,
                 "removed": removed
             }))?;
         }

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Library · Takokit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/base.css" />
+    <link rel="stylesheet" href="/assets/pages.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="shell nav-inner">
+        <a class="brand" href="/"><span class="brand-mark"></span>TAKOKIT</a>
+        <div class="nav-links">
+          <a aria-current="page" href="/library">Library</a>
+          <a href="/docs">Docs</a>
+          <a href="https://github.com/amaansyed27/Takokit">GitHub</a>
+          <a class="github-link" href="/docs#install">Get Takokit</a>
+        </div>
+      </div>
+    </nav>
+    <main class="shell">
+      <header class="page-head">
+        <p class="eyebrow">Curated and pinned</p>
+        <h1>Voice model library.</h1>
+        <p>Every family resolves to a Takokit-tested tag. Choose a variant explicitly or use the recommended default.</p>
+      </header>
+      <section class="section" style="padding-top: 0; border-top: 0">
+        <div class="library-tools">
+          <input id="library-search" class="search" type="search" placeholder="Filter models, tags, or capabilities…" autofocus />
+          <select id="task-filter" class="filter"><option value="">All capabilities</option></select>
+        </div>
+        <p class="result-line" id="result-line">Loading registry…</p>
+        <div class="model-grid" id="library-grid">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+        </div>
+      </section>
+    </main>
+    <footer class="footer"><div class="shell footer-inner"><span>Takokit Library</span><span>Verified manifests · direct upstream downloads</span></div></footer>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

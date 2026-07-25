@@ -1,0 +1,262 @@
+.page-head {
+  padding: 82px 0 45px;
+}
+
+.page-head h1 {
+  max-width: none;
+  font-size: clamp(2.7rem, 7vw, 5.8rem);
+}
+
+.page-head p {
+  max-width: 720px;
+  color: var(--muted);
+  font-family: system-ui, sans-serif;
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.library-tools {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.search,
+.filter {
+  min-height: 50px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  outline: 0;
+  background: var(--white);
+  color: var(--ink);
+}
+
+.search {
+  padding: 0 17px;
+}
+
+.filter {
+  padding: 0 13px;
+}
+
+.result-line {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.empty {
+  padding: 50px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+.model-hero {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 55px;
+  padding: 75px 0 55px;
+}
+
+.model-hero h1 {
+  font-size: clamp(2.5rem, 6vw, 5rem);
+}
+
+.manifest-panel,
+.doc-panel {
+  border: 1px solid var(--line);
+  background: var(--white);
+}
+
+.manifest-row {
+  display: grid;
+  grid-template-columns: 125px 1fr;
+  gap: 18px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.74rem;
+}
+
+.manifest-row:last-child {
+  border-bottom: 0;
+}
+
+.manifest-row span:first-child {
+  color: var(--muted);
+}
+
+.release-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  font-size: 0.76rem;
+}
+
+.release-table th,
+.release-table td {
+  padding: 15px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.release-table th {
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.digest {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 45px;
+  padding-bottom: 100px;
+}
+
+.docs-nav {
+  position: sticky;
+  top: 95px;
+  align-self: start;
+}
+
+.docs-nav a {
+  display: block;
+  padding: 9px 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.docs-nav a:hover {
+  color: var(--ink);
+}
+
+.doc-panel {
+  padding: clamp(25px, 5vw, 55px);
+}
+
+.doc-panel h2 {
+  margin-top: 55px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.doc-panel h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.doc-panel p,
+.doc-panel li {
+  font-family: system-ui, sans-serif;
+  line-height: 1.7;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 20px;
+  border: 1px solid #31414f;
+  background: var(--navy);
+  color: #f5eedf;
+  line-height: 1.7;
+}
+
+.footer {
+  padding: 38px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.skeleton {
+  min-height: 235px;
+  animation: pulse 1.2s infinite alternate;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgb(255 253 247 / 40%);
+}
+
+@keyframes pulse {
+  to {
+    background: rgb(255 253 247 / 90%);
+  }
+}
+
+@media (max-width: 860px) {
+  .hero,
+  .section-heading,
+  .model-hero,
+  .docs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    gap: 45px;
+    padding-top: 60px;
+  }
+
+  .model-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-strip,
+  .architecture {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .docs-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 580px) {
+  .shell {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .nav-links a:not(.github-link) {
+    display: none;
+  }
+
+  .model-grid,
+  .stat-strip,
+  .architecture,
+  .library-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .stat {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .section,
+  .page-head {
+    padding-top: 60px;
+  }
+
+  .release-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

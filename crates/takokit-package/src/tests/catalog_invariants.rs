@@ -54,3 +54,59 @@ fn executable_python_models_map_to_their_declared_adapter() {
         );
     }
 }
+
+#[test]
+fn registry_index_maps_all_legacy_ids_to_canonical_tags() {
+    let registry = PackageRegistry::bundled();
+    let families = registry.registry_models().expect("registry families");
+    assert_eq!(families.len(), 24);
+    assert_eq!(
+        families.iter().map(|model| model.tags.len()).sum::<usize>(),
+        31
+    );
+
+    for (legacy, canonical) in [
+        ("kokoro", "kokoro:latest"),
+        ("whisper-tiny", "whisper:tiny"),
+        ("whisper-base", "whisper:base"),
+        ("whisper-small", "whisper:small"),
+        ("qwen3-tts", "qwen3-tts:0.6b-custom"),
+        ("qwen3-tts-0.6b-base", "qwen3-tts:0.6b-base"),
+        ("qwen3-tts-1.7b-voice-design", "qwen3-tts:1.7b-voice-design"),
+    ] {
+        let resolved = registry
+            .resolve_model_reference(legacy)
+            .unwrap_or_else(|error| panic!("failed to resolve {legacy}: {error}"));
+        assert_eq!(resolved.canonical, canonical);
+        assert_eq!(
+            registry.model(canonical).expect("canonical manifest").id,
+            resolved.target
+        );
+    }
+}
+
+#[test]
+fn family_defaults_and_latest_aliases_are_hardware_conscious() {
+    let registry = PackageRegistry::bundled();
+    assert_eq!(
+        registry
+            .resolve_model_reference("whisper")
+            .expect("whisper default")
+            .canonical,
+        "whisper:base"
+    );
+    assert_eq!(
+        registry
+            .resolve_model_reference("whisper:latest")
+            .expect("whisper latest")
+            .canonical,
+        "whisper:base"
+    );
+    assert_eq!(
+        registry
+            .resolve_model_reference("qwen3-tts")
+            .expect("qwen default")
+            .canonical,
+        "qwen3-tts:0.6b-custom"
+    );
+}
