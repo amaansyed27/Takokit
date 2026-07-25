@@ -7,7 +7,8 @@ for (const path of [
   "model.html",
   "docs/index.html",
   "assets/app.js",
-  "assets/styles.css",
+  "assets/base.css",
+  "assets/pages.css",
   "api/v1/registry.js",
   "vercel.json",
 ]) {
