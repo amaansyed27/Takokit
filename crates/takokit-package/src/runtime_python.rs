@@ -531,3 +531,78 @@ pub(crate) fn write_adapter_record(path: &Path, record: &AdapterRecord) -> Packa
     std::fs::write(path, toml::to_string_pretty(record)?)?;
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_directory(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "takokit-runtime-python-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn shared_runtime_identity_tracks_python_abi() {
+        assert_eq!(
+            shared_runtime_identity("3.11"),
+            "shared-python-v1-py3.11"
+        );
+        assert_ne!(
+            shared_runtime_identity("3.10"),
+            shared_runtime_identity("3.12")
+        );
+    }
+
+    #[test]
+    fn adapter_venv_must_enable_shared_packages() {
+        let root = test_directory("site-packages");
+        std::fs::create_dir_all(&root).expect("create test venv");
+        std::fs::write(
+            root.join("pyvenv.cfg"),
+            "include-system-site-packages = true\n",
+        )
+        .expect("write pyvenv.cfg");
+        assert!(venv_inherits_shared_packages(&root));
+
+        std::fs::write(
+            root.join("pyvenv.cfg"),
+            "include-system-site-packages = false\n",
+        )
+        .expect("rewrite pyvenv.cfg");
+        assert!(!venv_inherits_shared_packages(&root));
+        std::fs::remove_dir_all(root).expect("remove test venv");
+    }
+
+    #[test]
+    fn managed_base_must_belong_to_takokit() {
+        let root = test_directory("managed-base");
+        let managed_root = root.join("tools").join("python");
+        let base = managed_root.join(if cfg!(windows) {
+            "python.exe"
+        } else {
+            "python"
+        });
+        let venv = root.join("venv");
+        std::fs::create_dir_all(&managed_root).expect("create managed root");
+        std::fs::create_dir_all(&venv).expect("create venv");
+        std::fs::write(&base, b"").expect("create fake interpreter");
+        std::fs::write(
+            venv.join("pyvenv.cfg"),
+            format!("base-executable = {}\n", base.display()),
+        )
+        .expect("write pyvenv.cfg");
+
+        assert_eq!(
+            managed_base_python(&venv, &root).expect("resolve managed Python"),
+            base
+        );
+        std::fs::remove_dir_all(root).expect("remove test tree");
+    }
+}
