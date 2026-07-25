@@ -7,8 +7,7 @@ use std::{
     time::Duration,
 };
 
-const DEFAULT_REGISTRY_URL: &str =
-    "https://takokit-library.vercel.app/v1/registry.json";
+const DEFAULT_REGISTRY_URL: &str = "https://takokit-library.vercel.app/v1/registry.json";
 const MAX_REGISTRY_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
