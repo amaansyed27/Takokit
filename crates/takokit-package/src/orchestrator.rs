@@ -18,12 +18,13 @@ pub fn install_model_complete(
     model_id: &str,
     options: InstallModelOptions,
 ) -> PackageResult<ModelInstallReport> {
-    let progress = InstallProgressReporter::model(takokit_root, model_id);
+    let model = package_registry.model_for_pull(model_id)?;
+    let progress = InstallProgressReporter::model(takokit_root, &model.id);
     let result = install_model_complete_inner(
         package_registry,
         installed_registry,
         takokit_root,
-        model_id,
+        &model,
         options,
         &progress,
     );
@@ -38,12 +39,11 @@ fn install_model_complete_inner(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
     takokit_root: &Path,
-    model_id: &str,
+    model: &ModelManifest,
     options: InstallModelOptions,
     progress: &InstallProgressReporter,
 ) -> PackageResult<ModelInstallReport> {
-    progress.update("resolving", "Resolving model and runner", 0, None);
-    let model = package_registry.model(model_id)?;
+    progress.update("resolving", "Resolved registry tag and runner", 0, None);
     let runner = package_registry.runner(&model.runner)?;
     let logs_path = takokit_root.join("logs");
 
@@ -57,7 +57,7 @@ fn install_model_complete_inner(
             &model,
         );
         let report = installed_registry.install_model_with_options(&model, options)?;
-        let plan = plan_model(package_registry, installed_registry, model_id)?;
+        let plan = plan_model(package_registry, installed_registry, &model.id)?;
         return Ok(ModelInstallReport {
             model_id: model.id,
             required_runner: runner.id,
@@ -312,7 +312,7 @@ fn install_model_complete_inner(
             return Err(rollback_final_verification(
                 snapshot,
                 installed_registry,
-                model_id,
+                &model.id,
                 error,
             ))
         }
@@ -321,7 +321,7 @@ fn install_model_complete_inner(
         return Err(rollback_final_verification(
             snapshot,
             installed_registry,
-            model_id,
+            &model.id,
             PackageError::ArtifactInstallFailed {
                 artifact: model.id.clone(),
                 reason: format!(
