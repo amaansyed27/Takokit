@@ -53,5 +53,8 @@ for (const [index, page] of pages.entries()) {
   if (!page.includes("data-site-header") || !page.includes("data-site-footer")) {
     throw new Error(`page ${index + 1} is not wired to shared site chrome`);
   }
+  if (!page.includes("/assets/app.js?v=") || !page.includes("/assets/base.css?v=")) {
+    throw new Error(`page ${index + 1} does not cache-bust shared assets`);
+  }
 }
 console.log("Takokit Library site validation passed");
