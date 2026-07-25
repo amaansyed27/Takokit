@@ -159,7 +159,10 @@ impl RegistryIndex {
                 .find(|family| family.name.eq_ignore_ascii_case(name))
             {
                 let release = if let Some(digest) = expected_digest {
-                    family.tags.iter().find(|release| digest_matches(&release.digest, digest))
+                    family
+                        .tags
+                        .iter()
+                        .find(|release| digest_matches(&release.digest, digest))
                 } else {
                     family
                         .tags
