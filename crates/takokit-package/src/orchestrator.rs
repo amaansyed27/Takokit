@@ -59,9 +59,9 @@ fn install_model_complete_inner(
         let report = installed_registry.install_model_with_options(&model, options)?;
         let plan = plan_model(package_registry, installed_registry, &model.id)?;
         return Ok(ModelInstallReport {
-            model_id: model.id,
+            model_id: model.id.clone(),
             required_runner: runner.id,
-            required_adapter: model.required_adapter,
+            required_adapter: model.required_adapter.clone(),
             artifacts: InstallStep {
                 state: if artifacts_before == ArtifactReuseState::Verified {
                     InstallStepState::AlreadyReady
@@ -333,9 +333,9 @@ fn install_model_complete_inner(
     }
 
     Ok(ModelInstallReport {
-        model_id: model.id,
+        model_id: model.id.clone(),
         required_runner: runner.id,
-        required_adapter: model.required_adapter,
+        required_adapter: model.required_adapter.clone(),
         artifacts,
         runner_contract,
         runner_runtime,
