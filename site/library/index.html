@@ -3,43 +3,64 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Browse Takokit's curated local voice model families and pinned releases." />
+    <meta name="theme-color" content="#071522" />
     <title>Model Library · Takokit</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="/assets/brand/takokit-mark.svg" />
     <link rel="stylesheet" href="/assets/base.css" />
     <link rel="stylesheet" href="/assets/pages.css" />
+    <link rel="stylesheet" href="/assets/detail.css" />
+    <link rel="stylesheet" href="/assets/responsive.css" />
   </head>
-  <body>
-    <nav class="nav">
-      <div class="shell nav-inner">
-        <a class="brand" href="/"><span class="brand-mark"></span>TAKOKIT</a>
-        <div class="nav-links">
-          <a aria-current="page" href="/library">Library</a>
-          <a href="/docs">Docs</a>
-          <a href="https://github.com/amaansyed27/Takokit">GitHub</a>
-          <a class="github-link" href="/docs#install">Get Takokit</a>
+  <body data-page="library">
+    <div data-site-header></div>
+    <main>
+      <header class="page-hero">
+        <div class="shell">
+          <p class="eyebrow">Curated and pinned</p>
+          <h1>Voice model library.</h1>
+          <p class="lead">
+            Search speech synthesis, transcription, cloning, conversion, and audio-language
+            families. Every visible release maps to a validated Takokit manifest.
+          </p>
         </div>
-      </div>
-    </nav>
-    <main class="shell">
-      <header class="page-head">
-        <p class="eyebrow">Curated and pinned</p>
-        <h1>Voice model library.</h1>
-        <p>Every family resolves to a Takokit-tested tag. Choose a variant explicitly or use the recommended default.</p>
       </header>
-      <section class="section" style="padding-top: 0; border-top: 0">
-        <div class="library-tools">
-          <input id="library-search" class="search" type="search" placeholder="Filter models, tags, or capabilities…" autofocus />
-          <select id="task-filter" class="filter"><option value="">All capabilities</option></select>
-        </div>
-        <p class="result-line" id="result-line">Loading registry…</p>
-        <div class="model-grid" id="library-grid">
-          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-        </div>
-      </section>
+      <div class="shell library-layout">
+        <aside class="filter-panel" aria-label="Model filters">
+          <div class="filter-group">
+            <strong>Capability</strong>
+            <button class="filter-button is-active" data-filter="">All models</button>
+            <button class="filter-button" data-filter="tts">Text to speech</button>
+            <button class="filter-button" data-filter="stt">Speech to text</button>
+            <button class="filter-button" data-filter="voice-cloning">Voice cloning</button>
+            <button class="filter-button" data-filter="voice-conversion">Conversion</button>
+            <button class="filter-button" data-filter="voice-training">Voice training</button>
+            <button class="filter-button" data-filter="live-audio">Live audio</button>
+          </div>
+          <div class="filter-group">
+            <strong>Runtime</strong>
+            <button class="filter-button" data-runner="">Any runner</button>
+            <button class="filter-button" data-runner="python-managed">Python managed</button>
+            <button class="filter-button" data-runner="whispercpp">Whisper.cpp</button>
+            <button class="filter-button" data-runner="onnx">ONNX</button>
+          </div>
+        </aside>
+        <section>
+          <div class="search-bar">
+            <input id="library-search" type="search" placeholder="Search model, tag, task, runner…" autofocus />
+            <span>⌘ /</span>
+          </div>
+          <p class="result-line" id="result-line">Loading registry…</p>
+          <div class="model-list library-results" id="library-results">
+            <div class="loading-row"></div>
+            <div class="loading-row"></div>
+            <div class="loading-row"></div>
+            <div class="loading-row"></div>
+          </div>
+        </section>
+      </div>
     </main>
-    <footer class="footer"><div class="shell footer-inner"><span>Takokit Library</span><span>Verified manifests · direct upstream downloads</span></div></footer>
+    <div data-site-footer></div>
     <script type="module" src="/assets/app.js"></script>
   </body>
 </html>
