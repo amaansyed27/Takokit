@@ -9,3 +9,6 @@
 *.flac
 *.sqlite
 *.db
+/site/node_modules/
+/site/dist/
+/site/public/v1/registry.json
