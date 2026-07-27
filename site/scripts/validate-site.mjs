@@ -4,6 +4,8 @@ const root = new URL("../", import.meta.url);
 for (const path of [
   "index.html",
   "vite.config.js",
+  "public/brand/takokit-mark.svg",
+  "public/brand/takokit-lockup.svg",
   "src/main.jsx",
   "src/App.jsx",
   "src/router.js",
@@ -22,6 +24,12 @@ if (!pkg.dependencies.react || !pkg.dependencies.vite || !pkg.dependencies["@vit
 }
 
 const app = await readFile(new URL("src/App.jsx", root), "utf8");
+const chrome = await readFile(new URL("src/components/Chrome.jsx", root), "utf8");
+for (const [name, source] of [["App.jsx", app], ["Chrome.jsx", chrome]]) {
+  if (source.includes("assets/brand/")) {
+    throw new Error(`${name} references the deleted legacy brand directory`);
+  }
+}
 for (const route of ["/library", "/docs", "/download"]) {
   if (!app.includes(route)) throw new Error(`missing React route ${route}`);
 }
