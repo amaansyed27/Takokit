@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+<defs>
+  <linearGradient id="ygrad" x1="92" y1="134" x2="455" y2="376" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FFE45E"/><stop offset="55%" stop-color="#FFD400"/><stop offset="100%" stop-color="#FFBF00"/></linearGradient>
+  <linearGradient id="creamGrad" x1="96" y1="241" x2="268" y2="376" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FFF8D5"/><stop offset="100%" stop-color="#FFF1A8"/></linearGradient>
+  <linearGradient id="goldGrad" x1="271" y1="241" x2="451" y2="376" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FFD348"/><stop offset="100%" stop-color="#FFBF00"/></linearGradient>
+  <mask id="t_cut_mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect x="0" y="0" width="512" height="512" fill="white"/><path d="M178 169 H404 L379 229 H202 Z" fill="black"/><path d="M240 229 H322 L245 404 H163 Z" fill="black"/></mask>
+</defs>
+<g mask="url(#t_cut_mask)"><path d="M92 328 C102 207 182 134 276 134 C364 134 446 207 455 328 C421 250 351 197 274 197 C197 197 126 250 92 328 Z" fill="url(#ygrad)"/><path d="M96 376 C102 309 146 257 214 241 H268 L205 376 H96 Z" fill="url(#creamGrad)"/><path d="M271 376 L338 241 C402 257 449 311 451 376 H271 Z" fill="url(#goldGrad)"/></g></svg>
