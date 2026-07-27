@@ -1,7 +1,7 @@
 //! Shared Takokit-owned Python bases inherited by adapter environments.
 
 use crate::{
-    runtime_command::run_logged_command_with_env,
+    runtime_command::{run_logged_command_with_env, PathOrArg},
     runtime_uv::bootstrap_uv,
     *,
 };

@@ -106,6 +106,8 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     write_python_adapter_manifests(&layout)?;
     let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
     let mut record = python_adapter_record(takokit_root, adapter)?;
+    record.dependency_strategy =
+        "isolated-overlay-with-uv-hardlink-deduplication".to_string();
     let reset_environment = record.state == AdapterLifecycleState::Failed;
     record.state = AdapterLifecycleState::Installing;
     record.notes =
@@ -160,7 +162,7 @@ pub(crate) fn install_python_managed_runtime(
         manifest,
         RunnerLifecycleState::Ready,
         format!(
-            "Managed Python runtime is ready at {} using {}. A shared dependency base is installed once for each Python ABI when its first adapter is pulled.",
+            "Managed Python runtime is ready at {} using {}. Adapter dependencies are isolated by Python ABI and physically deduplicated through the managed uv cache.",
             layout.root.display(),
             uv.display()
         ),
