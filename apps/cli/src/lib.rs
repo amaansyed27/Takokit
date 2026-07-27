@@ -19,9 +19,10 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    bootstrap_uv, find_uv, initialize_runner_runtime, install_model_complete,
+    bootstrap_uv, clean_uv_cache, find_uv, initialize_runner_runtime, install_model_complete,
     install_python_adapter, model_info_from_plan, plan_model, python_adapter_record,
-    python_adapter_records, resolve_execution_plan, runner_runtime_layout, InstallModelOptions,
+    prune_uv_cache, python_adapter_records, resolve_execution_plan, runner_runtime_layout,
+    InstallModelOptions,
     InstalledRegistry, ModelPlan, PackageError, PackageRegistry, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
@@ -149,6 +150,14 @@ pub async fn run() -> anyhow::Result<()> {
                     "log: {}",
                     store.logs_dir().join("uv-bootstrap.log").display()
                 );
+            }
+            DepsCommand::Prune => {
+                let cache = prune_uv_cache(store.root()).map_err(cli_error)?;
+                println!("pruned uv cache: {}", cache.display());
+            }
+            DepsCommand::Clean => {
+                let cache = clean_uv_cache(store.root()).map_err(cli_error)?;
+                println!("cleaned uv cache: {}", cache.display());
             }
         },
         Some(Command::Samples {

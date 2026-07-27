@@ -1,6 +1,10 @@
 //! Managed uv discovery, bootstrap, and pinned-version verification.
 
-use crate::{artifact_io::sha256_file, *};
+use crate::{
+    artifact_io::sha256_file,
+    runtime_command::{run_logged_command_with_env, PathOrArg},
+    *,
+};
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -85,7 +89,33 @@ pub fn bootstrap_uv(takokit_root: &Path) -> PackageResult<PathBuf> {
     }
 }
 
-pub(crate) fn verify_uv_version(path: &Path, log: &Path) -> PackageResult<bool> {
+pub(crate) 
+pub fn prune_uv_cache(takokit_root: &Path) -> PackageResult<PathBuf> {
+    maintain_uv_cache(takokit_root, "prune")
+}
+
+pub fn clean_uv_cache(takokit_root: &Path) -> PackageResult<PathBuf> {
+    maintain_uv_cache(takokit_root, "clean")
+}
+
+fn maintain_uv_cache(takokit_root: &Path, action: &str) -> PackageResult<PathBuf> {
+    let uv = bootstrap_uv(takokit_root)?;
+    let cache = takokit_root.join("cache").join("uv");
+    let cache_value = cache.to_string_lossy().into_owned();
+    let logs = takokit_root.join("logs");
+    std::fs::create_dir_all(&logs)?;
+    let log = logs.join("uv-cache-maintenance.log");
+    let arguments: Vec<PathOrArg> = vec!["cache".into(), action.to_string().into()];
+    run_logged_command_with_env(
+        &log,
+        &uv,
+        &arguments,
+        &[("UV_CACHE_DIR", cache_value.as_str())],
+    )?;
+    Ok(cache)
+}
+
+fn verify_uv_version(path: &Path, log: &Path) -> PackageResult<bool> {
     let mut command = Command::new(path);
     command.arg("--version");
     #[cfg(windows)]

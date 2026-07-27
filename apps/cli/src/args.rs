@@ -189,6 +189,10 @@ pub(crate) struct QuickstartArgs {
 pub(crate) enum DepsCommand {
     Doctor,
     Bootstrap,
+    /// Remove outdated and unused entries while preserving the reusable package cache.
+    Prune,
+    /// Remove the complete disposable uv package cache.
+    Clean,
 }
 
 #[derive(Debug, Subcommand)]

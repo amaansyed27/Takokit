@@ -1,22 +1,17 @@
 //! Shared Takokit-owned Python bases inherited by adapter environments.
 
 use crate::{
-    runtime_command::{run_logged_command_with_env, PathOrArg},
+    runtime_command::run_logged_command_with_env,
     runtime_uv::bootstrap_uv,
     *,
 };
 use std::path::{Path, PathBuf};
 
-const SHARED_RUNTIME_VERSION: &str = "shared-python-v2";
-const SHARED_RUNTIME_PACKAGES: &[&str] = &[
-    "torch",
-    "torchaudio",
-    "huggingface_hub[hf_xet]",
-    "numpy",
-    "scipy",
-    "soundfile",
-    "packaging",
-];
+// Version 3 keeps the managed base interpreter package-free. Every adapter
+// receives an isolated overlay, while uv hard-links identical package files
+// from Takokit's same-volume cache so large libraries are stored physically
+// once without leaking one adapter's dependency versions into another.
+const SHARED_RUNTIME_VERSION: &str = "isolated-overlays-v3";
 
 pub(super) fn shared_runtime_identity(python: &str) -> String {
     format!("{SHARED_RUNTIME_VERSION}-py{python}")
@@ -28,11 +23,11 @@ fn shared_runtime_dir(layout: &PythonManagedRunnerLayout, python: &str) -> PathB
         .join(format!("shared-python-{}", python.replace('.', "_")))
 }
 
-pub(super) fn venv_inherits_shared_packages(venv: &Path) -> bool {
+pub(super) fn venv_uses_isolated_packages(venv: &Path) -> bool {
     std::fs::read_to_string(venv.join("pyvenv.cfg")).is_ok_and(|config| {
         config.lines().any(|line| {
             let normalized = line.replace(' ', "").to_ascii_lowercase();
-            normalized == "include-system-site-packages=true"
+            normalized == "include-system-site-packages=false"
         })
     })
 }
@@ -84,21 +79,6 @@ fn managed_base_python(venv: &Path, takokit_root: &Path) -> PackageResult<PathBu
         })
 }
 
-fn shared_package_install_arguments(base_python: &Path) -> Vec<PathOrArg> {
-    let mut arguments: Vec<PathOrArg> = vec![
-        "pip".into(),
-        "install".into(),
-        "--python".into(),
-        base_python.to_path_buf().into(),
-        "--system".into(),
-        "--break-system-packages".into(),
-        "--no-progress".into(),
-        "--torch-backend=auto".into(),
-    ];
-    arguments.extend(SHARED_RUNTIME_PACKAGES.iter().map(|item| (*item).into()));
-    arguments
-}
-
 pub(super) fn ensure_shared_python_runtime(
     takokit_root: &Path,
     layout: &PythonManagedRunnerLayout,
@@ -132,8 +112,9 @@ pub(super) fn ensure_shared_python_runtime(
         return Ok(base_python);
     }
 
-    let arguments = shared_package_install_arguments(&base_python);
-    run_logged_uv_command(takokit_root, &log, &uv, &arguments)?;
+    // Do not seed Torch, CUDA, or any other package into the base interpreter.
+    // Adapter-local installs remain version-isolated and uv provides physical
+    // deduplication through hard links from the shared cache.
     std::fs::write(&marker, identity)?;
     Ok(base_python)
 }
@@ -183,7 +164,10 @@ mod tests {
 
     #[test]
     fn shared_runtime_identity_tracks_python_abi() {
-        assert_eq!(shared_runtime_identity("3.11"), "shared-python-v2-py3.11");
+        assert_eq!(
+            shared_runtime_identity("3.11"),
+            "isolated-overlays-v3-py3.11"
+        );
         assert_ne!(
             shared_runtime_identity("3.10"),
             shared_runtime_identity("3.12")
@@ -191,20 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_install_explicitly_allows_the_verified_managed_base() {
-        let arguments = shared_package_install_arguments(Path::new("managed-python"));
-        let arguments = arguments
-            .iter()
-            .map(|argument| argument.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>();
-        assert!(arguments.iter().any(|argument| argument == "--system"));
-        assert!(arguments
-            .iter()
-            .any(|argument| argument == "--break-system-packages"));
-    }
-
-    #[test]
-    fn adapter_venv_must_enable_shared_packages() {
+    fn adapter_venv_must_isolate_packages() {
         let root = test_directory("site-packages");
         std::fs::create_dir_all(&root).expect("create test venv");
         std::fs::write(
@@ -212,14 +183,14 @@ mod tests {
             "include-system-site-packages = true\n",
         )
         .expect("write pyvenv.cfg");
-        assert!(venv_inherits_shared_packages(&root));
+        assert!(!venv_uses_isolated_packages(&root));
 
         std::fs::write(
             root.join("pyvenv.cfg"),
             "include-system-site-packages = false\n",
         )
         .expect("rewrite pyvenv.cfg");
-        assert!(!venv_inherits_shared_packages(&root));
+        assert!(venv_uses_isolated_packages(&root));
         std::fs::remove_dir_all(root).expect("remove test venv");
     }
 
