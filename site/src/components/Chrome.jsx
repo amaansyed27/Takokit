@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { RouteLink } from "../router";
-import mark from "../../assets/brand/takokit-mark.svg";
-import wordmark from "../../assets/brand/takokit-wordmark.svg";
 
 export function Header() {
   const [open, setOpen] = useState(false);
   return <header className="site-header">
     <div className="shell header-inner">
       <RouteLink href="/" className="brand" aria-label="Takokit home">
-        <img src={mark} alt="" /><img className="wordmark" src={wordmark} alt="Takokit" />
+        <img className="lockup" src="/brand/takokit-lockup.svg" alt="Takokit" />
       </RouteLink>
       <button className="menu-button" onClick={() => setOpen(!open)} aria-expanded={open}>Menu</button>
       <nav className={open ? "nav open" : "nav"} onClick={() => setOpen(false)}>
