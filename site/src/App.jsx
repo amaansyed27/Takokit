@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Footer, Header, CopyCommand } from "./components/Chrome";
 import { RouteLink, useRoute } from "./router";
 import { defaultRelease, formatBytes, getRegistry } from "./registry";
-import mark from "../assets/brand/takokit-mark.svg";
 
 function ModelList({ models }) {
   if (!models.length) return <div className="empty">No models match this search.</div>;
@@ -28,7 +27,7 @@ function Home() {
         <CopyCommand>tako pull kokoro</CopyCommand>
         <div className="actions"><RouteLink href="/download" className="primary">Download</RouteLink><RouteLink href="/library">Browse models</RouteLink></div>
       </div>
-      <div className="hero-art"><img src={mark} alt="Takokit abstract mark" /><div className="signal"><i/><i/><i/><i/><i/><i/><i/></div></div>
+      <div className="hero-art"><img src="/brand/takokit-mark.svg" alt="Takokit abstract mark" /><div className="signal"><i/><i/><i/><i/><i/><i/><i/></div></div>
     </section>
     <section className="shell strip"><span>Rust-first runtime</span><span>CLI · TUI · GUI · API</span><span>Local models and outputs</span></section>
     <section className="shell section"><div className="section-head"><div><p className="kicker">Model library</p><h2>Start with a model.</h2></div><RouteLink href="/library">View all →</RouteLink></div><ModelList models={models} /></section>
