@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 
 export function useRoute() {
   const [route, setRoute] = useState(() => location.pathname + location.search);
@@ -22,6 +22,9 @@ export function useRoute() {
   return route;
 }
 
-export const RouteLink = ({ href, children, className = "", ...props }) => (
-  <a href={href} data-route className={className} {...props}>{children}</a>
-);
+export const RouteLink = ({ href, children, className = "", ...props }) =>
+  createElement(
+    "a",
+    { href, "data-route": true, className, ...props },
+    children,
+  );
