@@ -24,6 +24,10 @@ if (!pkg.dependencies.react || !pkg.dependencies.vite || !pkg.dependencies["@vit
 }
 
 const app = await readFile(new URL("src/App.jsx", root), "utf8");
+const router = await readFile(new URL("src/router.js", root), "utf8");
+if (router.includes("<a ")) {
+  throw new Error("src/router.js contains JSX but does not use a .jsx extension");
+}
 const chrome = await readFile(new URL("src/components/Chrome.jsx", root), "utf8");
 for (const [name, source] of [["App.jsx", app], ["Chrome.jsx", chrome]]) {
   if (source.includes("assets/brand/")) {
