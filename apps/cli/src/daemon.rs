@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);
+const SHUTDOWN_ATTEMPTS: usize = 100;
 
 #[cfg(windows)]
 mod windows_handle_inheritance {
@@ -29,12 +30,19 @@ mod windows_handle_inheritance {
     const STD_ERROR_HANDLE: u32 = -12_i32 as u32;
     const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
     const INVALID_HANDLE_VALUE: Handle = -1_isize as Handle;
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    const WAIT_OBJECT_0: u32 = 0;
+    const ERROR_INVALID_PARAMETER: u32 = 87;
 
     #[link(name = "kernel32")]
     extern "system" {
         fn GetStdHandle(n_std_handle: u32) -> Handle;
         fn GetHandleInformation(handle: Handle, flags: *mut u32) -> i32;
         fn SetHandleInformation(handle: Handle, mask: u32, flags: u32) -> i32;
+        fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> Handle;
+        fn WaitForSingleObject(handle: Handle, milliseconds: u32) -> u32;
+        fn CloseHandle(handle: Handle) -> i32;
+        fn GetLastError() -> u32;
     }
 
     pub struct StandardHandleInheritanceGuard {
@@ -70,6 +78,18 @@ mod windows_handle_inheritance {
             }
         }
         StandardHandleInheritanceGuard { restored }
+    }
+
+    pub fn process_has_exited(pid: u32) -> bool {
+        let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
+        if handle.is_null() {
+            return unsafe { GetLastError() } == ERROR_INVALID_PARAMETER;
+        }
+        let status = unsafe { WaitForSingleObject(handle, 0) };
+        unsafe {
+            let _ = CloseHandle(handle);
+        }
+        status == WAIT_OBJECT_0
     }
 }
 
@@ -226,14 +246,25 @@ pub fn stop(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> 
             "managed daemon refused graceful shutdown; ownership was not revoked"
         ));
     }
-    for _ in 0..50 {
-        if !port_is_occupied(config) {
+    for _ in 0..SHUTDOWN_ATTEMPTS {
+        let port_released = !port_is_occupied(config);
+        let ownership_released = !daemon_lock_is_held(store)?;
+        #[cfg(windows)]
+        let process_exited = windows_handle_inheritance::process_has_exited(info.pid);
+        #[cfg(not(windows))]
+        let process_exited = ownership_released;
+
+        if port_released && ownership_released && process_exited {
             cleanup_proven_stale(store, config)?;
             return Ok(true);
         }
         thread::sleep(Duration::from_millis(100));
     }
-    Err(anyhow!("managed daemon did not stop gracefully; refusing PID termination without a fresh ownership check"))
+    Err(anyhow!(
+        "managed daemon accepted shutdown but process {} did not fully exit within 10 seconds; {} may still be locked",
+        info.pid,
+        info.executable.display()
+    ))
 }
 pub fn logs(store: &LocalStore) -> PathBuf {
     log_path(store)
