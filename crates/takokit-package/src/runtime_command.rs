@@ -100,6 +100,13 @@ pub(crate) fn configure_managed_command(command: &mut Command) {
         }
     }
 
+    // Python-backed package and model tools may emit Unicode even when their
+    // output is redirected to a log. Windows otherwise defaults to a legacy
+    // code page and can report a successful download as failed while printing
+    // characters such as the Hugging Face completion checkmark.
+    command.env("PYTHONUTF8", "1");
+    command.env("PYTHONIOENCODING", "utf-8");
+
     #[cfg(windows)]
     if std::env::var_os("UV_LINK_MODE").is_none() {
         // All managed environments and the uv cache live on the same volume.
@@ -159,5 +166,34 @@ impl PathOrArg {
             Self::Arg(value) => value.as_ref(),
             Self::Path(value) => value.as_os_str(),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    fn command_env<'a>(command: &'a Command, name: &str) -> Option<&'a OsStr> {
+        command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new(name))
+            .and_then(|(_, value)| value)
+    }
+
+    #[test]
+    fn managed_python_commands_force_utf8_output() {
+        let mut command = Command::new("python");
+        configure_managed_command(&mut command);
+
+        assert_eq!(
+            command_env(&command, "PYTHONUTF8"),
+            Some(OsStr::new("1"))
+        );
+        assert_eq!(
+            command_env(&command, "PYTHONIOENCODING"),
+            Some(OsStr::new("utf-8"))
+        );
     }
 }
