@@ -33,6 +33,21 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def ensure_compatible_transformers():
+    import transformers
+
+    version = str(getattr(transformers, "__version__", "0"))
+    try:
+        major = int(version.split(".", 1)[0])
+    except ValueError:
+        major = 0
+    if major >= 5:
+        raise RuntimeError(
+            "Coqui TTS requires Transformers 4.x; Takokit should install "
+            f"transformers==4.57.6 in this adapter overlay, but found {version}"
+        )
+
+
 def main():
     request = json.load(sys.stdin)
     model_id = request.get("model_id")
@@ -40,6 +55,7 @@ def main():
     if not checkpoint:
         raise ValueError(f"unsupported Coqui model: {model_id}")
     if request.get("operation") == "prefetch":
+        ensure_compatible_transformers()
         from TTS.api import TTS
 
         TTS(checkpoint)
@@ -75,6 +91,7 @@ def main():
     output_path = Path(request["output_path"]).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    ensure_compatible_transformers()
     import torch
     from TTS.api import TTS
 

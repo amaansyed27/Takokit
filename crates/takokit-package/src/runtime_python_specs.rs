@@ -78,6 +78,23 @@ mod tests {
         let spec = adapter_spec("rvc").expect("RVC adapter spec");
         assert_eq!(spec.python, "3.11");
     }
+
+    #[test]
+    fn coqui_pins_transformers_four_for_yourtts_and_xtts() {
+        let spec = adapter_spec("coqui_tts").expect("Coqui adapter spec");
+        assert!(spec.packages.contains(&"coqui-tts==0.27.5"));
+        assert!(spec.packages.contains(&"transformers==4.57.6"));
+        assert!(spec.packages.contains(&"torchcodec"));
+        assert!(COQUI_TTS_ADAPTER.contains("ensure_compatible_transformers"));
+    }
+
+    #[test]
+    fn f5_pins_release_and_avoids_runner_module_shadowing() {
+        let spec = adapter_spec("f5_tts").expect("F5 adapter spec");
+        assert!(spec.packages.contains(&"f5-tts==1.1.21"));
+        assert!(F5_TTS_ADAPTER.contains("load_f5tts_api"));
+        assert!(F5_TTS_ADAPTER.contains("sys.path[:]"));
+    }
 }
 
 pub(crate) fn model_prefetch_required(model_id: &str) -> bool {

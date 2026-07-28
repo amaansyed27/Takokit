@@ -9,7 +9,13 @@ const HF_AUDIO_PACKAGES: &[&str] = &[
     "soundfile",
     "scipy",
 ];
-const COQUI_PACKAGES: &[&str] = &["coqui-tts", "torch", "torchaudio"];
+const COQUI_PACKAGES: &[&str] = &[
+    "coqui-tts==0.27.5",
+    "transformers==4.57.6",
+    "torch",
+    "torchaudio",
+    "torchcodec",
+];
 const NEMO_PACKAGES: &[&str] = &[
     "torch",
     "Cython",
@@ -168,7 +174,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "f5_tts",
         "f5-tts",
         "3.11",
-        &["f5-tts", "huggingface_hub[hf_xet]"],
+        &["f5-tts==1.1.21", "huggingface_hub[hf_xet]"],
         F5_TTS_ADAPTER,
         None,
         "F5-TTS."
