@@ -54,6 +54,26 @@ pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
         .map(|spec| spec.id)
 }
 
+pub(crate) fn adapter_dependency_overrides(id: &str) -> &'static [&'static str] {
+    match id {
+        // PyAV 11.0.0 only publishes a source distribution. The closest newer
+        // release provides bundled FFmpeg wheels for every supported Takokit OS.
+        "rvc" => &["av==12.0.0"],
+        _ => &[],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rvc_uses_portable_pyav_override() {
+        assert_eq!(adapter_dependency_overrides("rvc"), &["av==12.0.0"]);
+        assert!(adapter_dependency_overrides("openvoice").is_empty());
+    }
+}
+
 pub(crate) fn model_prefetch_required(model_id: &str) -> bool {
     matches!(
         model_id,
