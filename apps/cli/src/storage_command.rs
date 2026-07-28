@@ -4,10 +4,12 @@ use crate::args::{StorageArgs, StorageCommand};
 use serde::Serialize;
 use std::{
     collections::HashSet,
-    fs, io,
+    fs,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
+const HARDLINK_IDENTITY_MIN_BYTES: u64 = 256 * 1024;
 const CATEGORY_ORDER: &[&str] = &[
     "models",
     "blobs",
@@ -39,6 +41,7 @@ pub(crate) struct StorageReport {
     pub(crate) logical_bytes: u64,
     pub(crate) unique_bytes: u64,
     pub(crate) hardlink_savings_bytes: u64,
+    pub(crate) hardlink_identity_threshold_bytes: u64,
     pub(crate) uv_cache_logical_bytes: u64,
     pub(crate) categories: Vec<StorageCategoryReport>,
 }
@@ -82,8 +85,13 @@ pub(crate) fn run_storage_command(
 ) -> anyhow::Result<()> {
     match args.command {
         None => {
+            let json_requested = args.json || json;
+            if !json_requested {
+                eprintln!("Scanning Takokit storage at {}...", root.display());
+                io::stderr().flush()?;
+            }
             let report = inspect_storage(root)?;
-            if args.json || json {
+            if json_requested {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 print_storage_report(&report);
@@ -143,6 +151,7 @@ pub(crate) fn inspect_storage(root: &Path) -> io::Result<StorageReport> {
         logical_bytes: total.logical_bytes,
         unique_bytes: total.unique_bytes,
         hardlink_savings_bytes: total.logical_bytes.saturating_sub(total.unique_bytes),
+        hardlink_identity_threshold_bytes: HARDLINK_IDENTITY_MIN_BYTES,
         uv_cache_logical_bytes,
         categories,
     })
@@ -194,11 +203,15 @@ fn scan_path(path: &Path, seen: &mut HashSet<FileIdentity>) -> io::Result<ScanTo
     }
     if metadata.is_file() {
         let length = metadata.len();
-        let identity = file_identity(path, &metadata);
+        let unique = if length >= HARDLINK_IDENTITY_MIN_BYTES {
+            seen.insert(file_identity(path, &metadata))
+        } else {
+            true
+        };
         return Ok(ScanTotals {
             files: 1,
             logical_bytes: length,
-            unique_bytes: if seen.insert(identity) { length } else { 0 },
+            unique_bytes: if unique { length } else { 0 },
         });
     }
 
@@ -213,7 +226,29 @@ fn scan_path(path: &Path, seen: &mut HashSet<FileIdentity>) -> io::Result<ScanTo
 }
 
 fn scan_logical_only(path: &Path) -> io::Result<ScanTotals> {
-    scan_path(path, &mut HashSet::new())
+    if !path.exists() {
+        return Ok(ScanTotals::default());
+    }
+    let metadata = fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() {
+        return Ok(ScanTotals::default());
+    }
+    if metadata.is_file() {
+        return Ok(ScanTotals {
+            files: 1,
+            logical_bytes: metadata.len(),
+            unique_bytes: metadata.len(),
+        });
+    }
+
+    let mut totals = ScanTotals::default();
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            merge_totals(&mut totals, scan_logical_only(&entry.path())?);
+        }
+    }
+    Ok(totals)
 }
 
 fn merge_totals(target: &mut ScanTotals, source: ScanTotals) {
@@ -243,7 +278,7 @@ fn clean_uv_cache(root: &Path, dry_run: bool) -> io::Result<StorageCleanReport> 
 fn print_storage_report(report: &StorageReport) {
     println!("Takokit storage");
     println!("  root              {}", report.root.display());
-    println!("  unique data       {}", format_bytes(report.unique_bytes));
+    println!("  estimated unique  {}", format_bytes(report.unique_bytes));
     println!("  logical paths     {}", format_bytes(report.logical_bytes));
     println!(
         "  hardlink savings  {}",
@@ -253,6 +288,10 @@ fn print_storage_report(report: &StorageReport) {
     println!(
         "  cleanable UV cache {}",
         format_bytes(report.uv_cache_logical_bytes)
+    );
+    println!(
+        "  scan mode         fast (deduplicates files >= {})",
+        format_bytes(report.hardlink_identity_threshold_bytes)
     );
     println!();
     println!("CATEGORY       UNIQUE      LOGICAL       FILES");
@@ -354,20 +393,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn report_deduplicates_hardlinked_files() {
+    fn report_deduplicates_large_hardlinked_files() {
         let temp = tempfile::tempdir().expect("tempdir");
         let tools = temp.path().join("tools");
         let runners = temp.path().join("runners");
         fs::create_dir_all(&tools).expect("tools");
         fs::create_dir_all(&runners).expect("runners");
         let original = tools.join("torch.dll");
-        fs::write(&original, vec![7_u8; 4096]).expect("write original");
+        let bytes = HARDLINK_IDENTITY_MIN_BYTES as usize + 4096;
+        fs::write(&original, vec![7_u8; bytes]).expect("write original");
         fs::hard_link(&original, runners.join("torch.dll")).expect("hardlink");
 
         let report = inspect_storage(temp.path()).expect("inspect");
-        assert_eq!(report.logical_bytes, 8192);
-        assert_eq!(report.unique_bytes, 4096);
-        assert_eq!(report.hardlink_savings_bytes, 4096);
+        assert_eq!(report.logical_bytes, (bytes * 2) as u64);
+        assert_eq!(report.unique_bytes, bytes as u64);
+        assert_eq!(report.hardlink_savings_bytes, bytes as u64);
     }
 
     #[test]
