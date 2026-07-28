@@ -10,9 +10,11 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
+mod overlay;
 mod prefetch;
 mod shared;
 
+use overlay::prune_shared_overlay;
 pub(crate) use prefetch::prefetch_python_adapter_model;
 use shared::{
     ensure_shared_python_runtime, run_logged_uv_command, shared_runtime_identity,
@@ -207,7 +209,7 @@ fn install_adapter_spec(
         &[
             "venv".into(),
             "--python".into(),
-            shared_python.into(),
+            shared_python.clone().into(),
             "--system-site-packages".into(),
             "--allow-existing".into(),
             venv.clone().into(),
@@ -278,16 +280,26 @@ fn install_adapter_spec(
         }
     }
 
+    let inherited_package_count = prune_shared_overlay(
+        takokit_root,
+        &uv,
+        &python,
+        &shared_python,
+        &adapter_dir,
+        &log,
+    )?;
+
     std::fs::write(adapter_dir.join(format!("{}.py", spec.id)), script)?;
     std::fs::write(
         adapter_dir.join(".takokit-shared-runtime"),
         shared_runtime_identity(spec.python),
     )?;
     Ok(format!(
-        "Ready. {} Shared Python {} with adapter overlay: {}. Source: {}. Install log: {}",
+        "Ready. {} Shared Python {} with thin adapter overlay: {}. {} exact package copies were replaced by inheritance from the ABI base. Source: {}. Install log: {}",
         spec.note,
         spec.python,
         venv.display(),
+        inherited_package_count,
         source_dir
             .as_ref()
             .map(|path| path.display().to_string())
