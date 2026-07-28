@@ -4,8 +4,7 @@ use crate::args::{StorageArgs, StorageCommand};
 use serde::Serialize;
 use std::{
     collections::HashSet,
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -62,7 +61,10 @@ enum FileIdentity {
         index_low: u32,
     },
     #[cfg(unix)]
-    Unix { device: u64, inode: u64 },
+    Unix {
+        device: u64,
+        inode: u64,
+    },
     Fallback(PathBuf),
 }
 
@@ -73,7 +75,11 @@ struct ScanTotals {
     unique_bytes: u64,
 }
 
-pub(crate) fn run_storage_command(root: &Path, args: StorageArgs, json: bool) -> anyhow::Result<()> {
+pub(crate) fn run_storage_command(
+    root: &Path,
+    args: StorageArgs,
+    json: bool,
+) -> anyhow::Result<()> {
     match args.command {
         None => {
             let report = inspect_storage(root)?;
@@ -90,9 +96,18 @@ pub(crate) fn run_storage_command(root: &Path, args: StorageArgs, json: bool) ->
             } else {
                 println!("Takokit storage cleanup");
                 println!("  target       {}", report.target.display());
-                println!("  cache size   {}", format_bytes(report.cache_logical_bytes));
-                println!("  mode         {}", if report.dry_run { "dry-run" } else { "clean" });
-                println!("  removed      {}", if report.removed { "yes" } else { "no" });
+                println!(
+                    "  cache size   {}",
+                    format_bytes(report.cache_logical_bytes)
+                );
+                println!(
+                    "  mode         {}",
+                    if report.dry_run { "dry-run" } else { "clean" }
+                );
+                println!(
+                    "  removed      {}",
+                    if report.removed { "yes" } else { "no" }
+                );
             }
         }
     }
@@ -235,7 +250,10 @@ fn print_storage_report(report: &StorageReport) {
         format_bytes(report.hardlink_savings_bytes)
     );
     println!("  files             {}", report.files);
-    println!("  cleanable UV cache {}", format_bytes(report.uv_cache_logical_bytes));
+    println!(
+        "  cleanable UV cache {}",
+        format_bytes(report.uv_cache_logical_bytes)
+    );
     println!();
     println!("CATEGORY       UNIQUE      LOGICAL       FILES");
     for category in &report.categories {
@@ -300,9 +318,8 @@ fn file_identity(path: &Path, _metadata: &fs::Metadata) -> FileIdentity {
 
     if let Ok(file) = File::open(path) {
         let mut information = MaybeUninit::<ByHandleFileInformation>::uninit();
-        let success = unsafe {
-            GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr())
-        };
+        let success =
+            unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
         if success != 0 {
             let information = unsafe { information.assume_init() };
             return FileIdentity::Windows {
