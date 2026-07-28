@@ -2,7 +2,10 @@
 
 use crate::{
     runtime_command::{run_logged_command, runner_python_path, PathOrArg},
-    runtime_python_specs::{adapter_spec, AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS},
+    runtime_python_specs::{
+        adapter_dependency_overrides, adapter_spec, AdapterSourceSpec, AdapterSpec,
+        ADAPTER_SPECS,
+    },
     runtime_uv::bootstrap_uv,
     *,
 };
@@ -223,6 +226,14 @@ fn install_adapter_spec(
         Some(source) => Some(install_adapter_source(&adapter_dir, &log, source)?),
         None => None,
     };
+    let dependency_overrides = adapter_dependency_overrides(spec.id);
+    let dependency_override_file = if dependency_overrides.is_empty() {
+        None
+    } else {
+        let path = adapter_dir.join("dependency-overrides.txt");
+        std::fs::write(&path, format!("{}\n", dependency_overrides.join("\n")))?;
+        Some(path)
+    };
     if !spec.packages.is_empty() {
         uv_pip_install(
             takokit_root,
@@ -251,22 +262,20 @@ fn install_adapter_spec(
                     reason: format!("required dependency file is missing: {}", path.display()),
                 });
             }
-            uv_pip_install(
-                takokit_root,
-                &uv,
-                &python,
-                &log,
-                ["-r".into(), path.into()].into_iter(),
-            )?;
+            let mut dependencies: Vec<PathOrArg> = Vec::new();
+            if let Some(overrides) = dependency_override_file.as_ref() {
+                dependencies.extend(["--override".into(), overrides.clone().into()]);
+            }
+            dependencies.extend(["-r".into(), path.into()]);
+            uv_pip_install(takokit_root, &uv, &python, &log, dependencies)?;
         }
         if source.editable {
-            uv_pip_install(
-                takokit_root,
-                &uv,
-                &python,
-                &log,
-                ["-e".into(), source_dir.clone().into()].into_iter(),
-            )?;
+            let mut dependencies: Vec<PathOrArg> = Vec::new();
+            if let Some(overrides) = dependency_override_file.as_ref() {
+                dependencies.extend(["--override".into(), overrides.clone().into()]);
+            }
+            dependencies.extend(["-e".into(), source_dir.clone().into()]);
+            uv_pip_install(takokit_root, &uv, &python, &log, dependencies)?;
         }
     }
 
