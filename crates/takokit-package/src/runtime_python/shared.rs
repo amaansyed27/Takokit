@@ -7,7 +7,7 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
-const SHARED_RUNTIME_VERSION: &str = "shared-python-v2";
+const SHARED_RUNTIME_VERSION: &str = "shared-python-v3";
 const SHARED_RUNTIME_PACKAGES: &[&str] = &[
     "torch",
     "torchaudio",
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn shared_runtime_identity_tracks_python_abi() {
-        assert_eq!(shared_runtime_identity("3.11"), "shared-python-v2-py3.11");
+        assert_eq!(shared_runtime_identity("3.11"), "shared-python-v3-py3.11");
         assert_ne!(
             shared_runtime_identity("3.10"),
             shared_runtime_identity("3.12")
