@@ -28,11 +28,29 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def load_f5tts_api():
+    # Takokit deploys this runner as `f5_tts.py`. Without removing the runner
+    # directory from sys.path, Python resolves that file instead of the real
+    # installed `f5_tts` package and reports that `f5_tts` is not a package.
+    adapter_dir = Path(__file__).resolve().parent
+    original_path = list(sys.path)
+    try:
+        sys.path[:] = [
+            entry
+            for entry in sys.path
+            if Path(entry or ".").resolve() != adapter_dir
+        ]
+        from f5_tts.api import F5TTS
+
+        return F5TTS
+    finally:
+        sys.path[:] = original_path
+
+
 def main():
     request = json.load(sys.stdin)
     if request.get("operation") == "prefetch":
-        from f5_tts.api import F5TTS
-
+        F5TTS = load_f5tts_api()
         F5TTS(model="F5TTS_v1_Base")
         hub = Path(request["cache_dir"]) / "huggingface" / "hub"
         model_roots = (
@@ -58,8 +76,7 @@ def main():
     output_path = Path(request["output_path"]).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    from f5_tts.api import F5TTS
-
+    F5TTS = load_f5tts_api()
     voice = request.get("voice")
     if voice and voice != "default":
         reference = Path(voice).expanduser().resolve()
