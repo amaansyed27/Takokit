@@ -189,7 +189,14 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             arguments,
-            ["pip", "uninstall", "--python", "adapter-python", "numpy", "torch"]
+            [
+                "pip",
+                "uninstall",
+                "--python",
+                "adapter-python",
+                "numpy",
+                "torch"
+            ]
         );
     }
 }
