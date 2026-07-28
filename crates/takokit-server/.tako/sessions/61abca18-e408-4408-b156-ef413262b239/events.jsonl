@@ -1,0 +1,1 @@
+{"id":"202f97f3-66c7-4d2c-bca8-20277258e8c6","session_id":"61abca18-e408-4408-b156-ef413262b239","timestamp":1785189904,"task":"text_to_speech","state":"failed","model":"kokoro","input":"Hello","message":"required Piper artifact kokoro-v1.0.int8.onnx is recorded but not downloaded"}
