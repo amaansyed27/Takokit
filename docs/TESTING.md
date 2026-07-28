@@ -288,57 +288,8 @@ version-conflict overrides. Python 3.10, 3.11 and 3.12 binary packages cannot sa
 one installation, so compiled packages such as Torch may be installed once for each ABI
 that the selected models require, but not once for every model.
 
-For a focused storage regression pass, pull two adapters on Python 3.11 and one on
-Python 3.10:
-
-```powershell
-$Tako = (Resolve-Path .\target\release\tako.exe).Path
-& $Tako pull mms-tts-eng
-& $Tako pull openvoice
-& $Tako pull rvc
-
-$Adapters = @("hf_audio", "openvoice", "rvc")
-$TorchOrigins = @{}
-foreach ($Adapter in $Adapters) {
-  $AdapterRoot = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\$Adapter"
-  $Python = Join-Path $AdapterRoot "venv\Scripts\python.exe"
-  $LocalTorch = Join-Path $AdapterRoot "venv\Lib\site-packages\torch"
-  if (Test-Path -LiteralPath $LocalTorch) {
-    throw "$Adapter kept an avoidable local Torch copy: $LocalTorch"
-  }
-
-  $TorchOrigins[$Adapter] = & $Python -I -c "import torch; print(torch.__file__)"
-  if (-not $TorchOrigins[$Adapter].StartsWith(
-      (Join-Path $env:TAKOKIT_HOME "tools\python"),
-      [StringComparison]::OrdinalIgnoreCase
-  )) {
-    throw "$Adapter did not inherit Torch from a Takokit-owned ABI base"
-  }
-}
-
-if ($TorchOrigins["hf_audio"] -ne $TorchOrigins["openvoice"]) {
-  throw "Python 3.11 adapters did not share the same Torch installation"
-}
-if ($TorchOrigins["rvc"] -eq $TorchOrigins["openvoice"]) {
-  throw "Python 3.10 and 3.11 unexpectedly shared one binary Torch installation"
-}
-
-$TorchOrigins
-Get-ChildItem "$env:TAKOKIT_HOME\runners\python-managed\adapters" `
-  -Filter ".takokit-inherited-packages.txt" -File -Recurse |
-  ForEach-Object {
-    [PSCustomObject]@{
-      Adapter = Split-Path $_.DirectoryName -Leaf
-      SharedPackages = (Get-Content $_.FullName) -join ", "
-    }
-  } | Format-Table -AutoSize
-```
-
-The adapter installer resolves normally first, removes only overlay distributions whose
-normalized name and version exactly match the ABI base, and verifies that no such duplicate
-remains before marking the adapter ready. A different version required by an adapter remains
-local. The UV cache is not a runtime target and may be cleared without breaking installed
-adapters.
+Run [SHARED_RUNTIME_STORAGE_TEST.md](SHARED_RUNTIME_STORAGE_TEST.md) for the focused
+same-ABI and cross-ABI storage regression matrix.
 
 To intentionally erase every previous test/model/runtime download before a from-scratch
 pass, run the guarded reset from the repository root:
