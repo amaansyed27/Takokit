@@ -72,6 +72,12 @@ mod tests {
         assert_eq!(adapter_dependency_overrides("rvc"), &["av==12.0.0"]);
         assert!(adapter_dependency_overrides("openvoice").is_empty());
     }
+
+    #[test]
+    fn rvc_reuses_primary_python_abi() {
+        let spec = adapter_spec("rvc").expect("RVC adapter spec");
+        assert_eq!(spec.python, "3.11");
+    }
 }
 
 pub(crate) fn model_prefetch_required(model_id: &str) -> bool {
