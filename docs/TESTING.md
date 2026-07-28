@@ -289,7 +289,7 @@ one installation, so compiled packages such as Torch may be installed once for e
 that the selected models require, but not once for every model.
 
 Run [SHARED_RUNTIME_STORAGE_TEST.md](SHARED_RUNTIME_STORAGE_TEST.md) for the focused
-same-ABI and cross-ABI storage regression matrix.
+shared Python 3.11 storage regression matrix.
 
 To intentionally erase every previous test/model/runtime download before a from-scratch
 pass, run the guarded reset from the repository root:
