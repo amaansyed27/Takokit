@@ -288,6 +288,9 @@ version-conflict overrides. Python 3.10, 3.11 and 3.12 binary packages cannot sa
 one installation, so compiled packages such as Torch may be installed once for each ABI
 that the selected models require, but not once for every model.
 
+Run [SHARED_RUNTIME_STORAGE_TEST.md](SHARED_RUNTIME_STORAGE_TEST.md) for the focused
+same-ABI and cross-ABI storage regression matrix.
+
 To intentionally erase every previous test/model/runtime download before a from-scratch
 pass, run the guarded reset from the repository root:
 
