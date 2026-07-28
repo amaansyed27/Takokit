@@ -14,7 +14,7 @@ mod shared;
 pub(crate) use prefetch::prefetch_python_adapter_model;
 use shared::{
     ensure_shared_python_runtime, run_logged_uv_command, shared_runtime_identity,
-    venv_uses_isolated_packages,
+    venv_inherits_shared_packages,
 };
 
 pub(crate) fn write_python_adapter_manifests(
@@ -31,7 +31,7 @@ pub(crate) fn write_python_adapter_manifests(
                     id: spec.id.to_string(),
                     model_family: spec.model_family.to_string(),
                     state: AdapterLifecycleState::NotInstalled,
-                    dependency_strategy: "isolated-overlay-with-uv-hardlink-deduplication"
+                    dependency_strategy: "shared-takokit-python-base-with-isolated-overlay"
                         .to_string(),
                     input_contract: "typed JSON request on stdin".to_string(),
                     output_contract: "typed JSON response on stdout".to_string(),
@@ -80,7 +80,7 @@ pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> b
         && std::fs::read_to_string(deployed_script).is_ok_and(|script| script == expected_script)
         && std::fs::read_to_string(shared_marker)
             .is_ok_and(|version| version.trim() == shared_runtime_identity(spec.python))
-        && venv_uses_isolated_packages(&venv)
+        && venv_inherits_shared_packages(&venv)
 }
 
 pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
@@ -106,13 +106,10 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     write_python_adapter_manifests(&layout)?;
     let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
     let mut record = python_adapter_record(takokit_root, adapter)?;
-    record.dependency_strategy =
-        "isolated-overlay-with-uv-hardlink-deduplication".to_string();
     let reset_environment = record.state == AdapterLifecycleState::Failed;
     record.state = AdapterLifecycleState::Installing;
-    record.notes =
-        "Takokit is installing an isolated adapter overlay with content-deduplicated packages."
-            .to_string();
+    record.notes = "Takokit is installing a lightweight adapter overlay on the shared Python base."
+        .to_string();
     write_adapter_record(&manifest_path, &record)?;
 
     let result = adapter_spec(adapter)
@@ -162,7 +159,7 @@ pub(crate) fn install_python_managed_runtime(
         manifest,
         RunnerLifecycleState::Ready,
         format!(
-            "Managed Python runtime is ready at {} using {}. Adapter dependencies are isolated by Python ABI and physically deduplicated through the managed uv cache.",
+            "Managed Python runtime is ready at {} using {}. A shared dependency base is installed once for each Python ABI when its first adapter is pulled.",
             layout.root.display(),
             uv.display()
         ),
@@ -193,7 +190,7 @@ fn install_adapter_spec(
     let venv = adapter_dir.join("venv");
     let log = adapter_dir.join("install.log");
     let shared_python = ensure_shared_python_runtime(takokit_root, layout, spec.python)?;
-    let must_migrate = !venv_uses_isolated_packages(&venv)
+    let must_migrate = !venv_inherits_shared_packages(&venv)
         || std::fs::read_to_string(adapter_dir.join(".takokit-shared-runtime"))
             .map(|value| value.trim() != shared_runtime_identity(spec.python))
             .unwrap_or(true);
@@ -209,6 +206,7 @@ fn install_adapter_spec(
             "venv".into(),
             "--python".into(),
             shared_python.into(),
+            "--system-site-packages".into(),
             "--allow-existing".into(),
             venv.clone().into(),
         ],
@@ -278,7 +276,7 @@ fn install_adapter_spec(
         shared_runtime_identity(spec.python),
     )?;
     Ok(format!(
-        "Ready. {} Managed Python {} with isolated, content-deduplicated adapter overlay: {}. Source: {}. Install log: {}",
+        "Ready. {} Shared Python {} with adapter overlay: {}. Source: {}. Install log: {}",
         spec.note,
         spec.python,
         venv.display(),
