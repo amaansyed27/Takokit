@@ -1,8 +1,8 @@
 # Shared managed-Python storage regression
 
 This focused Windows pass verifies that Takokit stores heavy Python dependencies once per
-Python ABI rather than once per adapter. It uses `mms-tts-eng` and `openvoice` for Python
-3.11, then `rvc` for Python 3.10.
+Python ABI rather than once per adapter. It uses `mms-tts-eng`, `openvoice`, and `rvc` on Takokit’s primary Python 3.11
+runtime.
 
 The adapter installer resolves the complete dependency graph first. It then removes only
 adapter distributions whose normalized package name and version exactly match the
@@ -22,9 +22,8 @@ $Tako = (Resolve-Path .\target\release\tako.exe).Path
 & $Tako pull rvc
 ```
 
-`mms-tts-eng` installs the `hf_audio` adapter. The first two adapters must inherit the
-same Python 3.11 base. RVC must inherit a separate Python 3.10 base because compiled
-Python extensions cannot be shared safely across ABIs.
+`mms-tts-eng` installs the `hf_audio` adapter. All three adapters must inherit the same Python 3.11 base. RVC’s pinned dependencies
+support CPython 3.11, so installing a second Torch/CUDA base is unnecessary.
 
 ## Verify dependency origins
 
@@ -56,16 +55,16 @@ foreach ($Adapter in $Adapters) {
 if ($TorchOrigins["hf_audio"] -ne $TorchOrigins["openvoice"]) {
   throw "Python 3.11 adapters did not share the same Torch installation"
 }
-if ($TorchOrigins["rvc"] -eq $TorchOrigins["openvoice"]) {
-  throw "Python 3.10 and 3.11 unexpectedly shared one binary Torch installation"
+if ($TorchOrigins["rvc"] -ne $TorchOrigins["openvoice"]) {
+  throw "RVC did not reuse the primary Python 3.11 Torch installation"
 }
 
 $TorchOrigins
 ```
 
-Expected: `hf_audio` and `openvoice` print the same path below
-`$env:TAKOKIT_HOME\tools\python`; RVC prints a different managed-Python path. None of the
-three adapter `site-packages` directories contains its own `torch` directory.
+Expected: all three adapters print the same Python 3.11 Torch path below
+`$env:TAKOKIT_HOME\tools\python`. None of the adapter `site-packages` directories contains
+its own `torch` directory.
 
 ## Inspect inherited packages
 

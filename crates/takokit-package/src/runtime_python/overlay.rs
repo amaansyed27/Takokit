@@ -5,7 +5,7 @@ use crate::{
     runtime_command::{run_logged_command, PathOrArg},
     *,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const OVERLAY_PROBE: &str = r#"
 import importlib.metadata as metadata
