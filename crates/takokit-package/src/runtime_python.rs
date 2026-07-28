@@ -3,8 +3,7 @@
 use crate::{
     runtime_command::{run_logged_command, runner_python_path, PathOrArg},
     runtime_python_specs::{
-        adapter_dependency_overrides, adapter_spec, AdapterSourceSpec, AdapterSpec,
-        ADAPTER_SPECS,
+        adapter_dependency_overrides, adapter_spec, AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS,
     },
     runtime_uv::bootstrap_uv,
     *,
