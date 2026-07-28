@@ -169,7 +169,6 @@ impl PathOrArg {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,10 +186,7 @@ mod tests {
         let mut command = Command::new("python");
         configure_managed_command(&mut command);
 
-        assert_eq!(
-            command_env(&command, "PYTHONUTF8"),
-            Some(OsStr::new("1"))
-        );
+        assert_eq!(command_env(&command, "PYTHONUTF8"), Some(OsStr::new("1")));
         assert_eq!(
             command_env(&command, "PYTHONIOENCODING"),
             Some(OsStr::new("utf-8"))
