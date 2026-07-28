@@ -355,7 +355,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
     adapter!(
         "rvc",
         "rvc",
-        "3.10",
+        "3.11",
         &[],
         RVC_ADAPTER,
         Some(RVC_SOURCE),
