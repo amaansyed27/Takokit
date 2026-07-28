@@ -46,6 +46,7 @@ pub(crate) enum Command {
     Doctor(DoctorArgs),
     Version,
     Status,
+    Storage(StorageArgs),
     Capabilities,
     Models,
     Runners,
@@ -160,6 +161,25 @@ pub(crate) struct PlanArgs {
     pub(crate) model: String,
     #[arg(long)]
     pub(crate) json: bool,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct StorageArgs {
+    /// Emit the storage report as JSON.
+    #[arg(long)]
+    pub(crate) json: bool,
+    #[command(subcommand)]
+    pub(crate) command: Option<StorageCommand>,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum StorageCommand {
+    /// Remove Takokit's isolated uv package cache. Installed hardlinked packages remain valid.
+    Clean {
+        /// Show what would be removed without changing files.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Debug, Args)]

@@ -5,6 +5,7 @@ mod display;
 mod doctor;
 mod gui;
 mod session_commands;
+mod storage_command;
 mod tui;
 mod workspace;
 
@@ -39,6 +40,7 @@ use direct_inference::*;
 use local_setup::*;
 use output::*;
 use session_commands::*;
+use storage_command::run_storage_command;
 use test_commands::*;
 use workspace::CliWorkspace;
 
@@ -161,6 +163,9 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Status) => {
             let state = AppState::new(config, store);
             print_serializable(&state.status())?;
+        }
+        Some(Command::Storage(args)) => {
+            run_storage_command(store.root(), args, json_output_requested())?;
         }
         Some(Command::Capabilities) => {
             for capability in CapabilityKind::ALL {
