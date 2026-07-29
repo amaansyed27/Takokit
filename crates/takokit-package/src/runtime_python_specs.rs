@@ -68,10 +68,7 @@ pub(crate) fn sanitized_adapter_requirements(
     target_os: &str,
     requirements: &str,
 ) -> Option<String> {
-    if !matches!(
-        (id, target_os),
-        ("cosyvoice2", "windows" | "macos")
-    ) {
+    if !matches!((id, target_os), ("cosyvoice2", "windows" | "macos")) {
         return None;
     }
 
@@ -79,9 +76,9 @@ pub(crate) fn sanitized_adapter_requirements(
     for line in requirements.lines() {
         // This auxiliary repository is needed for the Linux GPU wheel, but it
         // shadows ordinary PyPI packages under uv's safe first-index policy.
-        if line.contains(
-            "aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12",
-        ) {
+        if line
+            .contains("aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12")
+        {
             continue;
         }
         sanitized.push_str(line);
@@ -111,19 +108,14 @@ mod tests {
             "protobuf==4.25\n",
         );
 
-        let sanitized =
-            sanitized_adapter_requirements("cosyvoice2", "windows", requirements)
-                .expect("Windows requirements should be sanitized");
+        let sanitized = sanitized_adapter_requirements("cosyvoice2", "windows", requirements)
+            .expect("Windows requirements should be sanitized");
         assert!(!sanitized.contains("onnxruntime-cuda-12"));
         assert!(sanitized.contains("onnxruntime==1.18.0"));
         assert!(sanitized.contains("protobuf==4.25"));
 
-        assert!(
-            sanitized_adapter_requirements("cosyvoice2", "linux", requirements).is_none()
-        );
-        assert!(
-            sanitized_adapter_requirements("openvoice", "windows", requirements).is_none()
-        );
+        assert!(sanitized_adapter_requirements("cosyvoice2", "linux", requirements).is_none());
+        assert!(sanitized_adapter_requirements("openvoice", "windows", requirements).is_none());
     }
 
     #[test]
