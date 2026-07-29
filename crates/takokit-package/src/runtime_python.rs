@@ -388,4 +388,3 @@ fn uv_pip_install(
     arguments.extend(dependencies);
     run_logged_uv_command(takokit_root, log, uv, &arguments)
 }
-
