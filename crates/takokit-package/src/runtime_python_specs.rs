@@ -63,6 +63,19 @@ pub(crate) fn adapter_dependency_overrides(id: &str) -> &'static [&'static str] 
     }
 }
 
+pub(crate) fn adapter_pypi_bootstrap_packages(
+    id: &str,
+    target_os: &str,
+) -> &'static [&'static str] {
+    match (id, target_os) {
+        // CosyVoice's requirements add Microsoft's CUDA 12 ONNX index. On
+        // Windows and macOS the project requests the CPU onnxruntime wheel,
+        // which is published on PyPI instead of that auxiliary index.
+        ("cosyvoice2", "windows" | "macos") => &["onnxruntime==1.18.0"],
+        _ => &[],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,6 +84,20 @@ mod tests {
     fn rvc_uses_portable_pyav_override() {
         assert_eq!(adapter_dependency_overrides("rvc"), &["av==12.0.0"]);
         assert!(adapter_dependency_overrides("openvoice").is_empty());
+    }
+
+    #[test]
+    fn cosyvoice_bootstraps_cpu_onnxruntime_from_pypi_off_linux() {
+        assert_eq!(
+            adapter_pypi_bootstrap_packages("cosyvoice2", "windows"),
+            &["onnxruntime==1.18.0"]
+        );
+        assert_eq!(
+            adapter_pypi_bootstrap_packages("cosyvoice2", "macos"),
+            &["onnxruntime==1.18.0"]
+        );
+        assert!(adapter_pypi_bootstrap_packages("cosyvoice2", "linux").is_empty());
+        assert!(adapter_pypi_bootstrap_packages("openvoice", "windows").is_empty());
     }
 
     #[test]
