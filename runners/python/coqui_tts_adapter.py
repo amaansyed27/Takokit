@@ -30,6 +30,23 @@ def path_size(path):
     return total
 
 
+def coqui_model_root(cache_dir, checkpoint):
+    model_directory = checkpoint.replace("/", "--")
+    coqui_home = Path(cache_dir) / "coqui"
+    candidates = [
+        coqui_home / "tts" / model_directory,
+        coqui_home / model_directory,
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise RuntimeError(
+        f"Coqui loaded {checkpoint}, but its checkpoint directory was not found; "
+        f"searched: {searched}"
+    )
+
+
 def respond(**payload):
     print(json.dumps(payload), flush=True)
 
@@ -74,22 +91,14 @@ def main():
         from TTS.api import TTS
 
         TTS(checkpoint)
-        tts_home = Path(request["cache_dir"]) / "coqui"
-        needle = checkpoint.rsplit("/", 1)[-1].replace("_", "").lower()
-        model_roots = (
-            [
-                item
-                for item in tts_home.iterdir()
-                if item.is_dir()
-                and needle in item.name.replace("_", "").lower()
-            ]
-            if tts_home.is_dir()
-            else []
-        )
+        model_root = coqui_model_root(request["cache_dir"], checkpoint)
+        size_bytes = path_size(model_root)
+        if size_bytes <= 0:
+            raise RuntimeError(f"Coqui checkpoint directory is empty: {model_root}")
         respond(
             ok=True,
             detail=f"Prefetched {checkpoint}",
-            size_bytes=sum(path_size(item) for item in model_roots),
+            size_bytes=size_bytes,
         )
         return
     if request.get("operation") != "speech":

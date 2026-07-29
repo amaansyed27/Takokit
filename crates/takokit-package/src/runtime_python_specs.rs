@@ -89,6 +89,9 @@ mod tests {
         assert!(COQUI_TTS_ADAPTER.contains("ensure_xtts_terms_accepted"));
         assert!(COQUI_TTS_ADAPTER.contains("COQUI_TOS_AGREED"));
         assert!(COQUI_TTS_ADAPTER.contains("except SystemExit"));
+        assert!(COQUI_TTS_ADAPTER.contains("coqui_model_root"));
+        assert!(COQUI_TTS_ADAPTER.contains("coqui_home / \"tts\" / model_directory"));
+        assert!(COQUI_TTS_ADAPTER.contains("Coqui checkpoint directory is empty"));
     }
 
     #[test]
