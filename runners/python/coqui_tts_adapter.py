@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -48,12 +49,26 @@ def ensure_compatible_transformers():
         )
 
 
+def ensure_xtts_terms_accepted(model_id):
+    if model_id != "xtts-v2":
+        return
+    if os.environ.get("COQUI_TOS_AGREED", "").strip() == "1":
+        return
+    raise RuntimeError(
+        "XTTS v2 is licensed under the Coqui Public Model License (CPML). "
+        "Review and accept the XTTS terms, then set COQUI_TOS_AGREED=1 "
+        "before pulling or running this model. Takokit will not accept the "
+        "license on your behalf."
+    )
+
+
 def main():
     request = json.load(sys.stdin)
     model_id = request.get("model_id")
     checkpoint = MODELS.get(model_id)
     if not checkpoint:
         raise ValueError(f"unsupported Coqui model: {model_id}")
+    ensure_xtts_terms_accepted(model_id)
     if request.get("operation") == "prefetch":
         ensure_compatible_transformers()
         from TTS.api import TTS
@@ -117,6 +132,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except SystemExit as error:
+        respond(ok=False, error=f"SystemExit: {error}")
+        raise
     except Exception as error:
         respond(ok=False, error=f"{type(error).__name__}: {error}")
         raise
