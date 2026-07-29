@@ -257,12 +257,8 @@ fn install_adapter_spec(
                     reason: format!("required dependency file is missing: {}", path.display()),
                 });
             }
-            let install_path = prepare_adapter_requirements(
-                spec.id,
-                std::env::consts::OS,
-                &path,
-                &adapter_dir,
-            )?;
+            let install_path =
+                prepare_adapter_requirements(spec.id, std::env::consts::OS, &path, &adapter_dir)?;
             let mut dependencies: Vec<PathOrArg> = Vec::new();
             if let Some(overrides) = dependency_override_file.as_ref() {
                 dependencies.extend(["--override".into(), overrides.clone().into()]);
@@ -383,9 +379,7 @@ fn prepare_adapter_requirements(
     adapter_dir: &Path,
 ) -> PackageResult<PathBuf> {
     let requirements = std::fs::read_to_string(source)?;
-    let Some(sanitized) =
-        sanitized_adapter_requirements(adapter, target_os, &requirements)
-    else {
+    let Some(sanitized) = sanitized_adapter_requirements(adapter, target_os, &requirements) else {
         return Ok(source.to_path_buf());
     };
     let file_name = source
