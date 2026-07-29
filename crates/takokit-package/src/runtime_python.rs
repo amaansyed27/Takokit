@@ -238,8 +238,7 @@ fn install_adapter_spec(
             spec.packages.iter().map(|item| (*item).into()),
         )?;
     }
-    let pypi_bootstrap =
-        adapter_pypi_bootstrap_packages(spec.id, std::env::consts::OS);
+    let pypi_bootstrap = adapter_pypi_bootstrap_packages(spec.id, std::env::consts::OS);
     if !pypi_bootstrap.is_empty() {
         uv_pip_install_from_pypi(
             takokit_root,
