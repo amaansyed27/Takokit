@@ -86,6 +86,9 @@ mod tests {
         assert!(spec.packages.contains(&"transformers==4.57.6"));
         assert!(spec.packages.contains(&"torchcodec"));
         assert!(COQUI_TTS_ADAPTER.contains("ensure_compatible_transformers"));
+        assert!(COQUI_TTS_ADAPTER.contains("ensure_xtts_terms_accepted"));
+        assert!(COQUI_TTS_ADAPTER.contains("COQUI_TOS_AGREED"));
+        assert!(COQUI_TTS_ADAPTER.contains("except SystemExit"));
     }
 
     #[test]
