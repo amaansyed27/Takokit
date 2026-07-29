@@ -70,10 +70,7 @@ pub(super) fn ensure_adapter_manifest(path: &Path, spec: &AdapterSpec) -> Packag
     }
 }
 
-pub(super) fn read_adapter_record(
-    path: &Path,
-    spec: &AdapterSpec,
-) -> PackageResult<AdapterRecord> {
+pub(super) fn read_adapter_record(path: &Path, spec: &AdapterSpec) -> PackageResult<AdapterRecord> {
     match read_manifest(path) {
         Ok(record) => Ok(record),
         Err(ManifestReadError::Missing) => restore_previous_or_report_missing(path, spec),
@@ -242,10 +239,9 @@ mod tests {
 
         assert_eq!(record.state, AdapterLifecycleState::Failed);
         assert!(corrupt_path(&path).is_file());
-        let persisted: AdapterRecord = toml::from_str(
-            &std::fs::read_to_string(&path).expect("recovered manifest contents"),
-        )
-        .expect("valid recovered TOML");
+        let persisted: AdapterRecord =
+            toml::from_str(&std::fs::read_to_string(&path).expect("recovered manifest contents"))
+                .expect("valid recovered TOML");
         assert_eq!(persisted, record);
     }
 
@@ -278,10 +274,9 @@ mod tests {
         write_adapter_record(&path, &record).expect("write record");
         write_adapter_record(&path, &record).expect("replace record");
 
-        let persisted: AdapterRecord = toml::from_str(
-            &std::fs::read_to_string(path).expect("manifest contents"),
-        )
-        .expect("valid TOML");
+        let persisted: AdapterRecord =
+            toml::from_str(&std::fs::read_to_string(path).expect("manifest contents"))
+                .expect("valid TOML");
         assert_eq!(persisted, record);
     }
 }
