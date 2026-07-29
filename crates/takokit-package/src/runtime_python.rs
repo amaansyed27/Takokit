@@ -10,10 +10,15 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
+mod adapter_records;
 mod overlay;
 mod prefetch;
 mod shared;
 
+use adapter_records::{
+    default_adapter_record, ensure_adapter_manifest, lock_adapter_install, read_adapter_record,
+    write_adapter_record,
+};
 use overlay::prune_shared_overlay;
 pub(crate) use prefetch::prefetch_python_adapter_model;
 use shared::{
@@ -28,22 +33,7 @@ pub(crate) fn write_python_adapter_manifests(
         let adapter_dir = layout.adapters.join(spec.id);
         std::fs::create_dir_all(&adapter_dir)?;
         let manifest = adapter_dir.join("adapter.toml");
-        if !manifest.is_file() {
-            write_adapter_record(
-                &manifest,
-                &AdapterRecord {
-                    id: spec.id.to_string(),
-                    model_family: spec.model_family.to_string(),
-                    state: AdapterLifecycleState::NotInstalled,
-                    dependency_strategy: "shared-takokit-python-base-with-isolated-overlay"
-                        .to_string(),
-                    input_contract: "typed JSON request on stdin".to_string(),
-                    output_contract: "typed JSON response on stdout".to_string(),
-                    logs: "install.log".to_string(),
-                    notes: spec.note.to_string(),
-                },
-            )?;
-        }
+        ensure_adapter_manifest(&manifest, spec)?;
     }
     Ok(())
 }
@@ -57,10 +47,16 @@ pub fn python_adapter_records(takokit_root: &Path) -> PackageResult<Vec<AdapterR
     let mut entries = std::fs::read_dir(&layout.adapters)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
+        let adapter = entry.file_name().to_string_lossy().to_string();
         let path = entry.path().join("adapter.toml");
-        if path.is_file() {
-            let source = std::fs::read_to_string(path)?;
-            records.push(toml::from_str::<AdapterRecord>(&source)?);
+        let previous = entry.path().join("adapter.toml.previous");
+        if path.is_file() || previous.is_file() {
+            if let Some(spec) = adapter_spec(&adapter) {
+                records.push(read_adapter_record(&path, spec)?);
+            } else {
+                let source = std::fs::read_to_string(path)?;
+                records.push(toml::from_str::<AdapterRecord>(&source)?);
+            }
         }
     }
     Ok(records)
@@ -88,40 +84,38 @@ pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> b
 }
 
 pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+    let spec = adapter_spec(adapter).ok_or_else(|| PackageError::ArtifactInstallFailed {
+        artifact: adapter.to_string(),
+        reason: "unknown managed adapter".to_string(),
+    })?;
     let path = python_managed_runner_layout(takokit_root)
         .adapters
         .join(adapter)
         .join("adapter.toml");
-    let source = std::fs::read_to_string(&path).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => PackageError::ArtifactInstallFailed {
-            artifact: adapter.to_string(),
-            reason: format!(
-                "adapter is not available; run `takokit runner install takokit-python-managed`: {}",
-                path.display()
-            ),
-        },
-        _ => PackageError::Io(error),
-    })?;
-    Ok(toml::from_str::<AdapterRecord>(&source)?)
+    read_adapter_record(&path, spec)
 }
 
 pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
+    let spec = adapter_spec(adapter).ok_or_else(|| PackageError::ArtifactInstallFailed {
+        artifact: adapter.to_string(),
+        reason: "unknown managed adapter".to_string(),
+    })?;
     let layout = python_managed_runner_layout(takokit_root);
-    write_python_adapter_manifests(&layout)?;
-    let manifest_path = layout.adapters.join(adapter).join("adapter.toml");
-    let mut record = python_adapter_record(takokit_root, adapter)?;
-    let reset_environment = record.state == AdapterLifecycleState::Failed;
+    let adapter_dir = layout.adapters.join(adapter);
+    let _install_lock = lock_adapter_install(&adapter_dir, adapter)?;
+    let manifest_path = adapter_dir.join("adapter.toml");
+    ensure_adapter_manifest(&manifest_path, spec)?;
+    let mut record = read_adapter_record(&manifest_path, spec)?;
+    let reset_environment = matches!(
+        record.state,
+        AdapterLifecycleState::Failed | AdapterLifecycleState::Installing
+    );
     record.state = AdapterLifecycleState::Installing;
     record.notes = "Takokit is installing a lightweight adapter overlay on the shared Python base."
         .to_string();
     write_adapter_record(&manifest_path, &record)?;
 
-    let result = adapter_spec(adapter)
-        .ok_or_else(|| PackageError::ArtifactInstallFailed {
-            artifact: adapter.to_string(),
-            reason: "unknown managed adapter".to_string(),
-        })
-        .and_then(|spec| install_adapter_spec(takokit_root, &layout, spec, reset_environment));
+    let result = install_adapter_spec(takokit_root, &layout, spec, reset_environment);
     match result {
         Ok(note) => {
             record.state = AdapterLifecycleState::Ready;
@@ -395,14 +389,3 @@ fn uv_pip_install(
     run_logged_uv_command(takokit_root, log, uv, &arguments)
 }
 
-pub(crate) fn write_adapter_record(path: &Path, record: &AdapterRecord) -> PackageResult<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| PackageError::ArtifactInstallFailed {
-            artifact: record.id.clone(),
-            reason: "adapter manifest path has no parent directory".to_string(),
-        })?;
-    std::fs::create_dir_all(parent)?;
-    std::fs::write(path, toml::to_string_pretty(record)?)?;
-    Ok(())
-}
