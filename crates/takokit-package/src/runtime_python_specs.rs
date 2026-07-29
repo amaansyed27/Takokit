@@ -63,17 +63,29 @@ pub(crate) fn adapter_dependency_overrides(id: &str) -> &'static [&'static str] 
     }
 }
 
-pub(crate) fn adapter_pypi_bootstrap_packages(
+pub(crate) fn sanitized_adapter_requirements(
     id: &str,
     target_os: &str,
-) -> &'static [&'static str] {
-    match (id, target_os) {
-        // CosyVoice's requirements add Microsoft's CUDA 12 ONNX index. On
-        // Windows and macOS the project requests the CPU onnxruntime wheel,
-        // which is published on PyPI instead of that auxiliary index.
-        ("cosyvoice2", "windows" | "macos") => &["onnxruntime==1.18.0"],
-        _ => &[],
+    requirements: &str,
+) -> Option<String> {
+    if !matches!((id, target_os), ("cosyvoice2", "windows" | "macos")) {
+        return None;
     }
+
+    let mut sanitized = String::with_capacity(requirements.len());
+    for line in requirements.lines() {
+        // This auxiliary repository is needed for the Linux GPU wheel, but it
+        // shadows ordinary PyPI packages under uv's safe first-index policy.
+        if line
+            .contains("aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12")
+        {
+            continue;
+        }
+        sanitized.push_str(line);
+        sanitized.push('\n');
+    }
+
+    (sanitized != requirements).then_some(sanitized)
 }
 
 #[cfg(test)]
@@ -87,17 +99,23 @@ mod tests {
     }
 
     #[test]
-    fn cosyvoice_bootstraps_cpu_onnxruntime_from_pypi_off_linux() {
-        assert_eq!(
-            adapter_pypi_bootstrap_packages("cosyvoice2", "windows"),
-            &["onnxruntime==1.18.0"]
+    fn cosyvoice_isolates_the_linux_onnx_index_off_linux() {
+        let requirements = concat!(
+            "--extra-index-url ",
+            "https://aiinfra.pkgs.visualstudio.com/PublicPackages/",
+            "_packaging/onnxruntime-cuda-12/pypi/simple/\n",
+            "onnxruntime==1.18.0; sys_platform == 'win32'\n",
+            "protobuf==4.25\n",
         );
-        assert_eq!(
-            adapter_pypi_bootstrap_packages("cosyvoice2", "macos"),
-            &["onnxruntime==1.18.0"]
-        );
-        assert!(adapter_pypi_bootstrap_packages("cosyvoice2", "linux").is_empty());
-        assert!(adapter_pypi_bootstrap_packages("openvoice", "windows").is_empty());
+
+        let sanitized = sanitized_adapter_requirements("cosyvoice2", "windows", requirements)
+            .expect("Windows requirements should be sanitized");
+        assert!(!sanitized.contains("onnxruntime-cuda-12"));
+        assert!(sanitized.contains("onnxruntime==1.18.0"));
+        assert!(sanitized.contains("protobuf==4.25"));
+
+        assert!(sanitized_adapter_requirements("cosyvoice2", "linux", requirements).is_none());
+        assert!(sanitized_adapter_requirements("openvoice", "windows", requirements).is_none());
     }
 
     #[test]

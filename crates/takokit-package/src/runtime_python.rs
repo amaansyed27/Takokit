@@ -3,7 +3,7 @@
 use crate::{
     runtime_command::{run_logged_command, runner_python_path, PathOrArg},
     runtime_python_specs::{
-        adapter_dependency_overrides, adapter_pypi_bootstrap_packages, adapter_spec,
+        adapter_dependency_overrides, adapter_spec, sanitized_adapter_requirements,
         AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS,
     },
     runtime_uv::bootstrap_uv,
@@ -238,16 +238,6 @@ fn install_adapter_spec(
             spec.packages.iter().map(|item| (*item).into()),
         )?;
     }
-    let pypi_bootstrap = adapter_pypi_bootstrap_packages(spec.id, std::env::consts::OS);
-    if !pypi_bootstrap.is_empty() {
-        uv_pip_install_from_pypi(
-            takokit_root,
-            &uv,
-            &python,
-            &log,
-            pypi_bootstrap.iter().map(|item| (*item).into()),
-        )?;
-    }
     if !spec.no_deps_packages.is_empty() {
         uv_pip_install(
             takokit_root,
@@ -267,11 +257,13 @@ fn install_adapter_spec(
                     reason: format!("required dependency file is missing: {}", path.display()),
                 });
             }
+            let install_path =
+                prepare_adapter_requirements(spec.id, std::env::consts::OS, &path, &adapter_dir)?;
             let mut dependencies: Vec<PathOrArg> = Vec::new();
             if let Some(overrides) = dependency_override_file.as_ref() {
                 dependencies.extend(["--override".into(), overrides.clone().into()]);
             }
-            dependencies.extend(["-r".into(), path.into()]);
+            dependencies.extend(["-r".into(), install_path.into()]);
             uv_pip_install(takokit_root, &uv, &python, &log, dependencies)?;
         }
         if source.editable {
@@ -380,24 +372,23 @@ fn install_adapter_source(
     Ok(destination)
 }
 
-fn uv_pip_install_from_pypi(
-    takokit_root: &Path,
-    uv: &Path,
-    python: &Path,
-    log: &Path,
-    dependencies: impl IntoIterator<Item = PathOrArg>,
-) -> PackageResult<()> {
-    let mut arguments: Vec<PathOrArg> = vec![
-        "pip".into(),
-        "install".into(),
-        "--python".into(),
-        python.to_path_buf().into(),
-        "--no-progress".into(),
-        "--index".into(),
-        "https://pypi.org/simple".into(),
-    ];
-    arguments.extend(dependencies);
-    run_logged_uv_command(takokit_root, log, uv, &arguments)
+fn prepare_adapter_requirements(
+    adapter: &str,
+    target_os: &str,
+    source: &Path,
+    adapter_dir: &Path,
+) -> PackageResult<PathBuf> {
+    let requirements = std::fs::read_to_string(source)?;
+    let Some(sanitized) = sanitized_adapter_requirements(adapter, target_os, &requirements) else {
+        return Ok(source.to_path_buf());
+    };
+    let file_name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("requirements.txt");
+    let prepared = adapter_dir.join(format!(".takokit-{file_name}"));
+    std::fs::write(&prepared, sanitized)?;
+    Ok(prepared)
 }
 
 fn uv_pip_install(
