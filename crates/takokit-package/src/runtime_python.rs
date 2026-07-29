@@ -3,7 +3,8 @@
 use crate::{
     runtime_command::{run_logged_command, runner_python_path, PathOrArg},
     runtime_python_specs::{
-        adapter_dependency_overrides, adapter_spec, AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS,
+        adapter_dependency_overrides, adapter_pypi_bootstrap_packages, adapter_spec,
+        AdapterSourceSpec, AdapterSpec, ADAPTER_SPECS,
     },
     runtime_uv::bootstrap_uv,
     *,
@@ -16,8 +17,7 @@ mod prefetch;
 mod shared;
 
 use adapter_records::{
-    default_adapter_record, ensure_adapter_manifest, lock_adapter_install, read_adapter_record,
-    write_adapter_record,
+    ensure_adapter_manifest, lock_adapter_install, read_adapter_record, write_adapter_record,
 };
 use overlay::prune_shared_overlay;
 pub(crate) use prefetch::prefetch_python_adapter_model;
@@ -238,6 +238,16 @@ fn install_adapter_spec(
             spec.packages.iter().map(|item| (*item).into()),
         )?;
     }
+    let pypi_bootstrap = adapter_pypi_bootstrap_packages(spec.id, std::env::consts::OS);
+    if !pypi_bootstrap.is_empty() {
+        uv_pip_install_from_pypi(
+            takokit_root,
+            &uv,
+            &python,
+            &log,
+            pypi_bootstrap.iter().map(|item| (*item).into()),
+        )?;
+    }
     if !spec.no_deps_packages.is_empty() {
         uv_pip_install(
             takokit_root,
@@ -368,6 +378,26 @@ fn install_adapter_source(
     std::fs::write(temporary.join(".takokit-revision"), source.revision)?;
     std::fs::rename(&temporary, &destination)?;
     Ok(destination)
+}
+
+fn uv_pip_install_from_pypi(
+    takokit_root: &Path,
+    uv: &Path,
+    python: &Path,
+    log: &Path,
+    dependencies: impl IntoIterator<Item = PathOrArg>,
+) -> PackageResult<()> {
+    let mut arguments: Vec<PathOrArg> = vec![
+        "pip".into(),
+        "install".into(),
+        "--python".into(),
+        python.to_path_buf().into(),
+        "--no-progress".into(),
+        "--index".into(),
+        "https://pypi.org/simple".into(),
+    ];
+    arguments.extend(dependencies);
+    run_logged_uv_command(takokit_root, log, uv, &arguments)
 }
 
 fn uv_pip_install(
