@@ -1,4 +1,7 @@
-use crate::{args::{LicenseCommand, PullArgs}, cli_error, print_serializable};
+use crate::{
+    args::{LicenseCommand, PullArgs},
+    cli_error, print_serializable,
+};
 use std::io::{self, IsTerminal, Write};
 use takokit_package::{
     ensure_model_license_accepted, list_license_receipts, model_license_info,
@@ -15,7 +18,10 @@ pub(crate) fn prepare_pull_license(
     let Some(license) = model_license_info(&model) else {
         return Ok(());
     };
-    if valid_license_receipt(takokit_root, &model).map_err(cli_error)?.is_some() {
+    if valid_license_receipt(takokit_root, &model)
+        .map_err(cli_error)?
+        .is_some()
+    {
         return Ok(());
     }
     if let Some(accepted) = args.accept_license.as_deref() {
@@ -48,7 +54,9 @@ pub(crate) fn run_license_command(
     command: LicenseCommand,
 ) -> anyhow::Result<()> {
     match command {
-        LicenseCommand::List => print_serializable(&list_license_receipts(takokit_root).map_err(cli_error)?)?,
+        LicenseCommand::List => {
+            print_serializable(&list_license_receipts(takokit_root).map_err(cli_error)?)?
+        }
         LicenseCommand::Show { license } => {
             let receipts = list_license_receipts(takokit_root)
                 .map_err(cli_error)?
@@ -58,7 +66,8 @@ pub(crate) fn run_license_command(
             print_serializable(&receipts)?;
         }
         LicenseCommand::Revoke { license, model } => {
-            let removed = revoke_license_receipt(takokit_root, &license, model.as_deref()).map_err(cli_error)?;
+            let removed = revoke_license_receipt(takokit_root, &license, model.as_deref())
+                .map_err(cli_error)?;
             print_serializable(&serde_json::json!({
                 "license": license,
                 "model": model,
