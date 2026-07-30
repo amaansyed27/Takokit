@@ -17,7 +17,8 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    initialize_runner_runtime, install_model_complete, install_python_adapter,
+    acquire_maintenance_lock, initialize_runner_runtime, install_model_complete,
+    install_python_adapter,
     model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
     remove_model_complete, resolve_execution_plan, runner_runtime_layout, InstallModelOptions,
     InstalledModelsResponse, LibraryModelManifest, LibraryRunnerManifest, ModelPlan,
