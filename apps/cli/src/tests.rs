@@ -288,6 +288,7 @@ fn model_show_output_uses_canonical_planner_status() {
         version: "0.1.0".to_string(),
         summary: "Local STT".to_string(),
         license: "mit".to_string(),
+        license_info: None,
         license_warning: None,
         runtime: takokit_core::ModelRuntime::WhisperCpp,
         backend: "whispercpp".to_string(),
