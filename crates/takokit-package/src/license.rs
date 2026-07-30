@@ -2,7 +2,10 @@
 
 use crate::{ModelManifest, PackageError, PackageResult};
 use serde::{Deserialize, Serialize};
-use std::{path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use takokit_core::ModelLicenseInfo;
 
 pub const CPML_ID: &str = "CPML";
@@ -22,7 +25,9 @@ pub struct LicenseReceipt {
 
 pub fn model_license_info(model: &ModelManifest) -> Option<ModelLicenseInfo> {
     if model.license.eq_ignore_ascii_case(CPML_ID)
-        || model.license.eq_ignore_ascii_case("coqui-public-model-license-check-required")
+        || model
+            .license
+            .eq_ignore_ascii_case("coqui-public-model-license-check-required")
         || model.id == "xtts-v2"
     {
         Some(ModelLicenseInfo {
@@ -33,7 +38,9 @@ pub fn model_license_info(model: &ModelManifest) -> Option<ModelLicenseInfo> {
             digest: CPML_DIGEST.to_string(),
             requires_acceptance: true,
             commercial_use: false,
-            notice: "Non-commercial use only. Review the CPML before downloading or using this model.".to_string(),
+            notice:
+                "Non-commercial use only. Review the CPML before downloading or using this model."
+                    .to_string(),
         })
     } else {
         None
@@ -184,7 +191,13 @@ fn receipt_path(takokit_root: &Path, license_id: &str, model_id: &str) -> PathBu
 fn safe_component(value: &str) -> String {
     value
         .chars()
-        .map(|character| if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') { character } else { '_' })
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -195,13 +208,25 @@ mod tests {
 
     fn cpml_model() -> ModelManifest {
         ModelManifest {
-            id: "xtts-v2".into(), name: "XTTS v2".into(), family: "xtts-v2".into(),
-            version: "2".into(), kind: ModelKind::VoiceCloning, backend: ModelBackend::PythonManaged,
-            runner: "takokit-python-managed".into(), required_adapter: Some("coqui_tts".into()),
-            license: "CPML".into(), description: "fixture".into(),
+            id: "xtts-v2".into(),
+            name: "XTTS v2".into(),
+            family: "xtts-v2".into(),
+            version: "2".into(),
+            kind: ModelKind::VoiceCloning,
+            backend: ModelBackend::PythonManaged,
+            runner: "takokit-python-managed".into(),
+            required_adapter: Some("coqui_tts".into()),
+            license: "CPML".into(),
+            description: "fixture".into(),
             capabilities: CapabilityManifest::default(),
-            hardware: HardwareManifest { cpu: true, gpu: true, min_ram: None, min_vram: None },
-            source: None, artifacts: ArtifactManifest::default(),
+            hardware: HardwareManifest {
+                cpu: true,
+                gpu: true,
+                min_ram: None,
+                min_vram: None,
+            },
+            source: None,
+            artifacts: ArtifactManifest::default(),
         }
     }
 
@@ -214,9 +239,16 @@ mod tests {
             Err(PackageError::LicenseAcceptanceRequired { .. })
         ));
         ensure_model_license_accepted(root.path(), &model, Some("CPML")).expect("accept");
-        assert!(valid_license_receipt(root.path(), &model).expect("read").is_some());
-        assert_eq!(revoke_license_receipt(root.path(), "CPML", Some("xtts-v2")).expect("revoke"), 1);
-        assert!(valid_license_receipt(root.path(), &model).expect("read").is_none());
+        assert!(valid_license_receipt(root.path(), &model)
+            .expect("read")
+            .is_some());
+        assert_eq!(
+            revoke_license_receipt(root.path(), "CPML", Some("xtts-v2")).expect("revoke"),
+            1
+        );
+        assert!(valid_license_receipt(root.path(), &model)
+            .expect("read")
+            .is_none());
     }
 
     #[test]
@@ -229,9 +261,12 @@ mod tests {
         ));
         ensure_model_license_accepted(root.path(), &model, Some("CPML")).expect("accept");
         let path = receipt_path(root.path(), "CPML", "xtts-v2");
-        let mut receipt: LicenseReceipt = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let mut receipt: LicenseReceipt =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         receipt.license_digest = "changed".into();
         std::fs::write(path, serde_json::to_vec(&receipt).unwrap()).unwrap();
-        assert!(valid_license_receipt(root.path(), &model).expect("read").is_none());
+        assert!(valid_license_receipt(root.path(), &model)
+            .expect("read")
+            .is_none());
     }
 }
