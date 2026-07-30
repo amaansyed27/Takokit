@@ -5,7 +5,7 @@ use crate::{
     *,
 };
 use serde::{Deserialize, Serialize};
-use takokit_core::{CapabilityKind, ModelCapability, ModelInfo, ModelLicenseInfo, ModelRuntime};
+use takokit_core::{CapabilityKind, ModelCapability, ModelInfo, ModelRuntime};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModelManifest {
@@ -19,8 +19,6 @@ pub struct ModelManifest {
     #[serde(default)]
     pub required_adapter: Option<String>,
     pub license: String,
-    #[serde(default)]
-    pub license_info: Option<ModelLicenseInfo>,
     pub description: String,
     pub capabilities: CapabilityManifest,
     pub hardware: HardwareManifest,
@@ -194,7 +192,7 @@ impl ModelManifest {
             version: self.version.clone(),
             summary: self.description.clone(),
             license: self.license.clone(),
-            license_info: self.license_info.clone(),
+            license_info: model_license_info(self),
             license_warning: license_warning(&self.license),
             runtime: self.backend.to_model_runtime(),
             backend: self.backend.as_str().to_string(),
