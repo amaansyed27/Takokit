@@ -201,6 +201,8 @@ pub(crate) struct StorageArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum StorageCommand {
+    /// Show the last automatic cleanup result and whether background cleanup is enabled.
+    Status,
     /// Remove Takokit's isolated uv package cache. Installed hardlinked packages remain valid.
     Clean {
         /// Show what would be removed without changing files.
