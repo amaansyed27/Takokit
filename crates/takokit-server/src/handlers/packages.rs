@@ -280,6 +280,7 @@ pub async fn pull_model(
         &request.model,
         InstallModelOptions {
             metadata_only: request.metadata_only,
+            accepted_license: request.accepted_license,
         },
     )
     .map_err(Into::into)

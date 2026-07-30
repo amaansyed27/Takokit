@@ -192,6 +192,7 @@ impl ModelManifest {
             version: self.version.clone(),
             summary: self.description.clone(),
             license: self.license.clone(),
+            license_info: model_license_info(self),
             license_warning: license_warning(&self.license),
             runtime: self.backend.to_model_runtime(),
             backend: self.backend.as_str().to_string(),

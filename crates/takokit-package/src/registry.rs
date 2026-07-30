@@ -55,7 +55,9 @@ impl PackageRegistry {
                     .release(&resolved)
                     .ok_or_else(|| PackageError::ModelNotFound(reference.to_string()))?;
                 if let Some(source) = release.manifest_toml.as_deref() {
-                    let manifest: ModelManifest = toml::from_str(source)?;
+                    let mut manifest: ModelManifest = toml::from_str(source)?;
+                    manifest.license = release.license.clone();
+                    normalize_model_license(&mut manifest);
                     return Ok(manifest);
                 }
                 return self.read_model_manifest(&resolved.target);
@@ -165,7 +167,11 @@ impl PackageRegistry {
     }
 
     pub fn models(&self) -> PackageResult<Vec<ModelManifest>> {
-        read_manifest_dir(&self.root.join("models"))
+        let mut models: Vec<ModelManifest> = read_manifest_dir(&self.root.join("models"))?;
+        for model in &mut models {
+            normalize_model_license(model);
+        }
+        Ok(models)
     }
 
     pub fn runners(&self) -> PackageResult<Vec<RunnerManifest>> {
@@ -197,7 +203,11 @@ impl PackageRegistry {
                 std::io::ErrorKind::NotFound => PackageError::ModelNotFound(id.to_string()),
                 _ => PackageError::Io(error),
             })
-            .and_then(|source| Ok(toml::from_str(&source)?))
+            .and_then(|source| {
+                let mut manifest: ModelManifest = toml::from_str(&source)?;
+                normalize_model_license(&mut manifest);
+                Ok(manifest)
+            })
     }
 
     fn read_model(&self, id: &str) -> std::io::Result<String> {

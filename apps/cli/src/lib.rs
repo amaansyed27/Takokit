@@ -4,6 +4,7 @@ mod direct_inference;
 mod display;
 mod doctor;
 mod gui;
+mod license_command;
 mod session_commands;
 mod storage_command;
 mod tui;
@@ -37,6 +38,7 @@ mod test_commands;
 use args::*;
 use daemon_commands::*;
 use direct_inference::*;
+use license_command::*;
 use local_setup::*;
 use output::*;
 use session_commands::*;
@@ -78,6 +80,15 @@ pub async fn run() -> anyhow::Result<()> {
     } else {
         None
     };
+
+    if let Some(Command::Pull(args)) = command.as_ref() {
+        prepare_pull_license(
+            store.root(),
+            &package_registry,
+            args,
+            json_output_requested(),
+        )?;
+    }
 
     if !direct && route_daemon_command(&command, &store, &config).await? {
         return Ok(());
@@ -167,6 +178,9 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Storage(args)) => {
             run_storage_command(store.root(), args, json_output_requested())?;
         }
+        Some(Command::Licenses { command }) => {
+            run_license_command(store.root(), command)?;
+        }
         Some(Command::Capabilities) => {
             for capability in CapabilityKind::ALL {
                 println!("{} - {}", capability.label(), capability.explanation());
@@ -205,6 +219,7 @@ pub async fn run() -> anyhow::Result<()> {
                 &args.model,
                 InstallModelOptions {
                     metadata_only: args.metadata_only,
+                    accepted_license: args.accept_license,
                 },
             )
             .map_err(cli_error)?;

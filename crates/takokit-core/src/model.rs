@@ -76,6 +76,18 @@ pub enum ModelRuntime {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelLicenseInfo {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub url: String,
+    pub digest: String,
+    pub requires_acceptance: bool,
+    pub commercial_use: bool,
+    pub notice: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModelInfo {
     pub id: String,
     pub name: String,
@@ -83,6 +95,8 @@ pub struct ModelInfo {
     pub version: String,
     pub summary: String,
     pub license: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license_info: Option<ModelLicenseInfo>,
     pub license_warning: Option<String>,
     pub runtime: ModelRuntime,
     pub backend: String,

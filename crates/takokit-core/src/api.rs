@@ -83,6 +83,8 @@ pub struct PullModelRequest {
     pub model: String,
     #[serde(default)]
     pub metadata_only: bool,
+    #[serde(default)]
+    pub accepted_license: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

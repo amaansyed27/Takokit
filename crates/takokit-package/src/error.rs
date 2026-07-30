@@ -28,6 +28,18 @@ pub enum PackageError {
     ModelNotInstalled(String),
     #[error("runner is not installed: {0}")]
     RunnerPackageNotInstalled(String),
+    #[error("model {model} requires acceptance of {license}; review {url} and retry with --accept-license {license}")]
+    LicenseAcceptanceRequired {
+        model: String,
+        license: String,
+        url: String,
+    },
+    #[error("model {model} requires license {expected}, but {supplied} was supplied")]
+    LicenseMismatch {
+        model: String,
+        expected: String,
+        supplied: String,
+    },
     #[error("artifact URL missing for {model}: {artifact}")]
     ArtifactUrlMissing { model: String, artifact: String },
     #[error("artifact checksum missing for {model}: {artifact}")]
@@ -109,6 +121,10 @@ impl From<PackageError> for TakokitError {
                 code: ErrorCode::RunnerNotInstalled,
                 message: format!("runner is not installed: {id}"),
             },
+            error @ PackageError::LicenseAcceptanceRequired { .. }
+            | error @ PackageError::LicenseMismatch { .. } => {
+                TakokitError::InvalidRequest(error.to_string())
+            }
             error @ PackageError::ArtifactUrlMissing { .. } => TakokitError::Resolution {
                 code: ErrorCode::ArtifactUrlMissing,
                 message: error.to_string(),

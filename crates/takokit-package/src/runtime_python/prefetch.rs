@@ -137,6 +137,13 @@ pub(crate) fn prefetch_python_adapter_model(
         .stdout(Stdio::piped())
         .stderr(Stdio::from(std::fs::File::create(&log_path)?));
     configure_managed_command(&mut command);
+    command.env_remove("COQUI_TOS_AGREED");
+    if adapter == "coqui_tts"
+        && valid_license_receipt(takokit_root, model)?.is_some()
+        && model_license_info(model).is_some_and(|license| license.id == CPML_ID)
+    {
+        command.env("COQUI_TOS_AGREED", "1");
+    }
     let mut child = command
         .spawn()
         .map_err(|error| PackageError::ArtifactInstallFailed {

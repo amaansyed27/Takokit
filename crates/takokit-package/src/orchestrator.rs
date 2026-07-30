@@ -19,6 +19,7 @@ pub fn install_model_complete(
     options: InstallModelOptions,
 ) -> PackageResult<ModelInstallReport> {
     let model = package_registry.model_for_pull(model_id)?;
+    ensure_model_license_accepted(takokit_root, &model, options.accepted_license.as_deref())?;
     let progress = InstallProgressReporter::model(takokit_root, &model.id);
     let result = install_model_complete_inner(
         package_registry,
@@ -56,7 +57,7 @@ fn install_model_complete_inner(
                 .as_ref(),
             &model,
         );
-        let report = installed_registry.install_model_with_options(&model, options)?;
+        let report = installed_registry.install_model_with_options(&model, options.clone())?;
         let plan = plan_model(package_registry, installed_registry, &model.id)?;
         return Ok(ModelInstallReport {
             model_id: model.id.clone(),
@@ -261,7 +262,7 @@ fn install_model_complete_inner(
         download_total,
     );
     let artifact_result = installed_registry
-        .install_model_with_options(&model, options)
+        .install_model_with_options(&model, options.clone())
         .map_err(|error| PackageError::at_stage(InstallFailureStage::Artifacts, error));
     drop(monitor);
     let artifact_report = artifact_result?;

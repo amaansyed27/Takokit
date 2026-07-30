@@ -104,6 +104,7 @@ fn metadata_only_pull_preserves_verified_ready_install() {
             &manifest,
             InstallModelOptions {
                 metadata_only: true,
+                accepted_license: None,
             },
         )
         .unwrap();
@@ -123,10 +124,11 @@ fn repeated_metadata_only_pull_is_idempotent() {
     let installed = InstalledRegistry::new(temp.path().join("manifests"));
     let options = InstallModelOptions {
         metadata_only: true,
+        accepted_license: None,
     };
 
     let first = installed
-        .install_model_with_options(&manifest, options)
+        .install_model_with_options(&manifest, options.clone())
         .unwrap();
     let second = installed
         .install_model_with_options(&manifest, options)

@@ -29,9 +29,10 @@ pub struct PullReport {
     pub note: String,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct InstallModelOptions {
     pub metadata_only: bool,
+    pub accepted_license: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
