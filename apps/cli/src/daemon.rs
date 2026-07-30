@@ -9,6 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{DaemonIdentity, DaemonMode, RuntimeConfig};
+use takokit_package::run_automatic_uv_cleanup;
 use takokit_server::{run_server_with_listener, AppState};
 use takokit_store::LocalStore;
 use tokio::net::TcpListener;
@@ -221,6 +222,10 @@ pub async fn child(
         log_path: log_path(&store),
     };
     write_atomic(&store.daemon_info_path(), &info)?;
+    let cleanup_root = store.root().to_path_buf();
+    thread::spawn(move || {
+        let _ = run_automatic_uv_cleanup(&cleanup_root);
+    });
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let state = AppState::new(config, store.clone()).managed(info.identity(), shutdown_tx);
     let result = run_server_with_listener(state, listener, Some(shutdown_rx)).await;
