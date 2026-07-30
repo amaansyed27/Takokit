@@ -61,6 +61,7 @@ fn bundled_metadata_only_models_install_without_artifact_downloads() {
                 &manifest,
                 InstallModelOptions {
                     metadata_only: true,
+                accepted_license: None,
                 },
             )
             .expect("install metadata-only model");
@@ -140,6 +141,7 @@ fn metadata_only_model_install_still_works_with_artifact_placeholders() {
             &manifest,
             InstallModelOptions {
                 metadata_only: true,
+                accepted_license: None,
             },
         )
         .expect("metadata install");
@@ -327,6 +329,7 @@ fn installed_inventory_contains_only_verified_ready_models() {
             &manifest,
             InstallModelOptions {
                 metadata_only: true,
+                accepted_license: None,
             },
         )
         .expect("metadata install");
