@@ -61,7 +61,10 @@ impl Client {
     }
 
     pub fn delete(&self, path: &str) -> anyhow::Result<()> {
-        let _: serde_json::Value = self.delete_json(path)?;
+        let url = format!("{}{}", self.base, path);
+        self.headers(ureq::delete(&url))
+            .call()
+            .map_err(|error| request_error("DELETE", &url, error))?;
         Ok(())
     }
 
