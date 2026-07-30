@@ -43,7 +43,6 @@ pub fn model_license_info(model: &ModelManifest) -> Option<ModelLicenseInfo> {
 pub fn normalize_model_license(model: &mut ModelManifest) {
     if let Some(info) = model_license_info(model) {
         model.license = info.id;
-        model.license_info = Some(info);
     }
 }
 
@@ -199,7 +198,7 @@ mod tests {
             id: "xtts-v2".into(), name: "XTTS v2".into(), family: "xtts-v2".into(),
             version: "2".into(), kind: ModelKind::VoiceCloning, backend: ModelBackend::PythonManaged,
             runner: "takokit-python-managed".into(), required_adapter: Some("coqui_tts".into()),
-            license: "CPML".into(), license_info: None, description: "fixture".into(),
+            license: "CPML".into(), description: "fixture".into(),
             capabilities: CapabilityManifest::default(),
             hardware: HardwareManifest { cpu: true, gpu: true, min_ram: None, min_vram: None },
             source: None, artifacts: ArtifactManifest::default(),
