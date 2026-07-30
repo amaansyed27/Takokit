@@ -2,7 +2,10 @@
 
 use crate::{runtime_python_specs::adapter_spec, *};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::{Path, PathBuf}};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RemoveModelOptions {
@@ -236,10 +239,18 @@ fn execute_items(root: &Path, items: &[ModelRemovalItem]) -> PackageResult<()> {
 }
 
 fn collapse_nested_items(mut items: Vec<ModelRemovalItem>) -> Vec<ModelRemovalItem> {
-    items.sort_by(|left, right| left.path.components().count().cmp(&right.path.components().count()));
+    items.sort_by(|left, right| {
+        left.path
+            .components()
+            .count()
+            .cmp(&right.path.components().count())
+    });
     let mut collapsed: Vec<ModelRemovalItem> = Vec::new();
     for item in items {
-        if collapsed.iter().any(|parent| item.path.starts_with(&parent.path)) {
+        if collapsed
+            .iter()
+            .any(|parent| item.path.starts_with(&parent.path))
+        {
             continue;
         }
         collapsed.push(item);
@@ -314,8 +325,18 @@ mod tests {
     fn nested_dependency_paths_are_counted_once() {
         let root = PathBuf::from("root");
         let items = vec![
-            item("runner", "python", root.join("runners/python-managed"), "zero refs"),
-            item("adapter", "coqui", root.join("runners/python-managed/adapters/coqui"), "zero refs"),
+            item(
+                "runner",
+                "python",
+                root.join("runners/python-managed"),
+                "zero refs",
+            ),
+            item(
+                "adapter",
+                "coqui",
+                root.join("runners/python-managed/adapters/coqui"),
+                "zero refs",
+            ),
         ];
         let collapsed = collapse_nested_items(items);
         assert_eq!(collapsed.len(), 1);
