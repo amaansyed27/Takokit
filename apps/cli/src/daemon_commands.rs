@@ -28,7 +28,7 @@ pub(crate) async fn route_daemon_command(
         | Command::Pull(_)
         | Command::Show { .. }
         | Command::Plan(_)
-        | Command::Rm { .. }
+        | Command::Rm(_)
         | Command::List { .. }
         | Command::Run(_)
         | Command::Ps
@@ -56,10 +56,10 @@ pub(crate) async fn route_daemon_command(
         )?,
         Command::Show { model } => client.get(&format!("/v1/models/{model}"))?,
         Command::Plan(args) => client.get(&format!("/v1/models/{}/plan", args.model))?,
-        Command::Rm { model } => {
-            client.delete(&format!("/v1/models/{model}"))?;
-            serde_json::json!({"id":model,"removed":true})
-        }
+        Command::Rm(args) => client.delete_json(&format!(
+            "/v1/models/{}?dry_run={}",
+            args.model, args.dry_run
+        ))?,
         Command::List { target } => match target {
             None | Some(ListTarget::Models) => client.get("/v1/models/installed")?,
             Some(ListTarget::Runners) => client.get("/v1/runners")?,

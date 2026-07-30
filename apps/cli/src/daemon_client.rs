@@ -68,6 +68,15 @@ impl Client {
         Ok(())
     }
 
+    pub fn delete_json<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {
+        let url = format!("{}{}", self.base, path);
+        self.headers(ureq::delete(&url))
+            .call()
+            .map_err(|error| request_error("DELETE", &url, error))?
+            .into_json()
+            .with_context(|| format!("decode Takokit daemon response from {path}"))
+    }
+
     fn post_with_attempts<T: DeserializeOwned, B: Serialize>(
         &self,
         path: &str,
