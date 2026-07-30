@@ -29,9 +29,17 @@ pub enum PackageError {
     #[error("runner is not installed: {0}")]
     RunnerPackageNotInstalled(String),
     #[error("model {model} requires acceptance of {license}; review {url} and retry with --accept-license {license}")]
-    LicenseAcceptanceRequired { model: String, license: String, url: String },
+    LicenseAcceptanceRequired {
+        model: String,
+        license: String,
+        url: String,
+    },
     #[error("model {model} requires license {expected}, but {supplied} was supplied")]
-    LicenseMismatch { model: String, expected: String, supplied: String },
+    LicenseMismatch {
+        model: String,
+        expected: String,
+        supplied: String,
+    },
     #[error("artifact URL missing for {model}: {artifact}")]
     ArtifactUrlMissing { model: String, artifact: String },
     #[error("artifact checksum missing for {model}: {artifact}")]
