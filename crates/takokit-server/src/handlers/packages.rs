@@ -333,17 +333,34 @@ pub async fn install_runner(
     }))
 }
 
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct RemoveModelQuery {
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
 pub async fn remove_model(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<StatusCode, ApiError> {
-    state
-        .installed_registry
-        .remove_model(&id)
+    Query(query): Query<RemoveModelQuery>,
+) -> Result<Json<ModelRemovalReport>, ApiError> {
+    let resolved = state
+        .package_registry
+        .resolve_model_reference(&id)
         .map_err(Into::into)
         .map_err(ApiError)?;
+    let report = remove_model_complete(
+        &state.package_registry,
+        &state.installed_registry,
+        &resolved.target,
+        RemoveModelOptions {
+            dry_run: query.dry_run,
+        },
+    )
+    .map_err(Into::into)
+    .map_err(ApiError)?;
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(report))
 }
 
 pub async fn remove_runner(
