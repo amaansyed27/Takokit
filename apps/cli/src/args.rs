@@ -64,9 +64,7 @@ pub(crate) enum Command {
         model: String,
     },
     Plan(PlanArgs),
-    Rm {
-        model: String,
-    },
+    Rm(RmArgs),
     List {
         #[command(subcommand)]
         target: Option<ListTarget>,
@@ -169,6 +167,14 @@ pub(crate) enum LicenseCommand {
         #[arg(long)]
         model: Option<String>,
     },
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct RmArgs {
+    pub(crate) model: String,
+    /// Preview model and dependency garbage collection without changing files.
+    #[arg(long)]
+    pub(crate) dry_run: bool,
 }
 
 #[derive(Debug, Args)]
