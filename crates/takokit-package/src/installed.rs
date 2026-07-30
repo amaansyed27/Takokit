@@ -130,7 +130,7 @@ impl InstalledRegistry {
             });
         }
 
-        let mut installed = self.install_artifacts(manifest, options, previous.as_ref())?;
+        let mut installed = self.install_artifacts(manifest, options.clone(), previous.as_ref())?;
         if !options.metadata_only && !manifest.artifacts.metadata_only {
             if let Some(snapshot) =
                 install_model_source(&self.storage_root(), manifest, previous.as_ref())?
