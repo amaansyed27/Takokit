@@ -2,6 +2,7 @@
 
 use crate::args::{StorageArgs, StorageCommand};
 use serde::Serialize;
+use takokit_package::{automatic_cleanup_state, clean_uv_cache};
 use std::{
     collections::HashSet,
     fs,
@@ -46,15 +47,6 @@ pub(crate) struct StorageReport {
     pub(crate) categories: Vec<StorageCategoryReport>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct StorageCleanReport {
-    root: PathBuf,
-    target: PathBuf,
-    dry_run: bool,
-    removed: bool,
-    cache_logical_bytes: u64,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum FileIdentity {
     #[cfg(windows)]
@@ -97,6 +89,29 @@ pub(crate) fn run_storage_command(
                 print_storage_report(&report);
             }
         }
+        Some(StorageCommand::Status) => {
+            let state = automatic_cleanup_state(root)?;
+            if args.json || json {
+                println!("{}", serde_json::to_string_pretty(&state)?);
+            } else {
+                println!("Takokit automatic storage cleanup");
+                println!("  enabled      {}", if state.enabled { "yes" } else { "no" });
+                println!("  status       {}", state.status);
+                println!(
+                    "  reclaimed    {}",
+                    format_bytes(state.reclaimed_bytes)
+                );
+                if let Some(reason) = state.skip_reason {
+                    println!("  skipped      {reason}");
+                }
+                if let Some(error) = state.error {
+                    println!("  error        {error}");
+                }
+                println!(
+                    "  configuration TAKOKIT_AUTO_STORAGE_CLEANUP=0 disables background cleanup"
+                );
+            }
+        }
         Some(StorageCommand::Clean { dry_run }) => {
             let report = clean_uv_cache(root, dry_run)?;
             if args.json || json {
@@ -106,7 +121,7 @@ pub(crate) fn run_storage_command(
                 println!("  target       {}", report.target.display());
                 println!(
                     "  cache size   {}",
-                    format_bytes(report.cache_logical_bytes)
+                    format_bytes(report.reclaimed_bytes)
                 );
                 println!(
                     "  mode         {}",
@@ -255,24 +270,6 @@ fn merge_totals(target: &mut ScanTotals, source: ScanTotals) {
     target.files += source.files;
     target.logical_bytes += source.logical_bytes;
     target.unique_bytes += source.unique_bytes;
-}
-
-fn clean_uv_cache(root: &Path, dry_run: bool) -> io::Result<StorageCleanReport> {
-    let target = root.join("cache").join("uv");
-    let cache_logical_bytes = scan_logical_only(&target)?.logical_bytes;
-    let mut removed = false;
-    if !dry_run && target.exists() {
-        fs::remove_dir_all(&target)?;
-        fs::create_dir_all(&target)?;
-        removed = true;
-    }
-    Ok(StorageCleanReport {
-        root: root.to_path_buf(),
-        target,
-        dry_run,
-        removed,
-        cache_logical_bytes,
-    })
 }
 
 fn print_storage_report(report: &StorageReport) {
