@@ -82,7 +82,12 @@ pub async fn run() -> anyhow::Result<()> {
     };
 
     if let Some(Command::Pull(args)) = command.as_ref() {
-        prepare_pull_license(store.root(), &package_registry, args, json_output_requested())?;
+        prepare_pull_license(
+            store.root(),
+            &package_registry,
+            args,
+            json_output_requested(),
+        )?;
     }
 
     if !direct && route_daemon_command(&command, &store, &config).await? {
