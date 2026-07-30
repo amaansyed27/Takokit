@@ -124,7 +124,7 @@ fn repeated_metadata_only_pull_is_idempotent() {
     let installed = InstalledRegistry::new(temp.path().join("manifests"));
     let options = InstallModelOptions {
         metadata_only: true,
-                accepted_license: None,
+        accepted_license: None,
     };
 
     let first = installed
