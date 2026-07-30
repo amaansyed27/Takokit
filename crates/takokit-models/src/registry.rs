@@ -40,6 +40,7 @@ pub fn built_in_models() -> Vec<ModelInfo> {
             version: "0.1.0".to_string(),
             summary: "Deterministic test WAV generator for API and CLI scaffolding.".to_string(),
             license: "internal-test".to_string(),
+            license_info: None,
             license_warning: None,
             runtime: ModelRuntime::NativeRust,
             backend: "native_rust".to_string(),
@@ -138,6 +139,7 @@ fn model(
         version: "0.1.0".to_string(),
         summary: summary.to_string(),
         license: license.to_string(),
+        license_info: None,
         license_warning: Some(
             "Fallback registry entry; use runtime manifests for support status.".to_string(),
         ),
