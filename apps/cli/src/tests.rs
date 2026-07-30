@@ -448,9 +448,8 @@ fn cli_parses_registry_sync_show_and_tagged_pull() {
 
 #[test]
 fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
-    let pull = Cli::try_parse_from([
-        "takokit", "pull", "xtts-v2", "--accept-license", "CPML"
-    ]).expect("licensed pull");
+    let pull = Cli::try_parse_from(["takokit", "pull", "xtts-v2", "--accept-license", "CPML"])
+        .expect("licensed pull");
     assert!(matches!(
         pull.command,
         Some(Command::Pull(PullArgs { model, accept_license: Some(license), .. }))
@@ -458,8 +457,9 @@ fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
     ));
 
     let revoke = Cli::try_parse_from([
-        "takokit", "licenses", "revoke", "CPML", "--model", "xtts-v2"
-    ]).expect("license revoke");
+        "takokit", "licenses", "revoke", "CPML", "--model", "xtts-v2",
+    ])
+    .expect("license revoke");
     assert!(matches!(
         revoke.command,
         Some(Command::Licenses {
