@@ -128,7 +128,7 @@ fn repeated_metadata_only_pull_is_idempotent() {
     };
 
     let first = installed
-        .install_model_with_options(&manifest, options)
+        .install_model_with_options(&manifest, options.clone())
         .unwrap();
     let second = installed
         .install_model_with_options(&manifest, options)
