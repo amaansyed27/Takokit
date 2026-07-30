@@ -48,7 +48,11 @@ pub(crate) async fn route_daemon_command(
             format!("Pulling {}", args.model),
             &args.model,
             "/v1/models/pull",
-            &serde_json::json!({"model": args.model, "metadata_only": args.metadata_only}),
+            &serde_json::json!({
+                "model": args.model,
+                "metadata_only": args.metadata_only,
+                "accepted_license": args.accept_license,
+            }),
         )?,
         Command::Show { model } => client.get(&format!("/v1/models/{model}"))?,
         Command::Plan(args) => client.get(&format!("/v1/models/{}/plan", args.model))?,
