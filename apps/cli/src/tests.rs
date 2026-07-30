@@ -181,7 +181,7 @@ fn cli_parses_metadata_only_model_pull() {
 
     assert!(matches!(
         cli.command,
-        Some(Command::Pull(PullArgs { model, metadata_only: true })) if model == "piper-lessac"
+        Some(Command::Pull(PullArgs { model, metadata_only: true, .. })) if model == "piper-lessac"
     ));
 }
 
@@ -443,5 +443,27 @@ fn cli_parses_registry_sync_show_and_tagged_pull() {
         pull.command,
         Some(Command::Pull(PullArgs { model, metadata_only: false }))
             if model == "whisper:small"
+    ));
+}
+
+#[test]
+fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
+    let pull = Cli::try_parse_from([
+        "takokit", "pull", "xtts-v2", "--accept-license", "CPML"
+    ]).expect("licensed pull");
+    assert!(matches!(
+        pull.command,
+        Some(Command::Pull(PullArgs { model, accept_license: Some(license), .. }))
+            if model == "xtts-v2" && license == "CPML"
+    ));
+
+    let revoke = Cli::try_parse_from([
+        "takokit", "licenses", "revoke", "CPML", "--model", "xtts-v2"
+    ]).expect("license revoke");
+    assert!(matches!(
+        revoke.command,
+        Some(Command::Licenses {
+            command: LicenseCommand::Revoke { license, model: Some(model) }
+        }) if license == "CPML" && model == "xtts-v2"
     ));
 }
