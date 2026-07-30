@@ -160,6 +160,8 @@ pub async fn install_adapter(
     Json(request): Json<AdapterInstallRequest>,
 ) -> Result<Json<RunnerDetailResponse<takokit_package::AdapterRecord>>, ApiError> {
     let id = request.adapter.replace('-', "_");
+    let _maintenance_guard =
+        acquire_maintenance_lock(state.store.root()).map_err(Into::into).map_err(ApiError)?;
     let record = install_python_adapter(state.store.root(), &id)
         .map_err(Into::into)
         .map_err(ApiError)?;
@@ -315,6 +317,8 @@ pub async fn install_runner(
     State(state): State<AppState>,
     Json(request): Json<PullRunnerRequest>,
 ) -> Result<Json<PullModelResponse>, ApiError> {
+    let _maintenance_guard =
+        acquire_maintenance_lock(state.store.root()).map_err(Into::into).map_err(ApiError)?;
     let manifest = state
         .package_registry
         .runner(&request.runner)
