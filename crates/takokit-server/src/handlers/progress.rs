@@ -9,6 +9,7 @@ pub async fn model_pull_with_progress(
     let takokit_root = state.store.root().to_path_buf();
     let model = request.model;
     let metadata_only = request.metadata_only;
+    let accepted_license = request.accepted_license;
 
     let report = tokio::task::spawn_blocking(move || {
         install_model_complete(
@@ -16,7 +17,10 @@ pub async fn model_pull_with_progress(
             &installed_registry,
             &takokit_root,
             &model,
-            InstallModelOptions { metadata_only },
+            InstallModelOptions {
+                metadata_only,
+                accepted_license,
+            },
         )
     })
     .await
