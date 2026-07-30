@@ -23,8 +23,9 @@ use takokit_models::{
 use takokit_package::{
     bootstrap_uv, find_uv, initialize_runner_runtime, install_model_complete,
     install_python_adapter, model_info_from_plan, plan_model, python_adapter_record,
-    python_adapter_records, resolve_execution_plan, runner_runtime_layout, InstallModelOptions,
-    InstalledRegistry, ModelPlan, PackageError, PackageRegistry, RunnerManifest,
+    python_adapter_records, remove_model_complete, resolve_execution_plan, runner_runtime_layout,
+    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
+    RemoveModelOptions, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -237,18 +238,20 @@ pub async fn run() -> anyhow::Result<()> {
                 .map_err(cli_error)?;
             print_or_json_plan(&plan, args.json || json_output_requested())?;
         }
-        Some(Command::Rm { model }) => {
+        Some(Command::Rm(args)) => {
             let resolved = package_registry
-                .resolve_model_reference(&model)
+                .resolve_model_reference(&args.model)
                 .map_err(cli_error)?;
-            let removed = installed_registry
-                .remove_model(&resolved.target)
-                .map_err(cli_error)?;
-            print_value(&serde_json::json!({
-                "id": resolved.canonical,
-                "target": resolved.target,
-                "removed": removed
-            }))?;
+            let report = remove_model_complete(
+                &package_registry,
+                &installed_registry,
+                &resolved.target,
+                RemoveModelOptions {
+                    dry_run: args.dry_run,
+                },
+            )
+            .map_err(cli_error)?;
+            print_serializable(&report)?;
         }
         Some(Command::List { target }) => {
             let registry = ModelRegistry::default();
