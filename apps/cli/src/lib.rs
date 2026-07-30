@@ -21,11 +21,11 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    bootstrap_uv, find_uv, initialize_runner_runtime, install_model_complete,
-    install_python_adapter, model_info_from_plan, plan_model, python_adapter_record,
-    python_adapter_records, remove_model_complete, resolve_execution_plan, runner_runtime_layout,
-    InstallModelOptions, InstalledRegistry, ModelPlan, PackageError, PackageRegistry,
-    RemoveModelOptions, RunnerManifest,
+    acquire_maintenance_lock, bootstrap_uv, find_uv, initialize_runner_runtime,
+    install_model_complete, install_python_adapter, model_info_from_plan, plan_model,
+    python_adapter_record, python_adapter_records, remove_model_complete, resolve_execution_plan,
+    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
+    PackageRegistry, RemoveModelOptions, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::LocalStore;
@@ -322,6 +322,8 @@ pub async fn run() -> anyhow::Result<()> {
                 print_serializable(&report)?;
             }
             RunnerCommand::Install { runner } => {
+                let _maintenance_guard =
+                    acquire_maintenance_lock(store.root()).map_err(cli_error)?;
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
                 let report =
                     initialize_runner_runtime(store.root(), &installed_registry, &manifest)
@@ -370,6 +372,8 @@ pub async fn run() -> anyhow::Result<()> {
                 print_serializable(&records)?;
             }
             AdapterCommand::Install { adapter } => {
+                let _maintenance_guard =
+                    acquire_maintenance_lock(store.root()).map_err(cli_error)?;
                 let adapter = normalize_adapter_id(&adapter);
                 let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
                 print_serializable(&record)?;

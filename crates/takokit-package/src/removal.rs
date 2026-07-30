@@ -38,6 +38,7 @@ pub fn remove_model_complete(
     options: RemoveModelOptions,
 ) -> PackageResult<ModelRemovalReport> {
     let root = installed_registry.storage_root();
+    let _maintenance_guard = acquire_maintenance_lock(&root)?;
     let journal = removal_journal_path(&root, model_id);
     if !installed_registry.is_model_installed(model_id) && journal.is_file() {
         let mut report: ModelRemovalReport = serde_json::from_slice(&std::fs::read(&journal)?)?;

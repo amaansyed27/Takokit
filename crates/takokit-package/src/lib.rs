@@ -6,6 +6,7 @@ mod install_support;
 mod installed;
 mod inventory;
 mod license;
+mod maintenance;
 mod model;
 mod orchestrator;
 mod planning;
@@ -30,6 +31,7 @@ pub use catalog::*;
 pub use error::*;
 pub use installed::InstalledRegistry;
 pub use license::*;
+pub use maintenance::*;
 pub use model::*;
 pub use orchestrator::install_model_complete;
 pub use progress::{
