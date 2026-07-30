@@ -19,11 +19,7 @@ pub fn install_model_complete(
     options: InstallModelOptions,
 ) -> PackageResult<ModelInstallReport> {
     let model = package_registry.model_for_pull(model_id)?;
-    ensure_model_license_accepted(
-        takokit_root,
-        &model,
-        options.accepted_license.as_deref(),
-    )?;
+    ensure_model_license_accepted(takokit_root, &model, options.accepted_license.as_deref())?;
     let progress = InstallProgressReporter::model(takokit_root, &model.id);
     let result = install_model_complete_inner(
         package_registry,
