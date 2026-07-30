@@ -2,13 +2,13 @@
 
 use crate::args::{StorageArgs, StorageCommand};
 use serde::Serialize;
-use takokit_package::{automatic_cleanup_state, clean_uv_cache};
 use std::{
     collections::HashSet,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
 };
+use takokit_package::{automatic_cleanup_state, clean_uv_cache};
 
 const HARDLINK_IDENTITY_MIN_BYTES: u64 = 256 * 1024;
 const CATEGORY_ORDER: &[&str] = &[
@@ -95,7 +95,10 @@ pub(crate) fn run_storage_command(
                 println!("{}", serde_json::to_string_pretty(&state)?);
             } else {
                 println!("Takokit automatic storage cleanup");
-                println!("  enabled      {}", if state.enabled { "yes" } else { "no" });
+                println!(
+                    "  enabled      {}",
+                    if state.enabled { "yes" } else { "no" }
+                );
                 println!("  status       {}", state.status);
                 println!(
                     "  reclaimed    {}",
@@ -119,10 +122,7 @@ pub(crate) fn run_storage_command(
             } else {
                 println!("Takokit storage cleanup");
                 println!("  target       {}", report.target.display());
-                println!(
-                    "  cache size   {}",
-                    format_bytes(report.reclaimed_bytes)
-                );
+                println!("  cache size   {}", format_bytes(report.reclaimed_bytes));
                 println!(
                     "  mode         {}",
                     if report.dry_run { "dry-run" } else { "clean" }
