@@ -442,7 +442,11 @@ fn cli_parses_registry_sync_show_and_tagged_pull() {
     ));
     assert!(matches!(
         pull.command,
-        Some(Command::Pull(PullArgs { model, metadata_only: false }))
+        Some(Command::Pull(PullArgs {
+            model,
+            metadata_only: false,
+            accept_license: None,
+        }))
             if model == "whisper:small"
     ));
 }
