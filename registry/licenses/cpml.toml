@@ -1,0 +1,8 @@
+id = "CPML"
+name = "Coqui Public Model License"
+version = "1.0.0"
+url = "https://coqui.ai/cpml.txt"
+digest = "sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"
+requires_acceptance = true
+commercial_use = false
+notice = "Non-commercial use only. Review the CPML before downloading or using this model."
