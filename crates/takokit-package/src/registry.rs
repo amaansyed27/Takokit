@@ -163,11 +163,7 @@ impl PackageRegistry {
                 std::io::ErrorKind::NotFound => PackageError::RunnerNotFound(id.to_string()),
                 _ => PackageError::Io(error),
             })
-            .and_then(|source| {
-                let mut manifest: ModelManifest = toml::from_str(&source)?;
-                normalize_model_license(&mut manifest);
-                Ok(manifest)
-            })
+            .and_then(|source| Ok(toml::from_str(&source)?))
     }
 
     pub fn models(&self) -> PackageResult<Vec<ModelManifest>> {
@@ -207,7 +203,11 @@ impl PackageRegistry {
                 std::io::ErrorKind::NotFound => PackageError::ModelNotFound(id.to_string()),
                 _ => PackageError::Io(error),
             })
-            .and_then(|source| Ok(toml::from_str(&source)?))
+            .and_then(|source| {
+                let mut manifest: ModelManifest = toml::from_str(&source)?;
+                normalize_model_license(&mut manifest);
+                Ok(manifest)
+            })
     }
 
     fn read_model(&self, id: &str) -> std::io::Result<String> {
