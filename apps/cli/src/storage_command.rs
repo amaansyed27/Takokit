@@ -100,10 +100,7 @@ pub(crate) fn run_storage_command(
                     if state.enabled { "yes" } else { "no" }
                 );
                 println!("  status       {}", state.status);
-                println!(
-                    "  reclaimed    {}",
-                    format_bytes(state.reclaimed_bytes)
-                );
+                println!("  reclaimed    {}", format_bytes(state.reclaimed_bytes));
                 if let Some(reason) = state.skip_reason {
                     println!("  skipped      {reason}");
                 }
