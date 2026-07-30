@@ -224,6 +224,7 @@ fn model_info_is_derived_from_canonical_lifecycle_plan() {
             &whisper,
             InstallModelOptions {
                 metadata_only: true,
+                accepted_license: None,
             },
         )
         .expect("metadata-only whisper");
