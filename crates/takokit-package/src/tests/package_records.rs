@@ -61,7 +61,7 @@ fn bundled_metadata_only_models_install_without_artifact_downloads() {
                 &manifest,
                 InstallModelOptions {
                     metadata_only: true,
-                accepted_license: None,
+                    accepted_license: None,
                 },
             )
             .expect("install metadata-only model");
