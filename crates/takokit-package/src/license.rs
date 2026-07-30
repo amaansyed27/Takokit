@@ -126,7 +126,7 @@ pub fn list_license_receipts(takokit_root: &Path) -> PackageResult<Vec<LicenseRe
     if !root.is_dir() {
         return Ok(Vec::new());
     }
-    let mut receipts = Vec::new();
+    let mut receipts: Vec<LicenseReceipt> = Vec::new();
     for license_dir in std::fs::read_dir(root)? {
         let license_dir = license_dir?;
         if !license_dir.path().is_dir() {
