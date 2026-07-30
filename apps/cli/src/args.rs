@@ -47,6 +47,10 @@ pub(crate) enum Command {
     Version,
     Status,
     Storage(StorageArgs),
+    Licenses {
+        #[command(subcommand)]
+        command: LicenseCommand,
+    },
     Capabilities,
     Models,
     Runners,
@@ -148,6 +152,23 @@ pub(crate) struct PullArgs {
     pub(crate) model: String,
     #[arg(long)]
     pub(crate) metadata_only: bool,
+    /// Explicitly accept a model license in non-interactive use (for example CPML).
+    #[arg(long, value_name = "LICENSE")]
+    pub(crate) accept_license: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum LicenseCommand {
+    /// List durable license acceptance receipts.
+    List,
+    /// Show receipts for one license identifier.
+    Show { license: String },
+    /// Revoke acceptance for a license, optionally for one model only.
+    Revoke {
+        license: String,
+        #[arg(long)]
+        model: Option<String>,
+    },
 }
 
 #[derive(Debug, Args)]
