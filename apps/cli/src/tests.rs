@@ -288,6 +288,7 @@ fn model_show_output_uses_canonical_planner_status() {
         version: "0.1.0".to_string(),
         summary: "Local STT".to_string(),
         license: "mit".to_string(),
+        license_info: None,
         license_warning: None,
         runtime: takokit_core::ModelRuntime::WhisperCpp,
         backend: "whispercpp".to_string(),
@@ -465,5 +466,15 @@ fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
         Some(Command::Licenses {
             command: LicenseCommand::Revoke { license, model: Some(model) }
         }) if license == "CPML" && model == "xtts-v2"
+    ));
+}
+
+#[test]
+fn cli_parses_model_removal_dry_run() {
+    let cli = Cli::try_parse_from(["takokit", "rm", "whisper:tiny", "--dry-run"])
+        .expect("model removal dry-run");
+    assert!(matches!(
+        cli.command,
+        Some(Command::Rm(RmArgs { model, dry_run: true })) if model == "whisper:tiny"
     ));
 }
