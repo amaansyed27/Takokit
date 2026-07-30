@@ -1,9 +1,14 @@
 //! Cross-process maintenance coordination and safe UV-cache cleanup.
 
-use crate::{PackageError, PackageResult};
+use crate::PackageResult;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use std::{fs::{File, OpenOptions}, io::Write, path::{Path, PathBuf}, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{
+    fs::{File, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 pub const AUTO_CLEANUP_INTERVAL_SECS: u64 = 24 * 60 * 60;
 
@@ -60,7 +65,12 @@ pub fn clean_uv_cache(root: &Path, dry_run: bool) -> PackageResult<StorageCleanu
 
 pub fn automatic_cleanup_enabled() -> bool {
     std::env::var("TAKOKIT_AUTO_STORAGE_CLEANUP")
-        .map(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "0" | "false" | "no" | "off"))
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "0" | "false" | "no" | "off"
+            )
+        })
         .unwrap_or(true)
 }
 
@@ -99,7 +109,10 @@ pub fn run_automatic_uv_cleanup(root: &Path) -> AutomaticCleanupState {
         finish_state(root, &mut state, started);
         return state;
     }
-    if previous.last_attempt_unix.is_some_and(|attempt| now.saturating_sub(attempt) < AUTO_CLEANUP_INTERVAL_SECS) {
+    if previous
+        .last_attempt_unix
+        .is_some_and(|attempt| now.saturating_sub(attempt) < AUTO_CLEANUP_INTERVAL_SECS)
+    {
         state.skip_reason = Some("throttled; cleanup ran within the last 24 hours".to_string());
         finish_state(root, &mut state, started);
         return state;
@@ -109,7 +122,8 @@ pub fn run_automatic_uv_cleanup(root: &Path) -> AutomaticCleanupState {
     let guard = match try_acquire_maintenance_lock(root) {
         Ok(Some(guard)) => guard,
         Ok(None) => {
-            state.skip_reason = Some("maintenance lock is held by a pull or runtime install".to_string());
+            state.skip_reason =
+                Some("maintenance lock is held by a pull or runtime install".to_string());
             finish_state(root, &mut state, started);
             return state;
         }
@@ -160,7 +174,11 @@ fn open_lock(root: &Path) -> PackageResult<File> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    Ok(OpenOptions::new().read(true).write(true).create(true).open(path)?)
+    Ok(OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)?)
 }
 
 fn state_path(root: &Path) -> PathBuf {
@@ -192,13 +210,22 @@ fn finish_state(root: &Path, state: &mut AutomaticCleanupState, started: Instant
 }
 
 fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn path_size(path: &Path) -> u64 {
-    let Ok(metadata) = std::fs::symlink_metadata(path) else { return 0; };
-    if metadata.file_type().is_symlink() { return 0; }
-    if metadata.is_file() { return metadata.len(); }
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+        return 0;
+    };
+    if metadata.file_type().is_symlink() {
+        return 0;
+    }
+    if metadata.is_file() {
+        return metadata.len();
+    }
     std::fs::read_dir(path)
         .ok()
         .into_iter()
