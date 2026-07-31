@@ -31,7 +31,12 @@ impl CliWorkspace {
         } else {
             store.active_session()?
         };
-        let session = store.open_session(selected, Some(title))?;
+        let session = match (session_id, selected) {
+            (None, Some(id)) if !store.session_dir(id).join("session.json").is_file() => {
+                store.create_session(Some(title))?
+            }
+            _ => store.open_session(selected, Some(title))?,
+        };
         let workspace = Self { store, session };
         workspace.export_environment();
         Ok(workspace)
@@ -164,6 +169,41 @@ mod tests {
         let query = context.gui_query();
         assert!(query.contains("workspace="));
         assert!(query.contains(&context.session_id().to_string()));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn stale_implicit_active_session_is_replaced() {
+        let root = std::env::temp_dir().join(format!("takokit-cli-stale-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = WorkspaceStore::new(&root);
+        let stale = Uuid::new_v4();
+        store.set_active_session(stale).unwrap();
+
+        let context = CliWorkspace::resolve(Some(root.clone()), None, false, "recovered").unwrap();
+
+        assert_ne!(context.session_id(), stale);
+        assert!(context
+            .store
+            .session_dir(context.session_id())
+            .join("session.json")
+            .is_file());
+        assert_eq!(
+            context.store.active_session().unwrap(),
+            Some(context.session_id())
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn explicit_missing_session_still_fails() {
+        let root = std::env::temp_dir().join(format!("takokit-cli-explicit-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let missing = Uuid::new_v4();
+
+        let result = CliWorkspace::resolve(Some(root.clone()), Some(missing), false, "explicit");
+
+        assert!(result.is_err());
         let _ = std::fs::remove_dir_all(root);
     }
 }
