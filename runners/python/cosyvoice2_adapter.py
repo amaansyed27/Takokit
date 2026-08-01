@@ -15,6 +15,8 @@ def load_model(model_dir: Path):
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
     sys.path.insert(0, str(source / "third_party" / "Matcha-TTS"))
+    # Lightning in the pinned CosyVoice stack still imports pkg_resources.
+    import pkg_resources  # noqa: F401
     from cosyvoice.cli.cosyvoice import AutoModel
 
     return AutoModel(model_dir=str(model_dir))
