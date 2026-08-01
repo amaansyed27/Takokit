@@ -30,6 +30,25 @@ def configure_rvc_roots(model_path: Path, index_path: Path | None) -> None:
     os.environ["index_root"] = str(index_path.parent if index_path else model_path.parent)
 
 
+def install_pyav_mode_compat() -> None:
+    """Normalize legacy binary mode strings rejected by current PyAV releases."""
+    import av
+
+    original_open = av.open
+    if getattr(original_open, "_takokit_mode_compat", False):
+        return
+
+    def open_compat(file, mode=None, *args, **kwargs):
+        if mode == "rb":
+            mode = "r"
+        elif mode == "wb":
+            mode = "w"
+        return original_open(file, mode, *args, **kwargs)
+
+    open_compat._takokit_mode_compat = True
+    av.open = open_compat
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     if request.get("operation") != "convert":
@@ -53,6 +72,7 @@ def main() -> None:
     sys.path.insert(0, str(source))
     os.environ["rmvpe_root"] = str(model_dir)
     os.environ["hubert_path"] = str(hubert_path)
+    install_pyav_mode_compat()
     from scipy.io import wavfile
     from rvc.modules.vc.modules import VC
 
