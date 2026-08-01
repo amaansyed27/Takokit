@@ -13,3 +13,9 @@ fn rvc_adapter_configures_upstream_model_and_index_roots_before_loading_voice() 
     assert!(RVC_ADAPTER.contains("os.environ[\"index_root\"]"));
     assert!(configure_call < load_call);
 }
+
+#[test]
+fn rvc_adapter_passes_the_absolute_audio_path_as_a_string() {
+    assert!(RVC_ADAPTER.contains("str(source_audio),"));
+    assert!(!RVC_ADAPTER.contains("\n        source_audio,\n"));
+}

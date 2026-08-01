@@ -60,7 +60,7 @@ def main() -> None:
     converter.get_vc(model_path.name)
     sample_rate, audio, _, error = converter.vc_inference(
         0,
-        source_audio,
+        str(source_audio),
         f0_up_key=int(request.get("pitch_shift") or 0),
         f0_method="rmvpe",
         index_file=str(index_path) if index_path else "",
