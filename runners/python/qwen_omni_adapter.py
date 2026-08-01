@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
 import sys
 from pathlib import Path
@@ -12,13 +13,52 @@ QWEN25_SYSTEM_PROMPT = (
     "capable of perceiving auditory and visual inputs, as well as generating "
     "text and speech."
 )
+GIB = 1024**3
 
 
 def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
 
 
-def load_runtime(model_id: str, model_dir: Path):
+def windows_available_commit_bytes() -> int | None:
+    if sys.platform != "win32":
+        return None
+
+    class MemoryStatusEx(ctypes.Structure):
+        _fields_ = [
+            ("dwLength", ctypes.c_ulong),
+            ("dwMemoryLoad", ctypes.c_ulong),
+            ("ullTotalPhys", ctypes.c_ulonglong),
+            ("ullAvailPhys", ctypes.c_ulonglong),
+            ("ullTotalPageFile", ctypes.c_ulonglong),
+            ("ullAvailPageFile", ctypes.c_ulonglong),
+            ("ullTotalVirtual", ctypes.c_ulonglong),
+            ("ullAvailVirtual", ctypes.c_ulonglong),
+            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+        ]
+
+    status = MemoryStatusEx()
+    status.dwLength = ctypes.sizeof(status)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        return None
+    return int(status.ullAvailPageFile)
+
+
+def require_commit_headroom(operation: str) -> None:
+    available = windows_available_commit_bytes()
+    if available is None:
+        return
+    required = 18 * GIB if operation == "speech" else 10 * GIB
+    if available < required:
+        raise RuntimeError(
+            "Qwen2.5-Omni cannot start safely because Windows has only "
+            f"{available / GIB:.1f} GiB of available committed memory; "
+            f"this {operation} path requires at least {required / GIB:.0f} GiB. "
+            "Close memory-heavy applications or increase the Windows paging file."
+        )
+
+
+def load_runtime(model_id: str, model_dir: Path, operation: str):
     try:
         import torchvision  # noqa: F401
     except ImportError as error:
@@ -32,8 +72,14 @@ def load_runtime(model_id: str, model_dir: Path):
             Qwen2_5OmniProcessor,
         )
 
+        require_commit_headroom(operation)
+        enable_audio_output = operation == "speech"
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            str(model_dir), device_map="auto", torch_dtype="auto"
+            str(model_dir),
+            device_map="auto",
+            torch_dtype="auto",
+            low_cpu_mem_usage=True,
+            enable_audio_output=enable_audio_output,
         )
         processor = Qwen2_5OmniProcessor.from_pretrained(str(model_dir))
         return model, processor
@@ -92,14 +138,12 @@ def main() -> None:
     model_dir = Path(request["model_dir"]).expanduser().resolve()
     if not model_dir.is_dir():
         raise FileNotFoundError(f"Qwen Omni snapshot is missing: {model_dir}")
-    model, processor = load_runtime(model_id, model_dir)
+    model, processor = load_runtime(model_id, model_dir, operation)
 
     if operation == "transcribe":
         audio_path = Path(request["audio_path"]).expanduser().resolve()
         if not audio_path.is_file():
             raise FileNotFoundError(f"audio file does not exist: {audio_path}")
-        if hasattr(model, "disable_talker"):
-            model.disable_talker()
         messages = [
             {
                 "role": "system",
@@ -123,6 +167,7 @@ def main() -> None:
             **inputs,
             use_audio_in_video=True,
             return_audio=False,
+            max_new_tokens=256,
         )
         text_ids, _ = generated_parts(generated)
         transcript = decode_text(processor, text_ids)
@@ -136,7 +181,9 @@ def main() -> None:
         if not text:
             raise ValueError("speech input cannot be empty")
         voice = request.get("voice") or "Chelsie"
-        instruction = request.get("instruction") or text
+        instruction = request.get("instruction") or (
+            "Speak the following text exactly and do not add other words: " + text
+        )
         messages = [
             {
                 "role": "system",
@@ -152,6 +199,8 @@ def main() -> None:
             **inputs,
             speaker=voice,
             use_audio_in_video=True,
+            return_audio=True,
+            max_new_tokens=96,
         )
         _, audio = generated_parts(generated)
         if audio is None:
