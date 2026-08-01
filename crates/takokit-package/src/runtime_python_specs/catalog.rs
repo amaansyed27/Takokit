@@ -28,6 +28,7 @@ const QWEN3_PACKAGES: &[&str] = &["qwen-tts==0.1.1", "soundfile"];
 const CHATTERBOX_PACKAGES: &[&str] = &[
     "torch",
     "torchaudio",
+    "setuptools==80.9.0",
     "numpy>=1.26",
     "librosa==0.11.0",
     "s3tokenizer",
@@ -328,8 +329,8 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "cosyvoice2",
         "3.10",
         &[
-            "torch",
-            "torchaudio",
+            "torch>=2.13.0",
+            "torchaudio>=2.11.0",
             "soundfile>=0.12",
             "setuptools==80.9.0"
         ],
