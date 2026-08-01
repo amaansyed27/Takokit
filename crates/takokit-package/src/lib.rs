@@ -16,6 +16,7 @@ mod records;
 mod registry;
 mod registry_index;
 mod removal;
+mod removal_reference;
 mod resolution;
 mod runner;
 mod runtime;
