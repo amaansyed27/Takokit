@@ -15,6 +15,8 @@ def respond(**payload: object) -> None:
 def load_runtime(model_dir: Path):
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
+    # The pinned Melo/OpenVoice stack still imports pkg_resources.
+    import pkg_resources  # noqa: F401
     import torch
     from openvoice.api import ToneColorConverter
 
