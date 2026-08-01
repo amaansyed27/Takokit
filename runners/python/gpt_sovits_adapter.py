@@ -79,6 +79,51 @@ def fast_langdetect_cache() -> Path:
     return source_root() / "GPT_SoVITS" / "pretrained_models" / "fast_langdetect"
 
 
+def nltk_data_root() -> Path:
+    return source_root() / "GPT_SoVITS" / "pretrained_models" / "nltk_data"
+
+
+def prepare_nltk_resources(*, download_missing: bool) -> Path:
+    root = nltk_data_root()
+    root.mkdir(parents=True, exist_ok=True)
+    os.environ["NLTK_DATA"] = str(root)
+
+    import nltk
+
+    root_text = str(root)
+    if root_text not in nltk.data.path:
+        nltk.data.path.insert(0, root_text)
+
+    resources = (
+        ("averaged_perceptron_tagger", "taggers/averaged_perceptron_tagger"),
+        ("averaged_perceptron_tagger_eng", "taggers/averaged_perceptron_tagger_eng"),
+        ("cmudict", "corpora/cmudict"),
+    )
+    if download_missing:
+        for package, _ in resources:
+            downloaded = nltk.download(
+                package,
+                download_dir=root_text,
+                quiet=True,
+                raise_on_error=True,
+            )
+            if not downloaded:
+                raise RuntimeError(f"NLTK resource download failed: {package}")
+
+    missing: list[str] = []
+    for package, location in resources:
+        try:
+            nltk.data.find(location, paths=[root_text])
+        except LookupError:
+            missing.append(package)
+    if missing:
+        raise FileNotFoundError(
+            "GPT-SoVITS NLTK resources are missing. Run `tako pull gpt-sovits` "
+            f"while online to prefetch: {', '.join(missing)}"
+        )
+    return root
+
+
 def prepare_fast_langdetect(*, download_missing: bool) -> Path:
     cache = fast_langdetect_cache()
     cache.mkdir(parents=True, exist_ok=True)
@@ -152,6 +197,7 @@ def run_checked(command: list[str], *, cwd: Path, env: dict[str, str], log) -> N
 def run_speech(request: dict, model_dir: Path) -> None:
     source = source_root()
     prepare_fast_langdetect(download_missing=False)
+    prepare_nltk_resources(download_missing=False)
     sys.path.insert(0, str(source))
     sys.path.insert(0, str(source / "GPT_SoVITS"))
     os.chdir(source)
@@ -241,6 +287,7 @@ def merge_parts(directory: Path, pattern: str, output: Path, header: str | None 
 def run_training(request: dict, model_dir: Path) -> None:
     source = source_root()
     prepare_fast_langdetect(download_missing=False)
+    prepare_nltk_resources(download_missing=False)
     paths = model_paths(model_dir)
     require_paths(paths)
     dataset = Path(request["dataset_path"]).expanduser().resolve()
@@ -264,6 +311,7 @@ def run_training(request: dict, model_dir: Path) -> None:
         {
             "PYTHONUTF8": "1",
             "PYTHONIOENCODING": "utf-8",
+            "NLTK_DATA": str(nltk_data_root()),
             "inp_text": str(train_list),
             "inp_wav_dir": str(wav_dir),
             "exp_name": name,
@@ -386,10 +434,14 @@ def main() -> None:
     if operation == "prefetch":
         require_paths(model_paths(model_dir))
         cache = prepare_fast_langdetect(download_missing=True)
+        nltk_root = prepare_nltk_resources(download_missing=True)
         respond(
             ok=True,
-            detail=f"Prefetched GPT-SoVITS language detector at {cache}",
-            size_bytes=directory_size(cache),
+            detail=(
+                f"Prefetched GPT-SoVITS language detector at {cache} and "
+                f"NLTK resources at {nltk_root}"
+            ),
+            size_bytes=directory_size(cache) + directory_size(nltk_root),
         )
     elif operation == "speech":
         run_speech(request, model_dir)
