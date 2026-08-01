@@ -31,6 +31,42 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def install_soundfile_torchaudio_io():
+    import numpy as np
+    import soundfile as sf
+    import torch
+    import torchaudio
+
+    def load(
+        path,
+        frame_offset=0,
+        num_frames=-1,
+        normalize=True,
+        channels_first=True,
+        **_kwargs,
+    ):
+        del normalize
+        audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
+        start = max(0, int(frame_offset))
+        stop = None if int(num_frames) < 0 else start + int(num_frames)
+        audio = audio[start:stop]
+        tensor = torch.from_numpy(np.ascontiguousarray(audio))
+        if channels_first:
+            tensor = tensor.transpose(0, 1)
+        return tensor, int(sample_rate)
+
+    def save(path, source, sample_rate, channels_first=True, **_kwargs):
+        if hasattr(source, "detach"):
+            source = source.detach().cpu().float().numpy()
+        audio = np.asarray(source)
+        if channels_first and audio.ndim == 2:
+            audio = audio.T
+        sf.write(str(path), audio, int(sample_rate))
+
+    torchaudio.load = load
+    torchaudio.save = save
+
+
 def load_f5tts_api():
     # Takokit deploys this runner as `f5_tts.py`. Without removing the runner
     # directory from sys.path, Python resolves that file instead of the real
@@ -52,6 +88,7 @@ def load_f5tts_api():
 
 def main():
     request = json.load(sys.stdin)
+    install_soundfile_torchaudio_io()
     if request.get("operation") == "prefetch":
         F5TTS = load_f5tts_api()
         F5TTS(model="F5TTS_v1_Base")
