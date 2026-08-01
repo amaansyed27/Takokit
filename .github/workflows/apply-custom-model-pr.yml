@@ -40,6 +40,15 @@ jobs:
                   line = line[10:]
               lines.append(line)
           exec(compile('\n'.join(lines), 'custom-model-integration', 'exec'))
+
+          runtime_specs = Path('crates/takokit-package/src/runtime_python_specs.rs')
+          source = runtime_specs.read_text(encoding='utf-8')
+          source = source.replace(
+              'pub fn runtime_model_id(model: &ModelManifest) -> &str {',
+              'pub fn runtime_model_id(model: &crate::ModelManifest) -> &str {',
+              1,
+          )
+          runtime_specs.write_text(source, encoding='utf-8')
           BOOTSTRAP
 
       - name: Format and run focused tests
