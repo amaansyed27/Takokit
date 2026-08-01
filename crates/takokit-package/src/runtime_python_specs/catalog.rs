@@ -14,7 +14,7 @@ const COQUI_PACKAGES: &[&str] = &[
     "transformers==4.57.6",
     "torch",
     "torchaudio",
-    "torchcodec",
+    "soundfile>=0.12",
 ];
 const NEMO_PACKAGES: &[&str] = &[
     "torch",
@@ -34,13 +34,15 @@ const CHATTERBOX_PACKAGES: &[&str] = &[
     "transformers==4.46.3",
     "diffusers==0.29.0",
     "resemble-perth==1.0.1",
+    "PyYAML>=6.0",
+    "omegaconf==2.3.0",
     "conformer==0.3.2",
     "safetensors==0.5.3",
     "huggingface_hub[hf_xet]",
 ];
 const QWEN_OMNI_PACKAGES: &[&str] = &[
-    "git+https://github.com/huggingface/transformers.git",
-    "qwen-omni-utils[decord]",
+    "transformers==4.52.3",
+    "qwen-omni-utils",
     "accelerate",
     "soundfile",
     "librosa",
@@ -175,7 +177,11 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "f5_tts",
         "f5-tts",
         "3.11",
-        &["f5-tts==1.1.21", "huggingface_hub[hf_xet]"],
+        &[
+            "f5-tts==1.1.21",
+            "huggingface_hub[hf_xet]",
+            "soundfile>=0.12"
+        ],
         F5_TTS_ADAPTER,
         None,
         "F5-TTS."
@@ -321,7 +327,12 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "cosyvoice2",
         "cosyvoice2",
         "3.10",
-        &["torch", "torchaudio", "setuptools==80.9.0"],
+        &[
+            "torch",
+            "torchaudio",
+            "soundfile>=0.12",
+            "setuptools==80.9.0"
+        ],
         COSYVOICE2_ADAPTER,
         Some(COSYVOICE_SOURCE),
         "CosyVoice2."
@@ -345,6 +356,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
             "huggingface_hub",
             "soundfile",
             "setuptools==80.9.0",
+            "unidic-lite",
             "wavmark==0.0.3",
             "git+https://github.com/myshell-ai/MeloTTS.git@209145371cff8fc3bd60d7be902ea69cbdb7965a"
         ],
@@ -356,7 +368,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "gpt_sovits",
         "gpt-sovits",
         "3.10",
-        &["pyyaml"],
+        &["pyyaml", "soundfile>=0.12"],
         GPT_SOVITS_ADAPTER,
         Some(GPT_SOVITS_SOURCE),
         "GPT-SoVITS."
