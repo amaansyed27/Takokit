@@ -68,9 +68,6 @@ def install_soundfile_torchaudio_io():
 
 
 def load_f5tts_api():
-    # Takokit deploys this runner as `f5_tts.py`. Without removing the runner
-    # directory from sys.path, Python resolves that file instead of the real
-    # installed `f5_tts` package and reports that `f5_tts` is not a package.
     adapter_dir = Path(__file__).resolve().parent
     original_path = list(sys.path)
     try:
@@ -86,12 +83,50 @@ def load_f5tts_api():
         sys.path[:] = original_path
 
 
+def cuda_error_allows_cpu_retry(error):
+    message = f"{type(error).__name__}: {error}".lower()
+    return any(
+        marker in message
+        for marker in (
+            "device(s) is/are busy or unavailable",
+            "cuda-capable device",
+            "cudaerrordevicesunavailable",
+            "no kernel image is available",
+            "out of memory",
+        )
+    )
+
+
+def create_engine(F5TTS):
+    import torch
+
+    if torch.cuda.is_available():
+        try:
+            return F5TTS(model="F5TTS_v1_Base", device="cuda"), "cuda"
+        except Exception as error:
+            if not cuda_error_allows_cpu_retry(error):
+                raise
+            print(
+                "F5-TTS is retrying on CPU because CUDA could not initialize: "
+                f"{type(error).__name__}: {error}",
+                file=sys.stderr,
+                flush=True,
+            )
+            try:
+                torch.cuda.empty_cache()
+            except RuntimeError:
+                pass
+    return F5TTS(model="F5TTS_v1_Base", device="cpu"), "cpu"
+
+
 def main():
     request = json.load(sys.stdin)
     install_soundfile_torchaudio_io()
     if request.get("operation") == "prefetch":
         F5TTS = load_f5tts_api()
-        F5TTS(model="F5TTS_v1_Base")
+        # Prefetch only needs to materialize checkpoints. CPU initialization
+        # avoids making model installation depend on transient GPU availability.
+        F5TTS(model="F5TTS_v1_Base", device="cpu")
         hub = Path(request["cache_dir"]) / "huggingface" / "hub"
         model_roots = (
             [
@@ -127,7 +162,8 @@ def main():
         reference = Path(str(files("f5_tts").joinpath("infer/examples/basic/basic_ref_en.wav")))
         if not reference_text:
             reference_text = DEFAULT_REFERENCE_TEXT
-    engine = F5TTS(model="F5TTS_v1_Base")
+
+    engine, device = create_engine(F5TTS)
     _, sample_rate, _ = engine.infer(
         ref_file=str(reference),
         ref_text=reference_text,
@@ -143,6 +179,7 @@ def main():
         bytes=output_path.stat().st_size,
         sample_rate=int(sample_rate),
         voice=voice or "default",
+        device=device,
     )
 
 
