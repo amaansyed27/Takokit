@@ -34,13 +34,27 @@ pub struct ModelRemovalReport {
 pub fn remove_model_complete(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
-    model_id: &str,
+    model_reference: &str,
     options: RemoveModelOptions,
 ) -> PackageResult<ModelRemovalReport> {
     let root = installed_registry.storage_root();
     let _maintenance_guard = acquire_maintenance_lock(&root)?;
-    let journal = removal_journal_path(&root, model_id);
-    if !installed_registry.is_model_installed(model_id) && journal.is_file() {
+    let model_id = match resolve_installed_model_id(
+        package_registry,
+        installed_registry,
+        model_reference,
+    ) {
+        Ok(model_id) => model_id,
+        Err(PackageError::ModelNotInstalled(_)) => resolve_removal_journal_model_id(
+            package_registry,
+            &root,
+            model_reference,
+        )?
+        .ok_or_else(|| PackageError::ModelNotInstalled(model_reference.to_string()))?,
+        Err(error) => return Err(error),
+    };
+    let journal = removal_journal_path(&root, &model_id);
+    if !installed_registry.is_model_installed(&model_id) && journal.is_file() {
         let mut report: ModelRemovalReport = serde_json::from_slice(&std::fs::read(&journal)?)?;
         if !options.dry_run {
             execute_items(&root, &report.deleted)?;
@@ -51,10 +65,10 @@ pub fn remove_model_complete(
         return Ok(report);
     }
 
-    let target_record = installed_registry.installed_model_record(model_id)?;
+    let target_record = installed_registry.installed_model_record(&model_id)?;
     let target_manifest = package_registry
-        .model(model_id)
-        .or_else(|_| installed_registry.installed_model(model_id))?;
+        .model(&model_id)
+        .or_else(|_| installed_registry.installed_model(&model_id))?;
     let remaining_records = installed_registry
         .installed_model_records()?
         .into_iter()
@@ -84,8 +98,8 @@ pub fn remove_model_complete(
     push_candidate(
         &mut deleted,
         "model",
-        model_id,
-        root.join("models").join(model_id),
+        &model_id,
+        root.join("models").join(&model_id),
         "selected model data is exclusively owned by this installation",
     );
 
@@ -180,7 +194,7 @@ pub fn remove_model_complete(
         .map(|entry| entry.logical_bytes)
         .fold(0_u64, u64::saturating_add);
     let mut report = ModelRemovalReport {
-        model_id: model_id.to_string(),
+        model_id: model_id.clone(),
         dry_run: options.dry_run,
         removed: false,
         reclaimed_bytes,
@@ -196,10 +210,89 @@ pub fn remove_model_complete(
     }
     std::fs::write(&journal, serde_json::to_vec_pretty(&report)?)?;
     execute_items(&root, &report.deleted)?;
-    installed_registry.remove_model(model_id)?;
+    installed_registry.remove_model(&model_id)?;
     remove_file_if_present(&journal)?;
     report.removed = true;
     Ok(report)
+}
+
+fn resolve_installed_model_id(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+    model_reference: &str,
+) -> PackageResult<String> {
+    let mut matches = installed_registry
+        .installed_model_records()?
+        .into_iter()
+        .filter(|record| model_references_match(package_registry, &record.id, model_reference))
+        .map(|record| record.id)
+        .collect::<Vec<_>>();
+    matches.sort();
+    matches.dedup();
+    match matches.as_slice() {
+        [model_id] => Ok(model_id.clone()),
+        [] => Err(PackageError::ModelNotInstalled(model_reference.to_string())),
+        _ => Err(PackageError::ArtifactInstallFailed {
+            artifact: model_reference.to_string(),
+            reason: format!(
+                "model reference resolves to multiple installed records: {}",
+                matches.join(", ")
+            ),
+        }),
+    }
+}
+
+fn resolve_removal_journal_model_id(
+    package_registry: &PackageRegistry,
+    root: &Path,
+    model_reference: &str,
+) -> PackageResult<Option<String>> {
+    let directory = root.join("runtime").join("removals");
+    if !directory.is_dir() {
+        return Ok(None);
+    }
+    let mut matches = Vec::new();
+    for entry in std::fs::read_dir(directory)? {
+        let entry = entry?;
+        if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let report: ModelRemovalReport = serde_json::from_slice(&std::fs::read(entry.path())?)?;
+        if model_references_match(package_registry, &report.model_id, model_reference) {
+            matches.push(report.model_id);
+        }
+    }
+    matches.sort();
+    matches.dedup();
+    match matches.as_slice() {
+        [model_id] => Ok(Some(model_id.clone())),
+        [] => Ok(None),
+        _ => Err(PackageError::ArtifactInstallFailed {
+            artifact: model_reference.to_string(),
+            reason: format!(
+                "model reference matches multiple interrupted removals: {}",
+                matches.join(", ")
+            ),
+        }),
+    }
+}
+
+fn model_references_match(
+    package_registry: &PackageRegistry,
+    installed_id: &str,
+    model_reference: &str,
+) -> bool {
+    if installed_id.eq_ignore_ascii_case(model_reference) {
+        return true;
+    }
+    let Ok(installed) = package_registry.resolve_model_reference(installed_id) else {
+        return false;
+    };
+    let Ok(requested) = package_registry.resolve_model_reference(model_reference) else {
+        return false;
+    };
+    installed.canonical.eq_ignore_ascii_case(&requested.canonical)
+        || installed.target.eq_ignore_ascii_case(&requested.target)
 }
 
 fn python_abi_paths(root: &Path, abi: &str) -> PackageResult<Vec<PathBuf>> {
@@ -321,6 +414,104 @@ fn path_size(path: &Path) -> u64 {
 mod tests {
     use super::*;
 
+    fn model_manifest_source(id: &str) -> String {
+        format!(
+            r#"id = "{id}"
+name = "XTTS v2"
+family = "xtts"
+version = "2.0.0"
+kind = "tts"
+backend = "python-managed"
+runner = "takokit-python-managed"
+license = "mit"
+description = "fixture"
+
+[capabilities]
+tts = true
+
+[hardware]
+cpu = true
+gpu = false
+
+[artifacts]
+metadata_only = true
+"#
+        )
+    }
+
+    fn alias_fixture() -> (tempfile::TempDir, PackageRegistry, InstalledRegistry) {
+        let root = tempfile::tempdir().expect("tempdir");
+        let registry_root = root.path().join("registry");
+        let manifests_root = root.path().join("manifests");
+        std::fs::create_dir_all(registry_root.join("models")).expect("registry models");
+        std::fs::create_dir_all(manifests_root.join("models")).expect("installed models");
+        std::fs::create_dir_all(manifests_root.join("installed-models"))
+            .expect("installed records");
+
+        let target_source = model_manifest_source("xtts-v2");
+        std::fs::write(registry_root.join("models/xtts-v2.toml"), &target_source)
+            .expect("target manifest");
+        let index = RegistryIndex {
+            schema_version: REGISTRY_SCHEMA_VERSION,
+            namespace: "library".into(),
+            generated_at: "0".into(),
+            models: vec![RegistryModel {
+                name: "xtts".into(),
+                display_name: "XTTS v2".into(),
+                default_tag: "2".into(),
+                summary: "fixture".into(),
+                tasks: vec!["tts".into()],
+                aliases: Vec::new(),
+                tags: vec![RegistryTag {
+                    tag: "2".into(),
+                    target: "xtts-v2".into(),
+                    aliases: vec!["xtts-v2".into()],
+                    version: "2.0.0".into(),
+                    digest: manifest_digest(&target_source),
+                    size_bytes: 0,
+                    runner: "takokit-python-managed".into(),
+                    adapter: None,
+                    license: "mit".into(),
+                    kind: "tts".into(),
+                    backend: "python-managed".into(),
+                    hardware: RegistryHardware {
+                        cpu: true,
+                        gpu: false,
+                        min_ram: None,
+                        min_vram: None,
+                    },
+                    source: RegistrySource {
+                        provider: "artifact".into(),
+                        repository: None,
+                        revision: None,
+                    },
+                    manifest_toml: Some(target_source),
+                }],
+            }],
+        };
+        std::fs::write(
+            registry_root.join("index.json"),
+            serde_json::to_vec_pretty(&index).expect("registry json"),
+        )
+        .expect("registry index");
+
+        let installed_source = model_manifest_source("xtts");
+        let installed_manifest: ModelManifest =
+            toml::from_str(&installed_source).expect("installed manifest");
+        let installed_manifest_path = manifests_root.join("models/xtts.toml");
+        std::fs::write(&installed_manifest_path, installed_source).expect("installed manifest file");
+        let record = installed_model_record(&installed_manifest, installed_manifest_path);
+        std::fs::write(
+            manifests_root.join("installed-models/xtts.toml"),
+            toml::to_string_pretty(&record).expect("installed record toml"),
+        )
+        .expect("installed record");
+
+        let package_registry = PackageRegistry::new(registry_root);
+        let installed_registry = InstalledRegistry::new(manifests_root);
+        (root, package_registry, installed_registry)
+    }
+
     #[test]
     fn nested_dependency_paths_are_counted_once() {
         let root = PathBuf::from("root");
@@ -363,5 +554,22 @@ mod tests {
         assert!(!report.removed);
         assert!(shared.exists());
         assert!(exclusive.exists());
+    }
+
+    #[test]
+    fn removal_alias_resolves_the_existing_legacy_install_record() {
+        let (_root, package_registry, installed_registry) = alias_fixture();
+        let report = remove_model_complete(
+            &package_registry,
+            &installed_registry,
+            "xtts-v2",
+            RemoveModelOptions { dry_run: true },
+        )
+        .expect("alias removal plan");
+
+        assert_eq!(report.model_id, "xtts");
+        assert!(report.dry_run);
+        assert!(!report.removed);
+        assert!(installed_registry.is_model_installed("xtts"));
     }
 }
