@@ -9,8 +9,64 @@ import tempfile
 from pathlib import Path
 
 
+NLTK_RESOURCES = (
+    ("averaged_perceptron_tagger", "taggers/averaged_perceptron_tagger.zip"),
+    ("averaged_perceptron_tagger_eng", "taggers/averaged_perceptron_tagger_eng"),
+    ("cmudict", "corpora/cmudict"),
+)
+
+
 def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
+
+
+def directory_size(path: Path) -> int:
+    total = 0
+    if not path.is_dir():
+        return total
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def configure_nltk_data(cache_dir: Path, *, download_missing: bool) -> Path:
+    import nltk
+
+    root = cache_dir.expanduser().resolve() / "openvoice" / "nltk_data"
+    root.mkdir(parents=True, exist_ok=True)
+    os.environ["NLTK_DATA"] = str(root)
+    if str(root) not in nltk.data.path:
+        nltk.data.path.insert(0, str(root))
+
+    missing = []
+    for resource, lookup in NLTK_RESOURCES:
+        try:
+            nltk.data.find(lookup, paths=[str(root)])
+            continue
+        except LookupError:
+            if not download_missing:
+                missing.append(resource)
+                continue
+        downloaded = nltk.download(
+            resource,
+            download_dir=str(root),
+            quiet=True,
+            raise_on_error=True,
+        )
+        if not downloaded:
+            raise RuntimeError(f"NLTK failed to download {resource}")
+
+    if missing:
+        joined = ", ".join(missing)
+        raise RuntimeError(
+            "OpenVoice language resources are missing: "
+            f"{joined}. Run `tako pull openvoice` while online to prefetch them."
+        )
+    return root
 
 
 def configure_mecab_dictionary() -> None:
@@ -58,8 +114,6 @@ def speaker_embedding(reference: Path, converter, cache_dir: Path):
 
 
 def resolve_speaker_id(speaker_ids, speaker_key: str) -> int:
-    # Melo stores spk2id in its HParams wrapper. That object exposes items,
-    # values and __getitem__, but intentionally does not implement dict.get.
     mapping = dict(speaker_ids.items())
     if not mapping:
         raise RuntimeError("MeloTTS returned an empty speaker map")
@@ -67,6 +121,8 @@ def resolve_speaker_id(speaker_ids, speaker_key: str) -> int:
 
 
 def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, str]:
+    cache_root = Path(request["cache_dir"])
+    configure_nltk_data(cache_root, download_missing=False)
     checkpoint_root, converter, device = load_runtime(model_dir)
     text = str(request.get("input") or "").strip()
     reference = request.get("voice")
@@ -85,7 +141,7 @@ def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, 
 
     base_model = TTS(language=language, device=device)
     speaker_id = resolve_speaker_id(base_model.hps.data.spk2id, speaker_key)
-    cache_dir = Path(request["cache_dir"]).expanduser().resolve() / "openvoice"
+    cache_dir = cache_root.expanduser().resolve() / "openvoice"
     cache_dir.mkdir(parents=True, exist_ok=True)
     target_se = speaker_embedding(reference_path, converter, cache_dir / "target")
     source_se_path = (
@@ -141,6 +197,18 @@ def main() -> None:
     request = json.load(sys.stdin)
     operation = request.get("operation")
     model_dir = Path(request["model_dir"]).expanduser().resolve()
+    if operation == "prefetch":
+        root = configure_nltk_data(
+            Path(request["cache_dir"]),
+            download_missing=True,
+        )
+        respond(
+            ok=True,
+            detail=f"Prefetched OpenVoice NLTK resources at {root}",
+            size_bytes=directory_size(root),
+        )
+        return
+
     output_path = Path(request["output_path"]).expanduser().resolve()
     if operation == "speech":
         sample_rate, voice = run_speech(request, model_dir, output_path)
