@@ -39,10 +39,7 @@ pub struct CustomModelRecord {
 }
 
 pub fn custom_models_dir(takokit_root: &Path) -> PathBuf {
-    takokit_root
-        .join("manifests")
-        .join("custom")
-        .join("models")
+    takokit_root.join("manifests").join("custom").join("models")
 }
 
 pub fn register_custom_model(

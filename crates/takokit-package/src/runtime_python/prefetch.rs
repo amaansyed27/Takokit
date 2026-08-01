@@ -3,7 +3,7 @@
 use crate::{
     artifact_io::sha256_file,
     runtime_command::{configure_managed_command, runner_python_path},
-    runtime_python_specs::model_prefetch_required,
+    runtime_python_specs::{model_prefetch_required, runtime_model_id},
     *,
 };
 use serde::{Deserialize, Serialize};
@@ -54,7 +54,8 @@ pub(crate) fn prefetch_python_adapter_model(
     model: &ModelManifest,
     adapter: &str,
 ) -> PackageResult<Option<String>> {
-    if !model_prefetch_required(&model.id) {
+    let runtime_model = runtime_model_id(model);
+    if !model_prefetch_required(runtime_model) {
         return Ok(None);
     }
 
@@ -117,7 +118,7 @@ pub(crate) fn prefetch_python_adapter_model(
 
     let payload = serde_json::to_vec(&ModelPrefetchRequest {
         operation: "prefetch",
-        model_id: &model.id,
+        model_id: runtime_model,
         model_dir: &model_dir,
         cache_dir: &cache_dir,
     })?;

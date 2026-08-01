@@ -15,6 +15,7 @@ pub struct PackageRegistry {
     root: PathBuf,
     cache_path: Option<PathBuf>,
     remote_url: Option<String>,
+    custom_models_dir: Option<PathBuf>,
 }
 
 impl PackageRegistry {
@@ -23,6 +24,7 @@ impl PackageRegistry {
             root: root.as_ref().to_path_buf(),
             cache_path: None,
             remote_url: None,
+            custom_models_dir: None,
         }
     }
 
@@ -37,10 +39,17 @@ impl PackageRegistry {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| DEFAULT_REGISTRY_URL.to_string());
+        let cache_path = home
+            .as_ref()
+            .map(|home| home.join("manifests").join("registry").join("index.json"));
+        let custom_models_dir = home
+            .as_ref()
+            .map(|home| home.join("manifests").join("custom").join("models"));
         Self {
             root,
-            cache_path: home.map(|home| home.join("manifests").join("registry").join("index.json")),
+            cache_path,
             remote_url: Some(remote_url),
+            custom_models_dir,
         }
     }
 
@@ -48,7 +57,19 @@ impl PackageRegistry {
         &self.root
     }
 
+    pub fn with_custom_models_dir(mut self, directory: impl AsRef<Path>) -> Self {
+        self.custom_models_dir = Some(directory.as_ref().to_path_buf());
+        self
+    }
+
+    pub fn custom_models_dir(&self) -> Option<&Path> {
+        self.custom_models_dir.as_deref()
+    }
+
     pub fn model(&self, reference: &str) -> PackageResult<ModelManifest> {
+        if let Some(manifest) = self.custom_model(reference)? {
+            return Ok(manifest);
+        }
         if let Ok(index) = self.registry_index() {
             if let Ok(resolved) = index.resolve(reference) {
                 let release = index
@@ -69,6 +90,9 @@ impl PackageRegistry {
     /// Pulls refresh the small control-plane index first. Network failure is
     /// deliberately non-fatal: the verified bundled or cached index remains usable.
     pub fn model_for_pull(&self, reference: &str) -> PackageResult<ModelManifest> {
+        if let Some(manifest) = self.custom_model(reference)? {
+            return Ok(manifest);
+        }
         if !registry_offline() {
             let _ = self.sync_remote();
         }
@@ -79,6 +103,24 @@ impl PackageRegistry {
         &self,
         reference: &str,
     ) -> PackageResult<ResolvedModelReference> {
+        if let Some(id) = custom_reference_id(reference)? {
+            if let Some(directory) = self.custom_models_dir.as_deref() {
+                let path = directory.join(format!("{id}.toml"));
+                if path.is_file() {
+                    let spec = read_custom_model_spec(&path)?;
+                    let manifest_source = toml::to_string(&spec)?;
+                    return Ok(ResolvedModelReference {
+                        requested: reference.to_string(),
+                        canonical: format!("local/{id}:latest"),
+                        namespace: "local".to_string(),
+                        name: id.clone(),
+                        tag: "latest".to_string(),
+                        digest: manifest_digest(&manifest_source),
+                        target: id,
+                    });
+                }
+            }
+        }
         if let Ok(index) = self.registry_index() {
             return index.resolve(reference);
         }
@@ -96,6 +138,13 @@ impl PackageRegistry {
     }
 
     pub fn canonical_reference_for_id(&self, id: &str) -> String {
+        if self
+            .custom_models_dir
+            .as_deref()
+            .is_some_and(|directory| directory.join(format!("{id}.toml")).is_file())
+        {
+            return format!("local/{id}:latest");
+        }
         self.registry_index()
             .ok()
             .and_then(|index| index.canonical_for_target(id))
@@ -171,6 +220,8 @@ impl PackageRegistry {
         for model in &mut models {
             normalize_model_license(model);
         }
+        models.extend(self.custom_models()?);
+        models.sort_by(|left, right| left.id.cmp(&right.id));
         Ok(models)
     }
 
@@ -184,6 +235,47 @@ impl PackageRegistry {
 
     pub fn library_runners(&self) -> PackageResult<Vec<LibraryRunnerManifest>> {
         read_manifest_dir(&self.root.join("library").join("runners"))
+    }
+
+    fn custom_model(&self, reference: &str) -> PackageResult<Option<ModelManifest>> {
+        let Some(id) = custom_reference_id(reference)? else {
+            return Ok(None);
+        };
+        let Some(directory) = self.custom_models_dir.as_deref() else {
+            return Ok(None);
+        };
+        let path = directory.join(format!("{id}.toml"));
+        if !path.is_file() {
+            return Ok(None);
+        }
+        let spec = read_custom_model_spec(&path)?;
+        Ok(Some(materialize_custom_model(self, &spec)?))
+    }
+
+    fn custom_models(&self) -> PackageResult<Vec<ModelManifest>> {
+        let Some(directory) = self.custom_models_dir.as_deref() else {
+            return Ok(Vec::new());
+        };
+        if !directory.is_dir() {
+            return Ok(Vec::new());
+        }
+        let mut entries = std::fs::read_dir(directory)?.collect::<Result<Vec<_>, _>>()?;
+        entries.sort_by_key(|entry| entry.file_name());
+        let mut models = Vec::new();
+        for entry in entries {
+            if entry.path().extension().and_then(|value| value.to_str()) != Some("toml") {
+                continue;
+            }
+            let spec = read_custom_model_spec(&entry.path())?;
+            let mut model = materialize_custom_model(self, &spec)?;
+            normalize_model_license(&mut model);
+            models.push(model);
+        }
+        Ok(models)
+    }
+
+    pub(crate) fn read_bundled_model(&self, id: &str) -> PackageResult<ModelManifest> {
+        self.read_model_manifest(id)
     }
 
     fn registry_index(&self) -> PackageResult<RegistryIndex> {

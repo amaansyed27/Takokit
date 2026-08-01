@@ -52,14 +52,7 @@ pub fn voice_contract_for_model(model: &ModelManifest) -> VoiceContract {
             contract.modes = vec![VoiceMode::PresetSpeaker];
             contract.default_voice = Some("Ryan".to_string());
             contract.preset_voices = [
-                "Vivian",
-                "Serena",
-                "Uncle_Fu",
-                "Dylan",
-                "Eric",
-                "Ryan",
-                "Aiden",
-                "Ono_Anna",
+                "Vivian", "Serena", "Uncle_Fu", "Dylan", "Eric", "Ryan", "Aiden", "Ono_Anna",
                 "Sohee",
             ]
             .into_iter()

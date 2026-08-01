@@ -40,6 +40,8 @@ pub enum PackageError {
         expected: String,
         supplied: String,
     },
+    #[error("invalid custom model: {0}")]
+    InvalidCustomModel(String),
     #[error("artifact URL missing for {model}: {artifact}")]
     ArtifactUrlMissing { model: String, artifact: String },
     #[error("artifact checksum missing for {model}: {artifact}")]
@@ -124,6 +126,9 @@ impl From<PackageError> for TakokitError {
             error @ PackageError::LicenseAcceptanceRequired { .. }
             | error @ PackageError::LicenseMismatch { .. } => {
                 TakokitError::InvalidRequest(error.to_string())
+            }
+            PackageError::InvalidCustomModel(message) => {
+                TakokitError::InvalidRequest(format!("invalid custom model: {message}"))
             }
             error @ PackageError::ArtifactUrlMissing { .. } => TakokitError::Resolution {
                 code: ErrorCode::ArtifactUrlMissing,

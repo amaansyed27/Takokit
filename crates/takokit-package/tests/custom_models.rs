@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use takokit_package::{
-    custom_model_record, custom_model_records, register_custom_model, ArtifactRole,
-    PackageRegistry,
+    custom_model_record, custom_model_records, register_custom_model, ArtifactRole, PackageRegistry,
 };
 
 fn write_registry(root: &Path) {
