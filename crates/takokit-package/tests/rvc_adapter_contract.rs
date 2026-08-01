@@ -23,7 +23,7 @@ fn rvc_adapter_passes_the_absolute_audio_path_as_a_string() {
 #[test]
 fn rvc_adapter_normalizes_legacy_pyav_binary_modes_before_importing_upstream() {
     let compatibility_call = RVC_ADAPTER
-        .find("\n    install_pyav_mode_compat()\n    from scipy.io")
+        .rfind("install_pyav_mode_compat()")
         .expect("PyAV compatibility call before upstream imports");
     let upstream_import = RVC_ADAPTER
         .find("from rvc.modules.vc.modules import VC")
