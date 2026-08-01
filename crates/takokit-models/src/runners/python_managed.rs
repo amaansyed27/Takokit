@@ -9,7 +9,7 @@ use takokit_core::{
     TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse, VoiceConversionRequest,
     VoiceConversionResponse,
 };
-use takokit_package::{adapter_for_model, ExecutionPlan};
+use takokit_package::{adapter_for_model, runtime_model_id, ExecutionPlan};
 use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
@@ -90,9 +90,10 @@ fn speak_with_adapter(
     let output_path = output_dir.join(format!("speech-{id}.wav"));
     let model_dir = plan.storage_root.join("models").join(&plan.model.id);
     let cache_dir = plan.storage_root.join("cache");
+    let runtime_model = runtime_model_id(&plan.model);
     let payload = ManagedAdapterRequest {
         operation: "speech",
-        model_id: &plan.model.id,
+        model_id: runtime_model,
         model_dir: &model_dir,
         cache_dir: &cache_dir,
         input: Some(&request.input),
@@ -143,9 +144,10 @@ fn transcribe_with_adapter(
     let layout = adapter_layout(plan, adapter)?;
     let model_dir = plan.storage_root.join("models").join(&plan.model.id);
     let cache_dir = plan.storage_root.join("cache");
+    let runtime_model = runtime_model_id(&plan.model);
     let payload = ManagedAdapterRequest {
         operation: "transcribe",
-        model_id: &plan.model.id,
+        model_id: runtime_model,
         model_dir: &model_dir,
         cache_dir: &cache_dir,
         input: None,
@@ -199,9 +201,10 @@ fn convert_with_adapter(
     let output_path = output_dir.join(format!("conversion-{id}.wav"));
     let model_dir = plan.storage_root.join("models").join(&plan.model.id);
     let cache_dir = plan.storage_root.join("cache");
+    let runtime_model = runtime_model_id(&plan.model);
     let payload = ManagedAdapterRequest {
         operation: "convert",
-        model_id: &plan.model.id,
+        model_id: runtime_model,
         model_dir: &model_dir,
         cache_dir: &cache_dir,
         input: None,
@@ -258,9 +261,10 @@ fn train_with_adapter(
         .map_err(|error| TakokitError::Storage(error.to_string()))?;
     let model_dir = plan.storage_root.join("models").join(&plan.model.id);
     let cache_dir = plan.storage_root.join("cache");
+    let runtime_model = runtime_model_id(&plan.model);
     let payload = ManagedAdapterRequest {
         operation: "train",
-        model_id: &plan.model.id,
+        model_id: runtime_model,
         model_dir: &model_dir,
         cache_dir: &cache_dir,
         input: None,

@@ -21,14 +21,16 @@ use takokit_models::{
     TextToSpeechEngine,
 };
 use takokit_package::{
-    acquire_maintenance_lock, bootstrap_uv, find_uv, initialize_runner_runtime,
-    install_model_complete, install_python_adapter, model_info_from_plan, plan_model,
-    python_adapter_record, python_adapter_records, remove_model_complete, resolve_execution_plan,
-    runner_runtime_layout, InstallModelOptions, InstalledRegistry, ModelPlan, PackageError,
-    PackageRegistry, RemoveModelOptions, RunnerManifest,
+    acquire_maintenance_lock, bootstrap_uv, custom_model_record, custom_model_records, find_uv,
+    initialize_runner_runtime, install_model_complete, install_python_adapter,
+    model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
+    register_custom_model, remove_custom_model, remove_model_complete, require_custom_model_id,
+    resolve_execution_plan, runner_runtime_layout, voice_contract_for_model, InstallModelOptions,
+    InstalledRegistry, ModelPlan, PackageError, PackageRegistry, RemoveModelOptions,
+    RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
-use takokit_store::LocalStore;
+use takokit_store::{LocalStore, VoiceProfileStore};
 
 mod args;
 mod daemon_commands;
@@ -189,6 +191,57 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Models) => print_models(&package_registry, &installed_registry)?,
         Some(Command::Runners) => print_runners(&package_registry, &installed_registry)?,
+        Some(Command::CustomModel { command }) => match command {
+            CustomModelCommand::Add { manifest } => {
+                let record = register_custom_model(store.root(), &package_registry, &manifest)
+                    .map_err(cli_error)?;
+                print_serializable(&record)?;
+            }
+            CustomModelCommand::List => {
+                print_serializable(
+                    &custom_model_records(store.root(), &package_registry).map_err(cli_error)?,
+                )?;
+            }
+            CustomModelCommand::Show { model } => {
+                print_serializable(
+                    &custom_model_record(store.root(), &package_registry, &model)
+                        .map_err(cli_error)?,
+                )?;
+            }
+            CustomModelCommand::Rm { model } => {
+                let id = require_custom_model_id(&model).map_err(cli_error)?;
+                if installed_registry.is_model_installed(&id) {
+                    return Err(anyhow::anyhow!(
+                        "custom model {id} is installed; run `tako rm {id}` before removing its registration"
+                    ));
+                }
+                let removed = remove_custom_model(store.root(), &id).map_err(cli_error)?;
+                print_value(&serde_json::json!({"id": id, "removed": removed}))?;
+            }
+        },
+        Some(Command::Voice { command }) => match command {
+            VoiceCommand::List => {
+                print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?;
+            }
+            VoiceCommand::Show { model } => {
+                let manifest = package_registry.model(&model).map_err(cli_error)?;
+                print_serializable(&voice_contract_for_model(&manifest))?;
+            }
+            VoiceCommand::Add {
+                sample,
+                name,
+                model,
+                consent,
+            } => run_clone(
+                CloneArgs {
+                    sample,
+                    name,
+                    model,
+                    consent,
+                },
+                workspace.as_ref().expect("voice add workspace"),
+            )?,
+        },
         Some(Command::Library { target }) => match target {
             LibraryTarget::Models => print_library_models(&package_registry)?,
             LibraryTarget::Runners => print_library_runners(&package_registry)?,
@@ -260,7 +313,9 @@ pub async fn run() -> anyhow::Result<()> {
                     print_models(&package_registry, &installed_registry)?
                 }
                 Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
-                Some(ListTarget::Voices) => print_serializable(registry.voices())?,
+                Some(ListTarget::Voices) => {
+                    print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?
+                }
             }
         }
         Some(Command::Run(args)) => {
@@ -401,6 +456,9 @@ fn command_uses_workspace(command: &Option<Command>) -> bool {
             | Some(Command::Run(_))
             | Some(Command::Transcribe { .. })
             | Some(Command::Clone(_))
+            | Some(Command::Voice {
+                command: VoiceCommand::Add { .. }
+            })
             | Some(Command::Convert(_))
             | Some(Command::Train(_))
     )
@@ -417,6 +475,9 @@ fn surface_title(command: &Option<Command>) -> &'static str {
         Some(Command::Speak(_)) => "CLI speech",
         Some(Command::Transcribe { .. }) => "CLI transcription",
         Some(Command::Clone(_)) => "CLI voice cloning",
+        Some(Command::Voice {
+            command: VoiceCommand::Add { .. },
+        }) => "CLI voice profile",
         Some(Command::Convert(_)) => "CLI voice conversion",
         Some(Command::Train(_)) => "CLI voice training",
         _ => "Takokit CLI",

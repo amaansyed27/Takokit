@@ -161,6 +161,15 @@ tako pull library/openvoice:2
 
 Legacy names remain aliases. For example, `whisper-tiny` and `whisper:tiny` resolve to the same pinned manifest, install ID and content-addressed files. The registry carries metadata and verified manifests; model bytes still download directly from the pinned upstream source. See [docs/registry.md](docs/registry.md).
 
+## Custom voices and custom checkpoints
+
+`tako voice add`, `tako voice list`, and `tako voice show <model>` expose reusable
+consent-backed reference voices and each model's preset/reference/design contract.
+
+`tako custom-model add <manifest.toml>` registers a pinned checkpoint only when it
+extends a bundled model with a verified generic runner contract. Takokit does not execute
+arbitrary scripts supplied by a model manifest. See [docs/custom-models.md](docs/custom-models.md).
+
 ## Pull lifecycle
 
 `tako pull <model>` owns setup. Users should not clone upstream repositories, launch Gradio applications or install random Python dependencies globally.

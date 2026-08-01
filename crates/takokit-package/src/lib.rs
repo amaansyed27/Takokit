@@ -1,6 +1,7 @@
 mod artifact_io;
 mod artifact_reuse;
 mod catalog;
+mod custom_model;
 mod error;
 mod install_support;
 mod installed;
@@ -26,8 +27,10 @@ mod runtime_python_specs;
 mod runtime_uv;
 mod runtime_whisper;
 mod transaction;
+mod voice_contract;
 
 pub use catalog::*;
+pub use custom_model::*;
 pub use error::*;
 pub use installed::InstalledRegistry;
 pub use license::*;
@@ -48,8 +51,9 @@ pub use resolution::{
 pub use runner::*;
 pub use runtime::{initialize_runner_runtime, python_managed_runner_layout, runner_runtime_layout};
 pub use runtime_python::{install_python_adapter, python_adapter_record, python_adapter_records};
-pub use runtime_python_specs::adapter_for_model;
+pub use runtime_python_specs::{adapter_for_model, runtime_model_id};
 pub use runtime_uv::{bootstrap_uv, find_uv};
+pub use voice_contract::*;
 
 #[cfg(test)]
 mod tests;

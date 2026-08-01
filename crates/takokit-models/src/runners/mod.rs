@@ -9,7 +9,7 @@ use takokit_core::{
     TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse, VoiceConversionRequest,
     VoiceConversionResponse,
 };
-use takokit_package::{ExecutionPlan, RunnerKind};
+use takokit_package::{validate_speech_request, ExecutionPlan, RunnerKind};
 
 use self::onnx::OnnxRunner;
 use self::python_managed::PythonManagedRunner;
@@ -67,6 +67,7 @@ pub async fn execute_speech(
     request: SpeechRequest,
     output_dir: &Path,
 ) -> TakokitResult<SpeechResponse> {
+    validate_speech_request(&plan.model, &request)?;
     match plan.runner.kind {
         RunnerKind::Onnx => OnnxRunner.speak(plan, request, output_dir).await,
         RunnerKind::PythonManaged => PythonManagedRunner.speak(plan, request, output_dir).await,

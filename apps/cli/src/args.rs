@@ -54,6 +54,14 @@ pub(crate) enum Command {
     Capabilities,
     Models,
     Runners,
+    CustomModel {
+        #[command(subcommand)]
+        command: CustomModelCommand,
+    },
+    Voice {
+        #[command(subcommand)]
+        command: VoiceCommand,
+    },
     Library {
         #[command(subcommand)]
         target: LibraryTarget,
@@ -319,6 +327,31 @@ pub(crate) enum LibraryTarget {
     Runners,
     Sync,
     Show { model: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum CustomModelCommand {
+    Add { manifest: PathBuf },
+    List,
+    Show { model: String },
+    Rm { model: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum VoiceCommand {
+    List,
+    Show {
+        model: String,
+    },
+    Add {
+        sample: PathBuf,
+        #[arg(long)]
+        name: String,
+        #[arg(long, default_value = "xtts-v2")]
+        model: String,
+        #[arg(long)]
+        consent: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

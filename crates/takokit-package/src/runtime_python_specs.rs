@@ -54,6 +54,21 @@ pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
         .map(|spec| spec.id)
 }
 
+pub fn runtime_model_id(model: &crate::ModelManifest) -> &str {
+    if adapter_for_model(&model.id).is_some() {
+        return &model.id;
+    }
+    if let (Some(required), Some(base_adapter)) = (
+        model.required_adapter.as_deref(),
+        adapter_for_model(&model.family),
+    ) {
+        if required == base_adapter {
+            return &model.family;
+        }
+    }
+    &model.id
+}
+
 pub(crate) fn adapter_dependency_overrides(id: &str) -> &'static [&'static str] {
     match id {
         "rvc" => &["av==12.0.0"],
