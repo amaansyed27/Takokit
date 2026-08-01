@@ -38,7 +38,8 @@ pub(crate) fn resolve_model_removal_id(
         .join("runtime")
         .join("removals");
     if journal_dir.is_dir() {
-        let mut entries = std::fs::read_dir(&journal_dir)?.collect::<Result<Vec<_>, _>>()?;
+        let mut entries =
+            std::fs::read_dir(&journal_dir)?.collect::<Result<Vec<_>, _>>()?;
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
@@ -128,7 +129,7 @@ mod tests {
         let journal = root.path().join("runtime/removals/xtts.json");
         std::fs::create_dir_all(journal.parent().expect("journal parent"))
             .expect("journal directory");
-        std::fs::write(&journal, br#"{"model_id":"xtts"}"#).expect("journal write");
+        std::fs::write(&journal, b"{\"model_id\":\"xtts\"}").expect("journal write");
 
         let model_id = resolve_model_removal_id(&registry, &installed, "xtts-v2")
             .expect("journal resolution");
