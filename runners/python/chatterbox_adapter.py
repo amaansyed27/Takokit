@@ -7,6 +7,59 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def install_soundfile_torchaudio_io():
+    import numpy as np
+    import soundfile as sf
+    import torch
+    import torchaudio
+
+    def load(
+        path,
+        frame_offset=0,
+        num_frames=-1,
+        normalize=True,
+        channels_first=True,
+        **_kwargs,
+    ):
+        del normalize
+        audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
+        start = max(0, int(frame_offset))
+        stop = None if int(num_frames) < 0 else start + int(num_frames)
+        audio = audio[start:stop]
+        tensor = torch.from_numpy(np.ascontiguousarray(audio))
+        if channels_first:
+            tensor = tensor.transpose(0, 1)
+        return tensor, int(sample_rate)
+
+    def save(path, source, sample_rate, channels_first=True, **_kwargs):
+        if hasattr(source, "detach"):
+            source = source.detach().cpu().float().numpy()
+        audio = np.asarray(source)
+        if channels_first and audio.ndim == 2:
+            audio = audio.T
+        sf.write(str(path), audio, int(sample_rate))
+
+    torchaudio.load = load
+    torchaudio.save = save
+
+
+def ensure_perth_watermarker():
+    import perth
+
+    if getattr(perth, "PerthImplicitWatermarker", None) is not None:
+        return
+    try:
+        from perth.perth_net.perth_net_implicit.perth_watermarker import (
+            PerthImplicitWatermarker,
+        )
+    except Exception as error:
+        raise RuntimeError(
+            "Chatterbox watermark runtime could not be imported: "
+            f"{type(error).__name__}: {error}"
+        ) from error
+    perth.PerthImplicitWatermarker = PerthImplicitWatermarker
+
+
 def load_chatterbox_tts():
     # Takokit deploys this runner as `chatterbox.py`. Remove the adapter
     # directory while importing so Python resolves the installed `chatterbox`
@@ -19,6 +72,7 @@ def load_chatterbox_tts():
             for entry in sys.path
             if Path(entry or ".").resolve() != adapter_dir
         ]
+        ensure_perth_watermarker()
         from chatterbox.tts import ChatterboxTTS
 
         return ChatterboxTTS
@@ -40,8 +94,8 @@ def main():
         raise FileNotFoundError(f"Chatterbox snapshot is missing: {model_dir}")
 
     import torch
-    import torchaudio
 
+    install_soundfile_torchaudio_io()
     ChatterboxTTS = load_chatterbox_tts()
 
     if torch.cuda.is_available():
@@ -60,7 +114,13 @@ def main():
             raise FileNotFoundError(f"voice reference does not exist: {reference}")
         options["audio_prompt_path"] = str(reference)
     waveform = model.generate(text, **options)
-    torchaudio.save(str(output_path), waveform.detach().cpu(), model.sr)
+
+    import soundfile as sf
+
+    audio = waveform.detach().cpu().float().numpy()
+    if audio.ndim == 2:
+        audio = audio.T
+    sf.write(str(output_path), audio, int(model.sr))
     if not output_path.is_file() or output_path.stat().st_size <= 44:
         raise RuntimeError(f"Chatterbox did not create a valid WAV at {output_path}")
     respond(
