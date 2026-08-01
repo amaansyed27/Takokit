@@ -52,6 +52,42 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def install_soundfile_torchaudio_io():
+    import numpy as np
+    import soundfile as sf
+    import torch
+    import torchaudio
+
+    def load(
+        path,
+        frame_offset=0,
+        num_frames=-1,
+        normalize=True,
+        channels_first=True,
+        **_kwargs,
+    ):
+        del normalize
+        audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
+        start = max(0, int(frame_offset))
+        stop = None if int(num_frames) < 0 else start + int(num_frames)
+        audio = audio[start:stop]
+        tensor = torch.from_numpy(np.ascontiguousarray(audio))
+        if channels_first:
+            tensor = tensor.transpose(0, 1)
+        return tensor, int(sample_rate)
+
+    def save(path, source, sample_rate, channels_first=True, **_kwargs):
+        if hasattr(source, "detach"):
+            source = source.detach().cpu().float().numpy()
+        audio = np.asarray(source)
+        if channels_first and audio.ndim == 2:
+            audio = audio.T
+        sf.write(str(path), audio, int(sample_rate))
+
+    torchaudio.load = load
+    torchaudio.save = save
+
+
 def ensure_compatible_transformers():
     import transformers
 
@@ -70,11 +106,7 @@ def ensure_compatible_transformers():
 def valid_xtts_license_receipt(request):
     takokit_root = Path(request["cache_dir"]).expanduser().resolve().parent
     receipt_path = (
-        takokit_root
-        / "licenses"
-        / "receipts"
-        / "CPML"
-        / "xtts-v2.json"
+        takokit_root / "licenses" / "receipts" / "CPML" / "xtts-v2.json"
     )
     try:
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -107,6 +139,7 @@ def main():
     if not checkpoint:
         raise ValueError(f"unsupported Coqui model: {model_id}")
     ensure_xtts_terms_accepted(model_id, request)
+    install_soundfile_torchaudio_io()
     if request.get("operation") == "prefetch":
         ensure_compatible_transformers()
         from TTS.api import TTS
