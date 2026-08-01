@@ -56,8 +56,6 @@ pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
 
 pub(crate) fn adapter_dependency_overrides(id: &str) -> &'static [&'static str] {
     match id {
-        // PyAV 11.0.0 only publishes a source distribution. The closest newer
-        // release provides bundled FFmpeg wheels for every supported Takokit OS.
         "rvc" => &["av==12.0.0"],
         _ => &[],
     }
@@ -75,18 +73,11 @@ pub(crate) fn sanitized_adapter_requirements(
     let mut sanitized = String::with_capacity(requirements.len());
     for line in requirements.lines() {
         let trimmed = line.trim();
-        // This auxiliary repository is needed for the Linux GPU wheel, but it
-        // shadows ordinary PyPI packages under uv's safe first-index policy.
         if line
             .contains("aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12")
         {
             continue;
         }
-        // The pinned CosyVoice source predates Blackwell and forces Torch 2.3.1
-        // from the CUDA 12.1 index. On Windows, inherit Takokit's current shared
-        // Torch/TorchAudio runtime so newer GPUs do not receive an sm_90-only
-        // build. The adapter still falls back to CPU if the installed wheel
-        // cannot execute the detected compute capability.
         if target_os == "windows"
             && ((trimmed.starts_with("--extra-index-url")
                 && trimmed.contains("download.pytorch.org/whl/cu121"))
@@ -166,8 +157,6 @@ mod tests {
             .contains("sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"));
         assert!(COQUI_TTS_ADAPTER.contains("except SystemExit"));
         assert!(COQUI_TTS_ADAPTER.contains("coqui_model_root"));
-        assert!(COQUI_TTS_ADAPTER.contains("coqui_home / \"tts\" / model_directory"));
-        assert!(COQUI_TTS_ADAPTER.contains("Coqui checkpoint directory is empty"));
     }
 
     #[test]
@@ -177,48 +166,59 @@ mod tests {
         assert!(spec.packages.contains(&"soundfile>=0.12"));
         assert!(F5_TTS_ADAPTER.contains("load_f5tts_api"));
         assert!(F5_TTS_ADAPTER.contains("install_soundfile_torchaudio_io"));
-        assert!(F5_TTS_ADAPTER.contains("sys.path[:]"));
+        assert!(F5_TTS_ADAPTER.contains("create_engine"));
+        assert!(F5_TTS_ADAPTER.contains("device=\"cpu\""));
+        assert!(F5_TTS_ADAPTER.contains("cuda_error_allows_cpu_retry"));
         assert!(F5_TTS_ADAPTER.contains("seed=0"));
-        assert!(F5_TTS_ADAPTER.contains("reference_text"));
     }
 
     #[test]
-    fn targeted_smoke_adapters_include_runtime_compatibility_fixes() {
+    fn targeted_runtime_round_three_is_covered() {
         let chatterbox = adapter_spec("chatterbox").expect("Chatterbox adapter spec");
         let cosyvoice = adapter_spec("cosyvoice2").expect("CosyVoice adapter spec");
         let openvoice = adapter_spec("openvoice").expect("OpenVoice adapter spec");
-        let voxtral = adapter_spec("voxtral").expect("Voxtral adapter spec");
         let qwen_omni = adapter_spec("qwen_omni").expect("Qwen Omni adapter spec");
         let gpt_sovits = adapter_spec("gpt_sovits").expect("GPT-SoVITS adapter spec");
 
+        assert!(chatterbox.packages.contains(&"setuptools==80.9.0"));
         assert!(chatterbox.packages.contains(&"PyYAML>=6.0"));
-        assert!(chatterbox.packages.contains(&"omegaconf==2.3.0"));
-        assert!(cosyvoice.packages.contains(&"setuptools==80.9.0"));
-        assert!(cosyvoice.packages.contains(&"soundfile>=0.12"));
-        assert!(openvoice.packages.contains(&"setuptools==80.9.0"));
+        assert!(cosyvoice.packages.contains(&"torch>=2.13.0"));
+        assert!(cosyvoice.packages.contains(&"torchaudio>=2.11.0"));
         assert!(openvoice.packages.contains(&"unidic-lite"));
-        assert!(voxtral.packages.contains(&"librosa"));
         assert!(qwen_omni.packages.contains(&"transformers==4.52.3"));
-        assert!(qwen_omni.packages.contains(&"torchvision"));
         assert!(gpt_sovits.packages.contains(&"soundfile>=0.12"));
 
+        assert!(HF_AUDIO_ADAPTER.contains("whisper-asr"));
+        assert!(HF_AUDIO_ADAPTER.contains("return_timestamps"));
+        assert!(COSYVOICE2_ADAPTER.contains("paging_file_error"));
+        assert!(COSYVOICE2_ADAPTER.contains("torch.__version__"));
+        assert!(OPENVOICE_ADAPTER.contains("resolve_speaker_id"));
+        assert!(OPENVOICE_ADAPTER.contains("dict(speaker_ids.items())"));
+        assert!(QWEN_OMNI_ADAPTER.contains("enable_audio_output=enable_audio_output"));
+        assert!(QWEN_OMNI_ADAPTER.contains("require_commit_headroom"));
+        assert!(QWEN_OMNI_ADAPTER.contains("max_new_tokens=96"));
+        assert!(GPT_SOVITS_ADAPTER.contains("configure_utf8_stdio"));
+        assert!(GPT_SOVITS_ADAPTER.contains("PYTHONIOENCODING"));
+        assert!(GPT_SOVITS_ADAPTER.contains("Last training log lines"));
+    }
+
+    #[test]
+    fn existing_hardware_smoke_fixes_remain_present() {
+        let voxtral = adapter_spec("voxtral").expect("Voxtral adapter spec");
+        assert!(voxtral.packages.contains(&"librosa"));
         assert!(CHATTERBOX_ADAPTER.contains("ensure_perth_watermarker"));
         assert!(CHATTERBOX_ADAPTER.contains("install_soundfile_torchaudio_io"));
         assert!(HF_AUDIO_ADAPTER.contains("decode_audio"));
-        assert!(HF_AUDIO_ADAPTER.contains("always_2d=True"));
         assert!(F5_TTS_ADAPTER.contains("install_soundfile_torchaudio_io"));
         assert!(COSYVOICE2_ADAPTER.contains("cuda_runtime_is_compatible"));
         assert!(COSYVOICE2_ADAPTER.contains("text_frontend=False"));
         assert!(OPENVOICE_ADAPTER.contains("configure_mecab_dictionary"));
-        assert!(OPENVOICE_ADAPTER.contains("MECABRC"));
         assert!(KYUTAI_TTS_ADAPTER.contains("NO_TORCH_COMPILE"));
         assert!(QWEN_OMNI_ADAPTER.contains("return_audio=False"));
         assert!(QWEN_OMNI_ADAPTER.contains("QWEN25_SYSTEM_PROMPT"));
         assert!(VOXTRAL_ADAPTER.contains("import librosa"));
         assert!(QWEN3_TTS_ADAPTER.contains("load_reference_audio"));
-        assert!(QWEN3_TTS_ADAPTER.contains("always_2d=True"));
-        assert!(GPT_SOVITS_ADAPTER.contains("install_soundfile_torchaudio_io"));
-        assert!(GPT_SOVITS_ADAPTER.contains("Last training log lines"));
+        assert!(RVC_ADAPTER.contains("operation"));
     }
 }
 

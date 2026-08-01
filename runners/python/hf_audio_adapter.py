@@ -38,7 +38,7 @@ MODELS = {
     "distil-whisper-large-v3": {
         "operation": "transcribe",
         "checkpoint": "distil-whisper/distil-large-v3",
-        "kind": "asr-pipeline",
+        "kind": "whisper-asr",
     },
     "wav2vec2-base-960h": {
         "operation": "transcribe",
@@ -234,10 +234,13 @@ def transcribe(request, spec):
         model=checkpoint,
         device=device,
     )
-    # Decode locally rather than passing a file path through Transformers'
-    # ffmpeg subprocess. This keeps WAV/FLAC input portable on Windows and
-    # avoids treating a valid file as malformed when ffmpeg is unavailable.
-    result = recognizer(decode_audio(audio_path))
+    call_options = {}
+    if spec["kind"] == "whisper-asr":
+        # Transformers switches Whisper into long-form generation above 3000
+        # mel frames. Requesting timestamps is required even when a test input
+        # was expected to be short but its real duration exceeds 30 seconds.
+        call_options["return_timestamps"] = True
+    result = recognizer(decode_audio(audio_path), **call_options)
     text = str(result.get("text") or "").strip()
     if not text:
         raise RuntimeError("the ASR model returned an empty transcript")

@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+
+def configure_utf8_stdio() -> None:
+    os.environ["PYTHONUTF8"] = "1"
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 def respond(**payload: object) -> None:
@@ -213,6 +221,8 @@ def run_training(request: dict, model_dir: Path) -> None:
     env = os.environ.copy()
     env.update(
         {
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
             "inp_text": str(train_list),
             "inp_wav_dir": str(wav_dir),
             "exp_name": name,
@@ -328,6 +338,7 @@ def run_training(request: dict, model_dir: Path) -> None:
 
 
 def main() -> None:
+    configure_utf8_stdio()
     request = json.load(sys.stdin)
     model_dir = Path(request["model_dir"]).expanduser().resolve()
     operation = request.get("operation")

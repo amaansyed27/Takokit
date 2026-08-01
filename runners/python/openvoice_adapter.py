@@ -21,9 +21,6 @@ def configure_mecab_dictionary() -> None:
     mecabrc = dictionary / "mecabrc"
     if not mecabrc.is_file():
         raise FileNotFoundError(f"unidic-lite dictionary is incomplete: {mecabrc}")
-    # Melo imports all language frontends at module import time. Its Japanese
-    # frontend asks mecab-python3 for the default UniDic path even for English
-    # synthesis. Point that lookup at the bundled, offline dictionary.
     unidic.DICDIR = str(dictionary)
     os.environ["MECABRC"] = str(mecabrc)
 
@@ -31,7 +28,6 @@ def configure_mecab_dictionary() -> None:
 def load_runtime(model_dir: Path):
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
-    # The pinned Melo/OpenVoice stack still imports pkg_resources.
     import pkg_resources  # noqa: F401
     import torch
     from openvoice.api import ToneColorConverter
@@ -61,6 +57,15 @@ def speaker_embedding(reference: Path, converter, cache_dir: Path):
     )
 
 
+def resolve_speaker_id(speaker_ids, speaker_key: str) -> int:
+    # Melo stores spk2id in its HParams wrapper. That object exposes items,
+    # values and __getitem__, but intentionally does not implement dict.get.
+    mapping = dict(speaker_ids.items())
+    if not mapping:
+        raise RuntimeError("MeloTTS returned an empty speaker map")
+    return int(mapping.get(speaker_key, next(iter(mapping.values()))))
+
+
 def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, str]:
     checkpoint_root, converter, device = load_runtime(model_dir)
     text = str(request.get("input") or "").strip()
@@ -79,8 +84,7 @@ def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, 
     from melo.api import TTS
 
     base_model = TTS(language=language, device=device)
-    speaker_ids = base_model.hps.data.spk2id
-    speaker_id = speaker_ids.get(speaker_key, next(iter(speaker_ids.values())))
+    speaker_id = resolve_speaker_id(base_model.hps.data.spk2id, speaker_key)
     cache_dir = Path(request["cache_dir"]).expanduser().resolve() / "openvoice"
     cache_dir.mkdir(parents=True, exist_ok=True)
     target_se = speaker_embedding(reference_path, converter, cache_dir / "target")
