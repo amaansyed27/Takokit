@@ -22,6 +22,19 @@ def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
 
 
+def directory_size(path: Path) -> int:
+    total = 0
+    if not path.is_dir():
+        return total
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def install_soundfile_torchaudio_io() -> None:
     import numpy as np
     import soundfile as sf
@@ -60,6 +73,32 @@ def install_soundfile_torchaudio_io() -> None:
 
 def source_root() -> Path:
     return Path(__file__).resolve().parent / "source"
+
+
+def fast_langdetect_cache() -> Path:
+    return source_root() / "GPT_SoVITS" / "pretrained_models" / "fast_langdetect"
+
+
+def prepare_fast_langdetect(*, download_missing: bool) -> Path:
+    cache = fast_langdetect_cache()
+    cache.mkdir(parents=True, exist_ok=True)
+    if not download_missing:
+        return cache
+
+    source = source_root()
+    sys.path.insert(0, str(source))
+    sys.path.insert(0, str(source / "GPT_SoVITS"))
+    previous = Path.cwd()
+    try:
+        os.chdir(source)
+        from GPT_SoVITS.text.LangSegmenter.langsegmenter import LangSegmenter
+
+        LangSegmenter.getTexts("Takokit language detector prefetch.")
+    finally:
+        os.chdir(previous)
+    if directory_size(cache) == 0:
+        raise RuntimeError("GPT-SoVITS language detector prefetch produced an empty cache")
+    return cache
 
 
 def model_paths(model_dir: Path) -> dict[str, Path]:
@@ -112,6 +151,7 @@ def run_checked(command: list[str], *, cwd: Path, env: dict[str, str], log) -> N
 
 def run_speech(request: dict, model_dir: Path) -> None:
     source = source_root()
+    prepare_fast_langdetect(download_missing=False)
     sys.path.insert(0, str(source))
     sys.path.insert(0, str(source / "GPT_SoVITS"))
     os.chdir(source)
@@ -200,6 +240,7 @@ def merge_parts(directory: Path, pattern: str, output: Path, header: str | None 
 
 def run_training(request: dict, model_dir: Path) -> None:
     source = source_root()
+    prepare_fast_langdetect(download_missing=False)
     paths = model_paths(model_dir)
     require_paths(paths)
     dataset = Path(request["dataset_path"]).expanduser().resolve()
@@ -342,7 +383,15 @@ def main() -> None:
     request = json.load(sys.stdin)
     model_dir = Path(request["model_dir"]).expanduser().resolve()
     operation = request.get("operation")
-    if operation == "speech":
+    if operation == "prefetch":
+        require_paths(model_paths(model_dir))
+        cache = prepare_fast_langdetect(download_missing=True)
+        respond(
+            ok=True,
+            detail=f"Prefetched GPT-SoVITS language detector at {cache}",
+            size_bytes=directory_size(cache),
+        )
+    elif operation == "speech":
         run_speech(request, model_dir)
     elif operation == "train":
         run_training(request, model_dir)

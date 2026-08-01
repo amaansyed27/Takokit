@@ -1,5 +1,7 @@
+import importlib.util
 import json
 import sys
+import types
 from pathlib import Path
 
 
@@ -43,7 +45,36 @@ def install_soundfile_torchaudio_io():
     torchaudio.save = save
 
 
+def install_pkg_resources_compat():
+    try:
+        import pkg_resources  # noqa: F401
+
+        return
+    except ModuleNotFoundError:
+        pass
+
+    module = types.ModuleType("pkg_resources")
+
+    def resource_filename(package_or_requirement, resource_name):
+        package = str(package_or_requirement)
+        spec = importlib.util.find_spec(package)
+        if spec is None:
+            raise ModuleNotFoundError(f"could not resolve package resources for {package}")
+        locations = list(spec.submodule_search_locations or [])
+        if locations:
+            root = Path(locations[0])
+        elif spec.origin:
+            root = Path(spec.origin).resolve().parent
+        else:
+            raise ModuleNotFoundError(f"package {package} has no resource location")
+        return str((root / resource_name).resolve())
+
+    module.resource_filename = resource_filename
+    sys.modules["pkg_resources"] = module
+
+
 def ensure_perth_watermarker():
+    install_pkg_resources_compat()
     import perth
 
     if getattr(perth, "PerthImplicitWatermarker", None) is not None:
@@ -61,9 +92,6 @@ def ensure_perth_watermarker():
 
 
 def load_chatterbox_tts():
-    # Takokit deploys this runner as `chatterbox.py`. Remove the adapter
-    # directory while importing so Python resolves the installed `chatterbox`
-    # package rather than the runner script itself.
     adapter_dir = Path(__file__).resolve().parent
     original_path = list(sys.path)
     try:
