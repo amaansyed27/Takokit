@@ -24,6 +24,12 @@ def find_model(target: Path) -> tuple[Path, Path | None]:
     raise FileNotFoundError(f"RVC target checkpoint does not exist: {target}")
 
 
+def configure_rvc_roots(model_path: Path, index_path: Path | None) -> None:
+    """Configure the directory variables required by the pinned RVC library."""
+    os.environ["weight_root"] = str(model_path.parent)
+    os.environ["index_root"] = str(index_path.parent if index_path else model_path.parent)
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     if request.get("operation") != "convert":
@@ -41,6 +47,7 @@ def main() -> None:
             f"RVC base assets are incomplete below {model_dir}; run `tako pull rvc`"
         )
     model_path, index_path = find_model(target)
+    configure_rvc_roots(model_path, index_path)
 
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
@@ -50,7 +57,7 @@ def main() -> None:
     from rvc.modules.vc.modules import VC
 
     converter = VC()
-    converter.get_vc(str(model_path))
+    converter.get_vc(model_path.name)
     sample_rate, audio, _, error = converter.vc_inference(
         0,
         source_audio,
