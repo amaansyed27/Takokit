@@ -19,3 +19,18 @@ fn rvc_adapter_passes_the_absolute_audio_path_as_a_string() {
     assert!(RVC_ADAPTER.contains("str(source_audio),"));
     assert!(!RVC_ADAPTER.contains("\n        source_audio,\n"));
 }
+
+#[test]
+fn rvc_adapter_normalizes_legacy_pyav_binary_modes_before_importing_upstream() {
+    let compatibility_call = RVC_ADAPTER
+        .find("install_pyav_mode_compat()\n    from scipy.io")
+        .expect("PyAV compatibility call before upstream imports");
+    let upstream_import = RVC_ADAPTER
+        .find("from rvc.modules.vc.modules import VC")
+        .expect("upstream RVC import");
+
+    assert!(RVC_ADAPTER.contains("if mode == \"rb\":\n            mode = \"r\""));
+    assert!(RVC_ADAPTER.contains("elif mode == \"wb\":\n            mode = \"w\""));
+    assert!(RVC_ADAPTER.contains("av.open = open_compat"));
+    assert!(compatibility_call < upstream_import);
+}
