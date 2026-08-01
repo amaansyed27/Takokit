@@ -4,6 +4,9 @@ from importlib.resources import files
 from pathlib import Path
 
 
+DEFAULT_REFERENCE_TEXT = "Some call me nature, others call me mother nature."
+
+
 def path_size(path):
     root = Path(path)
     try:
@@ -78,19 +81,22 @@ def main():
 
     F5TTS = load_f5tts_api()
     voice = request.get("voice")
+    reference_text = str(request.get("reference_text") or "").strip()
     if voice and voice != "default":
         reference = Path(voice).expanduser().resolve()
         if not reference.is_file():
             raise FileNotFoundError(f"voice reference does not exist: {reference}")
     else:
         reference = Path(str(files("f5_tts").joinpath("infer/examples/basic/basic_ref_en.wav")))
+        if not reference_text:
+            reference_text = DEFAULT_REFERENCE_TEXT
     engine = F5TTS(model="F5TTS_v1_Base")
     _, sample_rate, _ = engine.infer(
         ref_file=str(reference),
-        ref_text="",
+        ref_text=reference_text,
         gen_text=text,
         file_wave=str(output_path),
-        seed=None,
+        seed=0,
     )
     if not output_path.is_file():
         raise RuntimeError(f"F5-TTS did not create {output_path}")

@@ -46,6 +46,7 @@ const QWEN_OMNI_PACKAGES: &[&str] = &[
     "librosa",
     "torch",
     "torchaudio",
+    "torchvision",
 ];
 
 const COSYVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -213,6 +214,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
             "accelerate",
             "huggingface_hub[hf_xet]",
             "soundfile",
+            "librosa",
             "mistral-common[audio]"
         ],
         VOXTRAL_ADAPTER,
@@ -319,7 +321,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "cosyvoice2",
         "cosyvoice2",
         "3.10",
-        &["torch", "torchaudio"],
+        &["torch", "torchaudio", "setuptools==80.9.0"],
         COSYVOICE2_ADAPTER,
         Some(COSYVOICE_SOURCE),
         "CosyVoice2."
@@ -342,6 +344,7 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
             "torchaudio",
             "huggingface_hub",
             "soundfile",
+            "setuptools==80.9.0",
             "wavmark==0.0.3",
             "git+https://github.com/myshell-ai/MeloTTS.git@209145371cff8fc3bd60d7be902ea69cbdb7965a"
         ],

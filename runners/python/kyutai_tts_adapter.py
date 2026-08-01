@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -56,6 +57,11 @@ def main():
         raise ValueError("speech input cannot be empty")
     output_path = Path(request["output_path"]).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Moshi uses torch.compile by default. Triton is unavailable on the
+    # supported Windows path, so use the upstream eager-mode switch there.
+    if sys.platform == "win32":
+        os.environ.setdefault("NO_TORCH_COMPILE", "1")
 
     import numpy as np
     import sphn

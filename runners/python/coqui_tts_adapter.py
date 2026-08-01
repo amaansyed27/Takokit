@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -8,6 +7,8 @@ MODELS = {
     "xtts-v2": "tts_models/multilingual/multi-dataset/xtts_v2",
     "yourtts": "tts_models/multilingual/multi-dataset/your_tts",
 }
+CPML_DIGEST = "sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"
+CPML_URL = "https://coqui.ai/cpml.txt"
 
 
 def path_size(path):
@@ -66,16 +67,36 @@ def ensure_compatible_transformers():
         )
 
 
-def ensure_xtts_terms_accepted(model_id):
+def valid_xtts_license_receipt(request):
+    takokit_root = Path(request["cache_dir"]).expanduser().resolve().parent
+    receipt_path = (
+        takokit_root
+        / "licenses"
+        / "receipts"
+        / "CPML"
+        / "xtts-v2.json"
+    )
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        receipt.get("license_id") == "CPML"
+        and receipt.get("license_version") == "1.0.0"
+        and receipt.get("license_digest") == CPML_DIGEST
+        and receipt.get("license_url") == CPML_URL
+        and receipt.get("model_id") == "xtts-v2"
+    )
+
+
+def ensure_xtts_terms_accepted(model_id, request):
     if model_id != "xtts-v2":
         return
-    if os.environ.get("COQUI_TOS_AGREED", "").strip() == "1":
+    if valid_xtts_license_receipt(request):
         return
     raise RuntimeError(
-        "XTTS v2 is licensed under the Coqui Public Model License (CPML). "
-        "Review and accept the XTTS terms, then set COQUI_TOS_AGREED=1 "
-        "before pulling or running this model. Takokit will not accept the "
-        "license on your behalf."
+        "XTTS v2 requires a valid Coqui Public Model License receipt. "
+        "Run `tako pull xtts-v2`, review the CPML, and accept the prompt."
     )
 
 
@@ -85,7 +106,7 @@ def main():
     checkpoint = MODELS.get(model_id)
     if not checkpoint:
         raise ValueError(f"unsupported Coqui model: {model_id}")
-    ensure_xtts_terms_accepted(model_id)
+    ensure_xtts_terms_accepted(model_id, request)
     if request.get("operation") == "prefetch":
         ensure_compatible_transformers()
         from TTS.api import TTS

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import traceback
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -18,6 +19,22 @@ VOICE_DESIGN_MODELS = {"qwen3-tts-1.7b-voice-design"}
 def fail(message: str) -> None:
     print(json.dumps({"ok": False, "error": message}), flush=True)
     raise SystemExit(1)
+
+
+def load_reference_audio(value: str):
+    reference = Path(value).expanduser().resolve()
+    if not reference.is_file():
+        fail(f"Qwen3-TTS reference audio does not exist: {reference}")
+    audio, sample_rate = sf.read(
+        str(reference),
+        dtype="float32",
+        always_2d=True,
+    )
+    if audio.size == 0:
+        fail(f"Qwen3-TTS reference audio is empty: {reference}")
+    # Qwen accepts a (numpy waveform, sample-rate) tuple. Loading here avoids
+    # the optional torchaudio/SoX path on Windows and normalizes stereo input.
+    return audio.mean(axis=1), int(sample_rate)
 
 
 def main() -> None:
@@ -69,7 +86,7 @@ def main() -> None:
                 kwargs = {
                     "text": text,
                     "language": language,
-                    "ref_audio": voice,
+                    "ref_audio": load_reference_audio(str(voice)),
                     "x_vector_only_mode": not bool(reference_text),
                 }
                 if reference_text:
@@ -108,6 +125,7 @@ def main() -> None:
     except SystemExit:
         raise
     except Exception as error:
+        traceback.print_exc(file=sys.stderr)
         fail(f"{type(error).__name__}: {error}")
 
 

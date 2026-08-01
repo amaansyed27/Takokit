@@ -12,6 +12,13 @@ def respond(**payload: object) -> None:
 
 
 def load_runtime(model_id: str, model_dir: Path):
+    try:
+        import torchvision  # noqa: F401
+    except ImportError as error:
+        raise RuntimeError(
+            "Qwen Omni requires torchvision for its multimodal processor"
+        ) from error
+
     if model_id == "qwen2-5-omni":
         from transformers import (
             Qwen2_5OmniForConditionalGeneration,

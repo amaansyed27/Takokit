@@ -132,7 +132,11 @@ mod tests {
         assert!(spec.packages.contains(&"torchcodec"));
         assert!(COQUI_TTS_ADAPTER.contains("ensure_compatible_transformers"));
         assert!(COQUI_TTS_ADAPTER.contains("ensure_xtts_terms_accepted"));
-        assert!(COQUI_TTS_ADAPTER.contains("COQUI_TOS_AGREED"));
+        assert!(COQUI_TTS_ADAPTER.contains("valid_xtts_license_receipt"));
+        assert!(COQUI_TTS_ADAPTER.contains("licenses"));
+        assert!(COQUI_TTS_ADAPTER.contains("receipts"));
+        assert!(COQUI_TTS_ADAPTER
+            .contains("sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"));
         assert!(COQUI_TTS_ADAPTER.contains("except SystemExit"));
         assert!(COQUI_TTS_ADAPTER.contains("coqui_model_root"));
         assert!(COQUI_TTS_ADAPTER.contains("coqui_home / \"tts\" / model_directory"));
@@ -145,6 +149,32 @@ mod tests {
         assert!(spec.packages.contains(&"f5-tts==1.1.21"));
         assert!(F5_TTS_ADAPTER.contains("load_f5tts_api"));
         assert!(F5_TTS_ADAPTER.contains("sys.path[:]"));
+        assert!(F5_TTS_ADAPTER.contains("seed=0"));
+        assert!(F5_TTS_ADAPTER.contains("reference_text"));
+    }
+
+    #[test]
+    fn hardware_smoke_adapters_include_runtime_compatibility_fixes() {
+        let cosyvoice = adapter_spec("cosyvoice2").expect("CosyVoice adapter spec");
+        let openvoice = adapter_spec("openvoice").expect("OpenVoice adapter spec");
+        let voxtral = adapter_spec("voxtral").expect("Voxtral adapter spec");
+        let qwen_omni = adapter_spec("qwen_omni").expect("Qwen Omni adapter spec");
+
+        assert!(cosyvoice.packages.contains(&"setuptools==80.9.0"));
+        assert!(openvoice.packages.contains(&"setuptools==80.9.0"));
+        assert!(voxtral.packages.contains(&"librosa"));
+        assert!(qwen_omni.packages.contains(&"torchvision"));
+
+        assert!(CHATTERBOX_ADAPTER.contains("load_chatterbox_tts"));
+        assert!(!HF_AUDIO_ADAPTER.contains("model_kwargs={\"local_files_only\": True}"));
+        assert!(COSYVOICE2_ADAPTER.contains("import pkg_resources"));
+        assert!(OPENVOICE_ADAPTER.contains("import pkg_resources"));
+        assert!(KYUTAI_TTS_ADAPTER.contains("NO_TORCH_COMPILE"));
+        assert!(QWEN_OMNI_ADAPTER.contains("import torchvision"));
+        assert!(VOXTRAL_ADAPTER.contains("import librosa"));
+        assert!(QWEN3_TTS_ADAPTER.contains("load_reference_audio"));
+        assert!(QWEN3_TTS_ADAPTER.contains("always_2d=True"));
+        assert!(GPT_SOVITS_ADAPTER.contains("Last training log lines"));
     }
 }
 
