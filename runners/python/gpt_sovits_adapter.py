@@ -36,6 +36,17 @@ def require_paths(paths: dict[str, Path]) -> None:
         raise FileNotFoundError("GPT-SoVITS snapshot is incomplete: " + "; ".join(missing))
 
 
+def log_tail(log, lines: int = 40) -> str:
+    try:
+        log.flush()
+        path = Path(log.name)
+        return "\n".join(
+            path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+        )
+    except (AttributeError, OSError):
+        return ""
+
+
 def run_checked(command: list[str], *, cwd: Path, env: dict[str, str], log) -> None:
     log.write("$ " + " ".join(command) + "\n")
     log.flush()
@@ -48,7 +59,11 @@ def run_checked(command: list[str], *, cwd: Path, env: dict[str, str], log) -> N
         check=False,
     )
     if process.returncode != 0:
-        raise RuntimeError(f"command exited with {process.returncode}: {' '.join(command)}")
+        detail = log_tail(log)
+        suffix = f"\nLast training log lines:\n{detail}" if detail else ""
+        raise RuntimeError(
+            f"command exited with {process.returncode}: {' '.join(command)}{suffix}"
+        )
 
 
 def run_speech(request: dict, model_dir: Path) -> None:
