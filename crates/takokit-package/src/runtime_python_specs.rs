@@ -203,6 +203,20 @@ mod tests {
     }
 
     #[test]
+    fn final_runtime_prefetch_gaps_are_covered() {
+        assert!(CHATTERBOX_ADAPTER.contains("install_pkg_resources_compat"));
+        assert!(CHATTERBOX_ADAPTER.contains("resource_filename"));
+        assert!(OPENVOICE_ADAPTER.contains("averaged_perceptron_tagger_eng"));
+        assert!(OPENVOICE_ADAPTER.contains("configure_nltk_data"));
+        assert!(OPENVOICE_ADAPTER.contains("download_missing=True"));
+        assert!(GPT_SOVITS_ADAPTER.contains("prepare_fast_langdetect"));
+        assert!(GPT_SOVITS_ADAPTER.contains("fast_langdetect_cache"));
+        assert!(GPT_SOVITS_ADAPTER.contains("download_missing=True"));
+        assert!(model_prefetch_required("openvoice"));
+        assert!(model_prefetch_required("gpt-sovits"));
+    }
+
+    #[test]
     fn existing_hardware_smoke_fixes_remain_present() {
         let voxtral = adapter_spec("voxtral").expect("Voxtral adapter spec");
         assert!(voxtral.packages.contains(&"librosa"));
@@ -231,8 +245,10 @@ pub(crate) fn model_prefetch_required(model_id: &str) -> bool {
             | "dia"
             | "distil-whisper-large-v3"
             | "f5-tts"
+            | "gpt-sovits"
             | "kyutai-tts-1.6b"
             | "mms-tts-eng"
+            | "openvoice"
             | "sensevoice"
             | "voxtral"
             | "wav2vec2-base-960h"
