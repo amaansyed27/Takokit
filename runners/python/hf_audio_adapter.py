@@ -204,6 +204,21 @@ def speech(request, spec):
     )
 
 
+def decode_audio(audio_path):
+    import numpy as np
+    import soundfile as sf
+
+    audio, sample_rate = sf.read(
+        str(audio_path),
+        dtype="float32",
+        always_2d=True,
+    )
+    if audio.size == 0:
+        raise ValueError(f"audio file is empty: {audio_path}")
+    mono = np.ascontiguousarray(audio.mean(axis=1), dtype=np.float32)
+    return {"array": mono, "sampling_rate": int(sample_rate)}
+
+
 def transcribe(request, spec):
     audio_path = Path(request["audio_path"]).expanduser().resolve()
     if not audio_path.is_file():
@@ -214,15 +229,15 @@ def transcribe(request, spec):
 
     checkpoint = local_checkpoint(spec)
     device = 0 if torch.cuda.is_available() else -1
-    # `checkpoint` is already a verified local snapshot. Passing
-    # local_files_only again through model_kwargs duplicates the value that
-    # Transformers' pipeline supplies internally on current releases.
     recognizer = pipeline(
         "automatic-speech-recognition",
         model=checkpoint,
         device=device,
     )
-    result = recognizer(str(audio_path))
+    # Decode locally rather than passing a file path through Transformers'
+    # ffmpeg subprocess. This keeps WAV/FLAC input portable on Windows and
+    # avoids treating a valid file as malformed when ffmpeg is unavailable.
+    result = recognizer(decode_audio(audio_path))
     text = str(result.get("text") or "").strip()
     if not text:
         raise RuntimeError("the ASR model returned an empty transcript")
