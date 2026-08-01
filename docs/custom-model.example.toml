@@ -1,0 +1,18 @@
+schema_version = 1
+id = "my-qwen-voice"
+name = "My Qwen Voice"
+extends = "qwen3-tts-1.7b-base"
+version = "1.0.0"
+license = "apache-2.0"
+description = "Pinned Qwen3-TTS-compatible custom checkpoint."
+
+[source]
+provider = "hugging-face"
+repository = "owner/model"
+revision = "0123456789abcdef0123456789abcdef01234567"
+
+[artifacts]
+metadata_only = false
+weights = []
+configs = []
+voices = []
