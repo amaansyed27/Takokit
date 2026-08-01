@@ -29,9 +29,6 @@ mod runtime_whisper;
 mod transaction;
 mod voice_contract;
 
-#[cfg(test)]
-pub(crate) use install_support::installed_model_record;
-
 pub use catalog::*;
 pub use custom_model::*;
 pub use error::*;
