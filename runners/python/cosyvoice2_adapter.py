@@ -59,11 +59,14 @@ def cuda_runtime_is_compatible(torch) -> bool:
     return not supported or required in supported
 
 
+def paging_file_error(error: BaseException) -> bool:
+    return getattr(error, "winerror", None) == 1455 or "paging file is too small" in str(error).lower()
+
+
 def load_model(model_dir: Path):
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
     sys.path.insert(0, str(source / "third_party" / "Matcha-TTS"))
-    # Lightning in the pinned CosyVoice stack still imports pkg_resources.
     import pkg_resources  # noqa: F401
     import torch
 
@@ -75,18 +78,25 @@ def load_model(model_dir: Path):
         print(
             "CosyVoice is falling back to CPU because this Torch build does not "
             f"support CUDA capability sm_{capability[0]}{capability[1]} "
-            f"(supported: {supported}).",
+            f"(supported: {supported}; torch: {torch.__version__}).",
             file=sys.stderr,
             flush=True,
         )
-        # The pinned upstream model chooses its device from this function and
-        # exposes no device argument. Keep it false for this isolated adapter
-        # process so later frontend calls cannot move tensors back to CUDA.
         torch.cuda.is_available = lambda: False
 
     from cosyvoice.cli.cosyvoice import AutoModel
 
-    model = AutoModel(model_dir=str(model_dir))
+    try:
+        model = AutoModel(model_dir=str(model_dir))
+    except OSError as error:
+        if paging_file_error(error):
+            raise RuntimeError(
+                "CosyVoice exhausted Windows committed memory while loading. "
+                "Close memory-heavy applications or increase the Windows paging file. "
+                f"The adapter was using {'CUDA' if compatible_cuda else 'CPU fallback'} "
+                f"with torch {torch.__version__}."
+            ) from error
+        raise
     return model, "cuda" if compatible_cuda else "cpu"
 
 
