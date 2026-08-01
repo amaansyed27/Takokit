@@ -1,5 +1,4 @@
-const GPT_SOVITS_ADAPTER: &str =
-    include_str!("../../../runners/python/gpt_sovits_adapter.py");
+const GPT_SOVITS_ADAPTER: &str = include_str!("../../../runners/python/gpt_sovits_adapter.py");
 
 #[test]
 fn gpt_sovits_prefetches_current_and_legacy_english_nltk_data() {
