@@ -49,6 +49,31 @@ def install_pyav_mode_compat() -> None:
     av.open = open_compat
 
 
+def install_trusted_torch_checkpoint_compat(trusted_checkpoint: Path) -> None:
+    """Permit Fairseq to deserialize Takokit's pinned HuBERT checkpoint on PyTorch 2.6+."""
+    import torch
+
+    original_load = torch.load
+    if getattr(original_load, "_takokit_rvc_checkpoint_compat", False):
+        return
+
+    trusted_checkpoint = trusted_checkpoint.resolve()
+
+    def load_compat(file, *args, **kwargs):
+        candidate = None
+        if isinstance(file, (str, os.PathLike)):
+            try:
+                candidate = Path(file).expanduser().resolve()
+            except (OSError, RuntimeError, ValueError):
+                candidate = None
+        if candidate == trusted_checkpoint and "weights_only" not in kwargs:
+            kwargs["weights_only"] = False
+        return original_load(file, *args, **kwargs)
+
+    load_compat._takokit_rvc_checkpoint_compat = True
+    torch.load = load_compat
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     if request.get("operation") != "convert":
@@ -73,6 +98,7 @@ def main() -> None:
     os.environ["rmvpe_root"] = str(model_dir)
     os.environ["hubert_path"] = str(hubert_path)
     install_pyav_mode_compat()
+    install_trusted_torch_checkpoint_compat(hubert_path)
     from scipy.io import wavfile
     from rvc.modules.vc.modules import VC
 

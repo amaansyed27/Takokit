@@ -41,3 +41,21 @@ fn rvc_adapter_normalizes_legacy_pyav_binary_modes_before_importing_upstream() {
     assert!(adapter.contains("av.open = open_compat"));
     assert!(compatibility_call < upstream_import);
 }
+
+#[test]
+fn rvc_adapter_disables_weights_only_for_the_managed_hubert_checkpoint_only() {
+    let adapter = normalized_adapter();
+    let compatibility_call = adapter
+        .rfind("install_trusted_torch_checkpoint_compat(hubert_path)")
+        .expect("trusted HuBERT compatibility call");
+    let upstream_import = adapter
+        .find("from rvc.modules.vc.modules import VC")
+        .expect("upstream RVC import");
+
+    assert!(adapter.contains("candidate == trusted_checkpoint"));
+    assert!(adapter.contains("\"weights_only\" not in kwargs"));
+    assert!(adapter.contains("kwargs[\"weights_only\"] = False"));
+    assert!(adapter.contains("torch.load = load_compat"));
+    assert!(!adapter.contains("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"));
+    assert!(compatibility_call < upstream_import);
+}
