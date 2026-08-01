@@ -1,6 +1,6 @@
 //! Reference-aware model removal and dependency garbage collection.
 
-use crate::{runtime_python_specs::adapter_spec, *};
+use crate::{removal_reference::resolve_model_removal_id, runtime_python_specs::adapter_spec, *};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -39,6 +39,9 @@ pub fn remove_model_complete(
 ) -> PackageResult<ModelRemovalReport> {
     let root = installed_registry.storage_root();
     let _maintenance_guard = acquire_maintenance_lock(&root)?;
+    let resolved_model_id =
+        resolve_model_removal_id(package_registry, installed_registry, model_id)?;
+    let model_id = resolved_model_id.as_str();
     let journal = removal_journal_path(&root, model_id);
     if !installed_registry.is_model_installed(model_id) && journal.is_file() {
         let mut report: ModelRemovalReport = serde_json::from_slice(&std::fs::read(&journal)?)?;
