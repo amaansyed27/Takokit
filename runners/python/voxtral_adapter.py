@@ -46,6 +46,7 @@ def main():
     if not audio_path.is_file():
         raise FileNotFoundError(f"audio file does not exist: {audio_path}")
 
+    import librosa  # noqa: F401
     from transformers import AutoProcessor, VoxtralForConditionalGeneration
 
     processor = AutoProcessor.from_pretrained(checkpoint)
