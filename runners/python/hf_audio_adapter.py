@@ -214,11 +214,13 @@ def transcribe(request, spec):
 
     checkpoint = local_checkpoint(spec)
     device = 0 if torch.cuda.is_available() else -1
+    # `checkpoint` is already a verified local snapshot. Passing
+    # local_files_only again through model_kwargs duplicates the value that
+    # Transformers' pipeline supplies internally on current releases.
     recognizer = pipeline(
         "automatic-speech-recognition",
         model=checkpoint,
         device=device,
-        model_kwargs={"local_files_only": True},
     )
     result = recognizer(str(audio_path))
     text = str(result.get("text") or "").strip()
