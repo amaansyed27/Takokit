@@ -7,6 +7,13 @@ import sys
 from pathlib import Path
 
 
+QWEN25_SYSTEM_PROMPT = (
+    "You are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, "
+    "capable of perceiving auditory and visual inputs, as well as generating "
+    "text and speech."
+)
+
+
 def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
 
@@ -112,7 +119,11 @@ def main() -> None:
             },
         ]
         inputs = build_inputs(model, processor, messages)
-        generated = model.generate(**inputs, use_audio_in_video=True)
+        generated = model.generate(
+            **inputs,
+            use_audio_in_video=True,
+            return_audio=False,
+        )
         text_ids, _ = generated_parts(generated)
         transcript = decode_text(processor, text_ids)
         if not transcript:
@@ -125,18 +136,22 @@ def main() -> None:
         if not text:
             raise ValueError("speech input cannot be empty")
         voice = request.get("voice") or "Chelsie"
-        instruction = request.get("instruction") or (
-            "Speak the following text exactly and do not add any other words: " + text
-        )
+        instruction = request.get("instruction") or text
         messages = [
+            {
+                "role": "system",
+                "content": [{"type": "text", "text": QWEN25_SYSTEM_PROMPT}],
+            },
             {
                 "role": "user",
                 "content": [{"type": "text", "text": instruction}],
-            }
+            },
         ]
         inputs = build_inputs(model, processor, messages)
         generated = model.generate(
-            **inputs, speaker=voice, use_audio_in_video=True
+            **inputs,
+            speaker=voice,
+            use_audio_in_video=True,
         )
         _, audio = generated_parts(generated)
         if audio is None:
