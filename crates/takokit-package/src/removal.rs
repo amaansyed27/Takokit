@@ -1,8 +1,6 @@
 //! Reference-aware model removal and dependency garbage collection.
 
-use crate::{
-    removal_reference::resolve_model_removal_id, runtime_python_specs::adapter_spec, *,
-};
+use crate::{removal_reference::resolve_model_removal_id, runtime_python_specs::adapter_spec, *};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
