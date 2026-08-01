@@ -7,6 +7,25 @@ def respond(**payload):
     print(json.dumps(payload), flush=True)
 
 
+def load_chatterbox_tts():
+    # Takokit deploys this runner as `chatterbox.py`. Remove the adapter
+    # directory while importing so Python resolves the installed `chatterbox`
+    # package rather than the runner script itself.
+    adapter_dir = Path(__file__).resolve().parent
+    original_path = list(sys.path)
+    try:
+        sys.path[:] = [
+            entry
+            for entry in sys.path
+            if Path(entry or ".").resolve() != adapter_dir
+        ]
+        from chatterbox.tts import ChatterboxTTS
+
+        return ChatterboxTTS
+    finally:
+        sys.path[:] = original_path
+
+
 def main():
     request = json.load(sys.stdin)
     if request.get("operation") != "speech":
@@ -22,7 +41,8 @@ def main():
 
     import torch
     import torchaudio
-    from chatterbox.tts import ChatterboxTTS
+
+    ChatterboxTTS = load_chatterbox_tts()
 
     if torch.cuda.is_available():
         device = "cuda"
