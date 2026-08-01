@@ -135,9 +135,8 @@ mod tests {
         assert!(COQUI_TTS_ADAPTER.contains("valid_xtts_license_receipt"));
         assert!(COQUI_TTS_ADAPTER.contains("licenses"));
         assert!(COQUI_TTS_ADAPTER.contains("receipts"));
-        assert!(COQUI_TTS_ADAPTER.contains(
-            "sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"
-        ));
+        assert!(COQUI_TTS_ADAPTER
+            .contains("sha256:3dbb31aa8875793cde77882e71dbb5f80fe31b818ecca4a4a5812a430f7209c7"));
         assert!(COQUI_TTS_ADAPTER.contains("except SystemExit"));
         assert!(COQUI_TTS_ADAPTER.contains("coqui_model_root"));
         assert!(COQUI_TTS_ADAPTER.contains("coqui_home / \"tts\" / model_directory"));
