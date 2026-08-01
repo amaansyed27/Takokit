@@ -1,0 +1,62 @@
+name: Apply custom model integration on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/custom-voices-and-models
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Run integration script
+        shell: bash
+        run: |
+          python - <<'BOOTSTRAP'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-custom-model-integration.yml').read_text(encoding='utf-8')
+          start = "          python - <<'PY'\n"
+          end = "\n          PY\n"
+          if start not in workflow or end not in workflow:
+              raise SystemExit('integration script markers are missing')
+          script = workflow.split(start, 1)[1].split(end, 1)[0]
+          lines = []
+          for line in script.splitlines():
+              if line.startswith('          '):
+                  line = line[10:]
+              lines.append(line)
+          exec(compile('\n'.join(lines), 'custom-model-integration', 'exec'))
+          BOOTSTRAP
+
+      - name: Format and run focused tests
+        shell: bash
+        run: |
+          cargo fmt --all
+          cargo test -p takokit-package --test custom_models
+          cargo test -p takokit-package voice_contract
+          cargo test -p takokit-cli cli_parses_custom_model_and_voice_commands
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-custom-model-integration.yml
+          git rm .github/workflows/apply-custom-model-pr.yml
+          git add README.md docs apps crates
+          git commit -m "feat: add custom voices and safe custom models"
+          git push origin HEAD:feat/custom-voices-and-models
