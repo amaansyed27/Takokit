@@ -1,0 +1,112 @@
+name: Finalize custom voice feature layout
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/custom-voices-and-models
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Move parser tests and format sources
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          tests = Path('apps/cli/src/tests.rs')
+          source = tests.read_text(encoding='utf-8')
+          marker = '\n#[test]\nfn cli_parses_custom_model_and_voice_commands() {'
+          if source.count(marker) != 1:
+              raise SystemExit('custom command test marker missing or duplicated')
+          tests.write_text(source.split(marker, 1)[0].rstrip() + '\n', encoding='utf-8')
+
+          args = Path('apps/cli/src/args.rs')
+          source = args.read_text(encoding='utf-8').rstrip()
+          if 'custom_model_and_voice_commands_parse' in source:
+              raise SystemExit('argument parser tests already exist')
+          source += r'''
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn custom_model_and_voice_commands_parse() {
+        let custom = Cli::try_parse_from([
+            "takokit",
+            "custom-model",
+            "add",
+            "custom.toml",
+        ])
+        .expect("custom model add");
+        let voice = Cli::try_parse_from([
+            "takokit",
+            "voice",
+            "add",
+            "sample.wav",
+            "--name",
+            "Amaan",
+            "--model",
+            "qwen3-tts-1.7b-base",
+            "--consent",
+        ])
+        .expect("voice add");
+
+        assert!(matches!(
+            custom.command,
+            Some(Command::CustomModel {
+                command: CustomModelCommand::Add { manifest }
+            }) if manifest == PathBuf::from("custom.toml")
+        ));
+        assert!(matches!(
+            voice.command,
+            Some(Command::Voice {
+                command: VoiceCommand::Add {
+                    sample,
+                    name,
+                    model,
+                    consent: true,
+                }
+            }) if sample == PathBuf::from("sample.wav")
+                && name == "Amaan"
+                && model == "qwen3-tts-1.7b-base"
+        ));
+    }
+}
+'''
+          args.write_text(source + '\n', encoding='utf-8')
+          PY
+
+          cargo fmt --all
+          python scripts/audit_file_sizes.py
+          cargo test -p takokit-package --test custom_models
+          cargo test -p takokit-package --test custom_model_runtime_routing
+          cargo test -p takokit-package voice_contract
+          cargo test -p takokit-cli custom_model_and_voice_commands_parse
+
+      - name: Commit finalized layout
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/finalize-custom-voices.yml
+          git add apps crates
+          git commit -m "test: keep custom voice coverage modular"
+          git push origin HEAD:feat/custom-voices-and-models
