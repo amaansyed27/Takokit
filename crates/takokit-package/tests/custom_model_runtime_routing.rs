@@ -1,5 +1,4 @@
-const PYTHON_RUNNER: &str =
-    include_str!("../../takokit-models/src/runners/python_managed.rs");
+const PYTHON_RUNNER: &str = include_str!("../../takokit-models/src/runners/python_managed.rs");
 const PREFETCH: &str = include_str!("../src/runtime_python/prefetch.rs");
 const RUNNER_DISPATCH: &str = include_str!("../../takokit-models/src/runners/mod.rs");
 
