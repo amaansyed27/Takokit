@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -10,6 +11,21 @@ from pathlib import Path
 
 def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
+
+
+def configure_mecab_dictionary() -> None:
+    import unidic
+    import unidic_lite
+
+    dictionary = Path(unidic_lite.DICDIR).resolve()
+    mecabrc = dictionary / "mecabrc"
+    if not mecabrc.is_file():
+        raise FileNotFoundError(f"unidic-lite dictionary is incomplete: {mecabrc}")
+    # Melo imports all language frontends at module import time. Its Japanese
+    # frontend asks mecab-python3 for the default UniDic path even for English
+    # synthesis. Point that lookup at the bundled, offline dictionary.
+    unidic.DICDIR = str(dictionary)
+    os.environ["MECABRC"] = str(mecabrc)
 
 
 def load_runtime(model_dir: Path):
@@ -59,6 +75,7 @@ def run_speech(request: dict, model_dir: Path, output_path: Path) -> tuple[int, 
     language = str(request.get("language") or "EN").upper()
     speaker_key = "EN-US" if language.startswith("EN") else language
 
+    configure_mecab_dictionary()
     from melo.api import TTS
 
     base_model = TTS(language=language, device=device)
