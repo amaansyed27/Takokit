@@ -1,6 +1,8 @@
 //! Reference-aware model removal and dependency garbage collection.
 
-use crate::{runtime_python_specs::adapter_spec, *};
+use crate::{
+    removal_reference::resolve_model_removal_id, runtime_python_specs::adapter_spec, *,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -205,86 +207,6 @@ pub fn remove_model_complete(
     Ok(report)
 }
 
-fn resolve_model_removal_id(
-    package_registry: &PackageRegistry,
-    installed_registry: &InstalledRegistry,
-    reference: &str,
-) -> PackageResult<String> {
-    if installed_registry.is_model_installed(reference) {
-        return Ok(reference.to_string());
-    }
-
-    let resolved = package_registry.resolve_model_reference(reference).ok();
-    let target = resolved
-        .as_ref()
-        .map(|resolved| resolved.target.clone())
-        .unwrap_or_else(|| reference.to_string());
-    let canonical = resolved
-        .as_ref()
-        .map(|resolved| resolved.canonical.clone())
-        .unwrap_or_else(|| package_registry.canonical_reference_for_id(&target));
-    let mut matches = installed_registry
-        .installed_model_records()?
-        .into_iter()
-        .map(|record| record.id)
-        .filter(|candidate| {
-            model_id_matches(package_registry, candidate, &target, &canonical)
-        })
-        .collect::<Vec<_>>();
-
-    let journal_dir = installed_registry
-        .storage_root()
-        .join("runtime")
-        .join("removals");
-    if journal_dir.is_dir() {
-        let mut entries = std::fs::read_dir(&journal_dir)?.collect::<Result<Vec<_>, _>>()?;
-        entries.sort_by_key(|entry| entry.file_name());
-        for entry in entries {
-            if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
-                continue;
-            }
-            let Ok(bytes) = std::fs::read(entry.path()) else {
-                continue;
-            };
-            let Ok(report) = serde_json::from_slice::<ModelRemovalReport>(&bytes) else {
-                continue;
-            };
-            if model_id_matches(package_registry, &report.model_id, &target, &canonical) {
-                matches.push(report.model_id);
-            }
-        }
-    }
-
-    matches.sort();
-    matches.dedup();
-    match matches.as_slice() {
-        [model_id] => Ok(model_id.clone()),
-        [] => Err(PackageError::ModelNotInstalled(target)),
-        _ => Err(PackageError::ArtifactInstallFailed {
-            artifact: target,
-            reason: format!(
-                "multiple installed records match this model reference: {}; remove one exact install ID at a time",
-                matches.join(", ")
-            ),
-        }),
-    }
-}
-
-fn model_id_matches(
-    package_registry: &PackageRegistry,
-    candidate: &str,
-    target: &str,
-    canonical: &str,
-) -> bool {
-    candidate.eq_ignore_ascii_case(target)
-        || package_registry
-            .canonical_reference_for_id(candidate)
-            .eq_ignore_ascii_case(canonical)
-        || package_registry
-            .resolve_model_reference(candidate)
-            .is_ok_and(|resolved| resolved.target.eq_ignore_ascii_case(target))
-}
-
 fn python_abi_paths(root: &Path, abi: &str) -> PackageResult<Vec<PathBuf>> {
     let python_root = root.join("tools").join("python");
     if !python_root.is_dir() {
@@ -404,10 +326,6 @@ fn path_size(path: &Path) -> u64 {
 mod tests {
     use super::*;
 
-    fn bundled_registry() -> PackageRegistry {
-        PackageRegistry::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../registry"))
-    }
-
     #[test]
     fn nested_dependency_paths_are_counted_once() {
         let root = PathBuf::from("root");
@@ -450,65 +368,5 @@ mod tests {
         assert!(!report.removed);
         assert!(shared.exists());
         assert!(exclusive.exists());
-    }
-
-    #[test]
-    fn removal_resolves_a_legacy_installed_alias_from_target_or_canonical_reference() {
-        let root = tempfile::tempdir().expect("tempdir");
-        let registry = bundled_registry();
-        let installed = InstalledRegistry::new(root.path().join("manifests"));
-        let mut legacy_manifest = registry.model("xtts-v2").expect("XTTS manifest");
-        legacy_manifest.id = "xtts".to_string();
-        installed
-            .install_model_with_options(
-                &legacy_manifest,
-                InstallModelOptions {
-                    metadata_only: true,
-                    ..InstallModelOptions::default()
-                },
-            )
-            .expect("legacy install record");
-
-        for reference in ["xtts-v2", "xtts:2"] {
-            let report = remove_model_complete(
-                &registry,
-                &installed,
-                reference,
-                RemoveModelOptions { dry_run: true },
-            )
-            .expect("alias-aware dry run");
-            assert_eq!(report.model_id, "xtts");
-            assert!(!report.removed);
-        }
-    }
-
-    #[test]
-    fn removal_recovers_an_alias_named_interrupted_journal() {
-        let root = tempfile::tempdir().expect("tempdir");
-        let registry = bundled_registry();
-        let installed = InstalledRegistry::new(root.path().join("manifests"));
-        let journal = removal_journal_path(root.path(), "xtts");
-        std::fs::create_dir_all(journal.parent().expect("journal parent"))
-            .expect("journal directory");
-        let report = ModelRemovalReport {
-            model_id: "xtts".to_string(),
-            dry_run: false,
-            removed: false,
-            reclaimed_bytes: 0,
-            deleted: Vec::new(),
-            retained: Vec::new(),
-        };
-        std::fs::write(&journal, serde_json::to_vec_pretty(&report).expect("journal JSON"))
-            .expect("journal write");
-
-        let recovered = remove_model_complete(
-            &registry,
-            &installed,
-            "xtts-v2",
-            RemoveModelOptions { dry_run: true },
-        )
-        .expect("journal recovery");
-        assert_eq!(recovered.model_id, "xtts");
-        assert!(journal.is_file());
     }
 }
