@@ -5,8 +5,9 @@ use std::{
     process::{Command, Stdio},
 };
 use takokit_core::{
-    ErrorCode, SpeechRequest, SpeechResponse, TakokitError, TakokitResult, TrainVoiceRequest,
-    TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse, VoiceConversionRequest,
+    ErrorCode, RvcCheckpointMetadata, SpeechRequest, SpeechResponse, TakokitError, TakokitResult,
+    TrainVoiceRequest, TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse,
+    VoiceConversionExecutionStatus, VoiceConversionQualityStatus, VoiceConversionRequest,
     VoiceConversionResponse,
 };
 use takokit_package::{adapter_for_model, runtime_model_id, ExecutionPlan};
@@ -107,7 +108,12 @@ fn speak_with_adapter(
         target_voice: None,
         dataset_path: None,
         name: None,
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: None,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
@@ -161,7 +167,12 @@ fn transcribe_with_adapter(
         target_voice: None,
         dataset_path: None,
         name: None,
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: None,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
@@ -192,6 +203,10 @@ fn convert_with_adapter(
             request.source_path.display()
         )));
     }
+    request
+        .settings()
+        .validate()
+        .map_err(TakokitError::InvalidRequest)?;
     let adapter = adapter_id(plan)?;
     let layout = adapter_layout(plan, adapter)?;
     let target_voice = resolve_target_voice(plan, &request.target_voice)?;
@@ -218,11 +233,28 @@ fn convert_with_adapter(
         target_voice: Some(&target_voice),
         dataset_path: None,
         name: None,
+        f0_method: Some(request.f0_method.as_str()),
         pitch_shift: Some(request.pitch_shift),
+        index_rate: Some(request.index_rate),
+        rms_mix_rate: Some(request.rms_mix_rate),
+        protect: Some(request.protect),
+        filter_radius: Some(request.filter_radius),
         epochs: None,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
     validate_file_output(adapter, &output_path, response.output_path.as_deref())?;
+    let effective_settings = response
+        .effective_settings
+        .unwrap_or_else(|| request.settings());
+    let checkpoint = if adapter == "rvc" {
+        response.checkpoint.ok_or_else(|| {
+            TakokitError::Audio(
+                "RVC completed without returning checkpoint and index evidence".to_string(),
+            )
+        })?
+    } else {
+        non_rvc_target_metadata(&target_voice)
+    };
     Ok(VoiceConversionResponse {
         id,
         model: plan.model.id.clone(),
@@ -231,6 +263,12 @@ fn convert_with_adapter(
         content_type: "audio/wav".to_string(),
         bytes: output_bytes(&output_path)?,
         sample_rate: response.sample_rate,
+        execution_status: VoiceConversionExecutionStatus::Passed,
+        quality_status: VoiceConversionQualityStatus::NotEvaluated,
+        quality_review_required: true,
+        quality_notice: "Execution produced a valid WAV. Listen to the source, target reference and output before recording a quality pass.".to_string(),
+        effective_settings,
+        checkpoint,
     })
 }
 
@@ -278,7 +316,12 @@ fn train_with_adapter(
         target_voice: None,
         dataset_path: Some(&request.samples_path),
         name: Some(&request.name),
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: request.epochs,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
@@ -297,6 +340,24 @@ fn train_with_adapter(
         status: response.status.unwrap_or_else(|| "completed".to_string()),
         log_path: response.log_path,
     })
+}
+
+fn non_rvc_target_metadata(target: &str) -> RvcCheckpointMetadata {
+    let path = PathBuf::from(target);
+    let bytes = std::fs::metadata(&path)
+        .map(|metadata| metadata.len())
+        .unwrap_or_default();
+    RvcCheckpointMetadata {
+        checkpoint_path: path,
+        checkpoint_sha256: "not-applicable".to_string(),
+        checkpoint_bytes: bytes,
+        index_path: None,
+        index_sha256: None,
+        index_bytes: None,
+        pairing_status: "not_applicable".to_string(),
+        target_reference_path: Some(PathBuf::from(target)),
+        quality_baseline_ready: true,
+    }
 }
 
 #[derive(Debug)]
