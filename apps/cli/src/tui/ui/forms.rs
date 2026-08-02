@@ -305,11 +305,46 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
         ),
         rows[4],
     );
-    render_convert_value(frame, rows[5], app, ConvertField::PitchShift, "Pitch shift · -24..24", &app.convert_state.pitch_shift);
-    render_convert_value(frame, rows[6], app, ConvertField::IndexRate, "Index rate · 0..1", &app.convert_state.index_rate);
-    render_convert_value(frame, rows[7], app, ConvertField::RmsMixRate, "RMS mix rate · 0..1", &app.convert_state.rms_mix_rate);
-    render_convert_value(frame, rows[8], app, ConvertField::Protect, "Protect · 0..0.5", &app.convert_state.protect);
-    render_convert_value(frame, rows[9], app, ConvertField::FilterRadius, "Filter radius · 0..7", &app.convert_state.filter_radius);
+    render_convert_value(
+        frame,
+        rows[5],
+        app,
+        ConvertField::PitchShift,
+        "Pitch shift · -24..24",
+        &app.convert_state.pitch_shift,
+    );
+    render_convert_value(
+        frame,
+        rows[6],
+        app,
+        ConvertField::IndexRate,
+        "Index rate · 0..1",
+        &app.convert_state.index_rate,
+    );
+    render_convert_value(
+        frame,
+        rows[7],
+        app,
+        ConvertField::RmsMixRate,
+        "RMS mix rate · 0..1",
+        &app.convert_state.rms_mix_rate,
+    );
+    render_convert_value(
+        frame,
+        rows[8],
+        app,
+        ConvertField::Protect,
+        "Protect · 0..0.5",
+        &app.convert_state.protect,
+    );
+    render_convert_value(
+        frame,
+        rows[9],
+        app,
+        ConvertField::FilterRadius,
+        "Filter radius · 0..7",
+        &app.convert_state.filter_radius,
+    );
     frame.render_widget(
         field(
             "Consent · Space toggles",
@@ -340,11 +375,19 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
     match app.convert_state.field {
         ConvertField::Source => set_input_cursor(frame, rows[2], app.convert_state.source_cursor),
         ConvertField::Target => set_input_cursor(frame, rows[3], app.convert_state.target_cursor),
-        ConvertField::PitchShift => set_input_cursor(frame, rows[5], app.convert_state.pitch_shift_cursor),
-        ConvertField::IndexRate => set_input_cursor(frame, rows[6], app.convert_state.index_rate_cursor),
-        ConvertField::RmsMixRate => set_input_cursor(frame, rows[7], app.convert_state.rms_mix_rate_cursor),
+        ConvertField::PitchShift => {
+            set_input_cursor(frame, rows[5], app.convert_state.pitch_shift_cursor)
+        }
+        ConvertField::IndexRate => {
+            set_input_cursor(frame, rows[6], app.convert_state.index_rate_cursor)
+        }
+        ConvertField::RmsMixRate => {
+            set_input_cursor(frame, rows[7], app.convert_state.rms_mix_rate_cursor)
+        }
         ConvertField::Protect => set_input_cursor(frame, rows[8], app.convert_state.protect_cursor),
-        ConvertField::FilterRadius => set_input_cursor(frame, rows[9], app.convert_state.filter_radius_cursor),
+        ConvertField::FilterRadius => {
+            set_input_cursor(frame, rows[9], app.convert_state.filter_radius_cursor)
+        }
         _ => {}
     }
 }
