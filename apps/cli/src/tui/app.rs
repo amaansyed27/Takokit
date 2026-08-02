@@ -17,7 +17,10 @@ pub const HOME_ACTIONS: [(&str, &str); 7] = [
     ("Speak", "Generate speech with an installed TTS model"),
     ("Transcribe", "Turn a local audio file into text"),
     ("Clone voice", "Create a consented local voice profile"),
-    ("Convert voice", "Run RVC and review execution separately from quality"),
+    (
+        "Convert voice",
+        "Run RVC and review execution separately from quality",
+    ),
     ("Manage", "Inspect models, runners, and the local service"),
     ("Sessions", "Open prior work or start a clean session"),
     ("Activity", "Read the complete result from the latest task"),
