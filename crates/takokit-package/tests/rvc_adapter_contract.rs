@@ -59,3 +59,13 @@ fn rvc_adapter_disables_weights_only_for_the_managed_hubert_checkpoint_only() {
     assert!(!adapter.contains("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"));
     assert!(compatibility_call < upstream_import);
 }
+
+#[test]
+fn rvc_adapter_resolves_paths_from_fairseq_open_file_objects() {
+    let adapter = normalized_adapter();
+
+    assert!(adapter.contains("def checkpoint_candidate(file: object) -> Path | None:"));
+    assert!(adapter.contains("getattr(file, \"name\", None)"));
+    assert!(adapter.contains("candidate = checkpoint_candidate(file)"));
+    assert!(adapter.contains("except (OSError, RuntimeError, TypeError, ValueError):"));
+}

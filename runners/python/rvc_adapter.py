@@ -49,6 +49,17 @@ def install_pyav_mode_compat() -> None:
     av.open = open_compat
 
 
+def checkpoint_candidate(file: object) -> Path | None:
+    """Resolve a torch.load path from a path-like value or an opened file object."""
+    value = file if isinstance(file, (str, os.PathLike)) else getattr(file, "name", None)
+    if not isinstance(value, (str, os.PathLike)):
+        return None
+    try:
+        return Path(value).expanduser().resolve()
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
+
+
 def install_trusted_torch_checkpoint_compat(trusted_checkpoint: Path) -> None:
     """Permit Fairseq to deserialize Takokit's pinned HuBERT checkpoint on PyTorch 2.6+."""
     import torch
@@ -60,12 +71,7 @@ def install_trusted_torch_checkpoint_compat(trusted_checkpoint: Path) -> None:
     trusted_checkpoint = trusted_checkpoint.resolve()
 
     def load_compat(file, *args, **kwargs):
-        candidate = None
-        if isinstance(file, (str, os.PathLike)):
-            try:
-                candidate = Path(file).expanduser().resolve()
-            except (OSError, RuntimeError, ValueError):
-                candidate = None
+        candidate = checkpoint_candidate(file)
         if candidate == trusted_checkpoint and "weights_only" not in kwargs:
             kwargs["weights_only"] = False
         return original_load(file, *args, **kwargs)
