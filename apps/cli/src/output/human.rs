@@ -2,6 +2,8 @@ use super::yes_no;
 
 #[path = "removal.rs"]
 mod removal;
+#[path = "rvc.rs"]
+mod rvc;
 
 pub(crate) fn print_serializable<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<()> {
     print_value(&serde_json::to_value(value)?)
@@ -49,6 +51,10 @@ fn render_value(value: &serde_json::Value, depth: usize) {
 fn render_object(map: &serde_json::Map<String, serde_json::Value>, depth: usize) {
     if removal::is_model_removal_report(map) {
         println!("{}", removal::format_model_removal(map));
+        return;
+    }
+    if rvc::is_voice_conversion_report(map) {
+        println!("{}", rvc::format_voice_conversion(map));
         return;
     }
     if map.contains_key("model_id") && map.contains_key("artifacts") {
