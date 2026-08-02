@@ -11,14 +11,8 @@ pub(crate) fn is_model_removal_report(map: &Map<String, Value>) -> bool {
 
 pub(crate) fn format_model_removal(map: &Map<String, Value>) -> String {
     let model_id = text(map, "model_id");
-    let dry_run = map
-        .get("dry_run")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    let removed = map
-        .get("removed")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
+    let dry_run = map.get("dry_run").and_then(Value::as_bool).unwrap_or(false);
+    let removed = map.get("removed").and_then(Value::as_bool).unwrap_or(false);
     let reclaimed = map
         .get("reclaimed_bytes")
         .and_then(Value::as_u64)
@@ -43,7 +37,10 @@ pub(crate) fn format_model_removal(map: &Map<String, Value>) -> String {
 }
 
 fn render_items(lines: &mut Vec<String>, heading: &str, value: Option<&Value>) {
-    let items = value.and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+    let items = value
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
     lines.push(format!("  {heading}:"));
     if items.is_empty() {
         lines.push("    none".to_string());
