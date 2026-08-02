@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use takokit_core::{RvcCheckpointMetadata, RvcInferenceSettings};
 
 #[derive(Debug, Serialize)]
 pub(super) struct ManagedAdapterRequest<'a> {
@@ -20,7 +21,12 @@ pub(super) struct ManagedAdapterRequest<'a> {
     pub(super) target_voice: Option<&'a str>,
     pub(super) dataset_path: Option<&'a Path>,
     pub(super) name: Option<&'a str>,
+    pub(super) f0_method: Option<&'a str>,
     pub(super) pitch_shift: Option<i32>,
+    pub(super) index_rate: Option<f32>,
+    pub(super) rms_mix_rate: Option<f32>,
+    pub(super) protect: Option<f32>,
+    pub(super) filter_radius: Option<u32>,
     pub(super) epochs: Option<u32>,
 }
 
@@ -35,6 +41,8 @@ pub(super) struct ManagedAdapterResponse {
     pub(super) status: Option<String>,
     pub(super) log_path: Option<PathBuf>,
     pub(super) error: Option<String>,
+    pub(super) effective_settings: Option<RvcInferenceSettings>,
+    pub(super) checkpoint: Option<RvcCheckpointMetadata>,
 }
 
 pub(super) fn decode_adapter_response(stdout: &[u8]) -> Option<ManagedAdapterResponse> {
