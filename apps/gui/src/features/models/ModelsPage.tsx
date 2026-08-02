@@ -216,6 +216,8 @@ function capabilityLabel(capability: ModelCapability): string {
       return "STT";
     case "voice_cloning":
       return "Cloning";
+    case "voice_conversion":
+      return "Conversion";
     case "live_transcription":
       return "Live STT";
     case "live_audio":
