@@ -12,7 +12,7 @@ pub(super) fn handle_home(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
             app.home_index = shifted_index(app.home_index, HOME_ACTIONS.len(), 1)
         }
         KeyCode::Enter => open_home_item(app, app.home_index),
-        KeyCode::Char(character @ '1'..='6') => {
+        KeyCode::Char(character @ '1'..='7') => {
             let index = character as usize - '1' as usize;
             app.home_index = index;
             open_home_item(app, index);
@@ -28,8 +28,9 @@ pub(super) fn open_home_item(app: &mut App, index: usize) {
         0 => TuiScreen::Speak,
         1 => TuiScreen::Transcribe,
         2 => TuiScreen::Clone,
-        3 => TuiScreen::Manage,
-        4 => TuiScreen::Sessions,
+        3 => TuiScreen::Convert,
+        4 => TuiScreen::Manage,
+        5 => TuiScreen::Sessions,
         _ => TuiScreen::Activity,
     };
 }
@@ -177,6 +178,11 @@ pub(super) fn open_or_repair_selected_model(app: &mut App) -> Option<TuiAction> 
     } else if model.voice_cloning {
         app.screen = TuiScreen::Clone;
         app.set_status("Model selected. Enter a profile name and reference audio path.");
+    } else if model.voice_conversion {
+        app.set_convert_model(&model.id);
+        app.screen = TuiScreen::Convert;
+        app.convert_state.field = crate::tui::convert::ConvertField::Source;
+        app.set_status("Model selected. Enter source audio and a target RVC package.");
     } else {
         app.set_status("This model is installed, but it has no interactive TUI task.");
     }

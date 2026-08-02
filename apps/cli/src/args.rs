@@ -12,6 +12,25 @@ pub(crate) enum OutputFormat {
     Json,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum RvcF0MethodArg {
+    Rmvpe,
+    Harvest,
+    Crepe,
+    Pm,
+}
+
+impl From<RvcF0MethodArg> for takokit_core::RvcF0Method {
+    fn from(value: RvcF0MethodArg) -> Self {
+        match value {
+            RvcF0MethodArg::Rmvpe => Self::Rmvpe,
+            RvcF0MethodArg::Harvest => Self::Harvest,
+            RvcF0MethodArg::Crepe => Self::Crepe,
+            RvcF0MethodArg::Pm => Self::Pm,
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
@@ -272,8 +291,18 @@ pub(crate) struct ConvertArgs {
     pub(crate) target_voice: String,
     #[arg(long, default_value = "rvc")]
     pub(crate) model: String,
-    #[arg(long, default_value_t = 0)]
+    #[arg(long, value_enum, default_value = "rmvpe")]
+    pub(crate) f0_method: RvcF0MethodArg,
+    #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(i32).range(-24..=24))]
     pub(crate) pitch_shift: i32,
+    #[arg(long, default_value_t = 0.75, value_parser = parse_unit_interval)]
+    pub(crate) index_rate: f32,
+    #[arg(long, default_value_t = 0.25, value_parser = parse_unit_interval)]
+    pub(crate) rms_mix_rate: f32,
+    #[arg(long, default_value_t = 0.33, value_parser = parse_protect)]
+    pub(crate) protect: f32,
+    #[arg(long, default_value_t = 3, value_parser = clap::value_parser!(u32).range(0..=7))]
+    pub(crate) filter_radius: u32,
     /// Confirm ownership or explicit permission for the source and target voices.
     #[arg(long)]
     pub(crate) consent: bool,
@@ -386,4 +415,23 @@ pub(crate) enum AdapterCommand {
         #[arg(long)]
         json: bool,
     },
+}
+
+fn parse_unit_interval(value: &str) -> Result<f32, String> {
+    parse_range(value, 0.0, 1.0, "value")
+}
+
+fn parse_protect(value: &str) -> Result<f32, String> {
+    parse_range(value, 0.0, 0.5, "protect")
+}
+
+fn parse_range(value: &str, minimum: f32, maximum: f32, label: &str) -> Result<f32, String> {
+    let parsed = value
+        .parse::<f32>()
+        .map_err(|_| format!("{label} must be a number"))?;
+    if parsed.is_finite() && (minimum..=maximum).contains(&parsed) {
+        Ok(parsed)
+    } else {
+        Err(format!("{label} must be between {minimum} and {maximum}"))
+    }
 }

@@ -30,6 +30,7 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         TuiScreen::Speak => forms::render_speak(frame, page[1], app),
         TuiScreen::Transcribe => forms::render_transcribe(frame, page[1], app),
         TuiScreen::Clone => forms::render_clone(frame, page[1], app),
+        TuiScreen::Convert => forms::render_convert(frame, page[1], app),
         TuiScreen::Manage => home::render_manage(frame, page[1], app),
         TuiScreen::Models => lists::render_models(frame, page[1], app),
         TuiScreen::Runners => lists::render_runners(frame, page[1], app),
@@ -106,7 +107,7 @@ fn render_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
 fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let text = match app.screen {
         TuiScreen::Home => {
-            "↑/↓ choose · Enter open · 1–6 shortcut · R refresh · F1 help · Esc quit"
+            "↑/↓ choose · Enter open · 1–7 shortcut · R refresh · F1 help · Esc quit"
         }
         TuiScreen::Speak => {
             "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home"
@@ -116,6 +117,9 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         }
         TuiScreen::Clone => {
             "Tab next field · ↑/↓ model · Space consent · Ctrl+Enter run · Esc home"
+        }
+        TuiScreen::Convert => {
+            "Tab next field · arrows model/F0 · Space consent · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Manage => "↑/↓ choose · Enter open · 1–3 shortcut · R refresh · Esc home",
         TuiScreen::Models => {
@@ -137,11 +141,11 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn render_help(frame: &mut Frame<'_>, app: &App) {
-    let area = widgets::centered_rect(76, 72, frame.area());
+    let area = widgets::centered_rect(76, 76, frame.area());
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nStart on Home and choose a task with ↑/↓ and Enter, or press its number.\n\nSpeak, Transcribe, Clone\n  Tab moves through fields. Arrow keys change the model. Ctrl+Enter runs the task.\n\nManage\n  Installed Models contains local models only. Runners and System hold runtime maintenance actions.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows the complete output from the latest task or error.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C always exits when no task is running.",
+            "Takokit TUI\n\nStart on Home and choose a task with ↑/↓ and Enter, or press its number.\n\nSpeak, Transcribe, Clone, Convert\n  Tab moves through fields. Arrow keys change the model and RVC F0 method. Ctrl+Enter runs the task.\n  A successful conversion means execution passed only. The output must still be compared with the target reference for intelligibility, similarity, and artefacts.\n\nManage\n  Installed Models contains local models only. Runners and System hold runtime maintenance actions.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows the complete output from the latest task or error, including RVC settings and checkpoint evidence.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C always exits when no task is running.",
         )
         .wrap(Wrap { trim: false })
         .block(

@@ -1,4 +1,4 @@
-export type ModelCapability = "tts" | "stt" | "voice_cloning" | "live_transcription" | "live_audio";
+export type ModelCapability = "tts" | "stt" | "voice_cloning" | "voice_conversion" | "live_transcription" | "live_audio";
 
 export type CapabilitySummary = {
   id: ModelCapability;
@@ -135,6 +135,52 @@ export type TranscriptionApiResponse = {
   id: string;
   model: string;
   text: string;
+};
+
+export type RvcF0Method = "rmvpe" | "harvest" | "crepe" | "pm";
+
+export type RvcInferenceSettings = {
+  f0_method: RvcF0Method;
+  pitch_shift: number;
+  index_rate: number;
+  rms_mix_rate: number;
+  protect: number;
+  filter_radius: number;
+};
+
+export type VoiceConversionApiRequest = RvcInferenceSettings & {
+  model: string;
+  source_path: string;
+  target_voice: string;
+  consent_affirmed: boolean;
+};
+
+export type RvcCheckpointMetadata = {
+  checkpoint_path: string;
+  checkpoint_sha256: string;
+  checkpoint_bytes: number;
+  index_path?: string;
+  index_sha256?: string;
+  index_bytes?: number;
+  pairing_status: string;
+  target_reference_path?: string;
+  quality_baseline_ready: boolean;
+};
+
+export type VoiceConversionApiResponse = {
+  id: string;
+  model: string;
+  target_voice: string;
+  output_path: string;
+  content_type: string;
+  bytes: number;
+  sample_rate?: number;
+  execution_status: "passed";
+  quality_status: "not_evaluated" | "passed" | "failed";
+  quality_review_required: boolean;
+  quality_notice: string;
+  effective_settings: RvcInferenceSettings;
+  checkpoint: RvcCheckpointMetadata;
 };
 
 export type SessionTask =

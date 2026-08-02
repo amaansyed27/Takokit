@@ -1,6 +1,7 @@
 mod app;
 mod catalog;
 mod clone;
+mod convert;
 mod editor;
 mod input;
 mod job;
@@ -163,6 +164,40 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
                 name,
                 "--model".into(),
                 model,
+                "--consent".into(),
+            ],
+        ),
+        TuiAction::ConvertVoice {
+            model,
+            source,
+            target,
+            f0_method,
+            pitch_shift,
+            index_rate,
+            rms_mix_rate,
+            protect,
+            filter_radius,
+        } => (
+            format!("Converting voice with {model}"),
+            vec![
+                "convert".into(),
+                source,
+                "--target-voice".into(),
+                target,
+                "--model".into(),
+                model,
+                "--f0-method".into(),
+                f0_method,
+                "--pitch-shift".into(),
+                pitch_shift.to_string(),
+                "--index-rate".into(),
+                index_rate.to_string(),
+                "--rms-mix-rate".into(),
+                rms_mix_rate.to_string(),
+                "--protect".into(),
+                protect.to_string(),
+                "--filter-radius".into(),
+                filter_radius.to_string(),
                 "--consent".into(),
             ],
         ),

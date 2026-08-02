@@ -69,3 +69,50 @@ fn rvc_adapter_resolves_paths_from_fairseq_open_file_objects() {
     assert!(adapter.contains("candidate = checkpoint_candidate(file)"));
     assert!(adapter.contains("except (OSError, RuntimeError, TypeError, ValueError):"));
 }
+
+#[test]
+fn rvc_adapter_applies_validated_user_inference_settings() {
+    let adapter = normalized_adapter();
+
+    for key in [
+        "f0_method",
+        "pitch_shift",
+        "index_rate",
+        "rms_mix_rate",
+        "protect",
+        "filter_radius",
+    ] {
+        assert!(
+            adapter.contains(&format!("settings[\"{key}\"]")),
+            "missing {key}"
+        );
+    }
+    assert!(adapter.contains("F0_METHODS = {\"rmvpe\", \"harvest\", \"crepe\", \"pm\"}"));
+    assert!(adapter.contains("if not -24 <= pitch_shift <= 24:"));
+    assert!(adapter.contains("if not 0.0 <= index_rate <= 1.0:"));
+    assert!(adapter.contains("if not 0.0 <= protect <= 0.5:"));
+}
+
+#[test]
+fn rvc_adapter_requires_explicit_package_metadata_for_ambiguous_assets() {
+    let adapter = normalized_adapter();
+
+    assert!(adapter.contains("rvc.json"));
+    assert!(adapter.contains("multiple RVC checkpoints were found"));
+    assert!(adapter.contains("multiple RVC indexes were found"));
+    assert!(adapter.contains("manifest_verified"));
+    assert!(adapter.contains("matched_by_name"));
+    assert!(adapter.contains("single_index_unverified"));
+}
+
+#[test]
+fn rvc_adapter_returns_checkpoint_hashes_and_quality_baseline_state() {
+    let adapter = normalized_adapter();
+
+    assert!(adapter.contains("\"checkpoint_sha256\": sha256(model)"));
+    assert!(adapter.contains("\"index_sha256\": sha256(index) if index else None"));
+    assert!(adapter.contains("\"target_reference_path\""));
+    assert!(adapter.contains("\"quality_baseline_ready\""));
+    assert!(adapter.contains("effective_settings=settings"));
+    assert!(adapter.contains("checkpoint=checkpoint_metadata("));
+}

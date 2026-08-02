@@ -2,7 +2,9 @@ import type {
   SpeechApiRequest,
   SpeechApiResponse,
   TranscriptionApiRequest,
-  TranscriptionApiResponse
+  TranscriptionApiResponse,
+  VoiceConversionApiRequest,
+  VoiceConversionApiResponse
 } from "./types";
 import { workspaceHeaders } from "./workspace";
 
@@ -16,6 +18,12 @@ export function transcribeSessionAudio(
   request: TranscriptionApiRequest
 ): Promise<TranscriptionApiResponse> {
   return requestJson<TranscriptionApiResponse>("/v1/audio/transcriptions", request);
+}
+
+export function convertSessionVoice(
+  request: VoiceConversionApiRequest
+): Promise<VoiceConversionApiResponse> {
+  return requestJson<VoiceConversionApiResponse>("/v1/audio/conversions", request);
 }
 
 async function requestJson<T>(path: string, body: unknown): Promise<T> {

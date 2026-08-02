@@ -239,7 +239,12 @@ pub(crate) async fn run_convert(
         model: args.model.clone(),
         source_path: args.source.clone(),
         target_voice: args.target_voice,
+        f0_method: args.f0_method.into(),
         pitch_shift: args.pitch_shift,
+        index_rate: args.index_rate,
+        rms_mix_rate: args.rms_mix_rate,
+        protect: args.protect,
+        filter_radius: args.filter_radius,
         consent_affirmed: args.consent,
     };
     let plan = resolve_execution_plan(
@@ -266,7 +271,10 @@ pub(crate) async fn run_convert(
                     source_path: Some(request.source_path),
                     output_path: Some(response.output_path.clone()),
                     text: None,
-                    message: Some(format!("Converted {} bytes", response.bytes)),
+                    message: Some(format!(
+                        "Voice-conversion execution passed ({} bytes); perceptual quality is not evaluated and requires listening review.",
+                        response.bytes
+                    )),
                 },
             )?;
             print_serializable(&response)?;

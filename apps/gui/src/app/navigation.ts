@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  AudioWaveform,
   Box,
   Boxes,
   History,
@@ -18,6 +19,7 @@ export type PageId =
   | "voices"
   | "speak"
   | "transcribe"
+  | "convert"
   | "history"
   | "diagnostics"
   | "settings";
@@ -35,6 +37,7 @@ export const navItems: NavItem[] = [
   { id: "voices", label: "Voices", icon: User },
   { id: "speak", label: "Speak", icon: AudioLines },
   { id: "transcribe", label: "Transcribe", icon: Speech },
+  { id: "convert", label: "Convert", icon: AudioWaveform },
   { id: "history", label: "History", icon: History },
   { id: "diagnostics", label: "Diagnostics", icon: Server },
   { id: "settings", label: "Settings", icon: Settings }

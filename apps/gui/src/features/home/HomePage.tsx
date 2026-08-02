@@ -1,4 +1,4 @@
-import { Box, FileAudio, Mic, Server, Volume2 } from "lucide-react";
+import { AudioWaveform, Box, FileAudio, Mic, Server, Volume2 } from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Section";
@@ -14,7 +14,7 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
     <section className="page">
       <header className="page__header">
         <h1>Local voice runtime</h1>
-        <p>Use installed models, manage local voices, and run speech or transcription tasks.</p>
+        <p>Use installed models, manage local voices, and run speech, transcription, or conversion tasks.</p>
       </header>
 
       <div className="stats-grid" aria-label="Runtime summary">
@@ -35,15 +35,20 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
             <strong>Generate speech</strong>
             <span>Installed TTS models</span>
           </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
-            <Mic size={18} />
-            <strong>Add voice</strong>
-            <span>Consent required</span>
-          </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("transcribe")}>
             <FileAudio size={18} />
             <strong>Transcribe audio</strong>
             <span>Installed STT models</span>
+          </button>
+          <button className="quick-action" type="button" onClick={() => onNavigate("convert")}>
+            <AudioWaveform size={18} />
+            <strong>Convert voice</strong>
+            <span>Execution and quality gates</span>
+          </button>
+          <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
+            <Mic size={18} />
+            <strong>Add voice</strong>
+            <span>Consent required</span>
           </button>
           <button className="quick-action" type="button" onClick={() => onNavigate("models")}>
             <Box size={18} />

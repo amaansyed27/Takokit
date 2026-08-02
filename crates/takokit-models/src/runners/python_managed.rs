@@ -13,6 +13,7 @@ use takokit_package::{adapter_for_model, runtime_model_id, ExecutionPlan};
 use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
+mod conversion;
 mod protocol;
 
 use protocol::{decode_adapter_response, ManagedAdapterRequest, ManagedAdapterResponse};
@@ -56,7 +57,7 @@ impl VoiceConversionRunner for PythonManagedRunner {
         request: VoiceConversionRequest,
         output_dir: &Path,
     ) -> TakokitResult<VoiceConversionResponse> {
-        convert_with_adapter(plan, request, output_dir)
+        conversion::convert_with_adapter(plan, request, output_dir)
     }
 }
 
@@ -107,7 +108,12 @@ fn speak_with_adapter(
         target_voice: None,
         dataset_path: None,
         name: None,
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: None,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
@@ -161,7 +167,12 @@ fn transcribe_with_adapter(
         target_voice: None,
         dataset_path: None,
         name: None,
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: None,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
@@ -173,64 +184,6 @@ fn transcribe_with_adapter(
         id: Uuid::new_v4(),
         model: plan.model.id.clone(),
         text,
-    })
-}
-
-fn convert_with_adapter(
-    plan: &ExecutionPlan,
-    request: VoiceConversionRequest,
-    output_dir: &Path,
-) -> TakokitResult<VoiceConversionResponse> {
-    if !request.consent_affirmed {
-        return Err(TakokitError::InvalidRequest(
-            "voice conversion requires explicit ownership or permission consent".to_string(),
-        ));
-    }
-    if !request.source_path.is_file() {
-        return Err(TakokitError::InvalidRequest(format!(
-            "source audio does not exist: {}",
-            request.source_path.display()
-        )));
-    }
-    let adapter = adapter_id(plan)?;
-    let layout = adapter_layout(plan, adapter)?;
-    let target_voice = resolve_target_voice(plan, &request.target_voice)?;
-    std::fs::create_dir_all(output_dir)
-        .map_err(|error| TakokitError::Storage(error.to_string()))?;
-    let id = Uuid::new_v4();
-    let output_path = output_dir.join(format!("conversion-{id}.wav"));
-    let model_dir = plan.storage_root.join("models").join(&plan.model.id);
-    let cache_dir = plan.storage_root.join("cache");
-    let runtime_model = runtime_model_id(&plan.model);
-    let payload = ManagedAdapterRequest {
-        operation: "convert",
-        model_id: runtime_model,
-        model_dir: &model_dir,
-        cache_dir: &cache_dir,
-        input: None,
-        voice: None,
-        language: None,
-        instruction: None,
-        reference_text: None,
-        output_path: Some(&output_path),
-        output_dir: None,
-        audio_path: Some(&request.source_path),
-        target_voice: Some(&target_voice),
-        dataset_path: None,
-        name: None,
-        pitch_shift: Some(request.pitch_shift),
-        epochs: None,
-    };
-    let response = run_adapter(adapter, &layout, &payload)?;
-    validate_file_output(adapter, &output_path, response.output_path.as_deref())?;
-    Ok(VoiceConversionResponse {
-        id,
-        model: plan.model.id.clone(),
-        target_voice: request.target_voice,
-        output_path: output_path.clone(),
-        content_type: "audio/wav".to_string(),
-        bytes: output_bytes(&output_path)?,
-        sample_rate: response.sample_rate,
     })
 }
 
@@ -278,7 +231,12 @@ fn train_with_adapter(
         target_voice: None,
         dataset_path: Some(&request.samples_path),
         name: Some(&request.name),
+        f0_method: None,
         pitch_shift: None,
+        index_rate: None,
+        rms_mix_rate: None,
+        protect: None,
+        filter_radius: None,
         epochs: request.epochs,
     };
     let response = run_adapter(adapter, &layout, &payload)?;
