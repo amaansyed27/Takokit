@@ -82,7 +82,10 @@ fn rvc_adapter_applies_validated_user_inference_settings() {
         "protect",
         "filter_radius",
     ] {
-        assert!(adapter.contains(&format!("settings[\"{key}\"]")), "missing {key}");
+        assert!(
+            adapter.contains(&format!("settings[\"{key}\"]")),
+            "missing {key}"
+        );
     }
     assert!(adapter.contains("F0_METHODS = {\"rmvpe\", \"harvest\", \"crepe\", \"pm\"}"));
     assert!(adapter.contains("if not -24 <= pitch_shift <= 24:"));
