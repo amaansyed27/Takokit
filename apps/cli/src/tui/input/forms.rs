@@ -217,18 +217,12 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
         }
         ConvertField::F0Method => match key.code {
             KeyCode::Left | KeyCode::Up => {
-                app.convert_state.f0_method_index = shifted_index(
-                    app.convert_state.f0_method_index,
-                    F0_METHODS.len(),
-                    -1,
-                )
+                app.convert_state.f0_method_index =
+                    shifted_index(app.convert_state.f0_method_index, F0_METHODS.len(), -1)
             }
             KeyCode::Right | KeyCode::Down => {
-                app.convert_state.f0_method_index = shifted_index(
-                    app.convert_state.f0_method_index,
-                    F0_METHODS.len(),
-                    1,
-                )
+                app.convert_state.f0_method_index =
+                    shifted_index(app.convert_state.f0_method_index, F0_METHODS.len(), 1)
             }
             KeyCode::Enter => app.convert_state.field = ConvertField::PitchShift,
             _ => {}
@@ -287,12 +281,7 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
     None
 }
 
-fn edit_numeric(
-    value: &mut String,
-    cursor: &mut usize,
-    key: KeyEvent,
-    field: &mut ConvertField,
-) {
+fn edit_numeric(value: &mut String, cursor: &mut usize, key: KeyEvent, field: &mut ConvertField) {
     if edit_text(value, cursor, key) {
         return;
     }
@@ -408,7 +397,8 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
     let index_rate = parse_float(app, ConvertField::IndexRate, "index rate", 0.0, 1.0)?;
     let rms_mix_rate = parse_float(app, ConvertField::RmsMixRate, "RMS mix rate", 0.0, 1.0)?;
     let protect = parse_float(app, ConvertField::Protect, "protect", 0.0, 0.5)?;
-    let filter_radius = parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?;
+    let filter_radius =
+        parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?;
 
     Some(TuiAction::ConvertVoice {
         model: model.id,
@@ -430,13 +420,13 @@ fn parse_float(
     minimum: f32,
     maximum: f32,
 ) -> Option<f32> {
-    let value = match field {
-        ConvertField::IndexRate => &app.convert_state.index_rate,
-        ConvertField::RmsMixRate => &app.convert_state.rms_mix_rate,
-        ConvertField::Protect => &app.convert_state.protect,
+    let source = match field {
+        ConvertField::IndexRate => app.convert_state.index_rate.clone(),
+        ConvertField::RmsMixRate => app.convert_state.rms_mix_rate.clone(),
+        ConvertField::Protect => app.convert_state.protect.clone(),
         _ => return None,
     };
-    match value.trim().parse::<f32>() {
+    match source.trim().parse::<f32>() {
         Ok(value) if value.is_finite() && (minimum..=maximum).contains(&value) => Some(value),
         _ => {
             app.set_status(format!("{label} must be between {minimum} and {maximum}."));
@@ -456,12 +446,12 @@ fn parse_number<T>(
 where
     T: std::str::FromStr + PartialOrd + Copy + std::fmt::Display,
 {
-    let value = match field {
-        ConvertField::PitchShift => &app.convert_state.pitch_shift,
-        ConvertField::FilterRadius => &app.convert_state.filter_radius,
+    let source = match field {
+        ConvertField::PitchShift => app.convert_state.pitch_shift.clone(),
+        ConvertField::FilterRadius => app.convert_state.filter_radius.clone(),
         _ => return None,
     };
-    match value.trim().parse::<T>() {
+    match source.trim().parse::<T>() {
         Ok(value) if value >= minimum && value <= maximum => Some(value),
         _ => {
             app.set_status(format!("{label} must be between {minimum} and {maximum}."));
