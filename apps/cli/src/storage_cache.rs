@@ -1,7 +1,6 @@
 use serde::Serialize;
 use std::{
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -128,7 +127,9 @@ mod tests {
         assert!(uv.cleanable);
         assert_eq!(uv.logical_bytes, 16);
         assert!(!huggingface.cleanable);
-        assert!(huggingface.classification.contains("active installed-model"));
+        assert!(huggingface
+            .classification
+            .contains("active installed-model"));
         assert!(!unknown.cleanable);
         assert!(unknown.classification.contains("unknown"));
     }
