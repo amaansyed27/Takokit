@@ -1,7 +1,6 @@
 import { AudioWaveform, CheckCircle2, CircleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Section } from "../../components/ui/Section";
 import { Select } from "../../components/ui/Select";
@@ -170,7 +169,7 @@ export function ConvertPage({ runtime }: RouteComponentProps) {
             <span><strong>Checkpoint</strong>{result.checkpoint.checkpoint_path}</span>
             <span><strong>Checkpoint SHA-256</strong>{result.checkpoint.checkpoint_sha256}</span>
             <span><strong>Index</strong>{result.checkpoint.index_path ?? "none"}</span>
-            <span><strong>Pairing</strong>{result.checkpoint.pairing_status.replaceAll("_", " ")}</span>
+            <span><strong>Pairing</strong>{result.checkpoint.pairing_status.replace(/_/g, " ")}</span>
             <span><strong>Target reference</strong>{result.checkpoint.target_reference_path ?? "not supplied"}</span>
             <span><strong>Quality baseline</strong>{result.checkpoint.quality_baseline_ready ? "ready" : "not established"}</span>
             <span><strong>Effective F0</strong>{result.effective_settings.f0_method}</span>
