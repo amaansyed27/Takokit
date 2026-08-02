@@ -2,26 +2,118 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
+
+F0_METHODS = {"rmvpe", "harvest", "crepe", "pm"}
+REFERENCE_NAMES = ("reference.wav", "target.wav", "sample.wav", "preview.wav")
 
 
 def respond(**payload: object) -> None:
     print(json.dumps(payload), flush=True)
 
 
-def find_model(target: Path) -> tuple[Path, Path | None]:
-    if target.is_file() and target.suffix.lower() == ".pth":
-        index = next(target.parent.glob("*.index"), None)
-        return target, index
-    if target.is_dir():
-        model = next(target.rglob("*.pth"), None)
-        if model is None:
-            raise FileNotFoundError(f"no RVC .pth checkpoint found below {target}")
-        return model, next(target.rglob("*.index"), None)
-    raise FileNotFoundError(f"RVC target checkpoint does not exist: {target}")
+def load_package_manifest(root: Path) -> dict[str, Any]:
+    path = root / "rvc.json"
+    if not path.is_file():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"RVC package manifest must contain a JSON object: {path}")
+    return payload
+
+
+def resolve_manifest_path(root: Path, value: object, label: str) -> Path | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"RVC package {label} must be a non-empty relative path")
+    candidate = (root / value).resolve()
+    if root != candidate and root not in candidate.parents:
+        raise ValueError(f"RVC package {label} escapes the target directory: {value}")
+    if not candidate.is_file():
+        raise FileNotFoundError(f"RVC package {label} does not exist: {candidate}")
+    return candidate
+
+
+def find_model(target: Path) -> tuple[Path, Path | None, str, Path | None, bool]:
+    root = target.parent if target.is_file() else target
+    if not root.is_dir():
+        raise FileNotFoundError(f"RVC target checkpoint does not exist: {target}")
+    manifest = load_package_manifest(root)
+
+    if target.is_file():
+        if target.suffix.lower() != ".pth":
+            raise ValueError(f"RVC target file must be a .pth checkpoint: {target}")
+        model = target
+    elif manifest.get("checkpoint") is not None:
+        model = resolve_manifest_path(root, manifest.get("checkpoint"), "checkpoint")
+        assert model is not None
+        if model.suffix.lower() != ".pth":
+            raise ValueError(f"RVC package checkpoint must use .pth: {model}")
+    else:
+        models = sorted(root.rglob("*.pth"))
+        if not models:
+            raise FileNotFoundError(f"no RVC .pth checkpoint found below {root}")
+        if len(models) != 1:
+            names = ", ".join(path.name for path in models)
+            raise ValueError(
+                "multiple RVC checkpoints were found; add rvc.json with an explicit "
+                f"checkpoint field: {names}"
+            )
+        model = models[0]
+
+    index, pairing_status = find_index(root, model, manifest)
+    reference = find_reference(root, manifest)
+    quality_ready = bool(
+        manifest.get("quality_baseline") is True
+        and isinstance(manifest.get("license"), str)
+        and manifest.get("license", "").strip()
+        and reference is not None
+        and pairing_status != "single_index_unverified"
+    )
+    return model.resolve(), index, pairing_status, reference, quality_ready
+
+
+def find_index(
+    root: Path, model: Path, manifest: dict[str, Any]
+) -> tuple[Path | None, str]:
+    explicit = resolve_manifest_path(root, manifest.get("index"), "index")
+    if explicit is not None:
+        if explicit.suffix.lower() != ".index":
+            raise ValueError(f"RVC package index must use .index: {explicit}")
+        return explicit.resolve(), "manifest_verified"
+
+    indexes = sorted(root.rglob("*.index"))
+    if not indexes:
+        return None, "no_index"
+    model_name = model.stem.lower()
+    matches = [path for path in indexes if model_name in path.stem.lower()]
+    if len(matches) == 1:
+        return matches[0].resolve(), "matched_by_name"
+    if len(indexes) == 1:
+        return indexes[0].resolve(), "single_index_unverified"
+    names = ", ".join(path.name for path in indexes)
+    raise ValueError(
+        "multiple RVC indexes were found and none matched the checkpoint name; "
+        f"add rvc.json with an explicit index field: {names}"
+    )
+
+
+def find_reference(root: Path, manifest: dict[str, Any]) -> Path | None:
+    explicit = resolve_manifest_path(root, manifest.get("target_reference"), "target_reference")
+    if explicit is not None:
+        return explicit.resolve()
+    for name in REFERENCE_NAMES:
+        candidate = root / name
+        if candidate.is_file():
+            return candidate.resolve()
+    wavs = sorted(root.glob("*.wav"))
+    return wavs[0].resolve() if len(wavs) == 1 else None
 
 
 def configure_rvc_roots(model_path: Path, index_path: Path | None) -> None:
@@ -80,6 +172,72 @@ def install_trusted_torch_checkpoint_compat(trusted_checkpoint: Path) -> None:
     torch.load = load_compat
 
 
+def number(request: dict[str, Any], key: str, default: float) -> float:
+    value = request.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"RVC {key} must be numeric")
+    return float(value)
+
+
+def effective_settings(request: dict[str, Any], has_index: bool) -> dict[str, Any]:
+    f0_method = str(request.get("f0_method") or "rmvpe").lower()
+    pitch_shift = int(number(request, "pitch_shift", 0))
+    index_rate = number(request, "index_rate", 0.75) if has_index else 0.0
+    rms_mix_rate = number(request, "rms_mix_rate", 0.25)
+    protect = number(request, "protect", 0.33)
+    filter_radius = int(number(request, "filter_radius", 3))
+
+    if f0_method not in F0_METHODS:
+        raise ValueError(f"unsupported RVC f0_method: {f0_method}")
+    if not -24 <= pitch_shift <= 24:
+        raise ValueError("RVC pitch_shift must be between -24 and 24")
+    if not 0.0 <= index_rate <= 1.0:
+        raise ValueError("RVC index_rate must be between 0.0 and 1.0")
+    if not 0.0 <= rms_mix_rate <= 1.0:
+        raise ValueError("RVC rms_mix_rate must be between 0.0 and 1.0")
+    if not 0.0 <= protect <= 0.5:
+        raise ValueError("RVC protect must be between 0.0 and 0.5")
+    if not 0 <= filter_radius <= 7:
+        raise ValueError("RVC filter_radius must be between 0 and 7")
+
+    return {
+        "f0_method": f0_method,
+        "pitch_shift": pitch_shift,
+        "index_rate": index_rate,
+        "rms_mix_rate": rms_mix_rate,
+        "protect": protect,
+        "filter_radius": filter_radius,
+    }
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def checkpoint_metadata(
+    model: Path,
+    index: Path | None,
+    pairing_status: str,
+    reference: Path | None,
+    quality_ready: bool,
+) -> dict[str, Any]:
+    return {
+        "checkpoint_path": str(model),
+        "checkpoint_sha256": sha256(model),
+        "checkpoint_bytes": model.stat().st_size,
+        "index_path": str(index) if index else None,
+        "index_sha256": sha256(index) if index else None,
+        "index_bytes": index.stat().st_size if index else None,
+        "pairing_status": pairing_status,
+        "target_reference_path": str(reference) if reference else None,
+        "quality_baseline_ready": quality_ready,
+    }
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     if request.get("operation") != "convert":
@@ -96,7 +254,8 @@ def main() -> None:
         raise FileNotFoundError(
             f"RVC base assets are incomplete below {model_dir}; run `tako pull rvc`"
         )
-    model_path, index_path = find_model(target)
+    model_path, index_path, pairing_status, reference, quality_ready = find_model(target)
+    settings = effective_settings(request, index_path is not None)
     configure_rvc_roots(model_path, index_path)
 
     source = Path(__file__).resolve().parent / "source"
@@ -113,14 +272,14 @@ def main() -> None:
     sample_rate, audio, _, error = converter.vc_inference(
         0,
         str(source_audio),
-        f0_up_key=int(request.get("pitch_shift") or 0),
-        f0_method="rmvpe",
+        f0_up_key=settings["pitch_shift"],
+        f0_method=settings["f0_method"],
         index_file=str(index_path) if index_path else "",
-        index_rate=0.75 if index_path else 0.0,
-        filter_radius=3,
+        index_rate=settings["index_rate"],
+        filter_radius=settings["filter_radius"],
         resample_sr=0,
-        rms_mix_rate=0.25,
-        protect=0.33,
+        rms_mix_rate=settings["rms_mix_rate"],
+        protect=settings["protect"],
         hubert_path=str(hubert_path),
     )
     if error or sample_rate is None or audio is None:
@@ -135,6 +294,10 @@ def main() -> None:
         bytes=output_path.stat().st_size,
         sample_rate=int(sample_rate),
         voice=str(model_path),
+        effective_settings=settings,
+        checkpoint=checkpoint_metadata(
+            model_path, index_path, pairing_status, reference, quality_ready
+        ),
     )
 
 
