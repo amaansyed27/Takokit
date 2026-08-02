@@ -1,5 +1,8 @@
 use super::yes_no;
 
+#[path = "removal.rs"]
+mod removal;
+
 pub(crate) fn print_serializable<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<()> {
     print_value(&serde_json::to_value(value)?)
 }
@@ -39,6 +42,10 @@ fn render_value(value: &serde_json::Value, depth: usize) {
             }
         }
         serde_json::Value::Object(map) => {
+            if removal::is_model_removal_report(map) {
+                println!("{}", removal::format_model_removal(map));
+                return;
+            }
             if map.contains_key("model_id") && map.contains_key("artifacts") {
                 render_pull(map);
                 return;
@@ -274,7 +281,7 @@ fn render_field(name: &str, value: Option<&serde_json::Value>) {
 
 fn text(map: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
     map.get(key)
-        .and_then(|value| value.as_str())
+        .and_then(|value| value.as_str)
         .unwrap_or("")
         .to_string()
 }
