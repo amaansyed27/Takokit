@@ -41,6 +41,7 @@ impl App {
             TuiScreen::Speak => forms::handle_speak(self, key),
             TuiScreen::Transcribe => forms::handle_transcribe(self, key),
             TuiScreen::Clone => forms::handle_clone(self, key),
+            TuiScreen::Convert => forms::handle_convert(self, key),
             TuiScreen::Manage => navigation::handle_manage(self, key),
             TuiScreen::Models => navigation::handle_models(self, key),
             TuiScreen::Runners => navigation::handle_runners(self, key),
@@ -60,6 +61,7 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
         TuiScreen::Speak => forms::submit_speak(app),
         TuiScreen::Transcribe => forms::submit_transcribe(app),
         TuiScreen::Clone => forms::submit_clone(app),
+        TuiScreen::Convert => forms::submit_convert(app),
         TuiScreen::Manage => {
             navigation::open_manage_item(app, app.manage_index);
             None
