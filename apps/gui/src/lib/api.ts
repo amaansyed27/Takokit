@@ -1,5 +1,21 @@
 import { mockRuntime } from "./mockData";
-import type { CapabilitySummary, DoctorResponse, ModelCapability, ModelInstallResponse, ModelPlan, ModelSummary, RunnerSummary, RuntimeSnapshot, SpeechApiRequest, SpeechApiResponse, TranscriptionApiRequest, TranscriptionApiResponse, VoiceSummary } from "./types";
+import type {
+  CapabilitySummary,
+  DoctorResponse,
+  ModelCapability,
+  ModelInstallResponse,
+  ModelPlan,
+  ModelSummary,
+  RunnerSummary,
+  RuntimeSnapshot,
+  SpeechApiRequest,
+  SpeechApiResponse,
+  TranscriptionApiRequest,
+  TranscriptionApiResponse,
+  VoiceConversionApiRequest,
+  VoiceConversionApiResponse,
+  VoiceSummary
+} from "./types";
 
 const viteApiOverride = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_TAKOKIT_API_URL;
 const LOCAL_API_BASE_URL = viteApiOverride || window.location.origin;
@@ -33,7 +49,13 @@ type ApiModel = {
   execution_status: string;
 };
 
-type ApiCapabilityId = "text_to_speech" | "speech_to_text" | "voice_cloning" | "live_transcription" | "live_audio";
+type ApiCapabilityId =
+  | "text_to_speech"
+  | "speech_to_text"
+  | "voice_cloning"
+  | "voice_conversion"
+  | "live_transcription"
+  | "live_audio";
 
 type ApiCapability = {
   id: ApiCapabilityId;
@@ -71,6 +93,16 @@ export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechA
 
 export async function transcribeAudio(request: TranscriptionApiRequest): Promise<TranscriptionApiResponse> {
   return requestJson<TranscriptionApiResponse>("/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function convertVoice(request: VoiceConversionApiRequest): Promise<VoiceConversionApiResponse> {
+  return requestJson<VoiceConversionApiResponse>("/v1/audio/conversions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -323,6 +355,8 @@ function toCapability(capability: ApiModel["capabilities"][number]): ModelCapabi
       return "stt";
     case "voice_cloning":
       return "voice_cloning";
+    case "voice_conversion":
+      return "voice_conversion";
     case "live_transcription":
       return "live_transcription";
     case "live_audio":
