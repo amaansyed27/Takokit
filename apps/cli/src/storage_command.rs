@@ -10,6 +10,11 @@ use std::{
 };
 use takokit_package::{automatic_cleanup_state, clean_uv_cache};
 
+#[path = "storage_cache.rs"]
+mod storage_cache;
+
+use storage_cache::{inspect_cache_entries, CacheEntryReport};
+
 const HARDLINK_IDENTITY_MIN_BYTES: u64 = 256 * 1024;
 const CATEGORY_ORDER: &[&str] = &[
     "models",
@@ -44,6 +49,8 @@ pub(crate) struct StorageReport {
     pub(crate) hardlink_savings_bytes: u64,
     pub(crate) hardlink_identity_threshold_bytes: u64,
     pub(crate) uv_cache_logical_bytes: u64,
+    pub(crate) protected_cache_logical_bytes: u64,
+    pub(crate) cache_entries: Vec<CacheEntryReport>,
     pub(crate) categories: Vec<StorageCategoryReport>,
 }
 
@@ -156,7 +163,18 @@ pub(crate) fn inspect_storage(root: &Path) -> io::Result<StorageReport> {
         categories.push(other);
     }
 
-    let uv_cache_logical_bytes = scan_logical_only(&root.join("cache").join("uv"))?.logical_bytes;
+    let cache_entries = inspect_cache_entries(root)?;
+    let uv_cache_logical_bytes = cache_entries
+        .iter()
+        .filter(|entry| entry.cleanable)
+        .map(|entry| entry.logical_bytes)
+        .fold(0_u64, u64::saturating_add);
+    let protected_cache_logical_bytes = cache_entries
+        .iter()
+        .filter(|entry| !entry.cleanable)
+        .map(|entry| entry.logical_bytes)
+        .fold(0_u64, u64::saturating_add);
+
     Ok(StorageReport {
         root: root.to_path_buf(),
         files: total.files,
@@ -165,6 +183,8 @@ pub(crate) fn inspect_storage(root: &Path) -> io::Result<StorageReport> {
         hardlink_savings_bytes: total.logical_bytes.saturating_sub(total.unique_bytes),
         hardlink_identity_threshold_bytes: HARDLINK_IDENTITY_MIN_BYTES,
         uv_cache_logical_bytes,
+        protected_cache_logical_bytes,
+        cache_entries,
         categories,
     })
 }
@@ -237,32 +257,6 @@ fn scan_path(path: &Path, seen: &mut HashSet<FileIdentity>) -> io::Result<ScanTo
     Ok(totals)
 }
 
-fn scan_logical_only(path: &Path) -> io::Result<ScanTotals> {
-    if !path.exists() {
-        return Ok(ScanTotals::default());
-    }
-    let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_symlink() {
-        return Ok(ScanTotals::default());
-    }
-    if metadata.is_file() {
-        return Ok(ScanTotals {
-            files: 1,
-            logical_bytes: metadata.len(),
-            unique_bytes: metadata.len(),
-        });
-    }
-
-    let mut totals = ScanTotals::default();
-    if metadata.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            merge_totals(&mut totals, scan_logical_only(&entry.path())?);
-        }
-    }
-    Ok(totals)
-}
-
 fn merge_totals(target: &mut ScanTotals, source: ScanTotals) {
     target.files += source.files;
     target.logical_bytes += source.logical_bytes;
@@ -280,8 +274,12 @@ fn print_storage_report(report: &StorageReport) {
     );
     println!("  files             {}", report.files);
     println!(
-        "  cleanable UV cache {}",
+        "  safe cache cleanup {}",
         format_bytes(report.uv_cache_logical_bytes)
+    );
+    println!(
+        "  protected cache   {}",
+        format_bytes(report.protected_cache_logical_bytes)
     );
     println!(
         "  scan mode         fast (deduplicates files >= {})",
@@ -298,8 +296,26 @@ fn print_storage_report(report: &StorageReport) {
             category.files
         );
     }
+
+    if !report.cache_entries.is_empty() {
+        println!();
+        println!("CACHE DIRECTORY       SIZE       FILES  STATUS");
+        for entry in &report.cache_entries {
+            println!(
+                "{:<18} {:>10} {:>10}  {}",
+                entry.name,
+                format_bytes(entry.logical_bytes),
+                entry.files,
+                entry.classification
+            );
+        }
+    }
+
     println!();
-    println!("Use `tako storage clean --dry-run` to preview UV-cache cleanup.");
+    println!("Use `tako storage clean --dry-run` to preview UV package-cache cleanup.");
+    println!(
+        "Provider caches marked protected may contain active installed-model checkpoints; do not delete them manually."
+    );
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -419,5 +435,20 @@ mod tests {
         assert!(cleaned.removed);
         assert!(cache.exists());
         assert!(!cache.join("package.whl").exists());
+    }
+
+    #[test]
+    fn report_separates_safe_and_protected_cache_bytes() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let uv = temp.path().join("cache/uv");
+        let huggingface = temp.path().join("cache/huggingface");
+        fs::create_dir_all(&uv).expect("uv cache");
+        fs::create_dir_all(&huggingface).expect("huggingface cache");
+        fs::write(uv.join("wheel"), vec![1_u8; 10]).expect("uv fixture");
+        fs::write(huggingface.join("weights"), vec![2_u8; 20]).expect("hf fixture");
+
+        let report = inspect_storage(temp.path()).expect("inspect");
+        assert_eq!(report.uv_cache_logical_bytes, 10);
+        assert_eq!(report.protected_cache_logical_bytes, 20);
     }
 }
