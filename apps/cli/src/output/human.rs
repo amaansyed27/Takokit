@@ -131,12 +131,18 @@ fn render_installed_models(value: Option<&serde_json::Value>) {
         "NAME", "TYPE", "ID", "SIZE", "MODIFIED"
     );
     for item in items {
-        let name = item.get("name").and_then(serde_json::Value::as_str).unwrap_or("-");
+        let name = item
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-");
         let model_type = item
             .get("model_type")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("-");
-        let id = item.get("id").and_then(serde_json::Value::as_str).unwrap_or("-");
+        let id = item
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-");
         let size = item
             .get("size_bytes")
             .and_then(serde_json::Value::as_u64)
