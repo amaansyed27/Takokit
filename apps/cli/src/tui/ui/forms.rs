@@ -10,6 +10,7 @@ use super::widgets::{centered_rect, field, primary_button, set_input_cursor};
 use crate::tui::{
     app::{App, SpeakField, TranscribeField},
     clone::CloneField,
+    convert::ConvertField,
 };
 
 pub fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -238,6 +239,132 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
         CloneField::Name => set_input_cursor(frame, rows[2], app.clone_state.name_cursor),
         CloneField::Sample => set_input_cursor(frame, rows[3], app.clone_state.sample_cursor),
         _ => {}
+    }
+}
+
+pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let form = centered_rect(90, 100, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(2),
+        ])
+        .split(form);
+
+    render_intro(
+        frame,
+        rows[0],
+        "Convert a voice",
+        "A valid WAV proves execution only. Listening review is required for quality.",
+    );
+    let model = app.selected_convert_model();
+    let model_label = model
+        .map(|model| format!("{}  ·  {}", model.title, model.state))
+        .unwrap_or_else(|| "No installed conversion model".to_string());
+    frame.render_widget(
+        field(
+            "Model · ↑/↓ change",
+            model_label,
+            app.convert_state.field == ConvertField::Model,
+        ),
+        rows[1],
+    );
+    frame.render_widget(
+        field(
+            "Source audio",
+            value_or_placeholder(&app.convert_state.source, r#"C:\path\to\source.wav"#),
+            app.convert_state.field == ConvertField::Source,
+        ),
+        rows[2],
+    );
+    frame.render_widget(
+        field(
+            "Target RVC package",
+            value_or_placeholder(&app.convert_state.target, r#"C:\path\to\rvc-package"#),
+            app.convert_state.field == ConvertField::Target,
+        ),
+        rows[3],
+    );
+    frame.render_widget(
+        field(
+            "F0 method · ↑/↓ change",
+            app.convert_state.f0_method(),
+            app.convert_state.field == ConvertField::F0Method,
+        ),
+        rows[4],
+    );
+    render_convert_value(frame, rows[5], app, ConvertField::PitchShift, "Pitch shift · -24..24", &app.convert_state.pitch_shift);
+    render_convert_value(frame, rows[6], app, ConvertField::IndexRate, "Index rate · 0..1", &app.convert_state.index_rate);
+    render_convert_value(frame, rows[7], app, ConvertField::RmsMixRate, "RMS mix rate · 0..1", &app.convert_state.rms_mix_rate);
+    render_convert_value(frame, rows[8], app, ConvertField::Protect, "Protect · 0..0.5", &app.convert_state.protect);
+    render_convert_value(frame, rows[9], app, ConvertField::FilterRadius, "Filter radius · 0..7", &app.convert_state.filter_radius);
+    frame.render_widget(
+        field(
+            "Consent · Space toggles",
+            if app.convert_state.consent {
+                "[x] I own these voices or have explicit permission."
+            } else {
+                "[ ] Explicit source and target permission is required."
+            },
+            app.convert_state.field == ConvertField::Consent,
+        ),
+        rows[10],
+    );
+    let label = match model {
+        Some(model) if model.executable => "Run conversion",
+        Some(_) => "Repair model",
+        None => "No conversion model installed",
+    };
+    frame.render_widget(
+        primary_button(label, app.convert_state.field == ConvertField::Submit),
+        rows[11],
+    );
+    frame.render_widget(
+        Paragraph::new("Result output shows checkpoint hashes, pairing, effective settings, and quality=not evaluated.")
+            .style(Style::default().add_modifier(Modifier::DIM)),
+        rows[12],
+    );
+
+    match app.convert_state.field {
+        ConvertField::Source => set_input_cursor(frame, rows[2], app.convert_state.source_cursor),
+        ConvertField::Target => set_input_cursor(frame, rows[3], app.convert_state.target_cursor),
+        ConvertField::PitchShift => set_input_cursor(frame, rows[5], app.convert_state.pitch_shift_cursor),
+        ConvertField::IndexRate => set_input_cursor(frame, rows[6], app.convert_state.index_rate_cursor),
+        ConvertField::RmsMixRate => set_input_cursor(frame, rows[7], app.convert_state.rms_mix_rate_cursor),
+        ConvertField::Protect => set_input_cursor(frame, rows[8], app.convert_state.protect_cursor),
+        ConvertField::FilterRadius => set_input_cursor(frame, rows[9], app.convert_state.filter_radius_cursor),
+        _ => {}
+    }
+}
+
+fn render_convert_value(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    app: &App,
+    target: ConvertField,
+    label: &str,
+    value: &str,
+) {
+    frame.render_widget(field(label, value, app.convert_state.field == target), area);
+}
+
+fn value_or_placeholder<'a>(value: &'a str, placeholder: &'a str) -> &'a str {
+    if value.is_empty() {
+        placeholder
+    } else {
+        value
     }
 }
 
