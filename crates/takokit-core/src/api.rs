@@ -183,18 +183,139 @@ pub struct CloneVoiceRequest {
     pub name: String,
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RvcF0Method {
+    #[default]
+    Rmvpe,
+    Harvest,
+    Crepe,
+    Pm,
+}
+
+impl RvcF0Method {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Rmvpe => "rmvpe",
+            Self::Harvest => "harvest",
+            Self::Crepe => "crepe",
+            Self::Pm => "pm",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RvcInferenceSettings {
+    #[serde(default)]
+    pub f0_method: RvcF0Method,
+    #[serde(default)]
+    pub pitch_shift: i32,
+    #[serde(default = "default_rvc_index_rate")]
+    pub index_rate: f32,
+    #[serde(default = "default_rvc_rms_mix_rate")]
+    pub rms_mix_rate: f32,
+    #[serde(default = "default_rvc_protect")]
+    pub protect: f32,
+    #[serde(default = "default_rvc_filter_radius")]
+    pub filter_radius: u32,
+}
+
+impl Default for RvcInferenceSettings {
+    fn default() -> Self {
+        Self {
+            f0_method: RvcF0Method::Rmvpe,
+            pitch_shift: 0,
+            index_rate: default_rvc_index_rate(),
+            rms_mix_rate: default_rvc_rms_mix_rate(),
+            protect: default_rvc_protect(),
+            filter_radius: default_rvc_filter_radius(),
+        }
+    }
+}
+
+impl RvcInferenceSettings {
+    pub fn validate(&self) -> Result<(), String> {
+        if !(-24..=24).contains(&self.pitch_shift) {
+            return Err("RVC pitch shift must be between -24 and 24 semitones".to_string());
+        }
+        validate_unit_interval("RVC index rate", self.index_rate)?;
+        validate_unit_interval("RVC RMS mix rate", self.rms_mix_rate)?;
+        if !(0.0..=0.5).contains(&self.protect) || !self.protect.is_finite() {
+            return Err("RVC protect must be between 0.0 and 0.5".to_string());
+        }
+        if self.filter_radius > 7 {
+            return Err("RVC filter radius must be between 0 and 7".to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VoiceConversionExecutionStatus {
+    Passed,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VoiceConversionQualityStatus {
+    NotEvaluated,
+    Passed,
+    Failed,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RvcCheckpointMetadata {
+    pub checkpoint_path: PathBuf,
+    pub checkpoint_sha256: String,
+    pub checkpoint_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_path: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_bytes: Option<u64>,
+    pub pairing_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_reference_path: Option<PathBuf>,
+    pub quality_baseline_ready: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VoiceConversionRequest {
     pub model: String,
     pub source_path: PathBuf,
     pub target_voice: String,
     #[serde(default)]
+    pub f0_method: RvcF0Method,
+    #[serde(default)]
     pub pitch_shift: i32,
+    #[serde(default = "default_rvc_index_rate")]
+    pub index_rate: f32,
+    #[serde(default = "default_rvc_rms_mix_rate")]
+    pub rms_mix_rate: f32,
+    #[serde(default = "default_rvc_protect")]
+    pub protect: f32,
+    #[serde(default = "default_rvc_filter_radius")]
+    pub filter_radius: u32,
     #[serde(default)]
     pub consent_affirmed: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+impl VoiceConversionRequest {
+    pub fn settings(&self) -> RvcInferenceSettings {
+        RvcInferenceSettings {
+            f0_method: self.f0_method,
+            pitch_shift: self.pitch_shift,
+            index_rate: self.index_rate,
+            rms_mix_rate: self.rms_mix_rate,
+            protect: self.protect,
+            filter_radius: self.filter_radius,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VoiceConversionResponse {
     pub id: Uuid,
     pub model: String,
@@ -204,6 +325,12 @@ pub struct VoiceConversionResponse {
     pub bytes: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sample_rate: Option<u32>,
+    pub execution_status: VoiceConversionExecutionStatus,
+    pub quality_status: VoiceConversionQualityStatus,
+    pub quality_review_required: bool,
+    pub quality_notice: String,
+    pub effective_settings: RvcInferenceSettings,
+    pub checkpoint: RvcCheckpointMetadata,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -226,6 +353,30 @@ pub struct TrainVoiceResponse {
     pub output_path: PathBuf,
     pub status: String,
     pub log_path: Option<PathBuf>,
+}
+
+fn default_rvc_index_rate() -> f32 {
+    0.75
+}
+
+fn default_rvc_rms_mix_rate() -> f32 {
+    0.25
+}
+
+fn default_rvc_protect() -> f32 {
+    0.33
+}
+
+fn default_rvc_filter_radius() -> u32 {
+    3
+}
+
+fn validate_unit_interval(label: &str, value: f32) -> Result<(), String> {
+    if !(0.0..=1.0).contains(&value) || !value.is_finite() {
+        Err(format!("{label} must be between 0.0 and 1.0"))
+    } else {
+        Ok(())
+    }
 }
 
 fn default_training_model() -> String {
@@ -260,6 +411,24 @@ mod tests {
             serde_json::from_str(r#"{"model":"piper-lessac"}"#).expect("pull request");
         assert_eq!(request.model, "piper-lessac");
         assert!(!request.metadata_only);
+    }
+
+    #[test]
+    fn rvc_request_defaults_are_stable_and_validated() {
+        let request: VoiceConversionRequest = serde_json::from_str(
+            r#"{"model":"rvc","source_path":"source.wav","target_voice":"voice"}"#,
+        )
+        .expect("RVC request");
+        assert_eq!(request.f0_method, RvcF0Method::Rmvpe);
+        assert_eq!(request.index_rate, 0.75);
+        assert_eq!(request.rms_mix_rate, 0.25);
+        assert_eq!(request.protect, 0.33);
+        assert_eq!(request.filter_radius, 3);
+        request.settings().validate().expect("default settings");
+
+        let mut invalid = request.settings();
+        invalid.index_rate = 1.5;
+        assert!(invalid.validate().unwrap_err().contains("index rate"));
     }
 
     #[test]
