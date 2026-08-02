@@ -5,15 +5,19 @@ use uuid::Uuid;
 
 use crate::workspace::{CliWorkspace, SESSION_ENV, WORKSPACE_ENV};
 
-use super::catalog::{
-    capability_indexes, find_capability_index, find_model_index, find_runner_index,
-    load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
+use super::{
+    catalog::{
+        capability_indexes, find_capability_index, find_model_index, find_runner_index,
+        load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
+    },
+    convert::ConvertState,
 };
 
-pub const HOME_ACTIONS: [(&str, &str); 6] = [
+pub const HOME_ACTIONS: [(&str, &str); 7] = [
     ("Speak", "Generate speech with an installed TTS model"),
     ("Transcribe", "Turn a local audio file into text"),
     ("Clone voice", "Create a consented local voice profile"),
+    ("Convert voice", "Run RVC and review execution separately from quality"),
     ("Manage", "Inspect models, runners, and the local service"),
     ("Sessions", "Open prior work or start a clean session"),
     ("Activity", "Read the complete result from the latest task"),
@@ -25,7 +29,7 @@ pub const MANAGE_ACTIONS: [(&str, &str); 3] = [
     ("System", "Daemon status, diagnostics, logs, and GUI"),
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TuiAction {
     Quit,
     Refresh,
@@ -45,6 +49,17 @@ pub enum TuiAction {
         name: String,
         sample: String,
     },
+    ConvertVoice {
+        model: String,
+        source: String,
+        target: String,
+        f0_method: String,
+        pitch_shift: i32,
+        index_rate: f32,
+        rms_mix_rate: f32,
+        protect: f32,
+        filter_radius: u32,
+    },
     PullRunner(String),
     InstallRunner(String),
     RemoveRunner(String),
@@ -60,6 +75,7 @@ pub enum TuiScreen {
     Speak,
     Transcribe,
     Clone,
+    Convert,
     Manage,
     Models,
     Runners,
@@ -75,6 +91,7 @@ impl TuiScreen {
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
             Self::Clone => "Clone voice",
+            Self::Convert => "Convert voice",
             Self::Manage => "Manage",
             Self::Models => "Installed models",
             Self::Runners => "Runners",
@@ -93,7 +110,10 @@ impl TuiScreen {
     }
 
     pub fn accepts_text(self) -> bool {
-        matches!(self, Self::Speak | Self::Transcribe | Self::Clone)
+        matches!(
+            self,
+            Self::Speak | Self::Transcribe | Self::Clone | Self::Convert
+        )
     }
 }
 
@@ -175,6 +195,7 @@ pub struct App {
     pub transcribe_audio: String,
     pub transcribe_audio_cursor: usize,
     pub clone_state: super::clone::CloneState,
+    pub convert_state: ConvertState,
     pub storage_root: String,
     pub server: String,
     pub status: String,
@@ -198,6 +219,7 @@ impl App {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
         let (tts_models, stt_models) = capability_indexes(&models);
         let clone_state = super::clone::CloneState::new(&models);
+        let convert_state = ConvertState::new(&models);
         let sessions = workspace.store.list_sessions(None)?;
         let active_session = workspace.session_id();
         let session_index = session_position(&sessions, active_session);
@@ -232,6 +254,7 @@ impl App {
             transcribe_audio: String::new(),
             transcribe_audio_cursor: 0,
             clone_state,
+            convert_state,
             storage_root: store.root().display().to_string(),
             server: config.local_base_url(),
             status: format!(
@@ -284,6 +307,7 @@ impl App {
             "whisper-tiny",
         );
         self.clone_state.reload_models(&self.models);
+        self.convert_state.reload_models(&self.models);
         self.storage_root = store.root().display().to_string();
         self.server = config.local_base_url();
         self.reload_sessions()?;
@@ -358,6 +382,13 @@ impl App {
             .and_then(|index| self.models.get(*index))
     }
 
+    pub fn selected_convert_model(&self) -> Option<&ModelRow> {
+        self.convert_state
+            .model_indexes
+            .get(self.convert_state.model_index)
+            .and_then(|index| self.models.get(*index))
+    }
+
     pub fn selected_transcribe_model(&self) -> Option<&ModelRow> {
         self.stt_models
             .get(self.transcribe_model_index)
@@ -372,6 +403,15 @@ impl App {
     pub fn set_transcribe_model(&mut self, id: &str) {
         self.transcribe_model_index =
             find_capability_index(&self.models, &self.stt_models, Some(id), id);
+    }
+
+    pub fn set_convert_model(&mut self, id: &str) {
+        self.convert_state.model_index = self
+            .convert_state
+            .model_indexes
+            .iter()
+            .position(|index| self.models[*index].id == id)
+            .unwrap_or(0);
     }
 
     pub fn set_status(&mut self, value: impl Into<String>) {
@@ -394,7 +434,7 @@ mod tests {
     #[test]
     fn nested_screens_have_obvious_parents() {
         assert_eq!(TuiScreen::Models.parent(), TuiScreen::Manage);
-        assert_eq!(TuiScreen::Speak.parent(), TuiScreen::Home);
+        assert_eq!(TuiScreen::Convert.parent(), TuiScreen::Home);
         assert_eq!(TuiScreen::Home.parent(), TuiScreen::Home);
     }
 
@@ -403,5 +443,6 @@ mod tests {
         assert_eq!(HOME_ACTIONS[0].0, "Speak");
         assert_eq!(HOME_ACTIONS[1].0, "Transcribe");
         assert_eq!(HOME_ACTIONS[2].0, "Clone voice");
+        assert_eq!(HOME_ACTIONS[3].0, "Convert voice");
     }
 }
