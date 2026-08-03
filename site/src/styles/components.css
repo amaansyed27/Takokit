@@ -1,0 +1,224 @@
+.command-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  max-width: 720px;
+  margin-block: 1.4rem;
+  border: 1px solid var(--ink);
+  background: var(--paper-bright);
+}
+
+.command-bar code {
+  overflow: auto;
+  padding: 0.85rem 1rem;
+  color: var(--ink);
+  font-size: 0.86rem;
+  white-space: pre;
+}
+
+.command-bar button {
+  min-width: 80px;
+  border: 0;
+  border-left: 1px solid var(--ink);
+  background: var(--gold);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.command-bar.is-compact {
+  margin: 0;
+  max-width: 340px;
+  border-color: var(--line);
+}
+
+.command-bar.is-compact code {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.76rem;
+}
+
+.command-bar.is-compact button {
+  min-width: 64px;
+}
+
+.status-badge {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.status-badge::before {
+  width: 0.48rem;
+  height: 0.48rem;
+  background: var(--muted);
+  content: "";
+}
+
+.status-verified::before {
+  background: var(--success);
+}
+
+.status-hardware-blocked::before {
+  background: var(--danger);
+}
+
+.status-executable::before {
+  background: var(--gold-dark);
+}
+
+.task-filter {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.task-filter button {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.7rem 1rem;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.task-filter button.is-active {
+  border-color: var(--gold);
+  font-weight: 750;
+}
+
+.control-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.filter-toggle {
+  min-height: 42px;
+  border: 1px solid var(--ink);
+  padding: 0.55rem 0.85rem;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.advanced-filter {
+  position: relative;
+}
+
+.filter-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  display: grid;
+  width: min(680px, calc(100vw - 2.5rem));
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  border: 1px solid var(--ink);
+  padding: 1.25rem;
+  background: var(--paper-bright);
+  box-shadow: 0 18px 45px rgb(11 23 34 / 14%);
+}
+
+.filter-panel fieldset {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.filter-panel legend {
+  margin-bottom: 0.55rem;
+  font-weight: 750;
+}
+
+.filter-panel label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.84rem;
+}
+
+.filter-panel select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.check-filter {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.filter-panel details {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.filter-panel details label {
+  max-width: 320px;
+  margin-top: 0.75rem;
+}
+
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sort-control select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  background: var(--paper-bright);
+}
+
+.state-box {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  min-height: 180px;
+  align-content: center;
+  border-block: 1px solid var(--line);
+  padding: 2rem 0;
+  color: var(--muted);
+}
+
+.state-box h2,
+.state-box p {
+  margin: 0;
+}
+
+.state-box button {
+  border: 1px solid var(--ink);
+  padding: 0.55rem 0.8rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.state-error {
+  color: var(--danger);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--line);
+  border-top-color: var(--gold-dark);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

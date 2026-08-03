@@ -17,10 +17,6 @@ export default async function handler(_request, response) {
     ) {
       throw new Error("registry upstream returned an invalid schema");
     }
-    response.setHeader(
-      "Cache-Control",
-      "public, s-maxage=300, stale-while-revalidate=86400",
-    );
     response.setHeader("Access-Control-Allow-Origin", "*");
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.status(200).send(JSON.stringify(registry));

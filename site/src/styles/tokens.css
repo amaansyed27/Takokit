@@ -1,0 +1,17 @@
+:root {
+  --paper: #f6f1e6;
+  --paper-deep: #ece4d5;
+  --paper-bright: #fffdf7;
+  --ink: #0b1722;
+  --ink-soft: #24313a;
+  --muted: #687078;
+  --line: #cfc5b4;
+  --gold: #e5ad16;
+  --gold-dark: #826000;
+  --danger: #8c3129;
+  --success: #286345;
+  --max-width: 1120px;
+  --font-body: Inter, Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Space Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  color-scheme: light;
+}
