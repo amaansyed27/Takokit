@@ -1,180 +1,175 @@
 .runtime-assembly {
-  --assembly-progress-width: 0%;
-  --assembly-scale: 0.94;
   position: relative;
-  min-height: 205svh;
   background: var(--tk-ink);
-  color: var(--tk-paper);
+  color: var(--tk-surface);
 }
 
-.runtime-assembly__stage {
-  position: sticky;
-  top: 64px;
+.runtime-assembly__layout {
   display: grid;
-  min-height: calc(100svh - 64px);
-  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.8fr);
-  grid-template-rows: 1fr auto;
-  align-items: center;
-  gap: clamp(2rem, 7vw, 6rem);
-  padding-block: clamp(3rem, 7vh, 5rem);
+  grid-template-columns: minmax(340px, 0.84fr) minmax(380px, 1fr);
+  align-items: start;
+  gap: clamp(4rem, 9vw, 8rem);
+  padding-block: clamp(6rem, 11vw, 10rem);
 }
 
-.runtime-assembly__copy {
+.runtime-assembly__intro {
+  position: sticky;
+  top: 110px;
   min-width: 0;
-  max-width: 600px;
 }
 
-.runtime-assembly__copy h2 {
+.runtime-assembly__intro h2 {
+  max-width: 560px;
   margin: 0;
-  font-size: clamp(2.4rem, 4.8vw, 4.8rem);
-  line-height: 0.98;
-  letter-spacing: -0.045em;
+  font-size: clamp(2.6rem, 4.1vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 .runtime-assembly__summary {
   max-width: 560px;
-  margin: 1rem 0 1.5rem;
-  color: rgb(255 254 249 / 62%);
-  font-size: 0.9rem;
+  margin: 1rem 0 1.6rem;
+  color: rgb(247 244 237 / 66%);
+  font-size: 1rem;
   line-height: 1.65;
-}
-
-.runtime-assembly__active {
-  min-height: 150px;
-  border-top: 1px solid var(--tk-line-light);
-  padding-top: 1rem;
-}
-
-.runtime-assembly__active > span {
-  color: var(--tk-cream);
-  font-family: var(--font-technical);
-  font-size: 0.62rem;
-}
-
-.runtime-assembly__active h3 {
-  margin: 0.35rem 0 0;
-  font-size: clamp(1.35rem, 2.2vw, 2rem);
-}
-
-.runtime-assembly__active p {
-  max-width: 540px;
-  margin: 0.55rem 0 0;
-  color: rgb(255 254 249 / 62%);
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.runtime-assembly__copy > .landing-text-link {
-  margin-top: 0.8rem;
 }
 
 .runtime-assembly__visual {
   position: relative;
   display: grid;
-  width: min(38vw, 430px);
+  width: min(100%, 390px);
   aspect-ratio: 1;
   place-items: center;
-  justify-self: center;
+  margin-block: 2rem 1.5rem;
 }
 
 .runtime-assembly__visual > img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.86;
-  transform: scale(var(--assembly-scale));
-  transition: transform 100ms linear;
+  opacity: 0.3;
+  filter: grayscale(1) brightness(2.2);
 }
 
-.runtime-assembly__ingredient {
+.runtime-assembly__layers {
   position: absolute;
-  top: 56%;
-  left: 50%;
-  display: grid;
-  width: min(72%, 310px);
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 0.7rem;
-  border: 1px solid rgb(255 254 249 / 22%);
-  padding: 0.78rem 0.9rem;
-  background: rgb(23 20 11 / 88%);
-  color: var(--tk-paper);
-  transform: translate(-50%, -50%);
-  box-shadow: 0 14px 50px rgb(0 0 0 / 28%);
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: url("/brand/takokit-mark.svg") center / contain no-repeat;
+  mask: url("/brand/takokit-mark.svg") center / contain no-repeat;
 }
 
-.runtime-assembly__ingredient span {
-  color: var(--tk-cream);
+.runtime-assembly__layers span {
+  position: absolute;
+  right: 7%;
+  left: 7%;
+  display: flex;
+  height: 9.5%;
+  align-items: center;
+  justify-content: flex-end;
+  border-block: 1px solid rgb(247 244 237 / 18%);
+  padding-inline: 0.8rem;
+  background: color-mix(in srgb, var(--tk-yellow) 18%, var(--tk-ink));
+  color: rgb(247 244 237 / 74%);
   font-family: var(--font-technical);
   font-size: 0.6rem;
+  opacity: 0;
+  transform: translate3d(0, -18px, 0);
+  transition: opacity 280ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1), background 220ms ease;
 }
 
-.runtime-assembly__ingredient strong {
-  font-family: var(--font-display);
-  font-size: 0.84rem;
+.runtime-assembly__layers span:nth-child(1) { top: 21%; }
+.runtime-assembly__layers span:nth-child(2) { top: 32%; }
+.runtime-assembly__layers span:nth-child(3) { top: 43%; }
+.runtime-assembly__layers span:nth-child(4) { top: 54%; }
+.runtime-assembly__layers span:nth-child(5) { top: 65%; }
+.runtime-assembly__layers span:nth-child(6) { top: 76%; }
+
+.runtime-assembly__layers span.is-visible {
+  opacity: 0.78;
+  transform: translate3d(0, 0, 0);
 }
 
-.runtime-assembly__signal {
-  position: absolute;
-  right: 8%;
-  bottom: 12%;
-  left: 8%;
-  height: 1px;
-  background: rgb(255 254 249 / 16%);
-}
-
-.runtime-assembly__signal i {
-  display: block;
-  width: var(--assembly-progress-width);
-  height: 100%;
+.runtime-assembly__layers span.is-active {
+  z-index: 2;
   background: var(--tk-yellow);
+  color: var(--tk-ink);
+  opacity: 1;
 }
 
-.runtime-assembly__steps {
-  grid-column: 1 / -1;
+.runtime-assembly__active-label {
+  position: absolute;
+  right: 5%;
+  bottom: 7%;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  min-width: 150px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgb(247 244 237 / 20%);
+  padding: 0.72rem 0.82rem;
+  background: rgb(23 20 15 / 90%);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 22%);
+}
+
+.runtime-assembly__active-label span {
+  color: var(--tk-cream);
+  font-family: var(--font-technical);
+  font-size: 0.62rem;
+}
+
+.runtime-assembly__active-label strong {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+}
+
+.runtime-assembly__cards {
+  display: grid;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--tk-line-light);
   list-style: none;
 }
 
-.runtime-assembly__steps button {
+.runtime-assembly__cards li {
   display: grid;
-  width: 100%;
-  min-height: 52px;
-  grid-template-columns: auto 1fr;
+  min-height: 190px;
+  grid-template-columns: 3rem minmax(0, 1fr);
   align-items: center;
-  gap: 0.5rem;
-  border: 0;
-  border-right: 1px solid var(--tk-line-light);
-  padding: 0.65rem;
-  background: transparent;
-  color: rgb(255 254 249 / 44%);
-  cursor: pointer;
-  text-align: left;
+  gap: 1.2rem;
+  border-top: 1px solid var(--tk-line-light);
+  padding: 2rem 1.4rem;
+  outline: none;
+  transition: background 240ms ease, border-color 240ms ease, transform 240ms ease;
 }
 
-.runtime-assembly__steps li:last-child button {
-  border-right: 0;
+.runtime-assembly__cards li:last-child {
+  border-bottom: 1px solid var(--tk-line-light);
 }
 
-.runtime-assembly__steps button span {
+.runtime-assembly__cards li > span {
   color: var(--tk-cream);
   font-family: var(--font-technical);
-  font-size: 0.56rem;
+  font-size: 0.66rem;
 }
 
-.runtime-assembly__steps button strong {
-  font-size: 0.7rem;
+.runtime-assembly__cards h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.2vw, 2.1rem);
 }
 
-.runtime-assembly__steps button.is-active {
-  background: var(--tk-yellow);
-  color: var(--tk-ink);
+.runtime-assembly__cards p {
+  max-width: 560px;
+  margin: 0.7rem 0 0;
+  color: rgb(247 244 237 / 62%);
+  font-size: 0.94rem;
+  line-height: 1.65;
 }
 
-.runtime-assembly__steps button.is-active span {
-  color: var(--tk-ink);
+.runtime-assembly__cards li.is-active,
+.runtime-assembly__cards li:focus-visible {
+  border-color: rgb(255 210 4 / 62%);
+  background: rgb(255 210 4 / 7%);
+  transform: translate3d(8px, 0, 0);
 }
