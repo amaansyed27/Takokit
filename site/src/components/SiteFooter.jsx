@@ -7,8 +7,8 @@ export function SiteFooter() {
         <div className="footer-intro">
           <img src="/brand/takokit-mark.svg" alt="" />
           <div>
-            <strong>Takokit</strong>
-            <p>Run open voice models locally.</p>
+            <strong>TAKOKIT</strong>
+            <p>Open voice models. One local runtime.</p>
           </div>
         </div>
         <div>
@@ -26,6 +26,10 @@ export function SiteFooter() {
           <a href="https://github.com/amaansyed27/Takokit">GitHub</a>
           <a href="https://github.com/amaansyed27/Takokit/releases">Releases</a>
         </div>
+      </div>
+      <div className="shell footer-base">
+        <span>© {new Date().getFullYear()} Takokit</span>
+        <span>Windows · Linux · macOS</span>
       </div>
     </footer>
   );
