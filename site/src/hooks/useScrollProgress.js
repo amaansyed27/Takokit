@@ -41,19 +41,22 @@ export function useScrollProgress(onProgress, disabled = false) {
   return sectionRef;
 }
 
-export function useReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(() =>
-    typeof window !== "undefined"
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+export function useMediaQuery(queryText) {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia(queryText).matches,
   );
 
   useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(query.matches);
+    const query = window.matchMedia(queryText);
+    const update = () => setMatches(query.matches);
     update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
-  }, []);
+  }, [queryText]);
 
-  return reducedMotion;
+  return matches;
+}
+
+export function useReducedMotion() {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
 }
