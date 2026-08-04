@@ -1,5 +1,6 @@
 .runtime-assembly {
-  --assembly-progress: 0;
+  --assembly-progress-width: 0%;
+  --assembly-scale: 0.94;
   position: relative;
   min-height: 205svh;
   background: var(--tk-ink);
@@ -81,7 +82,7 @@
   height: 100%;
   object-fit: contain;
   opacity: 0.86;
-  transform: scale(calc(0.94 + var(--assembly-progress) * 0.06));
+  transform: scale(var(--assembly-scale));
   transition: transform 100ms linear;
 }
 
@@ -124,7 +125,7 @@
 
 .runtime-assembly__signal i {
   display: block;
-  width: calc(var(--assembly-progress) * 100%);
+  width: var(--assembly-progress-width);
   height: 100%;
   background: var(--tk-yellow);
 }
