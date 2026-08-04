@@ -1,87 +1,67 @@
 .tk-models-scene {
-  --tk-models-progress: 0;
   position: relative;
-  min-height: 280svh;
-  background:
-    radial-gradient(circle at 20% 28%, rgba(212, 163, 76, 0.11), transparent 24%),
-    var(--tk-ivory);
-  color: var(--tk-navy);
-  isolation: isolate;
+  background: var(--tk-pale);
+  color: var(--tk-ink);
+  padding-block: clamp(5rem, 10vw, 9rem);
 }
 
 .tk-models-scene::before {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(90deg, transparent 49.94%, rgba(6, 26, 44, 0.07) 50%, transparent 50.06%),
-    linear-gradient(rgba(6, 26, 44, 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 12.5%;
+  background: linear-gradient(90deg, transparent 49.94%, rgb(23 20 11 / 5%) 50%, transparent 50.06%);
   content: "";
   pointer-events: none;
 }
 
-.tk-models-scene__stage {
-  position: sticky;
-  top: 68px;
-  display: grid;
-  min-height: calc(100svh - 68px);
-  grid-template-columns: minmax(20rem, 0.48fr) minmax(30rem, 0.9fr);
-  gap: clamp(2.5rem, 7vw, 8rem);
-  align-items: center;
-  overflow: hidden;
-  padding: clamp(7rem, 12vh, 8.5rem) clamp(1.25rem, 3.8vw, 4.5rem) clamp(3.5rem, 7vh, 5rem);
-}
-
-.tk-models-scene__intro {
+.tk-models-scene > .shell {
   position: relative;
-  z-index: 4;
+  z-index: 1;
 }
 
-.tk-models-scene__intro h2 {
+.tk-models-scene__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.55fr);
+  align-items: end;
+  gap: clamp(2rem, 7vw, 7rem);
+  margin-block: clamp(3rem, 7vw, 6rem);
+}
+
+.tk-models-scene__heading h2 {
   margin: 0;
-  font-size: clamp(3.5rem, 6.6vw, 7.7rem);
-  line-height: 0.82;
-  letter-spacing: -0.055em;
+  font-size: clamp(2.8rem, 5.8vw, 6.2rem);
+  line-height: 0.9;
 }
 
-.tk-models-scene__intro > p:not(.tk-kicker) {
-  max-width: 32rem;
-  margin: 1.6rem 0 2rem;
-  color: rgba(6, 26, 44, 0.66);
-  font-size: 0.8rem;
-  line-height: 1.8;
+.tk-models-scene__heading > div:last-child > p {
+  margin-bottom: 1.5rem;
+  color: rgb(23 20 11 / 64%);
 }
 
 .tk-models-scene__list {
-  position: relative;
-  z-index: 5;
   display: grid;
-  border-top: 1px solid rgba(6, 26, 44, 0.18);
+  border-top: 1px solid rgb(23 20 11 / 18%);
 }
 
 .tk-model-card {
-  --row-shift: calc((var(--model-index) - 1.5) * 1rem);
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) auto auto 1rem;
+  grid-template-columns: 2.2rem minmax(0, 1fr) minmax(170px, auto) 1rem;
   align-items: center;
-  gap: 1.1rem;
-  min-height: 118px;
-  border-bottom: 1px solid rgba(6, 26, 44, 0.18);
-  padding: 1.1rem 0;
-  color: var(--tk-navy);
-  transform: translateX(calc(var(--row-shift) * (1 - var(--tk-models-progress))));
-  transition: background 180ms ease, padding 180ms ease, transform 120ms linear;
+  gap: 1.2rem;
+  border-bottom: 1px solid rgb(23 20 11 / 18%);
+  padding: 1.3rem 0;
+  color: var(--tk-ink);
+  transition: background 160ms ease, padding 160ms ease;
 }
 
 .tk-model-card:hover,
 .tk-model-card:focus-visible {
-  background: rgba(212, 163, 76, 0.1);
+  background: rgb(255 210 4 / 13%);
   padding-inline: 1rem;
   text-decoration: none;
 }
 
 .tk-model-card__number {
-  color: var(--tk-gold-dark, #826000);
+  color: var(--gold-dark);
   font-size: 0.64rem;
 }
 
@@ -90,43 +70,39 @@
   margin: 0;
 }
 
-.tk-model-card > div:first-of-type > p:first-child {
-  color: rgba(6, 26, 44, 0.5);
+.tk-model-card__copy > p:first-child {
+  color: rgb(23 20 11 / 48%);
   font-size: 0.58rem;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .tk-model-card h3 {
-  margin-top: 0.25rem;
-  font-size: clamp(1rem, 1.55vw, 1.5rem);
-  letter-spacing: -0.02em;
+  margin-top: 0.2rem;
+  font-size: clamp(1rem, 1.7vw, 1.55rem);
 }
 
-.tk-model-card > div:first-of-type > p:last-child {
+.tk-model-card__copy > p:last-child {
   max-width: 42rem;
   margin-top: 0.35rem;
-  color: rgba(6, 26, 44, 0.58);
-  font-size: 0.7rem;
-  line-height: 1.55;
-}
-
-.tk-model-card__hardware {
-  color: rgba(6, 26, 44, 0.7);
+  color: rgb(23 20 11 / 60%);
   font-size: 0.72rem;
-  white-space: nowrap;
 }
 
-.tk-model-card .status-badge {
-  color: rgba(6, 26, 44, 0.7);
+.tk-model-card__meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+  color: rgb(23 20 11 / 68%);
+  font-size: 0.68rem;
+  text-align: right;
 }
 
 .tk-model-card > span:last-child {
-  color: var(--tk-gold-dark, #826000);
-  font-size: 1rem;
+  color: var(--gold-dark);
 }
 
 .tk-models-scene .state-box {
-  border-color: rgba(6, 26, 44, 0.16);
-  color: rgba(6, 26, 44, 0.62);
+  border-color: rgb(23 20 11 / 16%);
+  color: rgb(23 20 11 / 62%);
 }
