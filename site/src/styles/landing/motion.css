@@ -1,0 +1,16 @@
+.tk-wheel__core {
+  transform: translate(-50%, -50%) rotate(var(--tk-wheel-counter-turn));
+}
+
+@media (max-width: 920px) {
+  .tk-wheel__spoke > div {
+    transform: rotate(var(--spoke-counter-angle));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-wheel__core,
+  .tk-wheel__spoke > div {
+    transform: translate(-50%, -50%);
+  }
+}
