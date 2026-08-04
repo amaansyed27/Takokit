@@ -5,6 +5,15 @@ import { validateRegistry } from "../src/models/registry.js";
 
 const siteRoot = fileURLToPath(new URL("../", import.meta.url));
 const repoRoot = resolve(siteRoot, "..");
+const landingComponents = [
+  "LandingHero",
+  "ProductCapabilities",
+  "RuntimeAssembly",
+  "WorkflowPinwheel",
+  "ModelLibraryPreview",
+  "RuntimeArchitecture",
+  "FinalCTA",
+];
 const required = [
   "index.html",
   "package.json",
@@ -20,16 +29,22 @@ const required = [
   "src/pages/ModelDetailPage.jsx",
   "src/pages/DocsPage.jsx",
   "src/pages/DownloadPage.jsx",
-  "src/components/landing/CinematicHero.jsx",
-  "src/components/landing/FeatureTaco.jsx",
-  "src/components/landing/CapabilityPinwheel.jsx",
-  "src/components/landing/RecommendedModelsScene.jsx",
-  "src/components/landing/RuntimeFlow.jsx",
+  ...landingComponents.map((name) => `src/components/landing/${name}.jsx`),
   "src/hooks/useScrollProgress.js",
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
   "src/styles/landing/index.css",
+  "src/styles/landing/foundation.css",
+  "src/styles/landing/hero.css",
+  "src/styles/landing/capabilities.css",
+  "src/styles/landing/assembly.css",
+  "src/styles/landing/workflows.css",
+  "src/styles/landing/models.css",
+  "src/styles/landing/architecture.css",
+  "src/styles/landing/closing.css",
+  "src/styles/landing/responsive.css",
+  "src/styles/landing/motion.css",
 ];
 const rootAssets = [
   "assets/svg-transparent/512.svg",
@@ -66,16 +81,28 @@ const app = await readFile(resolve(siteRoot, "src/app/App.jsx"), "utf8");
 for (const page of ["HomePage", "ModelsPage", "ModelDetailPage", "DocsPage", "DownloadPage"]) {
   if (!app.includes(page)) throw new Error(`app router is missing ${page}`);
 }
+if (!app.includes("site--landing-home")) throw new Error("landing-specific site shell is missing");
 
 const home = await readFile(resolve(siteRoot, "src/pages/HomePage.jsx"), "utf8");
-for (const scene of [
-  "CinematicHero",
-  "FeatureTaco",
-  "CapabilityPinwheel",
-  "RecommendedModelsScene",
-  "RuntimeFlow",
+for (const component of landingComponents) {
+  if (!home.includes(component)) throw new Error(`landing homepage is missing ${component}`);
+}
+if (!home.includes("takokit-landing")) throw new Error("landing page root class is missing");
+
+const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
+for (const stylesheet of [
+  "foundation.css",
+  "hero.css",
+  "capabilities.css",
+  "assembly.css",
+  "workflows.css",
+  "models.css",
+  "architecture.css",
+  "closing.css",
+  "responsive.css",
+  "motion.css",
 ]) {
-  if (!home.includes(scene)) throw new Error(`cinematic homepage is missing ${scene}`);
+  if (!landingIndex.includes(stylesheet)) throw new Error(`landing styles are missing ${stylesheet}`);
 }
 
 const sourceEntries = await readdir(resolve(siteRoot, "src"), { recursive: true });
