@@ -1,0 +1,210 @@
+.runtime-assembly {
+  --assembly-progress: 0;
+  position: relative;
+  min-height: 250svh;
+  background: var(--tk-ink);
+  color: var(--tk-paper);
+}
+
+.runtime-assembly__stage {
+  position: sticky;
+  top: 64px;
+  display: grid;
+  min-height: calc(100svh - 64px);
+  grid-template-columns: minmax(280px, 0.8fr) minmax(340px, 1fr);
+  grid-template-rows: 1fr auto;
+  align-items: center;
+  gap: clamp(2rem, 7vw, 7rem);
+  padding-block: clamp(3rem, 6vh, 5rem);
+}
+
+.runtime-assembly__copy {
+  min-width: 0;
+}
+
+.runtime-assembly__copy h2 {
+  max-width: 620px;
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 5.6rem);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+
+.runtime-assembly__summary {
+  max-width: 580px;
+  margin: 1rem 0 1.5rem;
+  color: rgb(255 253 244 / 62%);
+  font-size: 0.92rem;
+}
+
+.runtime-assembly__active {
+  max-width: 610px;
+  min-height: 190px;
+  border-top: 1px solid var(--tk-line-light);
+  padding-top: 1.15rem;
+}
+
+.runtime-assembly__active > span,
+.runtime-assembly__active > strong {
+  color: var(--tk-cream);
+  font-family: var(--font-technical);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+
+.runtime-assembly__active h3 {
+  margin: 0.3rem 0 0.4rem;
+  font-size: clamp(1.4rem, 2.5vw, 2.4rem);
+}
+
+.runtime-assembly__active p {
+  max-width: 580px;
+  margin: 0.65rem 0 0;
+  color: rgb(255 253 244 / 62%);
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+.runtime-assembly__copy > .landing-text-link {
+  margin-top: 1rem;
+}
+
+.runtime-assembly__visual {
+  position: relative;
+  display: grid;
+  width: min(44vw, 540px);
+  aspect-ratio: 1;
+  place-items: center;
+  justify-self: center;
+}
+
+.runtime-assembly__outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.17;
+  filter: grayscale(1) brightness(2.6);
+}
+
+.runtime-assembly__mask {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: url("/brand/takokit-mark.svg") center / contain no-repeat;
+  mask: url("/brand/takokit-mark.svg") center / contain no-repeat;
+  background: rgb(255 253 244 / 5%);
+}
+
+.runtime-layer {
+  position: absolute;
+  right: 8%;
+  left: 8%;
+  display: grid;
+  height: 10.5%;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-top: 1px solid rgb(23 20 11 / 18%);
+  border-bottom: 1px solid rgb(255 253 244 / 18%);
+  padding-inline: 0.8rem;
+  background: color-mix(in srgb, var(--tk-yellow) 18%, var(--tk-ink));
+  opacity: 0;
+  transform: translateY(calc(-150% - var(--layer-index) * 12%));
+  transition: opacity 300ms ease, transform 620ms cubic-bezier(0.22, 1, 0.36, 1), background 220ms ease;
+}
+
+.runtime-layer:nth-child(1) { top: 20%; }
+.runtime-layer:nth-child(2) { top: 31%; }
+.runtime-layer:nth-child(3) { top: 42%; }
+.runtime-layer:nth-child(4) { top: 53%; }
+.runtime-layer:nth-child(5) { top: 64%; }
+.runtime-layer:nth-child(6) { top: 75%; }
+
+.runtime-layer.is-visible {
+  opacity: 0.78;
+  transform: translateY(0);
+}
+
+.runtime-layer.is-active {
+  z-index: 2;
+  background: var(--tk-yellow);
+  color: var(--tk-ink);
+  opacity: 1;
+}
+
+.runtime-layer i {
+  width: min(70%, 280px);
+  height: 2px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.runtime-layer b {
+  font-family: var(--font-technical);
+  font-size: 0.62rem;
+}
+
+.runtime-assembly__connector {
+  position: absolute;
+  right: 0;
+  bottom: 9%;
+  left: 0;
+  height: 1px;
+  background: rgb(255 253 244 / 14%);
+}
+
+.runtime-assembly__connector i {
+  display: block;
+  width: calc(var(--assembly-progress) * 100%);
+  height: 100%;
+  background: var(--tk-yellow);
+}
+
+.runtime-assembly__steps {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--tk-line-light);
+  list-style: none;
+}
+
+.runtime-assembly__steps button {
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  border-right: 1px solid var(--tk-line-light);
+  padding: 0.65rem 0.7rem;
+  background: transparent;
+  color: rgb(255 253 244 / 42%);
+  cursor: pointer;
+  text-align: left;
+}
+
+.runtime-assembly__steps li:last-child button {
+  border-right: 0;
+}
+
+.runtime-assembly__steps button span {
+  color: var(--tk-cream);
+  font-family: var(--font-technical);
+  font-size: 0.58rem;
+}
+
+.runtime-assembly__steps button strong {
+  font-size: 0.74rem;
+}
+
+.runtime-assembly__steps button.is-active {
+  background: var(--tk-yellow);
+  color: var(--tk-ink);
+}
+
+.runtime-assembly__steps button.is-active span {
+  color: var(--tk-ink);
+}
