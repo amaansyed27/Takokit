@@ -24,20 +24,21 @@ test("homepage uses the simplified Takokit landing flow", async () => {
   assert.match(home, /className="takokit-landing"/);
 });
 
-test("hero keeps a restrained cinematic scroll treatment", async () => {
+test("hero keeps motion lightweight and preserves installation", async () => {
   const hero = await source("src/components/landing/LandingHero.jsx");
-  assert.match(hero, /useScrollProgress/);
-  assert.match(hero, /--hero-progress/);
+  assert.doesNotMatch(hero, /useScrollProgress/);
+  assert.match(hero, /landing-hero__wave/);
   assert.match(hero, /PlatformInstall/);
   assert.match(hero, /Run open voice models locally/);
 });
 
-test("runtime assembly describes real Takokit layers", async () => {
+test("runtime assembly describes real Takokit layers without per-frame scroll state", async () => {
   const assembly = await source("src/components/landing/RuntimeAssembly.jsx");
   for (const capability of ["Models", "Runners", "Adapters", "Interfaces", "Local state", "Consent"]) {
     assert.ok(assembly.includes(capability), `missing ${capability}`);
   }
-  assert.match(assembly, /useScrollProgress/);
+  assert.match(assembly, /IntersectionObserver/);
+  assert.doesNotMatch(assembly, /useScrollProgress/);
   assert.match(assembly, /\/brand\/takokit-mark\.svg/);
 });
 
@@ -53,14 +54,16 @@ test("landing uses Dawnlight fonts with the Takokit palette", async () => {
   assert.match(html, /family=Orbitron/);
   assert.match(html, /family=Space\+Mono/);
   assert.match(foundation, /#ffd204/i);
+  assert.match(foundation, /#eeebe3/i);
   assert.doesNotMatch(foundation, /#061a2c/i);
   assert.match(vite, /takokit-root-brand-assets/);
   assert.match(vite, /assets\/svg-transparent\/512\.svg/);
 });
 
-test("responsive landing removes pinned layouts on compact screens", async () => {
+test("responsive landing adapts the sticky story for compact screens", async () => {
   const responsive = await source("src/styles/landing/responsive.css");
   assert.match(responsive, /max-width: 900px/);
+  assert.match(responsive, /runtime-assembly__intro/);
   assert.match(responsive, /position: relative/);
   assert.match(responsive, /max-width: 700px/);
   assert.match(responsive, /max-width: 390px/);
