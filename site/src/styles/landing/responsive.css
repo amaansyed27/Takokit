@@ -1,32 +1,10 @@
-@media (max-width: 1120px) {
-  .landing-hero__stage {
-    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.7fr);
-    gap: 2rem;
-  }
-
-  .landing-hero__mark {
-    width: min(36vw, 420px);
-  }
-
-  .runtime-assembly__visual,
-  .workflow-pinwheel__wheel {
-    width: min(40vw, 440px);
-  }
-
-  .workflow-pinwheel__item {
-    transform: translate(-50%, -50%) rotate(var(--item-angle)) translateY(-11rem);
-  }
-
-  .model-preview__row {
-    grid-template-columns: 2rem minmax(220px, 1fr) minmax(140px, auto) 1rem;
-  }
-
-  .model-preview__row code {
-    display: none;
+@media (min-width: 1500px) {
+  .landing-shell {
+    width: min(calc(100% - 4rem), 1160px);
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
   .landing-hero {
     min-height: 0;
   }
@@ -35,23 +13,10 @@
     position: relative;
     top: 0;
     min-height: auto;
-    grid-template-columns: 1fr;
-    padding-block: 5rem 4rem;
-  }
-
-  .landing-hero__copy {
-    max-width: 780px;
-  }
-
-  .landing-hero__visual {
-    margin-top: 1.5rem;
+    padding-block: 4.5rem 4rem;
   }
 
   .landing-hero__mark {
-    width: min(62vw, 420px);
-  }
-
-  .landing-hero__piece {
     transform: none;
   }
 
@@ -59,110 +24,83 @@
     display: none;
   }
 
-  .capability-strip__inner {
-    grid-template-columns: 1fr;
-  }
-
-  .capability-strip__line {
-    display: none;
-  }
-
-  .runtime-assembly,
-  .workflow-pinwheel {
+  .runtime-assembly {
     min-height: 0;
   }
 
-  .runtime-assembly__stage,
-  .workflow-pinwheel__stage {
+  .runtime-assembly__stage {
     position: relative;
     top: 0;
-    min-height: 0;
+    min-height: auto;
     grid-template-columns: 1fr;
     grid-template-rows: auto;
     padding-block: 5rem;
   }
 
-  .runtime-assembly__visual,
-  .workflow-pinwheel__wheel {
-    width: min(72vw, 470px);
+  .runtime-assembly__copy {
+    max-width: 680px;
   }
 
-  .runtime-assembly__steps,
-  .workflow-pinwheel__tabs {
+  .runtime-assembly__visual {
+    width: min(68vw, 420px);
+  }
+
+  .runtime-assembly__steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .runtime-assembly__steps button,
-  .workflow-pinwheel__tabs button {
+  .runtime-assembly__steps button {
     border-bottom: 1px solid var(--tk-line-light);
   }
 
-  .workflow-pinwheel__visual {
-    order: 2;
+  .model-preview__row {
+    grid-template-columns: minmax(200px, 1fr) minmax(170px, auto) 1rem;
   }
 
-  .workflow-pinwheel__copy {
-    order: 1;
-    max-width: 650px;
-  }
-
-  .workflow-pinwheel__tabs {
-    order: 3;
-  }
-
-  .workflow-pinwheel__item {
-    transform: translate(-50%, -50%) rotate(var(--item-angle)) translateY(-10.6rem);
-  }
-
-  .model-preview__header {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .runtime-architecture__nodes {
-    grid-template-columns: 1fr;
-  }
-
-  .runtime-architecture__nodes li {
-    display: grid;
-    grid-template-columns: 2rem 1fr;
-    border-right: 1px solid var(--tk-line);
-    border-bottom: 0;
-  }
-
-  .runtime-architecture__nodes li:last-child {
-    border-bottom: 1px solid var(--tk-line);
-  }
-
-  .runtime-architecture__nodes strong {
-    margin-top: 0;
-  }
-
-  .runtime-architecture__nodes li > i,
-  .runtime-architecture__signal {
+  .model-preview__facts {
     display: none;
   }
 
-  .landing-closing__cta {
-    grid-template-columns: minmax(220px, 0.45fr) minmax(0, 1fr);
+  .runtime-architecture__nodes {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .runtime-architecture__nodes li:nth-child(2) {
+    border-right: 0;
+  }
+
+  .runtime-architecture__nodes li:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--tk-line);
+  }
+
+  .runtime-architecture__nodes li > i {
+    display: none;
   }
 }
 
 @media (max-width: 700px) {
   .landing-shell {
-    width: min(calc(100% - 1.5rem), 1240px);
+    width: min(calc(100% - 1.5rem), 1080px);
   }
 
   .site--landing-home .site-nav {
-    background: var(--tk-ink);
+    background: var(--tk-paper);
   }
 
   .landing-hero__stage {
     padding-block: 3.5rem 3rem;
   }
 
+  .landing-hero__mark {
+    width: 82px;
+  }
+
+  .landing-hero__wave {
+    width: min(82vw, 420px);
+  }
+
   .landing-hero h1 {
-    font-size: clamp(2.7rem, 13vw, 4.4rem);
+    font-size: clamp(2.45rem, 12vw, 4rem);
   }
 
   .landing-hero .platform-install-head {
@@ -183,12 +121,9 @@
   }
 
   .landing-hero .command-bar button {
-    border-top: 1px solid rgb(255 253 244 / 22%);
+    min-height: 40px;
+    border-top: 1px solid var(--tk-line);
     border-left: 0;
-  }
-
-  .landing-hero__mark {
-    width: min(78vw, 340px);
   }
 
   .landing-actions {
@@ -200,7 +135,10 @@
     width: 100%;
   }
 
-  .capability-strip__inner {
+  .capability-strip__inner,
+  .model-preview__inner,
+  .runtime-architecture__inner,
+  .landing-closing > .landing-shell {
     padding-block: 4rem;
   }
 
@@ -208,110 +146,116 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .capability-strip li {
-    min-height: 86px;
-    border-top: 1px solid var(--tk-line);
+  .capability-strip li:nth-child(2) {
+    border-right: 0;
   }
 
-  .runtime-assembly__stage,
-  .workflow-pinwheel__stage {
+  .capability-strip li:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--tk-line);
+  }
+
+  .runtime-assembly__stage {
     padding-block: 4rem;
   }
 
   .runtime-assembly__copy h2,
-  .workflow-pinwheel__copy h2,
   .model-preview__header h2,
   .runtime-architecture h2,
   .landing-closing__cta h2 {
-    font-size: clamp(2.4rem, 12vw, 4rem);
-  }
-
-  .runtime-assembly__active {
-    min-height: 230px;
+    font-size: clamp(2.1rem, 10.5vw, 3.5rem);
   }
 
   .runtime-assembly__visual {
-    width: min(88vw, 390px);
+    width: min(88vw, 360px);
   }
 
-  .runtime-layer b {
-    font-size: 0.54rem;
+  .runtime-assembly__active {
+    min-height: 165px;
   }
 
-  .runtime-assembly__steps,
-  .workflow-pinwheel__tabs {
+  .runtime-assembly__steps {
     grid-template-columns: 1fr 1fr;
   }
 
-  .workflow-pinwheel__visual {
-    display: none;
-  }
-
-  .workflow-pinwheel__copy {
-    min-height: 370px;
-  }
-
-  .model-preview__inner,
-  .runtime-architecture__inner {
-    padding-block: 4.5rem;
+  .model-preview__header {
+    align-items: start;
+    flex-direction: column;
   }
 
   .model-preview__row {
-    grid-template-columns: 1.7rem minmax(0, 1fr) 1rem;
-    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) 1rem;
+    gap: 0.7rem;
   }
 
-  .model-preview__facts,
-  .model-preview__row code {
+  .model-preview__row code,
+  .model-preview__facts {
     display: none;
+  }
+
+  .runtime-architecture__nodes {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-architecture__nodes li,
+  .runtime-architecture__nodes li:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--tk-line);
+  }
+
+  .runtime-architecture__nodes li:last-child {
+    border-bottom: 0;
   }
 
   .landing-closing__steps {
     grid-template-columns: 1fr;
-    margin-bottom: 5rem;
+    margin-bottom: 4rem;
   }
 
-  .landing-closing__steps li,
-  .landing-closing__steps li + li {
+  .landing-closing__steps li {
     border-right: 0;
-    border-bottom: 1px solid var(--tk-line-light);
-    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--tk-line);
+  }
+
+  .landing-closing__steps li:last-child {
+    border-bottom: 0;
   }
 
   .landing-closing__cta {
-    min-height: 0;
     grid-template-columns: 1fr;
+    padding: 2rem 1.25rem;
   }
 
   .landing-closing__cta > img {
-    width: min(68vw, 300px);
+    width: 72px;
   }
 
   .landing-closing__cta .landing-text-link {
-    margin: 0.5rem 0 0;
+    margin: 0.35rem 0 0;
   }
 }
 
 @media (max-width: 390px) {
   .landing-hero h1 {
-    font-size: clamp(2.45rem, 12.8vw, 3.6rem);
+    font-size: clamp(2.2rem, 11.8vw, 3.2rem);
   }
 
   .capability-strip ul,
-  .runtime-assembly__steps,
-  .workflow-pinwheel__tabs {
+  .runtime-assembly__steps {
     grid-template-columns: 1fr;
   }
 
-  .runtime-assembly__visual {
-    width: min(92vw, 330px);
+  .capability-strip li,
+  .capability-strip li:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--tk-line);
   }
 
-  .runtime-layer {
-    padding-inline: 0.45rem;
+  .capability-strip li:last-child {
+    border-bottom: 0;
   }
 
-  .runtime-layer i {
-    width: 58%;
+  .runtime-assembly__ingredient {
+    width: 78%;
+    padding-inline: 0.7rem;
   }
 }
