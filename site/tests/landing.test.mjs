@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("homepage uses the cinematic Takokit journey", async () => {
+test("homepage uses the focused Takokit cinematic journey", async () => {
   const home = await source("src/pages/HomePage.jsx");
   for (const component of [
     "CinematicHero",
@@ -34,6 +34,7 @@ test("feature taco describes real Takokit capabilities", async () => {
   ]) {
     assert.ok(featureTaco.includes(capability), `missing ${capability}`);
   }
+  assert.match(featureTaco, /\/brand\/takokit-mark\.svg/);
 });
 
 test("workflow pinwheel retains valid public CLI commands", async () => {
@@ -43,12 +44,19 @@ test("workflow pinwheel retains valid public CLI commands", async () => {
   assert.match(pinwheel, /tako clone/);
   assert.match(pinwheel, /--consent/);
   assert.match(pinwheel, /tako convert/);
+  assert.match(pinwheel, /--tk-wheel-counter-turn/);
 });
 
-test("landing styles and Dawnlight typography are loaded", async () => {
+test("landing uses Dawnlight fonts with the Takokit palette", async () => {
   const styles = await source("src/styles/index.css");
+  const foundation = await source("src/styles/landing/foundation.css");
   const html = await source("index.html");
+  const vite = await source("vite.config.js");
   assert.match(styles, /landing\/index\.css/);
   assert.match(html, /family=Orbitron/);
   assert.match(html, /family=Space\+Mono/);
+  assert.match(foundation, /#ffd204/i);
+  assert.doesNotMatch(foundation, /#061a2c/i);
+  assert.match(vite, /takokit-root-brand-assets/);
+  assert.match(vite, /assets\/svg-transparent\/512\.svg/);
 });
