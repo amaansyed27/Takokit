@@ -1,15 +1,28 @@
 @media (prefers-reduced-motion: reduce) {
-  .landing-hero__signal i,
-  .capability-strip__line i,
+  .landing-hero__wave i,
+  .capability-strip__signal i,
   .runtime-architecture__signal i {
     animation: none;
   }
 
-  .landing-hero__piece,
-  .runtime-layer,
-  .workflow-pinwheel__wheel,
-  .workflow-pinwheel__item > div,
-  .workflow-pinwheel__core {
+  .landing-hero,
+  .runtime-assembly {
+    min-height: 0;
+  }
+
+  .landing-hero__stage,
+  .runtime-assembly__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .landing-hero__mark,
+  .runtime-assembly__visual > img,
+  .capability-strip li,
+  .model-preview__row,
+  .landing-button {
     transition: none;
+    transform: none;
   }
 }
