@@ -32,6 +32,15 @@ test("hero keeps motion lightweight and preserves installation", async () => {
   assert.match(hero, /Run open voice models locally/);
 });
 
+test("capability section reveals workflows on viewport entry", async () => {
+  const capabilities = await source("src/components/landing/ProductCapabilities.jsx");
+  assert.match(capabilities, /IntersectionObserver/);
+  assert.match(capabilities, /is-visible/);
+  for (const capability of ["Speak", "Transcribe", "Clone", "Convert"]) {
+    assert.ok(capabilities.includes(capability), `missing ${capability}`);
+  }
+});
+
 test("runtime assembly describes real Takokit layers without per-frame scroll state", async () => {
   const assembly = await source("src/components/landing/RuntimeAssembly.jsx");
   for (const capability of ["Models", "Runners", "Adapters", "Interfaces", "Local state", "Consent"]) {
@@ -39,6 +48,7 @@ test("runtime assembly describes real Takokit layers without per-frame scroll st
   }
   assert.match(assembly, /IntersectionObserver/);
   assert.doesNotMatch(assembly, /useScrollProgress/);
+  assert.match(assembly, /runtime-assembly__ingredient/);
   assert.match(assembly, /\/brand\/takokit-mark\.svg/);
 });
 
