@@ -1,8 +1,10 @@
-import { CapabilityPinwheel } from "../components/landing/CapabilityPinwheel";
-import { CinematicHero } from "../components/landing/CinematicHero";
-import { FeatureTaco } from "../components/landing/FeatureTaco";
-import { RecommendedModelsScene } from "../components/landing/RecommendedModelsScene";
-import { RuntimeFlow } from "../components/landing/RuntimeFlow";
+import { FinalCTA } from "../components/landing/FinalCTA";
+import { LandingHero } from "../components/landing/LandingHero";
+import { ModelLibraryPreview } from "../components/landing/ModelLibraryPreview";
+import { ProductCapabilities } from "../components/landing/ProductCapabilities";
+import { RuntimeArchitecture } from "../components/landing/RuntimeArchitecture";
+import { RuntimeAssembly } from "../components/landing/RuntimeAssembly";
+import { WorkflowPinwheel } from "../components/landing/WorkflowPinwheel";
 import { useRegistry } from "../hooks/useRegistry";
 import { RECOMMENDED_REFS } from "../models/presentation";
 import { resolveModel, resolveRelease } from "../models/registry";
@@ -39,17 +41,14 @@ export function HomePage() {
   const models = status === "ready" ? recommendedModels(registry) : [];
 
   return (
-    <main className="takokit-cinematic">
-      <CinematicHero />
-      <FeatureTaco />
-      <CapabilityPinwheel />
-      <RecommendedModelsScene
-        error={error}
-        models={models}
-        retry={retry}
-        status={status}
-      />
-      <RuntimeFlow />
+    <main className="takokit-landing">
+      <LandingHero />
+      <ProductCapabilities />
+      <RuntimeAssembly />
+      <WorkflowPinwheel />
+      <ModelLibraryPreview error={error} models={models} retry={retry} status={status} />
+      <RuntimeArchitecture />
+      <FinalCTA />
     </main>
   );
 }
