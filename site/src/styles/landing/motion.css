@@ -1,19 +1,15 @@
-.tk-wheel__core {
-  transform: translate(-50%, -50%) rotate(var(--tk-wheel-counter-turn));
-}
-
-@media (max-width: 920px) {
-  .tk-wheel__spoke > div {
-    transform: rotate(var(--spoke-counter-angle));
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .tk-wheel__core {
-    transform: translate(-50%, -50%);
+  .landing-hero__signal i,
+  .capability-strip__line i,
+  .runtime-architecture__signal i {
+    animation: none;
   }
 
-  .tk-wheel__spoke > div {
-    transform: rotate(var(--spoke-counter-angle));
+  .landing-hero__piece,
+  .runtime-layer,
+  .workflow-pinwheel__wheel,
+  .workflow-pinwheel__item > div,
+  .workflow-pinwheel__core {
+    transition: none;
   }
 }
