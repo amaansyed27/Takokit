@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RouteLink } from "../../app/router";
-import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
+import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 const FEATURES = [
   {
@@ -43,6 +43,8 @@ const FEATURES = [
 
 export function FeatureTaco() {
   const reducedMotion = useReducedMotion();
+  const narrowLayout = useMediaQuery("(max-width: 900px)");
+  const staticLayout = reducedMotion || narrowLayout;
   const [activeIndex, setActiveIndex] = useState(0);
   const sectionRef = useScrollProgress((progress, section) => {
     const bounded = Math.min(0.9999, Math.max(0, progress));
@@ -50,10 +52,10 @@ export function FeatureTaco() {
     setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
     section.style.setProperty("--tk-taco-progress", bounded.toFixed(4));
     section.style.setProperty("--tk-taco-turn", `${(-8 + bounded * 16).toFixed(2)}deg`);
-  }, reducedMotion);
+  }, staticLayout);
 
   function handlePointerMove(event) {
-    if (reducedMotion) return;
+    if (staticLayout) return;
     const visual = sectionRef.current?.querySelector(".tk-taco__visual");
     if (!visual) return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -71,7 +73,7 @@ export function FeatureTaco() {
 
   return (
     <section
-      className={`tk-taco ${reducedMotion ? "is-static" : ""}`}
+      className={`tk-taco ${staticLayout ? "is-static" : ""}`}
       id="features"
       ref={sectionRef}
       onPointerMove={handlePointerMove}
@@ -133,7 +135,7 @@ export function FeatureTaco() {
         </ol>
 
         <div className="tk-taco__progress" aria-hidden="true">
-          <span style={{ transform: `scaleX(${reducedMotion ? 1 : (activeIndex + 1) / FEATURES.length})` }} />
+          <span style={{ transform: `scaleX(${staticLayout ? 1 : (activeIndex + 1) / FEATURES.length})` }} />
         </div>
       </div>
     </section>
