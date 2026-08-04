@@ -25,8 +25,8 @@ export function RuntimeAssembly() {
 
       if (visible) setActiveIndex(Number(visible.target.dataset.index));
     }, {
-      rootMargin: "-32% 0px -42% 0px",
-      threshold: [0.15, 0.35, 0.65],
+      rootMargin: "-30% 0px -40% 0px",
+      threshold: [0.2, 0.45, 0.7],
     });
 
     cards.forEach((card) => observer.observe(card));
@@ -40,26 +40,26 @@ export function RuntimeAssembly() {
       <div className="runtime-assembly__layout landing-shell">
         <div className="runtime-assembly__intro">
           <p className="landing-kicker">Inside Takokit</p>
-          <h2 id="runtime-assembly-title">The runtime is the shell.</h2>
+          <h2 id="runtime-assembly-title">One shell for the whole voice stack.</h2>
           <p className="runtime-assembly__summary">
             Models, runners, interfaces, and local state come together as one inspectable system.
           </p>
 
-          <div className="runtime-assembly__visual" aria-label="Takokit features assembling inside the abstract logo">
-            <img src="/brand/takokit-mark.svg" alt="" />
-            <div className="runtime-assembly__layers" aria-hidden="true">
-              {FEATURES.map(([title], index) => (
-                <span
-                  className={`${index <= activeIndex ? "is-visible" : ""} ${index === activeIndex ? "is-active" : ""}`}
-                  key={title}
-                >
-                  {title}
-                </span>
-              ))}
-            </div>
-            <div className="runtime-assembly__active-label" aria-hidden="true">
+          <div className="runtime-assembly__visual" aria-label="Takokit runtime features entering the abstract logo shell">
+            <div className="runtime-assembly__ingredient" key={activeTitle} aria-hidden="true">
               <span>{String(activeIndex + 1).padStart(2, "0")}</span>
               <strong>{activeTitle}</strong>
+            </div>
+
+            <img src="/brand/takokit-mark.svg" alt="" />
+
+            <div className="runtime-assembly__progress" aria-hidden="true">
+              {FEATURES.map(([title], index) => (
+                <i
+                  className={`${index <= activeIndex ? "is-complete" : ""} ${index === activeIndex ? "is-active" : ""}`}
+                  key={title}
+                />
+              ))}
             </div>
           </div>
 
