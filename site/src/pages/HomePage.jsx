@@ -1,6 +1,7 @@
 import { RouteLink } from "../app/router";
 import { CommandBar } from "../components/CommandBar";
 import { HardwareSummary } from "../components/HardwareSummary";
+import { PlatformInstall } from "../components/PlatformInstall";
 import { ErrorState, LoadingState } from "../components/States";
 import { VerificationBadge } from "../components/VerificationBadge";
 import { useRegistry } from "../hooks/useRegistry";
@@ -53,9 +54,13 @@ export function HomePage() {
             Generate speech, transcribe audio, clone consented voices, and convert recordings
             through one local Rust-first runtime.
           </p>
-          <CommandBar>tako pull kokoro</CommandBar>
+          <PlatformInstall heading="Install for your machine" />
+          <div className="hero-quickstart">
+            <span>Already installed?</span>
+            <CommandBar compact>tako pull kokoro</CommandBar>
+          </div>
           <div className="hero-actions">
-            <RouteLink href="/download" className="button button-primary">Download for Windows</RouteLink>
+            <RouteLink href="/download" className="button button-primary">Installation details</RouteLink>
             <RouteLink href="/models" className="button button-secondary">Browse models</RouteLink>
           </div>
         </div>
