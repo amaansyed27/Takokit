@@ -20,9 +20,16 @@ const required = [
   "src/pages/ModelDetailPage.jsx",
   "src/pages/DocsPage.jsx",
   "src/pages/DownloadPage.jsx",
+  "src/components/landing/CinematicHero.jsx",
+  "src/components/landing/FeatureTaco.jsx",
+  "src/components/landing/CapabilityPinwheel.jsx",
+  "src/components/landing/RecommendedModelsScene.jsx",
+  "src/components/landing/RuntimeFlow.jsx",
+  "src/hooks/useScrollProgress.js",
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
+  "src/styles/landing/index.css",
   "public/brand/takokit-mark.svg",
   "public/brand/takokit-lockup.svg"
 ];
@@ -48,6 +55,18 @@ const app = await readFile(resolve(siteRoot, "src/app/App.jsx"), "utf8");
 for (const page of ["HomePage", "ModelsPage", "ModelDetailPage", "DocsPage", "DownloadPage"]) {
   if (!app.includes(page)) throw new Error(`app router is missing ${page}`);
 }
+
+const home = await readFile(resolve(siteRoot, "src/pages/HomePage.jsx"), "utf8");
+for (const scene of [
+  "CinematicHero",
+  "FeatureTaco",
+  "CapabilityPinwheel",
+  "RecommendedModelsScene",
+  "RuntimeFlow",
+]) {
+  if (!home.includes(scene)) throw new Error(`cinematic homepage is missing ${scene}`);
+}
+
 const sourceEntries = await readdir(resolve(siteRoot, "src"), { recursive: true });
 if (sourceEntries.some((path) => String(path).includes("assets/base.css"))) {
   throw new Error("obsolete static site source remains referenced");
