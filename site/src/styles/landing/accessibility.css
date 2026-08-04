@@ -1,0 +1,76 @@
+@media (prefers-reduced-motion: reduce) {
+  .tk-hero,
+  .tk-taco,
+  .tk-wheel,
+  .tk-models-scene,
+  .tk-flow {
+    height: auto;
+    min-height: 0;
+  }
+
+  .tk-hero__stage,
+  .tk-taco__stage,
+  .tk-wheel__stage,
+  .tk-models-scene__stage,
+  .tk-flow__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .tk-hero__copy {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+
+  .tk-hero__disc {
+    opacity: 1;
+    transform: none;
+  }
+
+  .tk-hero__scroll,
+  .tk-taco__progress,
+  .tk-wheel__rail {
+    display: none;
+  }
+
+  .tk-taco.is-static .tk-ingredient,
+  .tk-taco.is-static .tk-ingredient.is-added {
+    opacity: 0.92;
+    transform:
+      translate3d(-50%, calc(14.5rem - var(--ingredient-index) * 1.55rem), calc(var(--ingredient-index) * 18px))
+      rotate(calc((var(--ingredient-index) - 2.5) * 4deg))
+      scale(1);
+  }
+
+  .tk-taco.is-static .tk-taco__feature-list li {
+    color: var(--tk-ivory);
+    transform: none;
+  }
+
+  .tk-taco.is-static .tk-taco__feature-list p:last-child {
+    max-height: 8rem;
+    margin-top: 0.5rem;
+    opacity: 1;
+  }
+
+  .tk-wheel__rotor {
+    transform: rotate(-18deg);
+  }
+
+  .tk-wheel__spoke {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--spoke-angle))
+      translateY(-17rem)
+      rotate(calc(var(--spoke-counter-angle) + 18deg));
+  }
+
+  .tk-wheel__core {
+    transform: translate(-50%, -50%) rotate(18deg);
+  }
+
+  .tk-model-card {
+    transform: none;
+  }
+}
