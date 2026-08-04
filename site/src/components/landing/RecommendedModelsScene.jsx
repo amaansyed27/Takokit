@@ -2,17 +2,19 @@ import { RouteLink } from "../../app/router";
 import { HardwareSummary } from "../HardwareSummary";
 import { ErrorState, LoadingState } from "../States";
 import { VerificationBadge } from "../VerificationBadge";
-import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
+import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 export function RecommendedModelsScene({ models, status, error, retry }) {
   const reducedMotion = useReducedMotion();
+  const narrowLayout = useMediaQuery("(max-width: 900px)");
+  const staticLayout = reducedMotion || narrowLayout;
   const sectionRef = useScrollProgress((progress, section) => {
     section.style.setProperty("--tk-models-progress", progress.toFixed(4));
-  }, reducedMotion);
+  }, staticLayout);
 
   return (
     <section
-      className={`tk-models-scene ${reducedMotion ? "is-static" : ""}`}
+      className={`tk-models-scene ${staticLayout ? "is-static" : ""}`}
       ref={sectionRef}
       aria-labelledby="tk-models-title"
     >
