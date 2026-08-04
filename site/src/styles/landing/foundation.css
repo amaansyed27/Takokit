@@ -1,58 +1,105 @@
-.site--cinematic-home {
-  background: var(--paper);
+.site--landing-home {
+  --tk-yellow: #ffd204;
+  --tk-yellow-deep: #fdbd03;
+  --tk-cream: #fde57e;
+  --tk-paper: #fffdf4;
+  --tk-paper-soft: #f7f3e7;
+  --tk-ink: #17140b;
+  --tk-ink-soft: #302b1d;
+  --tk-muted: #756f60;
+  --tk-line: rgb(23 20 11 / 15%);
+  --tk-line-light: rgb(255 253 244 / 18%);
+  --font-display: "Orbitron", var(--font-body);
+  --font-technical: "Space Mono", var(--font-mono);
+  background: var(--tk-paper);
 }
 
-.takokit-cinematic {
-  --tk-yellow: #ffd204;
-  --tk-amber: #fdbd03;
-  --tk-cream: #fde57e;
-  --tk-pale: #fff8d8;
-  --tk-paper: #fffdf4;
-  --tk-ink: #17140b;
-  --tk-ink-soft: #3e3827;
+.site--landing-home .site-header {
+  min-height: 64px;
+  border-bottom-color: rgb(255 253 244 / 12%);
+  background: rgb(23 20 11 / 82%);
+  color: var(--tk-paper);
+  backdrop-filter: blur(18px);
+}
+
+.site--landing-home .header-inner {
+  min-height: 64px;
+}
+
+.site--landing-home .site-nav a {
+  color: rgb(255 253 244 / 72%);
+  font-family: var(--font-technical);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.site--landing-home .site-nav a:hover,
+.site--landing-home .site-nav a.is-active {
+  border-color: var(--tk-yellow);
+  color: var(--tk-paper);
+}
+
+.site--landing-home .menu-button {
+  border-color: rgb(255 253 244 / 36%);
+  color: var(--tk-paper);
+}
+
+.site--landing-home .site-footer {
+  border-top-color: rgb(255 253 244 / 12%);
+  background: var(--tk-ink);
+  color: var(--tk-paper);
+}
+
+.site--landing-home .footer-grid a,
+.site--landing-home .footer-grid p {
+  color: rgb(255 253 244 / 68%);
+}
+
+.site--landing-home .footer-grid span {
+  color: var(--tk-cream);
+}
+
+.takokit-landing {
   overflow: clip;
   background: var(--tk-paper);
   color: var(--tk-ink);
-  font-family: var(--font-body);
 }
 
-.takokit-cinematic h1,
-.takokit-cinematic h2,
-.takokit-cinematic h3 {
+.takokit-landing h1,
+.takokit-landing h2,
+.takokit-landing h3 {
   font-family: var(--font-display);
   font-weight: 600;
-  text-transform: uppercase;
+  text-wrap: balance;
 }
 
-.tk-kicker {
-  margin: 0 0 0.85rem;
-  color: var(--gold-dark);
-  font-size: 0.64rem;
+.takokit-landing p {
+  text-wrap: pretty;
+}
+
+.landing-shell {
+  width: min(calc(100% - 3rem), 1240px);
+  margin-inline: auto;
+}
+
+.landing-kicker {
+  margin: 0 0 0.8rem;
+  color: var(--tk-yellow-deep);
+  font-family: var(--font-technical);
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.tk-section-bar {
+.landing-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  border-bottom: 1px solid rgb(23 20 11 / 14%);
-  padding-bottom: 0.75rem;
-  color: rgb(23 20 11 / 58%);
-  font-size: clamp(0.55rem, 0.65vw, 0.67rem);
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  gap: 0.75rem;
 }
 
-.tk-section-bar--light {
-  border-color: rgb(255 253 244 / 18%);
-  color: rgb(255 253 244 / 58%);
-}
-
-.tk-action {
+.landing-button {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -60,54 +107,47 @@
   border: 1px solid currentColor;
   padding: 0.72rem 1rem;
   color: inherit;
-  font-size: 0.68rem;
+  font-family: var(--font-technical);
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.tk-action:hover,
-.tk-action:focus-visible {
+.landing-button:hover,
+.landing-button:focus-visible {
   text-decoration: none;
   transform: translateY(-2px);
 }
 
-.tk-action--primary,
-.tk-action--gold {
+.landing-button--primary {
   border-color: var(--tk-yellow);
   background: var(--tk-yellow);
   color: var(--tk-ink);
 }
 
-.tk-action--dark {
+.landing-button--dark {
   border-color: var(--tk-ink);
   background: var(--tk-ink);
   color: var(--tk-paper);
 }
 
-.tk-action--light {
-  border-color: rgb(255 253 244 / 48%);
-  color: var(--tk-paper);
-}
-
-.tk-text-link {
+.landing-text-link {
   display: inline-flex;
   width: fit-content;
   border-bottom: 1px solid currentColor;
-  padding-bottom: 0.28rem;
+  padding-bottom: 0.2rem;
   color: inherit;
-  font-size: 0.68rem;
+  font-family: var(--font-technical);
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
-.tk-text-link:hover {
-  color: var(--gold-dark);
+.landing-text-link:hover,
+.landing-text-link:focus-visible {
+  color: var(--tk-yellow-deep);
   text-decoration: none;
 }
 
-.takokit-cinematic code {
-  font-family: var(--font-mono);
+.takokit-landing code {
+  font-family: var(--font-technical);
 }
