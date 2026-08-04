@@ -20,7 +20,8 @@ export function RuntimeAssembly() {
     const bounded = Math.min(0.9999, Math.max(0, progress));
     const nextIndex = Math.min(FEATURES.length - 1, Math.floor(bounded * FEATURES.length));
     setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
-    section.style.setProperty("--assembly-progress", bounded.toFixed(4));
+    section.style.setProperty("--assembly-progress-width", `${(bounded * 100).toFixed(2)}%`);
+    section.style.setProperty("--assembly-scale", (0.94 + bounded * 0.06).toFixed(4));
   }, staticLayout);
 
   function selectFeature(index) {
