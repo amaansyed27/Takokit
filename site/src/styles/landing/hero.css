@@ -1,0 +1,267 @@
+.tk-hero {
+  --tk-hero-progress: 0;
+  --tk-hero-light: 0;
+  --tk-hero-copy: 1;
+  --tk-hero-lift: 0px;
+  position: relative;
+  height: 250svh;
+  background:
+    radial-gradient(circle at 68% 64%, rgba(212, 163, 76, calc(0.08 + var(--tk-hero-light) * 0.16)), transparent 27%),
+    linear-gradient(180deg, #02070d 0%, #061a2c 54%, #fcf8f5 100%);
+  isolation: isolate;
+}
+
+.tk-hero__stage {
+  position: sticky;
+  top: 68px;
+  min-height: calc(100svh - 68px);
+  overflow: hidden;
+}
+
+.tk-hero__stage::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 49.94%, rgba(252, 248, 245, 0.08) 50%, transparent 50.06%),
+    linear-gradient(rgba(252, 248, 245, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 12.5%;
+  content: "";
+  opacity: calc(0.2 + var(--tk-hero-light) * 0.6);
+  pointer-events: none;
+}
+
+.tk-hero__ambient,
+.tk-hero__ambient i {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.tk-hero__ambient {
+  inset: 0;
+  pointer-events: none;
+}
+
+.tk-hero__ambient i:nth-child(1) {
+  top: 12%;
+  left: 58%;
+  width: 34rem;
+  height: 34rem;
+  background: radial-gradient(circle, rgba(212, 163, 76, 0.2), transparent 68%);
+  filter: blur(28px);
+  opacity: calc(0.2 + var(--tk-hero-light) * 0.8);
+  transform: translateY(calc((1 - var(--tk-hero-light)) * 11rem));
+}
+
+.tk-hero__ambient i:nth-child(2) {
+  right: -14rem;
+  bottom: 8%;
+  width: 42rem;
+  height: 42rem;
+  border: 1px solid rgba(241, 207, 134, 0.2);
+  transform: rotate(calc(var(--tk-hero-progress) * 150deg));
+}
+
+.tk-hero__ambient i:nth-child(3) {
+  bottom: -28%;
+  left: -18%;
+  width: 52rem;
+  height: 52rem;
+  background: radial-gradient(circle, rgba(24, 89, 132, 0.24), transparent 70%);
+  filter: blur(38px);
+}
+
+.tk-hero__copy {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: clamp(1.25rem, 5vw, 5.75rem);
+  width: min(52vw, 60rem);
+  opacity: var(--tk-hero-copy);
+  transform: translateY(calc(-50% + var(--tk-hero-lift)));
+  will-change: opacity, transform;
+}
+
+.tk-hero h1 {
+  margin: 0;
+  font-size: clamp(4rem, 8.8vw, 10.5rem);
+  line-height: 0.78;
+  letter-spacing: -0.065em;
+}
+
+.tk-hero h1 span {
+  display: block;
+}
+
+.tk-hero h1 span:nth-child(2) {
+  color: var(--tk-gold-light);
+}
+
+.tk-hero__summary {
+  max-width: 43rem;
+  margin: clamp(1.7rem, 4vh, 3rem) 0 0;
+  color: rgba(252, 248, 245, 0.72);
+  font-size: clamp(0.82rem, 1vw, 1rem);
+  line-height: 1.8;
+}
+
+.tk-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.tk-hero .platform-install {
+  max-width: 46rem;
+  margin-block: 1.7rem 0;
+  border-color: rgba(252, 248, 245, 0.2);
+  padding-block: 1rem 0.7rem;
+}
+
+.tk-hero .platform-install .eyebrow,
+.tk-hero .platform-install h2 {
+  display: none;
+}
+
+.tk-hero .platform-install-head {
+  justify-content: flex-start;
+}
+
+.tk-hero .platform-switcher {
+  border-color: rgba(252, 248, 245, 0.18);
+}
+
+.tk-hero .platform-switcher button {
+  color: rgba(252, 248, 245, 0.64);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tk-hero .platform-switcher button.is-active {
+  border-color: var(--tk-gold);
+  color: var(--tk-ivory);
+}
+
+.tk-hero .platform-install-label,
+.tk-hero .platform-install-note {
+  color: rgba(252, 248, 245, 0.54);
+}
+
+.tk-hero .command-bar {
+  border-color: rgba(252, 248, 245, 0.34);
+  background: rgba(2, 8, 15, 0.58);
+}
+
+.tk-hero .command-bar code {
+  color: var(--tk-ivory);
+}
+
+.tk-hero .command-bar button {
+  border-color: rgba(252, 248, 245, 0.34);
+  background: var(--tk-gold);
+  color: var(--tk-navy-deep);
+}
+
+.tk-hero__visual {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: clamp(-8rem, -3vw, -2rem);
+  width: min(48vw, 46rem);
+  transform: translateY(-50%);
+}
+
+.tk-hero__disc {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(252, 248, 245, 0.16);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(212, 163, 76, 0.16) 0 16%, rgba(12, 53, 87, 0.28) 42%, rgba(2, 8, 15, 0.86) 72%);
+  box-shadow:
+    inset 0 0 8rem rgba(63, 112, 146, 0.22),
+    0 0 8rem rgba(0, 0, 0, 0.34);
+  opacity: calc(0.45 + var(--tk-hero-light) * 0.55);
+  transform: translateY(calc((1 - var(--tk-hero-light)) * 13rem)) scale(calc(0.72 + var(--tk-hero-light) * 0.28));
+  will-change: transform, opacity;
+}
+
+.tk-hero__disc > img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24%;
+  filter: brightness(0) invert(1);
+  opacity: calc(0.35 + var(--tk-hero-light) * 0.65);
+  transform: translate(-50%, -50%) rotate(calc(var(--tk-hero-progress) * -12deg));
+}
+
+.tk-hero__rings,
+.tk-hero__rings i {
+  position: absolute;
+  border: 1px solid rgba(241, 207, 134, 0.2);
+  border-radius: 50%;
+}
+
+.tk-hero__rings {
+  inset: 0;
+  border: 0;
+  transform: rotate(calc(var(--tk-hero-progress) * 120deg));
+}
+
+.tk-hero__rings i:nth-child(1) { inset: 8%; }
+.tk-hero__rings i:nth-child(2) { inset: 21%; border-style: dashed; }
+.tk-hero__rings i:nth-child(3) { inset: 36%; border-color: rgba(252, 248, 245, 0.26); }
+
+.tk-hero__wave {
+  position: absolute;
+  right: 12%;
+  bottom: 12%;
+  left: 12%;
+  display: flex;
+  height: 4.2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+}
+
+.tk-hero__wave i {
+  width: 2px;
+  height: calc(14% + (var(--tk-hero-light) * 62%));
+  background: linear-gradient(var(--tk-gold-light), rgba(252, 248, 245, 0.28));
+  transform: scaleY(calc(0.25 + var(--tk-hero-light) * 0.75));
+}
+
+.tk-hero__wave i:nth-child(3n) { height: 86%; }
+.tk-hero__wave i:nth-child(4n) { height: 58%; }
+.tk-hero__wave i:nth-child(5n) { height: 34%; }
+
+.tk-hero__platforms {
+  margin-top: 1rem;
+  color: rgba(252, 248, 245, 0.52);
+  font-size: 0.64rem;
+  letter-spacing: 0.13em;
+  text-align: center;
+}
+
+.tk-hero__scroll {
+  position: absolute;
+  z-index: 10;
+  right: clamp(1.25rem, 3.8vw, 4.5rem);
+  bottom: 1.25rem;
+  left: clamp(1.25rem, 3.8vw, 4.5rem);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(252, 248, 245, calc(0.65 - var(--tk-hero-progress) * 0.65));
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+}
+
+.tk-hero__scroll i {
+  height: 1px;
+  background: linear-gradient(90deg, var(--tk-gold) calc(var(--tk-hero-progress) * 100%), rgba(252, 248, 245, 0.18) 0);
+}
