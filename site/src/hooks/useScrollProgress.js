@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function useScrollProgress(onProgress, disabled = false) {
   const sectionRef = useRef(null);
@@ -42,17 +42,18 @@ export function useScrollProgress(onProgress, disabled = false) {
 }
 
 export function useReducedMotion() {
-  const reducedRef = useRef(false);
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== "undefined"
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    reducedRef.current = query.matches;
-    const update = () => {
-      reducedRef.current = query.matches;
-    };
+    const update = () => setReducedMotion(query.matches);
+    update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
 
-  return reducedRef;
+  return reducedMotion;
 }
