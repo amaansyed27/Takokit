@@ -1,9 +1,10 @@
 @import "./foundation.css";
 @import "./hero.css";
-@import "./taco.css";
-@import "./wheel.css";
+@import "./capabilities.css";
+@import "./assembly.css";
+@import "./workflows.css";
 @import "./models.css";
-@import "./flow.css";
+@import "./architecture.css";
+@import "./closing.css";
 @import "./responsive.css";
-@import "./accessibility.css";
 @import "./motion.css";
