@@ -1,0 +1,76 @@
+.command-bar code {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  letter-spacing: 0.01em;
+}
+
+.platform-install {
+  width: 100%;
+  max-width: 720px;
+  margin-block: 1.5rem;
+  border-block: 1px solid var(--line);
+  padding-block: 1.25rem;
+}
+
+.platform-install-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.platform-install h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.2rem, 3vw, 1.65rem);
+  letter-spacing: -0.025em;
+}
+
+.platform-switcher {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.platform-switcher button {
+  min-height: 38px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.platform-switcher button.is-active {
+  border-color: var(--gold);
+  font-weight: 750;
+}
+
+.platform-install-label {
+  margin: 1rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.platform-install .command-bar {
+  margin-block: 0.65rem;
+}
+
+.platform-install-note {
+  max-width: 660px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 700px) {
+  .platform-install-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .platform-switcher {
+    width: 100%;
+  }
+}
