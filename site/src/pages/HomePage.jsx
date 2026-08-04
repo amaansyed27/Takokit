@@ -4,7 +4,6 @@ import { ModelLibraryPreview } from "../components/landing/ModelLibraryPreview";
 import { ProductCapabilities } from "../components/landing/ProductCapabilities";
 import { RuntimeArchitecture } from "../components/landing/RuntimeArchitecture";
 import { RuntimeAssembly } from "../components/landing/RuntimeAssembly";
-import { WorkflowPinwheel } from "../components/landing/WorkflowPinwheel";
 import { useRegistry } from "../hooks/useRegistry";
 import { RECOMMENDED_REFS } from "../models/presentation";
 import { resolveModel, resolveRelease } from "../models/registry";
@@ -45,7 +44,6 @@ export function HomePage() {
       <LandingHero />
       <ProductCapabilities />
       <RuntimeAssembly />
-      <WorkflowPinwheel />
       <ModelLibraryPreview error={error} models={models} retry={retry} status={status} />
       <RuntimeArchitecture />
       <FinalCTA />
