@@ -10,11 +10,13 @@ const links = [
 
 export function SiteHeader({ pathname }) {
   const [open, setOpen] = useState(false);
+
   return (
     <header className="site-header">
       <div className="shell header-inner">
         <RouteLink href="/" className="brand" aria-label="Takokit home">
-          <img src="/brand/takokit-lockup.svg" alt="Takokit" />
+          <img src="/brand/takokit-mark.svg" alt="" />
+          <span>TAKOKIT</span>
         </RouteLink>
         <button
           className="menu-button"
