@@ -1,236 +1,317 @@
-@media (max-width: 1040px) {
-  .tk-hero__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.55fr);
+@media (max-width: 1120px) {
+  .landing-hero__stage {
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.7fr);
+    gap: 2rem;
   }
 
-  .tk-taco__stage {
-    grid-template-columns: minmax(220px, 0.72fr) minmax(300px, 1fr);
+  .landing-hero__mark {
+    width: min(36vw, 420px);
   }
 
-  .tk-taco__details {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 1rem;
+  .runtime-assembly__visual,
+  .workflow-pinwheel__wheel {
+    width: min(40vw, 440px);
   }
 
-  .tk-taco__details h3 {
-    max-width: none;
-    margin: 0;
+  .workflow-pinwheel__item {
+    transform: translate(-50%, -50%) rotate(var(--item-angle)) translateY(-11rem);
   }
 
-  .tk-model-card {
-    grid-template-columns: 2rem minmax(0, 1fr) minmax(150px, auto) 1rem;
+  .model-preview__row {
+    grid-template-columns: 2rem minmax(220px, 1fr) minmax(140px, auto) 1rem;
+  }
+
+  .model-preview__row code {
+    display: none;
   }
 }
 
-@media (max-width: 920px) {
-  .tk-hero {
+@media (max-width: 960px) {
+  .landing-hero {
     min-height: 0;
   }
 
-  .tk-hero__grid {
-    min-height: 0;
+  .landing-hero__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
     grid-template-columns: 1fr;
-    padding-block: 4.5rem 5rem;
+    padding-block: 5rem 4rem;
   }
 
-  .tk-hero__visual {
-    margin-top: 1rem;
+  .landing-hero__copy {
+    max-width: 780px;
   }
 
-  .tk-hero__mark-field {
-    width: min(72vw, 380px);
+  .landing-hero__visual {
+    margin-top: 1.5rem;
   }
 
-  .tk-hero__scroll {
+  .landing-hero__mark {
+    width: min(62vw, 420px);
+  }
+
+  .landing-hero__piece {
+    transform: none;
+  }
+
+  .landing-hero__scroll {
     display: none;
   }
 
-  .tk-taco,
-  .tk-wheel {
+  .capability-strip__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .capability-strip__line {
+    display: none;
+  }
+
+  .runtime-assembly,
+  .workflow-pinwheel {
     min-height: 0;
   }
 
-  .tk-taco__stage,
-  .tk-wheel__stage {
+  .runtime-assembly__stage,
+  .workflow-pinwheel__stage {
     position: relative;
     top: 0;
     min-height: 0;
     grid-template-columns: 1fr;
     grid-template-rows: auto;
-    padding-block: 4.5rem;
+    padding-block: 5rem;
   }
 
-  .tk-taco .tk-section-bar,
-  .tk-wheel .tk-section-bar {
-    grid-column: auto;
+  .runtime-assembly__visual,
+  .workflow-pinwheel__wheel {
+    width: min(72vw, 470px);
   }
 
-  .tk-taco__assembly,
-  .tk-wheel__orbit {
-    width: min(82vw, 440px);
-    margin-inline: auto;
+  .runtime-assembly__steps,
+  .workflow-pinwheel__tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .tk-taco.is-static .tk-ingredient,
-  .tk-taco.is-static .tk-ingredient.is-added {
-    opacity: 1;
-    transform: translate(-50%, calc(13rem - var(--ingredient-index) * 2.15rem)) scale(1);
+  .runtime-assembly__steps button,
+  .workflow-pinwheel__tabs button {
+    border-bottom: 1px solid var(--tk-line-light);
   }
 
-  .tk-taco__details {
-    grid-column: auto;
-    display: block;
+  .workflow-pinwheel__visual {
+    order: 2;
   }
 
-  .tk-taco__details h3 {
-    margin: 0.5rem 0 1.25rem;
+  .workflow-pinwheel__copy {
+    order: 1;
+    max-width: 650px;
   }
 
-  .tk-wheel__rotor {
-    transform: none;
+  .workflow-pinwheel__tabs {
+    order: 3;
   }
 
-  .tk-wheel__spoke {
-    transform: translate(-50%, -50%) rotate(var(--spoke-angle)) translateY(-11.5rem);
+  .workflow-pinwheel__item {
+    transform: translate(-50%, -50%) rotate(var(--item-angle)) translateY(-10.6rem);
   }
 
-  .tk-wheel__spoke > div {
-    transform: rotate(calc(var(--spoke-angle) * -1));
+  .model-preview__header {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
-  .tk-wheel__core {
-    transform: translate(-50%, -50%);
-  }
-
-  .tk-wheel__copy {
-    max-width: 46rem;
-    margin-inline: auto;
-  }
-
-  .tk-wheel__selector {
-    grid-column: auto;
-  }
-
-  .tk-models-scene__heading,
-  .tk-flow__heading {
+  .runtime-architecture__nodes {
     grid-template-columns: 1fr;
   }
 
-  .tk-flow__steps {
-    grid-template-columns: 1fr;
+  .runtime-architecture__nodes li {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    border-right: 1px solid var(--tk-line);
+    border-bottom: 0;
   }
 
-  .tk-flow__steps li {
-    min-height: 0;
-    border-right: 0;
-    border-bottom: 1px solid rgb(255 253 244 / 14%);
-    padding: 1.25rem 0;
+  .runtime-architecture__nodes li:last-child {
+    border-bottom: 1px solid var(--tk-line);
   }
 
-  .tk-flow__steps li + li {
-    padding-left: 0;
+  .runtime-architecture__nodes strong {
+    margin-top: 0;
+  }
+
+  .runtime-architecture__nodes li > i,
+  .runtime-architecture__signal {
+    display: none;
+  }
+
+  .landing-closing__cta {
+    grid-template-columns: minmax(220px, 0.45fr) minmax(0, 1fr);
   }
 }
 
 @media (max-width: 700px) {
-  .tk-section-bar {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.3rem;
+  .landing-shell {
+    width: min(calc(100% - 1.5rem), 1240px);
   }
 
-  .tk-hero h1 {
-    font-size: clamp(2.9rem, 14vw, 5rem);
+  .site--landing-home .site-nav {
+    background: var(--tk-ink);
   }
 
-  .tk-hero .platform-install-head {
-    display: block;
+  .landing-hero__stage {
+    padding-block: 3.5rem 3rem;
   }
 
-  .tk-hero .platform-switcher {
-    margin-bottom: 0.75rem;
+  .landing-hero h1 {
+    font-size: clamp(2.7rem, 13vw, 4.4rem);
   }
 
-  .tk-hero__actions {
+  .landing-hero .platform-install-head {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .tk-hero__actions .tk-action {
+  .landing-hero .platform-switcher {
     width: 100%;
   }
 
-  .tk-taco__copy h2,
-  .tk-models-scene__heading h2,
-  .tk-flow__heading h2 {
-    font-size: clamp(2.7rem, 13vw, 4.8rem);
+  .landing-hero .platform-switcher button {
+    flex: 1;
   }
 
-  .tk-taco__assembly {
-    width: min(100%, 360px);
+  .landing-hero .command-bar {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .tk-ingredient {
-    min-height: 34px;
-    font-size: 0.55rem;
+  .landing-hero .command-bar button {
+    border-top: 1px solid rgb(255 253 244 / 22%);
+    border-left: 0;
   }
 
-  .tk-ingredient.is-added,
-  .tk-taco.is-static .tk-ingredient,
-  .tk-taco.is-static .tk-ingredient.is-added {
-    transform: translate(-50%, calc(10.4rem - var(--ingredient-index) * 1.72rem)) scale(1);
+  .landing-hero__mark {
+    width: min(78vw, 340px);
   }
 
-  .tk-wheel__orbit {
-    width: min(100%, 340px);
+  .landing-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .tk-wheel__spoke {
-    width: 6.5rem;
-    transform: translate(-50%, -50%) rotate(var(--spoke-angle)) translateY(-8.5rem);
+  .landing-actions .landing-button {
+    width: 100%;
   }
 
-  .tk-wheel__copy h2 {
-    font-size: clamp(2.7rem, 15vw, 5rem);
+  .capability-strip__inner {
+    padding-block: 4rem;
   }
 
-  .tk-wheel__selector {
+  .capability-strip ul {
     grid-template-columns: 1fr 1fr;
   }
 
-  .tk-wheel__selector button:nth-child(2) {
-    border-right: 0;
+  .capability-strip li {
+    min-height: 86px;
+    border-top: 1px solid var(--tk-line);
   }
 
-  .tk-wheel__selector button:nth-child(-n + 2) {
-    border-bottom: 1px solid rgb(255 253 244 / 12%);
+  .runtime-assembly__stage,
+  .workflow-pinwheel__stage {
+    padding-block: 4rem;
   }
 
-  .tk-model-card {
+  .runtime-assembly__copy h2,
+  .workflow-pinwheel__copy h2,
+  .model-preview__header h2,
+  .runtime-architecture h2,
+  .landing-closing__cta h2 {
+    font-size: clamp(2.4rem, 12vw, 4rem);
+  }
+
+  .runtime-assembly__active {
+    min-height: 230px;
+  }
+
+  .runtime-assembly__visual {
+    width: min(88vw, 390px);
+  }
+
+  .runtime-layer b {
+    font-size: 0.54rem;
+  }
+
+  .runtime-assembly__steps,
+  .workflow-pinwheel__tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workflow-pinwheel__visual {
+    display: none;
+  }
+
+  .workflow-pinwheel__copy {
+    min-height: 370px;
+  }
+
+  .model-preview__inner,
+  .runtime-architecture__inner {
+    padding-block: 4.5rem;
+  }
+
+  .model-preview__row {
     grid-template-columns: 1.7rem minmax(0, 1fr) 1rem;
     gap: 0.75rem;
   }
 
-  .tk-model-card__meta {
+  .model-preview__facts,
+  .model-preview__row code {
     display: none;
   }
 
-  .tk-models-scene,
-  .tk-flow {
-    padding-block: 4.5rem;
+  .landing-closing__steps {
+    grid-template-columns: 1fr;
+    margin-bottom: 5rem;
+  }
+
+  .landing-closing__steps li,
+  .landing-closing__steps li + li {
+    border-right: 0;
+    border-bottom: 1px solid var(--tk-line-light);
+    padding: 1.1rem 0;
+  }
+
+  .landing-closing__cta {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .landing-closing__cta > img {
+    width: min(68vw, 300px);
+  }
+
+  .landing-closing__cta .landing-text-link {
+    margin: 0.5rem 0 0;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .takokit-cinematic *,
-  .takokit-cinematic *::before,
-  .takokit-cinematic *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+@media (max-width: 390px) {
+  .landing-hero h1 {
+    font-size: clamp(2.45rem, 12.8vw, 3.6rem);
+  }
+
+  .capability-strip ul,
+  .runtime-assembly__steps,
+  .workflow-pinwheel__tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-assembly__visual {
+    width: min(92vw, 330px);
+  }
+
+  .runtime-layer {
+    padding-inline: 0.45rem;
+  }
+
+  .runtime-layer i {
+    width: 58%;
   }
 }
