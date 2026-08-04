@@ -3,13 +3,13 @@
 }
 
 .landing-closing > .landing-shell {
-  padding-block: clamp(4.5rem, 8vw, 7rem);
+  padding-block: clamp(5rem, 9vw, 7rem);
 }
 
 .landing-closing__steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 0 clamp(4rem, 7vw, 6rem);
+  margin: 0 0 clamp(4rem, 7vw, 5.5rem);
   padding: 0;
   border-top: 1px solid var(--tk-line);
   border-bottom: 1px solid var(--tk-line);
@@ -18,8 +18,9 @@
 
 .landing-closing__steps li {
   min-width: 0;
+  min-height: 174px;
   border-right: 1px solid var(--tk-line);
-  padding: 1.2rem 1.1rem 1.4rem;
+  padding: 1.5rem 1.3rem;
 }
 
 .landing-closing__steps li:last-child {
@@ -29,50 +30,50 @@
 .landing-closing__steps span {
   color: var(--tk-yellow-deep);
   font-family: var(--font-technical);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
 }
 
 .landing-closing__steps h3 {
-  margin: 1rem 0 0.45rem;
-  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  margin: 1.05rem 0 0.5rem;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
 }
 
 .landing-closing__steps p {
-  max-width: 320px;
+  max-width: 340px;
   margin: 0;
   color: var(--tk-muted);
-  font-size: 0.78rem;
-  line-height: 1.55;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .landing-closing__cta {
   position: relative;
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   align-items: center;
-  gap: clamp(1.5rem, 5vw, 4rem);
+  gap: clamp(1.5rem, 5vw, 3.5rem);
   overflow: hidden;
-  padding: clamp(2rem, 5vw, 3.5rem);
+  padding: clamp(2.25rem, 5vw, 3.5rem);
   background: var(--tk-ink);
-  color: var(--tk-paper);
+  color: var(--tk-surface);
 }
 
 .landing-closing__cta::after {
   position: absolute;
-  right: -12%;
-  bottom: -80%;
-  width: 360px;
+  right: -10%;
+  bottom: -95%;
+  width: 320px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: rgb(255 210 4 / 10%);
+  background: rgb(255 210 4 / 9%);
   content: "";
-  filter: blur(20px);
+  filter: blur(18px);
 }
 
 .landing-closing__cta > img {
   position: relative;
   z-index: 1;
-  width: 96px;
+  width: 84px;
 }
 
 .landing-closing__cta > div {
@@ -81,15 +82,15 @@
 }
 
 .landing-closing__cta h2 {
-  max-width: 680px;
-  margin: 0 0 1.35rem;
-  font-size: clamp(2rem, 4.5vw, 4.3rem);
+  max-width: 700px;
+  margin: 0 0 1.4rem;
+  font-size: clamp(2.35rem, 4vw, 3.8rem);
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.04em;
 }
 
 .landing-closing__cta .landing-button:not(.landing-button--primary) {
-  border-color: rgb(255 254 249 / 24%);
+  border-color: rgb(247 244 237 / 26%);
 }
 
 .landing-closing__cta .landing-text-link {
