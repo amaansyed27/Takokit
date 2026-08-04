@@ -31,23 +31,27 @@
   }
 
   .runtime-assembly__intro {
-    top: 88px;
+    top: 82px;
   }
 
   .runtime-assembly__visual {
-    width: 310px;
-    margin-block: 1.2rem;
+    width: 270px;
+    margin-block: 0.8rem;
+  }
+
+  .runtime-assembly__ingredient {
+    top: 7%;
   }
 }
 
 @media (max-width: 1000px) {
   .runtime-assembly__layout {
-    grid-template-columns: minmax(300px, 0.78fr) minmax(340px, 1fr);
+    grid-template-columns: minmax(280px, 0.74fr) minmax(340px, 1fr);
     gap: 3rem;
   }
 
   .runtime-assembly__visual {
-    width: min(100%, 330px);
+    width: min(100%, 300px);
   }
 
   .model-preview__row {
@@ -86,7 +90,7 @@
   }
 
   .runtime-assembly__visual {
-    width: min(72vw, 360px);
+    width: min(66vw, 320px);
   }
 
   .runtime-assembly__cards {
@@ -95,7 +99,7 @@
 
   .runtime-assembly__cards li,
   .runtime-assembly__cards li:last-child {
-    min-height: 170px;
+    min-height: 165px;
     border-right: 1px solid var(--tk-line-light);
     border-bottom: 1px solid var(--tk-line-light);
   }
@@ -191,7 +195,7 @@
   .model-preview__inner,
   .runtime-architecture__inner,
   .landing-closing > .landing-shell {
-    padding-block: 4.5rem;
+    padding-block: 4.2rem;
   }
 
   .capability-strip h2,
@@ -219,7 +223,12 @@
   }
 
   .runtime-assembly__visual {
-    width: min(88vw, 330px);
+    width: min(82vw, 290px);
+  }
+
+  .runtime-assembly__ingredient {
+    min-width: 142px;
+    padding: 0.58rem 0.68rem;
   }
 
   .runtime-assembly__cards {
@@ -229,10 +238,10 @@
   .runtime-assembly__cards li,
   .runtime-assembly__cards li:last-child,
   .runtime-assembly__cards li:nth-child(2n) {
-    min-height: 145px;
+    min-height: 140px;
     border-right: 0;
     border-bottom: 1px solid var(--tk-line-light);
-    padding: 1.5rem 0.9rem;
+    padding: 1.4rem 0.9rem;
   }
 
   .model-preview__header {
@@ -305,7 +314,7 @@
 
   .capability-strip li,
   .capability-strip li:nth-child(2) {
-    min-height: 132px;
+    min-height: 128px;
     border-right: 0;
     border-bottom: 1px solid var(--tk-line);
   }
@@ -314,8 +323,12 @@
     border-bottom: 0;
   }
 
-  .runtime-assembly__active-label {
-    right: 2%;
+  .runtime-assembly__visual {
+    width: min(86vw, 270px);
+  }
+
+  .runtime-assembly__ingredient {
+    top: 6%;
     min-width: 132px;
   }
 }
