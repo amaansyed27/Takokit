@@ -51,7 +51,9 @@ export function RecommendedModelsScene({ models, status, error, retry }) {
                 <h3>{model.release.target === "whisper-tiny" ? "WHISPER TINY" : model.display_name.toUpperCase()}</h3>
                 <p>{model.shortSummary}</p>
               </div>
-              <HardwareSummary hardware={model.hardware} />
+              <span className="tk-model-card__hardware">
+                <HardwareSummary hardware={model.hardware} />
+              </span>
               <VerificationBadge status={model.status} />
               <span aria-hidden="true">↗</span>
             </RouteLink>
