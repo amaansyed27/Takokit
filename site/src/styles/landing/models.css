@@ -111,8 +111,10 @@
   line-height: 1.55;
 }
 
-.tk-model-card .hardware-summary {
+.tk-model-card__hardware {
   color: rgba(6, 26, 44, 0.7);
+  font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .tk-model-card .status-badge {
