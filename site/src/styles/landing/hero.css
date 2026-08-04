@@ -1,5 +1,8 @@
 .landing-hero {
-  --hero-progress: 0;
+  --hero-mark-y: 0px;
+  --hero-mark-scale: 1;
+  --hero-progress-width: 0%;
+  --hero-wave-opacity: 0.25;
   position: relative;
   min-height: 138svh;
   background:
@@ -25,9 +28,7 @@
   aspect-ratio: 1;
   place-items: center;
   margin-bottom: 1.15rem;
-  transform:
-    translateY(calc(var(--hero-progress) * -18px))
-    scale(calc(1 - var(--hero-progress) * 0.08));
+  transform: translateY(var(--hero-mark-y)) scale(var(--hero-mark-scale));
   transition: transform 90ms linear;
 }
 
@@ -49,7 +50,7 @@
   align-items: center;
   justify-content: space-between;
   transform: translate(-50%, -50%);
-  opacity: calc(0.25 + var(--hero-progress) * 0.45);
+  opacity: var(--hero-wave-opacity);
 }
 
 .landing-hero__wave i {
@@ -168,7 +169,7 @@
   height: 1px;
   background: linear-gradient(
     90deg,
-    var(--tk-yellow) calc(var(--hero-progress) * 100%),
+    var(--tk-yellow) var(--hero-progress-width),
     var(--tk-line) 0
   );
 }
