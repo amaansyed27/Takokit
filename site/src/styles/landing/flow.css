@@ -58,9 +58,14 @@
   gap: 1.2rem;
   border-top: 1px solid rgba(252, 248, 245, 0.16);
   padding: 1.2rem 0;
-  opacity: calc(0.28 + min(1, max(0, (var(--tk-flow-progress) * 3) - var(--flow-index))) * 0.72);
-  transform: translateX(calc((1 - min(1, max(0, (var(--tk-flow-progress) * 3) - var(--flow-index)))) * 3.5rem));
-  transition: opacity 160ms linear, transform 160ms linear;
+  opacity: 0.28;
+  transform: translateX(3.5rem);
+  transition: opacity 420ms ease, transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tk-flow__steps li.is-active {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .tk-flow__steps > li > span {
