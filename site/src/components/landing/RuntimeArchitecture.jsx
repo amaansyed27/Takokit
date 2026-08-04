@@ -1,9 +1,8 @@
 const NODES = [
-  ["01", "Model reference", "A versioned name such as whisper:tiny"],
-  ["02", "Registry resolver", "Manifest, artifacts, hardware, and support state"],
-  ["03", "Runner + adapter", "The execution path required by that model"],
-  ["04", "Shared interfaces", "CLI, TUI, GUI, and local API"],
-  ["05", "Local output", "Files, sessions, and reusable state on your machine"],
+  ["Model", "Choose a versioned model reference."],
+  ["Registry", "Resolve its manifest, runner, and requirements."],
+  ["Runtime", "Execute through the shared local system."],
+  ["Output", "Keep files, sessions, and reusable state locally."],
 ];
 
 export function RuntimeArchitecture() {
@@ -11,19 +10,17 @@ export function RuntimeArchitecture() {
     <section className="runtime-architecture" aria-labelledby="runtime-architecture-title">
       <div className="landing-shell runtime-architecture__inner">
         <header>
-          <p className="landing-kicker">How it moves</p>
-          <h2 id="runtime-architecture-title">One path from model reference to local output.</h2>
+          <p className="landing-kicker">How it works</p>
+          <h2 id="runtime-architecture-title">A direct path from model to local output.</h2>
         </header>
 
         <ol className="runtime-architecture__nodes">
-          {NODES.map(([number, title, description], index) => (
+          {NODES.map(([title, description], index) => (
             <li key={title}>
-              <span>{number}</span>
-              <div>
-                <strong>{title}</strong>
-                <p>{description}</p>
-              </div>
-              {index < NODES.length - 1 && <i aria-hidden="true" />}
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{title}</strong>
+              <p>{description}</p>
+              {index < NODES.length - 1 && <i aria-hidden="true">→</i>}
             </li>
           ))}
         </ol>
