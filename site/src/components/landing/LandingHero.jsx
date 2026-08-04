@@ -8,7 +8,10 @@ export function LandingHero() {
   const staticLayout = reducedMotion || compactLayout;
   const sectionRef = useScrollProgress((progress, section) => {
     const bounded = Math.min(1, Math.max(0, progress));
-    section.style.setProperty("--hero-progress", bounded.toFixed(4));
+    section.style.setProperty("--hero-mark-y", `${(-18 * bounded).toFixed(2)}px`);
+    section.style.setProperty("--hero-mark-scale", (1 - 0.08 * bounded).toFixed(4));
+    section.style.setProperty("--hero-progress-width", `${(100 * bounded).toFixed(2)}%`);
+    section.style.setProperty("--hero-wave-opacity", (0.25 + 0.45 * bounded).toFixed(4));
   }, staticLayout);
 
   return (
