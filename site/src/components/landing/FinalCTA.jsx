@@ -1,9 +1,9 @@
 import { RouteLink } from "../../app/router";
 
 const STEPS = [
-  ["01", "Pull", "Resolve a model, version, runner, and pinned artifacts."],
-  ["02", "Run", "Use the same local system through every Takokit interface."],
-  ["03", "Reuse", "Keep models, voices, sessions, and outputs ready on your machine."],
+  ["Pull", "Download a model and the runner it needs."],
+  ["Run", "Use it through the CLI, TUI, GUI, or API."],
+  ["Reuse", "Keep models, voices, and outputs ready locally."],
 ];
 
 export function FinalCTA() {
@@ -11,9 +11,9 @@ export function FinalCTA() {
     <section className="landing-closing" aria-labelledby="landing-closing-title">
       <div className="landing-shell">
         <ol className="landing-closing__steps">
-          {STEPS.map(([number, title, description]) => (
+          {STEPS.map(([title, description], index) => (
             <li key={title}>
-              <span>{number}</span>
+              <span>{String(index + 1).padStart(2, "0")}</span>
               <h3>{title}</h3>
               <p>{description}</p>
             </li>
@@ -24,11 +24,11 @@ export function FinalCTA() {
           <img src="/brand/takokit-mark.svg" alt="" aria-hidden="true" />
           <div>
             <p className="landing-kicker">Takokit</p>
-            <h2 id="landing-closing-title">Your voice stack. On your machine.</h2>
+            <h2 id="landing-closing-title">Start running voice models locally.</h2>
             <div className="landing-actions">
               <RouteLink href="/download" className="landing-button landing-button--primary">Install Takokit</RouteLink>
-              <RouteLink href="/docs" className="landing-button">Read the docs</RouteLink>
-              <a href="https://github.com/amaansyed27/Takokit" className="landing-text-link">View on GitHub →</a>
+              <RouteLink href="/docs" className="landing-button">Read documentation</RouteLink>
+              <a href="https://github.com/amaansyed27/Takokit" className="landing-text-link">GitHub →</a>
             </div>
           </div>
         </div>
