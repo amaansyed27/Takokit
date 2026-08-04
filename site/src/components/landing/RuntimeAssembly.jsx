@@ -53,7 +53,7 @@ export function RuntimeAssembly() {
           <p className="landing-kicker">Inside Takokit</p>
           <h2 id="runtime-assembly-title">The runtime is the shell.</h2>
           <p className="runtime-assembly__summary">
-            Each scroll step adds one real part of the local voice stack without turning the page into a product demo reel.
+            Each scroll step adds one real part of the local voice stack and locks it into the same system.
           </p>
 
           <div className="runtime-assembly__active" aria-live="polite">
@@ -65,7 +65,7 @@ export function RuntimeAssembly() {
           <RouteLink href="/docs" className="landing-text-link">Read how the runtime works →</RouteLink>
         </div>
 
-        <div className="runtime-assembly__visual" aria-label="Takokit features entering the abstract logo shell">
+        <div className="runtime-assembly__visual" role="img" aria-label="Takokit features entering the abstract logo shell">
           <img src="/brand/takokit-mark.svg" alt="" />
           <div className="runtime-assembly__ingredient" aria-hidden="true">
             <span>{String(activeIndex + 1).padStart(2, "0")}</span>
