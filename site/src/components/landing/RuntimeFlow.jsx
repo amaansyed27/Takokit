@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { RouteLink } from "../../app/router";
-import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 const STEPS = [
   {
@@ -24,37 +22,25 @@ const STEPS = [
 ];
 
 export function RuntimeFlow() {
-  const reducedMotion = useReducedMotion();
-  const narrowLayout = useMediaQuery("(max-width: 900px)");
-  const staticLayout = reducedMotion || narrowLayout;
-  const [activeIndex, setActiveIndex] = useState(0);
-  const sectionRef = useScrollProgress((progress, section) => {
-    const bounded = Math.min(0.9999, Math.max(0, progress));
-    const nextIndex = Math.min(STEPS.length - 1, Math.floor(bounded * STEPS.length));
-    setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
-    section.style.setProperty("--tk-flow-progress", bounded.toFixed(4));
-  }, staticLayout);
-
   return (
-    <section
-      className={`tk-flow ${staticLayout ? "is-static" : ""}`}
-      ref={sectionRef}
-      aria-labelledby="tk-flow-title"
-    >
-      <div className="tk-flow__stage">
+    <section className="tk-flow" aria-labelledby="tk-flow-title">
+      <div className="shell">
         <header className="tk-section-bar tk-section-bar--light">
           <span>04 / THE LOCAL LOOP</span>
           <span>MODEL → RUNNER → OUTPUT</span>
         </header>
 
-        <div className="tk-flow__headline">
-          <p className="tk-kicker">THE TAKOKIT CONTRACT</p>
-          <h2 id="tk-flow-title">PULL.<br />RUN.<br />REUSE.</h2>
+        <div className="tk-flow__heading">
+          <div>
+            <p className="tk-kicker">THE TAKOKIT CONTRACT</p>
+            <h2 id="tk-flow-title">PULL.<br />RUN.<br />REUSE.</h2>
+          </div>
+          <p>Open voice models should feel like tools—not fragile research demos.</p>
         </div>
 
         <ol className="tk-flow__steps">
-          {STEPS.map((step, index) => (
-            <li className={staticLayout || index <= activeIndex ? "is-active" : ""} key={step.number}>
+          {STEPS.map((step) => (
+            <li key={step.number}>
               <span>{step.number}</span>
               <article>
                 <p>{step.label}</p>
@@ -66,17 +52,8 @@ export function RuntimeFlow() {
         </ol>
 
         <div className="tk-flow__closing">
-          <p>Open voice models should feel like tools—not fragile research demos.</p>
-          <div>
-            <RouteLink href="/download" className="tk-action tk-action--gold">Install Takokit</RouteLink>
-            <RouteLink href="/docs" className="tk-action tk-action--light">Open documentation</RouteLink>
-          </div>
-        </div>
-
-        <div className="tk-flow__signal" aria-hidden="true">
-          <i />
-          <i />
-          <i />
+          <RouteLink href="/download" className="tk-action tk-action--gold">Install Takokit</RouteLink>
+          <RouteLink href="/docs" className="tk-action tk-action--light">Open documentation</RouteLink>
         </div>
       </div>
     </section>
