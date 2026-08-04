@@ -1,9 +1,11 @@
 import { RouteLink } from "../../app/router";
 import { PlatformInstall } from "../PlatformInstall";
-import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
+import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 export function CinematicHero() {
   const reducedMotion = useReducedMotion();
+  const narrowLayout = useMediaQuery("(max-width: 980px)");
+  const staticLayout = reducedMotion || narrowLayout;
   const sectionRef = useScrollProgress((progress, section) => {
     const light = Math.min(1, progress / 0.62);
     const copyExit = Math.max(0, Math.min(1, (progress - 0.58) / 0.28));
@@ -11,10 +13,14 @@ export function CinematicHero() {
     section.style.setProperty("--tk-hero-light", light.toFixed(4));
     section.style.setProperty("--tk-hero-copy", (1 - copyExit).toFixed(4));
     section.style.setProperty("--tk-hero-lift", `${(-46 * copyExit).toFixed(2)}px`);
-  }, reducedMotion);
+  }, staticLayout);
 
   return (
-    <section className="tk-hero" ref={sectionRef} aria-labelledby="tk-hero-title">
+    <section
+      className={`tk-hero ${staticLayout ? "is-static" : ""}`}
+      ref={sectionRef}
+      aria-labelledby="tk-hero-title"
+    >
       <div className="tk-hero__stage">
         <div className="tk-hero__ambient" aria-hidden="true">
           <i />
