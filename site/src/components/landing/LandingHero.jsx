@@ -7,7 +7,13 @@ export function LandingHero() {
   const compactLayout = useMediaQuery("(max-width: 960px)");
   const staticLayout = reducedMotion || compactLayout;
   const sectionRef = useScrollProgress((progress, section) => {
-    section.style.setProperty("--hero-progress", progress.toFixed(4));
+    const unsettled = 1 - progress;
+    section.style.setProperty("--hero-top-shift", `${(unsettled * -18).toFixed(2)}px`);
+    section.style.setProperty("--hero-left-shift", `${(unsettled * -18).toFixed(2)}px`);
+    section.style.setProperty("--hero-right-shift", `${(unsettled * 18).toFixed(2)}px`);
+    section.style.setProperty("--hero-lower-shift", `${(unsettled * 13).toFixed(2)}px`);
+    section.style.setProperty("--hero-axis-opacity", Math.max(0.15, 0.6 - progress * 0.45).toFixed(3));
+    section.style.setProperty("--hero-progress-width", `${(progress * 100).toFixed(2)}%`);
   }, staticLayout);
 
   function handlePointerMove(event) {
@@ -15,13 +21,17 @@ export function LandingHero() {
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - bounds.left) / bounds.width - 0.5) * 2;
     const y = ((event.clientY - bounds.top) / bounds.height - 0.5) * 2;
-    event.currentTarget.style.setProperty("--pointer-x", x.toFixed(3));
-    event.currentTarget.style.setProperty("--pointer-y", y.toFixed(3));
+    event.currentTarget.style.setProperty("--pointer-x-positive", `${(x * 5).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--pointer-x-negative", `${(x * -5).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--pointer-y-positive", `${(y * 4).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--pointer-y-negative", `${(y * -4).toFixed(2)}px`);
   }
 
   function resetPointer(event) {
-    event.currentTarget.style.setProperty("--pointer-x", "0");
-    event.currentTarget.style.setProperty("--pointer-y", "0");
+    event.currentTarget.style.setProperty("--pointer-x-positive", "0px");
+    event.currentTarget.style.setProperty("--pointer-x-negative", "0px");
+    event.currentTarget.style.setProperty("--pointer-y-positive", "0px");
+    event.currentTarget.style.setProperty("--pointer-y-negative", "0px");
   }
 
   return (
