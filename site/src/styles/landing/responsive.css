@@ -4,6 +4,53 @@
   }
 }
 
+@media (max-height: 760px) and (min-width: 901px) {
+  .landing-hero__stage {
+    padding-block: 1.2rem 2rem;
+  }
+
+  .landing-hero__mark {
+    width: 72px;
+    margin-bottom: 0.6rem;
+  }
+
+  .landing-hero h1 {
+    font-size: clamp(2.6rem, 4.4vw, 4rem);
+  }
+
+  .landing-hero__summary {
+    margin-top: 0.7rem;
+  }
+
+  .landing-hero .platform-install {
+    margin-top: 0.9rem;
+  }
+
+  .landing-hero .platform-install-note {
+    display: none;
+  }
+
+  .landing-hero .landing-actions {
+    margin-top: 0.7rem;
+  }
+
+  .runtime-assembly__stage {
+    padding-block: 1.5rem 2rem;
+  }
+
+  .runtime-assembly__copy h2 {
+    font-size: clamp(2.2rem, 4vw, 3.6rem);
+  }
+
+  .runtime-assembly__active {
+    min-height: 120px;
+  }
+
+  .runtime-assembly__visual {
+    width: min(34vw, 340px);
+  }
+}
+
 @media (max-width: 900px) {
   .landing-hero {
     min-height: 0;
