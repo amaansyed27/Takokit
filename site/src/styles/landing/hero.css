@@ -1,7 +1,14 @@
 .landing-hero {
-  --hero-progress: 0;
-  --pointer-x: 0;
-  --pointer-y: 0;
+  --hero-top-shift: -18px;
+  --hero-left-shift: -18px;
+  --hero-right-shift: 18px;
+  --hero-lower-shift: 13px;
+  --hero-axis-opacity: 0.6;
+  --hero-progress-width: 0%;
+  --pointer-x-positive: 0px;
+  --pointer-x-negative: 0px;
+  --pointer-y-positive: 0px;
+  --pointer-y-negative: 0px;
   position: relative;
   min-height: 124svh;
   background:
@@ -135,39 +142,36 @@
 
 .landing-hero__piece--top {
   clip-path: polygon(0 0, 100% 0, 100% 55%, 0 55%);
-  transform:
-    translate3d(
-      calc(var(--pointer-x) * 5px),
-      calc((1 - var(--hero-progress)) * -18px + var(--pointer-y) * 4px),
-      0
-    );
+  transform: translate3d(
+    var(--pointer-x-positive),
+    calc(var(--hero-top-shift) + var(--pointer-y-positive)),
+    0
+  );
 }
 
 .landing-hero__piece--left {
   clip-path: polygon(0 45%, 58% 45%, 58% 100%, 0 100%);
-  transform:
-    translate3d(
-      calc((1 - var(--hero-progress)) * -18px + var(--pointer-x) * -5px),
-      calc((1 - var(--hero-progress)) * 13px + var(--pointer-y) * 4px),
-      0
-    );
+  transform: translate3d(
+    calc(var(--hero-left-shift) + var(--pointer-x-negative)),
+    calc(var(--hero-lower-shift) + var(--pointer-y-positive)),
+    0
+  );
 }
 
 .landing-hero__piece--right {
   clip-path: polygon(52% 45%, 100% 45%, 100% 100%, 52% 100%);
-  transform:
-    translate3d(
-      calc((1 - var(--hero-progress)) * 18px + var(--pointer-x) * 5px),
-      calc((1 - var(--hero-progress)) * 13px + var(--pointer-y) * -4px),
-      0
-    );
+  transform: translate3d(
+    calc(var(--hero-right-shift) + var(--pointer-x-positive)),
+    calc(var(--hero-lower-shift) + var(--pointer-y-negative)),
+    0
+  );
 }
 
 .landing-hero__axis {
   position: absolute;
   display: block;
   background: rgb(255 253 244 / 14%);
-  opacity: calc(0.6 - var(--hero-progress) * 0.45);
+  opacity: var(--hero-axis-opacity);
 }
 
 .landing-hero__axis--horizontal {
@@ -231,7 +235,7 @@
 
 .landing-hero__scroll i {
   height: 1px;
-  background: linear-gradient(90deg, var(--tk-yellow) calc(var(--hero-progress) * 100%), rgb(255 253 244 / 14%) 0);
+  background: linear-gradient(90deg, var(--tk-yellow) var(--hero-progress-width), rgb(255 253 244 / 14%) 0);
 }
 
 @keyframes landing-signal {
