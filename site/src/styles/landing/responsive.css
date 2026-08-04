@@ -1,90 +1,47 @@
-@media (max-width: 1180px) {
-  .tk-hero__copy {
-    width: min(58vw, 55rem);
-  }
-
-  .tk-hero__visual {
-    right: -10rem;
-    width: min(52vw, 42rem);
+@media (max-width: 1040px) {
+  .tk-hero__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.55fr);
   }
 
   .tk-taco__stage {
-    grid-template-columns: minmax(17rem, 0.48fr) minmax(23rem, 0.72fr);
-    grid-template-rows: 1fr auto;
+    grid-template-columns: minmax(220px, 0.72fr) minmax(300px, 1fr);
   }
 
-  .tk-taco__feature-list {
+  .tk-taco__details {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .tk-taco__feature-list li {
-    border-right: 1px solid rgba(252, 248, 245, 0.12);
-    padding-right: 1rem;
-  }
-
-  .tk-taco__feature-list li.is-active {
-    transform: translateY(-0.35rem);
-  }
-
-  .tk-wheel__spoke {
-    transform:
-      translate(-50%, -50%)
-      rotate(var(--spoke-angle))
-      translateY(-14rem)
-      rotate(calc(var(--spoke-counter-angle) - var(--tk-wheel-turn)));
+  .tk-taco__details h3 {
+    max-width: none;
+    margin: 0;
   }
 
   .tk-model-card {
-    grid-template-columns: 2rem minmax(0, 1fr) auto 1rem;
-  }
-
-  .tk-model-card .hardware-summary {
-    display: none;
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(150px, auto) 1rem;
   }
 }
 
-@media (max-width: 980px) {
-  .tk-section-bar {
-    position: static;
-    margin-bottom: 3.5rem;
-  }
-
+@media (max-width: 920px) {
   .tk-hero {
-    height: auto;
     min-height: 0;
   }
 
-  .tk-hero__stage {
-    position: relative;
-    top: 0;
-    display: grid;
+  .tk-hero__grid {
     min-height: 0;
     grid-template-columns: 1fr;
-    padding: 6rem 1.5rem 4rem;
-  }
-
-  .tk-hero__copy {
-    position: relative;
-    top: auto;
-    left: auto;
-    width: min(100%, 52rem);
-    opacity: 1;
-    transform: none;
+    padding-block: 4.5rem 5rem;
   }
 
   .tk-hero__visual {
-    position: relative;
-    top: auto;
-    right: auto;
-    width: min(82vw, 36rem);
-    margin: 3rem auto 0;
-    transform: none;
+    margin-top: 1rem;
   }
 
-  .tk-hero__disc {
-    opacity: 1;
-    transform: none;
+  .tk-hero__mark-field {
+    width: min(72vw, 380px);
   }
 
   .tk-hero__scroll {
@@ -92,96 +49,64 @@
   }
 
   .tk-taco,
-  .tk-wheel,
-  .tk-models-scene,
-  .tk-flow {
-    height: auto;
+  .tk-wheel {
     min-height: 0;
   }
 
   .tk-taco__stage,
-  .tk-wheel__stage,
-  .tk-models-scene__stage,
-  .tk-flow__stage {
+  .tk-wheel__stage {
     position: relative;
     top: 0;
     min-height: 0;
-    overflow: visible;
-    padding: 5rem 1.5rem;
-  }
-
-  .tk-taco__stage {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
+    padding-block: 4.5rem;
   }
 
-  .tk-taco__intro {
-    max-width: 43rem;
+  .tk-taco .tk-section-bar,
+  .tk-wheel .tk-section-bar {
+    grid-column: auto;
   }
 
-  .tk-taco__visual {
-    width: min(88vw, 38rem);
+  .tk-taco__assembly,
+  .tk-wheel__orbit {
+    width: min(82vw, 440px);
     margin-inline: auto;
-    transform: none;
   }
 
   .tk-taco.is-static .tk-ingredient,
   .tk-taco.is-static .tk-ingredient.is-added {
-    opacity: 0.92;
-    transform:
-      translate3d(-50%, calc(14.5rem - var(--ingredient-index) * 1.55rem), calc(var(--ingredient-index) * 18px))
-      rotate(calc((var(--ingredient-index) - 2.5) * 4deg))
-      scale(1);
-  }
-
-  .tk-taco__feature-list {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .tk-taco.is-static .tk-taco__feature-list li {
-    color: var(--tk-ivory);
-    transform: none;
-  }
-
-  .tk-taco.is-static .tk-taco__feature-list p:last-child {
-    max-height: 8rem;
-    margin-top: 0.5rem;
     opacity: 1;
+    transform: translate(-50%, calc(13rem - var(--ingredient-index) * 2.15rem)) scale(1);
   }
 
-  .tk-taco__progress,
-  .tk-wheel__rail {
-    display: none;
+  .tk-taco__details {
+    grid-column: auto;
+    display: block;
   }
 
-  .tk-wheel__stage {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-  }
-
-  .tk-wheel__orbit {
-    width: min(86vw, 38rem);
-    margin-inline: auto;
+  .tk-taco__details h3 {
+    margin: 0.5rem 0 1.25rem;
   }
 
   .tk-wheel__rotor {
-    transform: rotate(-18deg);
+    transform: none;
   }
 
   .tk-wheel__spoke {
-    transform:
-      translate(-50%, -50%)
-      rotate(var(--spoke-angle))
-      translateY(-12rem)
-      rotate(calc(var(--spoke-counter-angle) + 18deg));
+    transform: translate(-50%, -50%) rotate(var(--spoke-angle)) translateY(-11.5rem);
+  }
+
+  .tk-wheel__spoke > div {
+    transform: rotate(calc(var(--spoke-angle) * -1));
   }
 
   .tk-wheel__core {
-    transform: translate(-50%, -50%) rotate(18deg);
+    transform: translate(-50%, -50%);
   }
 
   .tk-wheel__copy {
-    min-height: 31rem;
+    max-width: 46rem;
     margin-inline: auto;
   }
 
@@ -189,58 +114,36 @@
     grid-column: auto;
   }
 
-  .tk-models-scene__stage {
+  .tk-models-scene__heading,
+  .tk-flow__heading {
     grid-template-columns: 1fr;
   }
 
-  .tk-models-scene__intro {
-    max-width: 44rem;
-  }
-
-  .tk-model-card {
-    transform: none;
-  }
-
-  .tk-flow__stage {
+  .tk-flow__steps {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
   }
 
-  .tk-flow__headline {
-    max-width: 48rem;
+  .tk-flow__steps li {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 253 244 / 14%);
+    padding: 1.25rem 0;
   }
 
-  .tk-flow__closing {
-    grid-column: auto;
+  .tk-flow__steps li + li {
+    padding-left: 0;
   }
 }
 
 @media (max-width: 700px) {
-  .site--cinematic-home .site-nav {
-    background: var(--tk-navy-deep);
-  }
-
   .tk-section-bar {
     align-items: flex-start;
     flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .tk-section-bar span:last-child {
-    color: inherit;
-    opacity: 0.55;
-  }
-
-  .tk-hero__stage,
-  .tk-taco__stage,
-  .tk-wheel__stage,
-  .tk-models-scene__stage,
-  .tk-flow__stage {
-    padding-inline: 1rem;
+    gap: 0.3rem;
   }
 
   .tk-hero h1 {
-    font-size: clamp(3.2rem, 16vw, 5.6rem);
+    font-size: clamp(2.9rem, 14vw, 5rem);
   }
 
   .tk-hero .platform-install-head {
@@ -248,56 +151,50 @@
   }
 
   .tk-hero .platform-switcher {
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.75rem;
   }
 
-  .tk-hero__actions,
-  .tk-flow__closing > div {
+  .tk-hero__actions {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .tk-hero__actions .tk-action,
-  .tk-flow__closing .tk-action {
+  .tk-hero__actions .tk-action {
     width: 100%;
   }
 
-  .tk-taco__intro h2,
-  .tk-models-scene__intro h2 {
-    font-size: clamp(3rem, 14vw, 5.3rem);
+  .tk-taco__copy h2,
+  .tk-models-scene__heading h2,
+  .tk-flow__heading h2 {
+    font-size: clamp(2.7rem, 13vw, 4.8rem);
   }
 
-  .tk-taco__visual {
-    width: min(100%, 31rem);
+  .tk-taco__assembly {
+    width: min(100%, 360px);
   }
 
-  .tk-taco__feature-list {
-    grid-template-columns: 1fr;
+  .tk-ingredient {
+    min-height: 34px;
+    font-size: 0.55rem;
   }
 
-  .tk-taco__feature-list li {
-    border-right: 0;
+  .tk-ingredient.is-added,
+  .tk-taco.is-static .tk-ingredient,
+  .tk-taco.is-static .tk-ingredient.is-added {
+    transform: translate(-50%, calc(10.4rem - var(--ingredient-index) * 1.72rem)) scale(1);
   }
 
   .tk-wheel__orbit {
-    width: min(100%, 29rem);
+    width: min(100%, 340px);
   }
 
   .tk-wheel__spoke {
-    width: 7rem;
-    transform:
-      translate(-50%, -50%)
-      rotate(var(--spoke-angle))
-      translateY(-8.7rem)
-      rotate(calc(var(--spoke-counter-angle) + 18deg));
-  }
-
-  .tk-wheel__copy {
-    min-height: 34rem;
+    width: 6.5rem;
+    transform: translate(-50%, -50%) rotate(var(--spoke-angle)) translateY(-8.5rem);
   }
 
   .tk-wheel__copy h2 {
-    font-size: clamp(3.4rem, 18vw, 6rem);
+    font-size: clamp(2.7rem, 15vw, 5rem);
   }
 
   .tk-wheel__selector {
@@ -309,7 +206,7 @@
   }
 
   .tk-wheel__selector button:nth-child(-n + 2) {
-    border-bottom: 1px solid rgba(252, 248, 245, 0.12);
+    border-bottom: 1px solid rgb(255 253 244 / 12%);
   }
 
   .tk-model-card {
@@ -317,18 +214,13 @@
     gap: 0.75rem;
   }
 
-  .tk-model-card .hardware-summary,
-  .tk-model-card .status-badge {
+  .tk-model-card__meta {
     display: none;
   }
 
-  .tk-flow__headline h2 {
-    font-size: clamp(4rem, 20vw, 7rem);
-  }
-
-  .tk-flow__closing {
-    align-items: stretch;
-    flex-direction: column;
+  .tk-models-scene,
+  .tk-flow {
+    padding-block: 4.5rem;
   }
 }
 
