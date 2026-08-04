@@ -1,8 +1,6 @@
 @media (prefers-reduced-motion: reduce) {
   .tk-hero__visual,
-  .tk-wheel__rotor,
-  .tk-wheel__spoke > div,
-  .tk-wheel__core {
+  .tk-wheel__rotor {
     transform: none;
   }
 
@@ -25,5 +23,6 @@
   .tk-taco.is-static .tk-ingredient,
   .tk-taco.is-static .tk-ingredient.is-added {
     opacity: 1;
+    transform: translate(-50%, calc(13rem - var(--ingredient-index) * 2.15rem)) scale(1);
   }
 }
