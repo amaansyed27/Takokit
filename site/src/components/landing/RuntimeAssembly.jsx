@@ -50,7 +50,7 @@ export function RuntimeAssembly() {
     const bounded = Math.min(0.9999, Math.max(0, progress));
     const nextIndex = Math.min(FEATURES.length - 1, Math.floor(bounded * FEATURES.length));
     setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
-    section.style.setProperty("--assembly-progress", bounded.toFixed(4));
+    section.style.setProperty("--assembly-progress-width", `${(bounded * 100).toFixed(2)}%`);
   }, staticLayout);
 
   function selectFeature(index) {
@@ -101,7 +101,7 @@ export function RuntimeAssembly() {
               <span
                 className={`runtime-layer ${index <= activeIndex || staticLayout ? "is-visible" : ""} ${index === activeIndex ? "is-active" : ""}`}
                 key={feature.key}
-                style={{ "--layer-index": index }}
+                style={{ "--layer-offset": `${-150 - index * 12}%` }}
               >
                 <i />
                 <b>{feature.title}</b>
