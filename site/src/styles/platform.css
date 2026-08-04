@@ -64,6 +64,19 @@
   font-size: 0.82rem;
 }
 
+.hero-quickstart {
+  display: grid;
+  max-width: 420px;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.hero-quickstart > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 @media (max-width: 700px) {
   .platform-install-head {
     align-items: stretch;
