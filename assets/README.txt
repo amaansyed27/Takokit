@@ -1,1 +1,0 @@
-Takokit logo pack final: corrected small centered audio icon inside the O, centered exports, repaired small sizes.
