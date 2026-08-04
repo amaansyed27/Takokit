@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RouteLink } from "../../app/router";
-import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
+import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 const STEPS = [
   {
@@ -25,17 +25,19 @@ const STEPS = [
 
 export function RuntimeFlow() {
   const reducedMotion = useReducedMotion();
-  const [activeIndex, setActiveIndex] = useState(reducedMotion ? STEPS.length - 1 : 0);
+  const narrowLayout = useMediaQuery("(max-width: 900px)");
+  const staticLayout = reducedMotion || narrowLayout;
+  const [activeIndex, setActiveIndex] = useState(0);
   const sectionRef = useScrollProgress((progress, section) => {
     const bounded = Math.min(0.9999, Math.max(0, progress));
     const nextIndex = Math.min(STEPS.length - 1, Math.floor(bounded * STEPS.length));
     setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
     section.style.setProperty("--tk-flow-progress", bounded.toFixed(4));
-  }, reducedMotion);
+  }, staticLayout);
 
   return (
     <section
-      className={`tk-flow ${reducedMotion ? "is-static" : ""}`}
+      className={`tk-flow ${staticLayout ? "is-static" : ""}`}
       ref={sectionRef}
       aria-labelledby="tk-flow-title"
     >
@@ -52,7 +54,7 @@ export function RuntimeFlow() {
 
         <ol className="tk-flow__steps">
           {STEPS.map((step, index) => (
-            <li className={index <= activeIndex ? "is-active" : ""} key={step.number}>
+            <li className={staticLayout || index <= activeIndex ? "is-active" : ""} key={step.number}>
               <span>{step.number}</span>
               <article>
                 <p>{step.label}</p>
