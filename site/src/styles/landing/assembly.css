@@ -1,5 +1,5 @@
 .runtime-assembly {
-  --assembly-progress: 0;
+  --assembly-progress-width: 0%;
   position: relative;
   min-height: 250svh;
   background: var(--tk-ink);
@@ -109,7 +109,7 @@
   padding-inline: 0.8rem;
   background: color-mix(in srgb, var(--tk-yellow) 18%, var(--tk-ink));
   opacity: 0;
-  transform: translateY(calc(-150% - var(--layer-index) * 12%));
+  transform: translateY(var(--layer-offset));
   transition: opacity 300ms ease, transform 620ms cubic-bezier(0.22, 1, 0.36, 1), background 220ms ease;
 }
 
@@ -155,7 +155,7 @@
 
 .runtime-assembly__connector i {
   display: block;
-  width: calc(var(--assembly-progress) * 100%);
+  width: var(--assembly-progress-width);
   height: 100%;
   background: var(--tk-yellow);
 }
