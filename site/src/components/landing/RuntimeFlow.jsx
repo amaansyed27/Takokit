@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RouteLink } from "../../app/router";
 import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
@@ -24,8 +25,12 @@ const STEPS = [
 
 export function RuntimeFlow() {
   const reducedMotion = useReducedMotion();
+  const [activeIndex, setActiveIndex] = useState(reducedMotion ? STEPS.length - 1 : 0);
   const sectionRef = useScrollProgress((progress, section) => {
-    section.style.setProperty("--tk-flow-progress", progress.toFixed(4));
+    const bounded = Math.min(0.9999, Math.max(0, progress));
+    const nextIndex = Math.min(STEPS.length - 1, Math.floor(bounded * STEPS.length));
+    setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
+    section.style.setProperty("--tk-flow-progress", bounded.toFixed(4));
   }, reducedMotion);
 
   return (
@@ -47,7 +52,7 @@ export function RuntimeFlow() {
 
         <ol className="tk-flow__steps">
           {STEPS.map((step, index) => (
-            <li key={step.number} style={{ "--flow-index": index }}>
+            <li className={index <= activeIndex ? "is-active" : ""} key={step.number}>
               <span>{step.number}</span>
               <article>
                 <p>{step.label}</p>
