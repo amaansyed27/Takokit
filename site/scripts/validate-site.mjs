@@ -30,15 +30,26 @@ const required = [
   "src/models/filtering.js",
   "src/styles/index.css",
   "src/styles/landing/index.css",
-  "public/brand/takokit-mark.svg",
-  "public/brand/takokit-lockup.svg"
+];
+const rootAssets = [
+  "assets/svg-transparent/512.svg",
+  "assets/svg-white/512-white.svg",
+  "assets/favicon/favicon.ico",
+  "assets/favicon/favicon-32x32.png",
+  "assets/favicon/site.webmanifest",
 ];
 
 for (const path of required) await access(resolve(siteRoot, path));
+for (const path of rootAssets) await access(resolve(repoRoot, path));
 
 const pkg = JSON.parse(await readFile(resolve(siteRoot, "package.json"), "utf8"));
 if (pkg.scripts.build !== "vite build") throw new Error("canonical site build is not Vite");
 if (pkg.scripts.build.includes("scripts/build.mjs")) throw new Error("obsolete static builder is active");
+
+const vite = await readFile(resolve(siteRoot, "vite.config.js"), "utf8");
+if (!vite.includes("takokit-root-brand-assets")) {
+  throw new Error("the site is not serving canonical assets from the repository root");
+}
 
 const vercel = JSON.parse(await readFile(resolve(siteRoot, "vercel.json"), "utf8"));
 if (vercel.framework !== "vite" || vercel.outputDirectory !== "dist") {
@@ -72,8 +83,7 @@ if (sourceEntries.some((path) => String(path).includes("assets/base.css"))) {
   throw new Error("obsolete static site source remains referenced");
 }
 
-const registryPath = process.env.TAKOKIT_REGISTRY_PATH ||
-  resolve(repoRoot, "registry/index.json");
+const registryPath = process.env.TAKOKIT_REGISTRY_PATH || resolve(repoRoot, "registry/index.json");
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
 const errors = validateRegistry(registry);
 if (errors.length) throw new Error(`registry validation failed:\n${errors.join("\n")}`);
