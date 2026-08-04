@@ -9,10 +9,20 @@ const landingComponents = [
   "LandingHero",
   "ProductCapabilities",
   "RuntimeAssembly",
-  "WorkflowPinwheel",
   "ModelLibraryPreview",
   "RuntimeArchitecture",
   "FinalCTA",
+];
+const landingStyles = [
+  "foundation.css",
+  "hero.css",
+  "capabilities.css",
+  "assembly.css",
+  "models.css",
+  "architecture.css",
+  "closing.css",
+  "responsive.css",
+  "motion.css",
 ];
 const required = [
   "index.html",
@@ -35,16 +45,7 @@ const required = [
   "src/models/filtering.js",
   "src/styles/index.css",
   "src/styles/landing/index.css",
-  "src/styles/landing/foundation.css",
-  "src/styles/landing/hero.css",
-  "src/styles/landing/capabilities.css",
-  "src/styles/landing/assembly.css",
-  "src/styles/landing/workflows.css",
-  "src/styles/landing/models.css",
-  "src/styles/landing/architecture.css",
-  "src/styles/landing/closing.css",
-  "src/styles/landing/responsive.css",
-  "src/styles/landing/motion.css",
+  ...landingStyles.map((name) => `src/styles/landing/${name}`),
 ];
 const rootAssets = [
   "assets/svg-transparent/512.svg",
@@ -87,23 +88,14 @@ const home = await readFile(resolve(siteRoot, "src/pages/HomePage.jsx"), "utf8")
 for (const component of landingComponents) {
   if (!home.includes(component)) throw new Error(`landing homepage is missing ${component}`);
 }
+if (home.includes("WorkflowPinwheel")) throw new Error("obsolete landing pinwheel is still referenced");
 if (!home.includes("takokit-landing")) throw new Error("landing page root class is missing");
 
 const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
-for (const stylesheet of [
-  "foundation.css",
-  "hero.css",
-  "capabilities.css",
-  "assembly.css",
-  "workflows.css",
-  "models.css",
-  "architecture.css",
-  "closing.css",
-  "responsive.css",
-  "motion.css",
-]) {
+for (const stylesheet of landingStyles) {
   if (!landingIndex.includes(stylesheet)) throw new Error(`landing styles are missing ${stylesheet}`);
 }
+if (landingIndex.includes("workflows.css")) throw new Error("obsolete pinwheel styles are still imported");
 
 const sourceEntries = await readdir(resolve(siteRoot, "src"), { recursive: true });
 if (sourceEntries.some((path) => String(path).includes("assets/base.css"))) {
