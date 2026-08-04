@@ -34,7 +34,7 @@ export default function App() {
   }
 
   return (
-    <div className={route.name === "home" ? "site site--cinematic-home" : "site"}>
+    <div className={route.name === "home" ? "site site--landing-home" : "site"}>
       <SiteHeader pathname={location.pathname} />
       {page}
       <SiteFooter />
