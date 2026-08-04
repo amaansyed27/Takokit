@@ -7,3 +7,13 @@
     transform: rotate(var(--spoke-counter-angle));
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-wheel__core {
+    transform: translate(-50%, -50%);
+  }
+
+  .tk-wheel__spoke > div {
+    transform: rotate(var(--spoke-counter-angle));
+  }
+}
