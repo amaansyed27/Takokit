@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RouteLink } from "../../app/router";
-import { useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
+import { useMediaQuery, useReducedMotion, useScrollProgress } from "../../hooks/useScrollProgress";
 
 const CAPABILITIES = [
   {
@@ -43,6 +43,8 @@ const CAPABILITIES = [
 
 export function CapabilityPinwheel() {
   const reducedMotion = useReducedMotion();
+  const narrowLayout = useMediaQuery("(max-width: 980px)");
+  const staticLayout = reducedMotion || narrowLayout;
   const [activeIndex, setActiveIndex] = useState(0);
   const sectionRef = useScrollProgress((progress, section) => {
     const bounded = Math.min(0.9999, Math.max(0, progress));
@@ -50,10 +52,10 @@ export function CapabilityPinwheel() {
     setActiveIndex((current) => (current === nextIndex ? current : nextIndex));
     section.style.setProperty("--tk-wheel-turn", `${(-bounded * 360).toFixed(2)}deg`);
     section.style.setProperty("--tk-wheel-progress", `${Math.max(0.02, bounded) * 100}%`);
-  }, reducedMotion);
+  }, staticLayout);
 
   function jumpToCapability(index) {
-    if (reducedMotion || !sectionRef.current) {
+    if (staticLayout || !sectionRef.current) {
       setActiveIndex(index);
       return;
     }
@@ -70,7 +72,7 @@ export function CapabilityPinwheel() {
 
   return (
     <section
-      className={`tk-wheel ${reducedMotion ? "is-static" : ""}`}
+      className={`tk-wheel ${staticLayout ? "is-static" : ""}`}
       id="workflows"
       ref={sectionRef}
       aria-labelledby="tk-wheel-title"
