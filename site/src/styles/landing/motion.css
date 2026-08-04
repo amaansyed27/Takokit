@@ -1,6 +1,5 @@
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .capability-strip li,
     .model-preview__row,
     .runtime-architecture__nodes li,
     .landing-closing__steps li {
@@ -26,16 +25,19 @@
   .landing-hero__mark,
   .landing-hero__copy,
   .landing-hero__wave i,
-  .capability-strip__signal i,
+  .runtime-assembly__ingredient,
   .runtime-architecture__signal i {
     animation: none;
   }
 
-  .runtime-assembly__layers span,
-  .runtime-assembly__cards li,
+  .capability-strip header,
   .capability-strip li,
+  .capability-strip__signal i,
+  .runtime-assembly__cards li,
+  .runtime-assembly__progress i,
   .model-preview__row,
   .landing-button {
+    opacity: 1;
     transition: none;
     transform: none;
   }
