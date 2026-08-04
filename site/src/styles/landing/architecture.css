@@ -4,61 +4,60 @@
 
 .runtime-architecture__inner {
   position: relative;
-  padding-block: clamp(5rem, 10vw, 9rem);
+  padding-block: clamp(4.5rem, 8vw, 7rem);
 }
 
 .runtime-architecture header {
-  max-width: 760px;
-  margin-bottom: clamp(2.5rem, 6vw, 5rem);
+  max-width: 720px;
+  margin-bottom: 2.2rem;
 }
 
 .runtime-architecture h2 {
   margin: 0;
-  font-size: clamp(2.4rem, 4.8vw, 5.2rem);
-  line-height: 0.98;
-  letter-spacing: -0.05em;
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
 }
 
 .runtime-architecture__nodes {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
   padding: 0;
+  border-block: 1px solid var(--tk-line);
   list-style: none;
 }
 
 .runtime-architecture__nodes li {
   position: relative;
   min-width: 0;
-  border-top: 1px solid var(--tk-line);
-  border-bottom: 1px solid var(--tk-line);
-  border-left: 1px solid var(--tk-line);
-  padding: 1.2rem 1rem 1.4rem;
+  border-right: 1px solid var(--tk-line);
+  padding: 1.15rem 1rem 1.35rem;
 }
 
 .runtime-architecture__nodes li:last-child {
-  border-right: 1px solid var(--tk-line);
+  border-right: 0;
 }
 
 .runtime-architecture__nodes span {
   color: var(--tk-yellow-deep);
   font-family: var(--font-technical);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
 }
 
 .runtime-architecture__nodes strong {
   display: block;
-  margin-top: 1.8rem;
+  margin-top: 1.1rem;
   font-family: var(--font-display);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
 }
 
 .runtime-architecture__nodes p {
-  margin: 0.55rem 0 0;
+  margin: 0.45rem 0 0;
   color: var(--tk-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.55;
 }
 
@@ -66,35 +65,32 @@
   position: absolute;
   z-index: 3;
   top: 50%;
-  right: -4px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--tk-yellow);
+  right: -0.45rem;
+  color: var(--tk-yellow-deep);
+  font-family: var(--font-technical);
+  font-size: 0.72rem;
+  font-style: normal;
   transform: translateY(-50%);
 }
 
 .runtime-architecture__signal {
-  position: absolute;
-  right: 0;
-  bottom: clamp(4.2rem, 8vw, 7rem);
-  left: 0;
-  height: 1px;
+  position: relative;
+  height: 2px;
+  margin-top: 1.2rem;
+  overflow: hidden;
   background: var(--tk-line);
 }
 
 .runtime-architecture__signal i {
   display: block;
-  width: 9%;
-  height: 3px;
-  margin-top: -1px;
+  width: 14%;
+  height: 100%;
   background: var(--tk-yellow);
   animation: architecture-signal 5s ease-in-out infinite;
 }
 
 @keyframes architecture-signal {
-  0%, 100% { transform: translateX(0); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  99% { transform: translateX(1010%); opacity: 0; }
+  0%, 100% { transform: translateX(-110%); opacity: 0; }
+  12%, 88% { opacity: 1; }
+  99% { transform: translateX(720%); opacity: 0; }
 }
