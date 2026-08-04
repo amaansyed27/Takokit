@@ -64,7 +64,6 @@ export function CapabilityPinwheel() {
   }
 
   const active = CAPABILITIES[activeIndex];
-  const wheelTurn = `${-activeIndex * 90}deg`;
 
   return (
     <section
@@ -72,7 +71,10 @@ export function CapabilityPinwheel() {
       id="workflows"
       ref={sectionRef}
       aria-labelledby="tk-wheel-title"
-      style={{ "--tk-wheel-turn": wheelTurn }}
+      style={{
+        "--tk-wheel-turn": `${-activeIndex * 90}deg`,
+        "--tk-wheel-counter-turn": `${activeIndex * 90}deg`,
+      }}
     >
       <div className="tk-wheel__stage shell">
         <header className="tk-section-bar tk-section-bar--light">
@@ -88,6 +90,7 @@ export function CapabilityPinwheel() {
                 key={capability.task}
                 style={{
                   "--spoke-angle": `${index * 90}deg`,
+                  "--spoke-counter-angle": `${-index * 90}deg`,
                   "--label-turn": `${(activeIndex - index) * 90}deg`,
                 }}
               >
