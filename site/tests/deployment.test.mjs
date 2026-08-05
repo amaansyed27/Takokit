@@ -20,8 +20,10 @@ test("Vercel builds the canonical Vite source", async () => {
 
 test("SPA, registry, installer, and cache configuration are present", async () => {
   const config = JSON.parse(await readFile(new URL("vercel.json", root), "utf8"));
+  assert.equal(config.cleanUrls, true);
   assert.ok(config.rewrites.some((rule) => rule.source === "/v1/registry.json"));
-  assert.ok(config.rewrites.some((rule) => rule.destination === "/index.html"));
+  assert.ok(config.rewrites.some((rule) => rule.destination === "/"));
+  assert.ok(!config.rewrites.some((rule) => rule.destination === "/index.html"));
   assert.ok(config.headers.some((rule) => rule.source === "/assets/(.*)"));
   assert.ok(config.headers.some((rule) => rule.source === "/brand/(.*)"));
   assert.ok(config.headers.some((rule) => rule.source === "/install.ps1"));
