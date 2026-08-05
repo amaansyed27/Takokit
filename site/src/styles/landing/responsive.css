@@ -30,30 +30,13 @@
     display: none;
   }
 
-  .runtime-assembly__intro {
-    top: 82px;
-  }
-
-  .runtime-assembly__visual {
-    width: 270px;
-    margin-block: 0.8rem;
-  }
-
-  .runtime-assembly__ingredient {
-    top: 7%;
+  .capability-moment,
+  .runtime-band {
+    min-height: 560px;
   }
 }
 
 @media (max-width: 1000px) {
-  .runtime-assembly__layout {
-    grid-template-columns: minmax(280px, 0.74fr) minmax(340px, 1fr);
-    gap: 3rem;
-  }
-
-  .runtime-assembly__visual {
-    width: min(100%, 300px);
-  }
-
   .model-preview__row {
     grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) 1rem;
   }
@@ -77,39 +60,16 @@
     display: none;
   }
 
-  .runtime-assembly__layout {
-    grid-template-columns: 1fr;
-    gap: 3rem;
-    padding-block: 5.5rem;
+  .capability-moment,
+  .runtime-band {
+    min-height: 560px;
   }
 
-  .runtime-assembly__intro {
-    position: relative;
-    top: 0;
-    max-width: 720px;
-  }
-
-  .runtime-assembly__visual {
-    width: min(66vw, 320px);
-  }
-
-  .runtime-assembly__cards {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .runtime-assembly__cards li,
-  .runtime-assembly__cards li:last-child {
-    min-height: 165px;
-    border-right: 1px solid var(--tk-line-light);
-    border-bottom: 1px solid var(--tk-line-light);
-  }
-
-  .runtime-assembly__cards li:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .runtime-assembly__cards li.is-active,
-  .runtime-assembly__cards li:focus-visible {
+  .capability-moment__copy,
+  .capability-moment--right .capability-moment__copy,
+  .runtime-band__copy,
+  .runtime-band--right .runtime-band__copy {
+    opacity: 1;
     transform: none;
   }
 
@@ -191,57 +151,97 @@
     width: 100%;
   }
 
-  .capability-strip__inner,
+  .capability-story__header,
+  .runtime-story__header,
   .model-preview__inner,
   .runtime-architecture__inner,
   .landing-closing > .landing-shell {
-    padding-block: 4.2rem;
-  }
-
-  .capability-strip h2,
-  .model-preview__header h2,
-  .runtime-architecture h2,
-  .runtime-assembly__intro h2,
-  .landing-closing__cta h2 {
-    font-size: clamp(2.15rem, 9.5vw, 3.2rem);
-  }
-
-  .capability-strip ul {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .capability-strip li:nth-child(2) {
-    border-right: 0;
-  }
-
-  .capability-strip li:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--tk-line);
-  }
-
-  .runtime-assembly__layout {
     padding-block: 4.5rem;
   }
 
-  .runtime-assembly__visual {
-    width: min(82vw, 290px);
+  .capability-story__header h2,
+  .runtime-story__header h2,
+  .model-preview__header h2,
+  .runtime-architecture h2,
+  .landing-closing__cta h2 {
+    font-size: clamp(2.2rem, 9.5vw, 3.4rem);
   }
 
-  .runtime-assembly__ingredient {
-    min-width: 142px;
-    padding: 0.58rem 0.68rem;
+  .capability-moment,
+  .runtime-band {
+    min-height: auto;
   }
 
-  .runtime-assembly__cards {
+  .capability-moment__inner,
+  .capability-moment--right .capability-moment__inner,
+  .runtime-band__inner,
+  .runtime-band--right .runtime-band__inner {
+    min-height: 430px;
     grid-template-columns: 1fr;
+    align-content: center;
+    gap: 1rem;
+    padding-block: 5rem;
   }
 
-  .runtime-assembly__cards li,
-  .runtime-assembly__cards li:last-child,
-  .runtime-assembly__cards li:nth-child(2n) {
-    min-height: 140px;
-    border-right: 0;
-    border-bottom: 1px solid var(--tk-line-light);
-    padding: 1.4rem 0.9rem;
+  .capability-moment__number,
+  .capability-moment--right .capability-moment__number,
+  .runtime-band__number,
+  .runtime-band--right .runtime-band__number {
+    grid-column: 1;
+    grid-row: auto;
+    margin: 0;
+    text-align: left;
+  }
+
+  .capability-moment__copy,
+  .capability-moment--right .capability-moment__copy,
+  .runtime-band__copy,
+  .runtime-band--right .runtime-band__copy {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .capability-moment h3,
+  .runtime-band h3 {
+    font-size: clamp(3.2rem, 16vw, 5rem);
+  }
+
+  .capability-moment--right p,
+  .runtime-band--right p {
+    margin-left: 0;
+  }
+
+  .capability-moment__signal,
+  .capability-moment--right .capability-moment__signal {
+    right: -20%;
+    bottom: 8%;
+    left: -20%;
+    height: 76px;
+    transform: none;
+  }
+
+  .runtime-band__signal,
+  .runtime-band--right .runtime-band__signal {
+    right: -20%;
+    bottom: 10%;
+    left: -20%;
+    transform: none;
+  }
+
+  .runtime-story__outro {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 1.2rem;
+    padding-block: 4.5rem;
+  }
+
+  .runtime-story__outro img {
+    width: 58px;
+  }
+
+  .runtime-story__outro h3 {
+    font-size: clamp(1.8rem, 8.5vw, 2.8rem);
   }
 
   .model-preview__header {
@@ -308,27 +308,20 @@
     font-size: clamp(2.2rem, 11.4vw, 3rem);
   }
 
-  .capability-strip ul {
+  .capability-moment__inner,
+  .capability-moment--right .capability-moment__inner,
+  .runtime-band__inner,
+  .runtime-band--right .runtime-band__inner {
+    min-height: 390px;
+    padding-block: 4rem;
+  }
+
+  .capability-moment h3,
+  .runtime-band h3 {
+    font-size: clamp(2.9rem, 15vw, 4.1rem);
+  }
+
+  .runtime-story__outro {
     grid-template-columns: 1fr;
-  }
-
-  .capability-strip li,
-  .capability-strip li:nth-child(2) {
-    min-height: 128px;
-    border-right: 0;
-    border-bottom: 1px solid var(--tk-line);
-  }
-
-  .capability-strip li:last-child {
-    border-bottom: 0;
-  }
-
-  .runtime-assembly__visual {
-    width: min(86vw, 270px);
-  }
-
-  .runtime-assembly__ingredient {
-    top: 6%;
-    min-width: 132px;
   }
 }
