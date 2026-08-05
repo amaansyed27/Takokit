@@ -19,7 +19,7 @@ pub const HOME_ACTIONS: [(&str, &str); 7] = [
     ("Clone voice", "Create a consented local voice profile"),
     (
         "Convert voice",
-        "Run RVC and review execution separately from quality",
+        "Run conversion and review execution separately from quality",
     ),
     ("Manage", "Inspect models, runners, and the local service"),
     ("Sessions", "Open prior work or start a clean session"),
@@ -200,6 +200,7 @@ pub struct App {
     pub clone_state: super::clone::CloneState,
     pub convert_state: ConvertState,
     pub storage_root: String,
+    pub workspace_root: String,
     pub server: String,
     pub status: String,
     pub running_label: Option<String>,
@@ -208,7 +209,7 @@ pub struct App {
     pub tick: u64,
     pub show_help: bool,
     workspace_store: WorkspaceStore,
-    active_session: Uuid,
+    active_session: Option<Uuid>,
 }
 
 impl App {
@@ -224,8 +225,19 @@ impl App {
         let clone_state = super::clone::CloneState::new(&models);
         let convert_state = ConvertState::new(&models);
         let sessions = workspace.store.list_sessions(None)?;
-        let active_session = workspace.session_id();
+        let active_session = workspace
+            .active_session_id()
+            .or(workspace.store.active_session()?);
         let session_index = session_position(&sessions, active_session);
+        let workspace_root = workspace.store.workspace_root().display().to_string();
+        let status = match active_session {
+            Some(id) => format!(
+                "Workspace {workspace_root}. Session {id} is active; outputs are written under its .tako history."
+            ),
+            None => format!(
+                "Workspace {workspace_root}. No session exists yet; .tako will be created by the first workflow or New Session."
+            ),
+        };
 
         Ok(Self {
             screen: TuiScreen::Home,
@@ -259,12 +271,9 @@ impl App {
             clone_state,
             convert_state,
             storage_root: store.root().display().to_string(),
+            workspace_root,
             server: config.local_base_url(),
-            status: format!(
-                "Session {} is active. Outputs are saved under {}.",
-                active_session,
-                workspace.outputs_dir().display()
-            ),
+            status,
             running_label: None,
             last_label: None,
             output_scroll: 0,
@@ -319,6 +328,15 @@ impl App {
 
     pub fn reload_sessions(&mut self) -> anyhow::Result<()> {
         self.sessions = self.workspace_store.list_sessions(None)?;
+        if let Some(persisted) = self.workspace_store.active_session()? {
+            if self
+                .sessions
+                .iter()
+                .any(|session| session.id == persisted)
+            {
+                self.active_session = Some(persisted);
+            }
+        }
         self.session_index = session_position(&self.sessions, self.active_session);
         Ok(())
     }
@@ -326,7 +344,7 @@ impl App {
     pub fn activate_session(&mut self, id: Uuid) -> anyhow::Result<()> {
         let session = self.workspace_store.read_session(id)?;
         self.workspace_store.set_active_session(id)?;
-        self.active_session = id;
+        self.active_session = Some(id);
         std::env::set_var(WORKSPACE_ENV, self.workspace_store.workspace_root());
         std::env::set_var(SESSION_ENV, id.to_string());
         self.reload_sessions()?;
@@ -344,15 +362,17 @@ impl App {
     }
 
     pub fn workspace_args(&self) -> Vec<String> {
-        vec![
+        let mut arguments = vec![
             "--workspace".to_string(),
             self.workspace_store.workspace_root().display().to_string(),
-            "--session".to_string(),
-            self.active_session.to_string(),
-        ]
+        ];
+        if let Some(id) = self.active_session {
+            arguments.extend(["--session".to_string(), id.to_string()]);
+        }
+        arguments
     }
 
-    pub fn active_session(&self) -> Uuid {
+    pub fn active_session(&self) -> Option<Uuid> {
         self.active_session
     }
 
@@ -423,10 +443,9 @@ impl App {
     }
 }
 
-fn session_position(sessions: &[SessionSummary], active: Uuid) -> usize {
-    sessions
-        .iter()
-        .position(|session| session.id == active)
+fn session_position(sessions: &[SessionSummary], active: Option<Uuid>) -> usize {
+    active
+        .and_then(|id| sessions.iter().position(|session| session.id == id))
         .unwrap_or(0)
 }
 
@@ -447,5 +466,10 @@ mod tests {
         assert_eq!(HOME_ACTIONS[1].0, "Transcribe");
         assert_eq!(HOME_ACTIONS[2].0, "Clone voice");
         assert_eq!(HOME_ACTIONS[3].0, "Convert voice");
+    }
+
+    #[test]
+    fn session_position_handles_an_uninitialized_workspace() {
+        assert_eq!(session_position(&[], None), 0);
     }
 }
