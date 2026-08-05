@@ -1,6 +1,30 @@
 import { RouteLink } from "../app/router";
-import { CommandBar } from "../components/CommandBar";
-import { DOC_GROUPS, findDoc } from "../docs/content";
+import { DocsCodeBlock } from "../components/docs/DocsCodeBlock";
+import { DocsPager } from "../components/docs/DocsPager";
+import { DocsSidebar } from "../components/docs/DocsSidebar";
+import { DocsTableOfContents } from "../components/docs/DocsTableOfContents";
+import {
+  DOC_GROUPS,
+  adjacentDocs,
+  findDoc,
+  findDocGroup,
+} from "../docs/content";
+
+function DocSection({ section }) {
+  return (
+    <section className="docs-content__section" id={section.id} aria-labelledby={`${section.id}-title`}>
+      <h2 id={`${section.id}-title`}>
+        <a href={`#${section.id}`}>{section.title}</a>
+      </h2>
+      {section.body?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      {section.commands?.map((command) => (
+        <DocsCodeBlock key={command} label="Command">{command}</DocsCodeBlock>
+      ))}
+      {section.code && <DocsCodeBlock label="Example">{section.code}</DocsCodeBlock>}
+      {section.note && <aside className="docs-note"><strong>Note</strong><p>{section.note}</p></aside>}
+    </section>
+  );
+}
 
 export function DocsPage({ slug }) {
   const doc = findDoc(slug);
@@ -14,39 +38,37 @@ export function DocsPage({ slug }) {
     );
   }
 
+  const group = findDocGroup(slug);
+  const { previous, next } = adjacentDocs(slug);
+  const sections = doc.sections || [];
+
   return (
-    <main className="shell page docs-layout">
-      <aside className="docs-nav" aria-label="Documentation">
-        {DOC_GROUPS.map((group) => (
-          <section key={group.title}>
-            <h2>{group.title}</h2>
-            {group.pages.map(([id, title]) => (
-              <RouteLink
-                key={id}
-                href={`/docs/${id}`}
-                className={id === slug ? "is-active" : ""}
-                aria-current={id === slug ? "page" : undefined}
-              >
-                {title}
-              </RouteLink>
-            ))}
-          </section>
-        ))}
-      </aside>
-      <article className="docs-article">
-        <header>
-          <p className="eyebrow">Documentation</p>
-          <h1>{doc.title}</h1>
-          <p>{doc.intro}</p>
-        </header>
-        {doc.sections?.map(([title, text]) => (
-          <section key={title}><h2>{title}</h2><p>{text}</p></section>
-        ))}
-        {doc.commands?.length > 0 && (
-          <section><h2>Commands</h2>{doc.commands.map((command) => <CommandBar key={command}>{command}</CommandBar>)}</section>
-        )}
-        {doc.code && <section><h2>Example</h2><CommandBar>{doc.code}</CommandBar></section>}
-      </article>
+    <main className="docs-page">
+      <div className="docs-shell">
+        <DocsSidebar groups={DOC_GROUPS} slug={slug} />
+
+        <article className="docs-content">
+          <nav className="docs-breadcrumbs" aria-label="Breadcrumb">
+            <RouteLink href="/docs">Docs</RouteLink>
+            <span aria-hidden="true">/</span>
+            <span>{group?.title || "Documentation"}</span>
+          </nav>
+
+          <header className="docs-content__header">
+            <p className="docs-content__category">{group?.title || "Documentation"}</p>
+            <h1>{doc.title}</h1>
+            <p>{doc.intro}</p>
+          </header>
+
+          <div className="docs-content__body">
+            {sections.map((section) => <DocSection key={section.id} section={section} />)}
+          </div>
+
+          <DocsPager previous={previous} next={next} />
+        </article>
+
+        <DocsTableOfContents sections={sections} />
+      </div>
     </main>
   );
 }
