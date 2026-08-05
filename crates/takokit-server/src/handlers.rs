@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use takokit_core::{
-    CapabilitiesResponse, CapabilityInfo, CapabilityKind, DaemonIdentity, DaemonMode,
+    CapabilitiesResponse, CapabilityInfo, CapabilityKind, DaemonBuildIdentity, DaemonMode,
     DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse, ModelInstallReport,
     ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
     RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
