@@ -16,11 +16,14 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
-use crate::build_info;
-
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);
 const SHUTDOWN_ATTEMPTS: usize = 100;
+const BUILD_ID: &str = env!("TAKOKIT_BUILD_ID");
+
+pub(crate) fn current_build_id() -> &'static str {
+    BUILD_ID
+}
 
 #[cfg(windows)]
 mod windows_handle_inheritance {
@@ -177,7 +180,7 @@ pub fn ensure_fresh_running(
         if build_freshness(&identity) != BuildFreshness::Current {
             return Err(anyhow!(
                 "replacement daemon build verification failed: expected {}, got {}",
-                build_info::build_id(),
+                current_build_id(),
                 if identity.build_id.is_empty() {
                     "<missing>"
                 } else {
@@ -199,10 +202,12 @@ fn start_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Da
         }
     }
     if daemon_lock_is_held(store)? {
-        return wait_for_verified(store, config)?.ok_or_else(|| anyhow!(
-            "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
-            IDENTITY_WAIT.as_secs(), log_path(store).display()
-        ));
+        return wait_for_verified(store, config)?
+            .map(|(info, _)| info)
+            .ok_or_else(|| anyhow!(
+                "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
+                IDENTITY_WAIT.as_secs(), log_path(store).display()
+            ));
     }
     if port_is_occupied(config) {
         return Err(anyhow!("port {} is occupied by a direct Takokit server or another process; managed daemon will not take ownership", config.port));
@@ -283,7 +288,7 @@ pub async fn child(
         started_at: now(),
         mode: DaemonMode::Managed,
         log_path: log_path(&store),
-        build_id: build_info::build_id().to_string(),
+        build_id: current_build_id().to_string(),
     };
     write_atomic(&store.daemon_info_path(), &info)?;
     let cleanup_root = store.root().to_path_buf();
@@ -291,7 +296,7 @@ pub async fn child(
         let _ = run_automatic_uv_cleanup(&cleanup_root);
     });
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let state = AppState::new_with_build_id(config, store.clone(), build_info::build_id())
+    let state = AppState::new_with_build_id(config, store.clone(), current_build_id())
         .managed(info.identity(), shutdown_tx);
     let result = run_server_with_listener(state, listener, Some(shutdown_rx)).await;
     if read_info(&store)?.is_some_and(|current| current.instance_id == instance_id) {
@@ -465,7 +470,7 @@ fn verify_identity(info: &DaemonInfo, identity: &DaemonIdentity) -> anyhow::Resu
 pub(crate) fn build_freshness(identity: &DaemonIdentity) -> BuildFreshness {
     if identity.build_id.trim().is_empty() {
         BuildFreshness::Missing
-    } else if identity.build_id == build_info::build_id() {
+    } else if identity.build_id == current_build_id() {
         BuildFreshness::Current
     } else {
         BuildFreshness::Mismatched
