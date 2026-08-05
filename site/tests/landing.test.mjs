@@ -24,16 +24,23 @@ test("homepage uses the simplified Takokit landing flow", async () => {
   assert.match(home, /className="takokit-landing"/);
 });
 
-test("hero exposes the required pull command and primary actions without scroll state", async () => {
+test("hero rotates only the model reference while keeping the pull command stable", async () => {
   const hero = await source("src/components/landing/LandingHero.jsx");
+  const command = await source("src/components/landing/RollingPullCommand.jsx");
   const styles = await source("src/styles/landing/hero.css");
   assert.doesNotMatch(hero, /useScrollProgress|PlatformInstall/);
   assert.match(hero, /landing-hero__wave/);
   assert.match(hero, /Run open voice models locally/);
-  assert.match(hero, /tako pull kokoro/);
+  assert.match(hero, /RollingPullCommand/);
   assert.match(hero, /Download for Windows/);
   assert.match(hero, /Browse models/);
-  assert.match(styles, /landing-hero__quickstart/);
+  assert.match(command, /tako pull \$\{model\}/);
+  for (const model of ["kokoro", "whisper-tiny", "chatterbox", "rvc"]) {
+    assert.ok(command.includes(model), `missing rotating model ${model}`);
+  }
+  assert.match(command, /prefers-reduced-motion: reduce/);
+  assert.match(styles, /rolling-pull-command__window/);
+  assert.match(styles, /hero-model-roll/);
   assert.match(styles, /min-height: 52px/);
 });
 
