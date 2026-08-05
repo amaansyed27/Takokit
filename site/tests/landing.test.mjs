@@ -32,24 +32,30 @@ test("hero keeps motion lightweight and preserves installation", async () => {
   assert.match(hero, /Run open voice models locally/);
 });
 
-test("capability section reveals workflows on viewport entry", async () => {
+test("capabilities use large typography with a lightweight reveal fallback", async () => {
   const capabilities = await source("src/components/landing/ProductCapabilities.jsx");
+  const styles = await source("src/styles/landing/capabilities.css");
   assert.match(capabilities, /IntersectionObserver/);
-  assert.match(capabilities, /is-visible/);
+  assert.match(capabilities, /capability-moment/);
+  assert.match(styles, /animation-timeline: view\(\)/);
+  assert.match(styles, /capability-copy-left/);
   for (const capability of ["Speak", "Transcribe", "Clone", "Convert"]) {
     assert.ok(capabilities.includes(capability), `missing ${capability}`);
   }
 });
 
-test("runtime assembly describes real Takokit layers without per-frame scroll state", async () => {
-  const assembly = await source("src/components/landing/RuntimeAssembly.jsx");
-  for (const capability of ["Models", "Runners", "Adapters", "Interfaces", "Local state", "Consent"]) {
-    assert.ok(assembly.includes(capability), `missing ${capability}`);
+test("runtime story uses direct feature bands without scroll-driven React state", async () => {
+  const runtime = await source("src/components/landing/RuntimeAssembly.jsx");
+  const styles = await source("src/styles/landing/assembly.css");
+  for (const capability of ["Models", "Runners", "Every interface", "Local by default"]) {
+    assert.ok(runtime.includes(capability), `missing ${capability}`);
   }
-  assert.match(assembly, /IntersectionObserver/);
-  assert.doesNotMatch(assembly, /useScrollProgress/);
-  assert.match(assembly, /runtime-assembly__ingredient/);
-  assert.match(assembly, /\/brand\/takokit-mark\.svg/);
+  assert.doesNotMatch(runtime, /useScrollProgress|IntersectionObserver|useState/);
+  assert.match(runtime, /runtime-band/);
+  assert.match(runtime, /Different workflows/);
+  assert.match(runtime, /\/brand\/takokit-mark\.svg/);
+  assert.match(styles, /animation-timeline: view\(\)/);
+  assert.match(styles, /runtime-copy-left/);
 });
 
 test("landing uses Dawnlight fonts with the Takokit palette", async () => {
@@ -70,11 +76,11 @@ test("landing uses Dawnlight fonts with the Takokit palette", async () => {
   assert.match(vite, /assets\/svg-transparent\/512\.svg/);
 });
 
-test("responsive landing adapts the sticky story for compact screens", async () => {
+test("responsive landing keeps the parallax stories readable on compact screens", async () => {
   const responsive = await source("src/styles/landing/responsive.css");
   assert.match(responsive, /max-width: 900px/);
-  assert.match(responsive, /runtime-assembly__intro/);
-  assert.match(responsive, /position: relative/);
+  assert.match(responsive, /capability-moment/);
+  assert.match(responsive, /runtime-band/);
   assert.match(responsive, /max-width: 700px/);
   assert.match(responsive, /max-width: 390px/);
 });
