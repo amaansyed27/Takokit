@@ -25,6 +25,18 @@ pub struct AppState {
 }
 impl AppState {
     pub fn new(config: RuntimeConfig, store: LocalStore) -> Self {
+        Self::new_with_build_id(
+            config,
+            store,
+            format!("version-{}", env!("CARGO_PKG_VERSION")),
+        )
+    }
+
+    pub fn new_with_build_id(
+        config: RuntimeConfig,
+        store: LocalStore,
+        build_id: impl Into<String>,
+    ) -> Self {
         Self {
             package_registry: Arc::new(PackageRegistry::bundled()),
             installed_registry: Arc::new(InstalledRegistry::new(store.manifests_dir())),
@@ -38,6 +50,7 @@ impl AppState {
                 port: config.port,
                 started_at: now(),
                 log_path: None,
+                build_id: build_id.into(),
             },
             config,
             store,
