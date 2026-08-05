@@ -1,68 +1,62 @@
-import { useEffect, useRef } from "react";
 import { RouteLink } from "../../app/router";
 
 const FEATURES = [
-  ["Models", "Versioned voice models from one registry."],
-  ["Runners", "The required execution backend is selected and managed for each model family."],
-  ["Every interface", "CLI, TUI, GUI, and API share the same models, sessions, and local state."],
+  ["Models", "Versioned voice models resolved from one registry."],
+  ["Runners", "The right execution backend is managed for each model family."],
+  ["Every interface", "CLI, TUI, GUI, and API share the same models and state."],
   ["Local by default", "Models, voices, sessions, and outputs stay on your machine."],
 ];
 
 export function RuntimeAssembly() {
-  const sectionRef = useRef(null);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section || typeof IntersectionObserver === "undefined") return undefined;
-
-    const targets = section.querySelectorAll("[data-reveal]");
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add("is-visible");
-        observer.unobserve(entry.target);
-      });
-    }, {
-      rootMargin: "-8% 0px -14% 0px",
-      threshold: 0.16,
-    });
-
-    targets.forEach((target) => observer.observe(target));
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section
-      className="runtime-story"
-      id="features"
-      aria-labelledby="runtime-story-title"
-      ref={sectionRef}
-    >
-      <header className="landing-shell runtime-story__header" data-reveal>
-        <p className="landing-kicker">Inside Takokit</p>
-        <h2 id="runtime-story-title">The whole voice stack. One local runtime.</h2>
-      </header>
+    <section className="runtime-wheel" id="features" aria-labelledby="runtime-wheel-title">
+      <div className="runtime-wheel__stage landing-shell">
+        <header className="runtime-wheel__header">
+          <p className="landing-kicker">Inside Takokit</p>
+          <h2 id="runtime-wheel-title">
+            The whole voice stack.
+            <span>One local runtime.</span>
+          </h2>
+        </header>
 
-      <div className="runtime-story__bands">
-        {FEATURES.map(([title, description], index) => (
-          <article
-            className={`runtime-band ${index % 2 ? "runtime-band--right" : "runtime-band--left"}`}
-            data-reveal
-            key={title}
-          >
-            <div className="landing-shell runtime-band__inner">
-              <span className="runtime-band__number">{String(index + 1).padStart(2, "0")}</span>
-              <div className="runtime-band__copy">
-                <h3>{title}.</h3>
-                <p>{description}</p>
-              </div>
-              <i className="runtime-band__signal" aria-hidden="true" />
+        <div className="runtime-wheel__scene">
+          <div className="runtime-wheel__pinwheel" aria-hidden="true">
+            <div className="runtime-wheel__rotor">
+              {FEATURES.map(([title], index) => (
+                <span
+                  className="runtime-wheel__spoke"
+                  key={title}
+                  style={{ "--spoke-index": index }}
+                >
+                  <i />
+                </span>
+              ))}
+              <span className="runtime-wheel__hub">
+                <img src="/brand/takokit-mark.svg" alt="" />
+              </span>
             </div>
-          </article>
-        ))}
+          </div>
+
+          <div className="runtime-wheel__roller">
+            <div className="runtime-wheel__track">
+              {FEATURES.map(([title, description], index) => (
+                <article className="runtime-wheel__panel" key={title}>
+                  <span>{String(index + 1).padStart(2, "0")} / 04</span>
+                  <h3>{title}.</h3>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="runtime-wheel__footer" aria-hidden="true">
+          <span>Scroll through the runtime</span>
+          <i />
+        </div>
       </div>
 
-      <div className="landing-shell runtime-story__outro" data-reveal>
+      <div className="runtime-wheel__outro landing-shell">
         <img src="/brand/takokit-mark.svg" alt="" aria-hidden="true" />
         <div>
           <p className="landing-kicker">Takokit runtime</p>
