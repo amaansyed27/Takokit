@@ -1,0 +1,212 @@
+.docs-content {
+  min-width: 0;
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.docs-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.docs-breadcrumbs a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.docs-breadcrumbs a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.docs-content__header {
+  padding-bottom: 2.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.docs-content__category {
+  margin: 0 0 0.7rem;
+  color: var(--gold-dark);
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.docs-content__header h1 {
+  max-width: 700px;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: clamp(2.25rem, 5vw, 3.45rem);
+  font-weight: 720;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.docs-content__header > p:last-child {
+  max-width: 680px;
+  margin: 1rem 0 0;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.docs-content__body {
+  min-width: 0;
+}
+
+.docs-content__section {
+  scroll-margin-top: 100px;
+  padding: 2.4rem 0 0.3rem;
+}
+
+.docs-content__section + .docs-content__section {
+  margin-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.docs-content__section h2 {
+  margin: 0 0 1rem;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: clamp(1.4rem, 3vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.docs-content__section h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-content__section h2 a:hover::after {
+  margin-left: 0.45rem;
+  color: var(--gold-dark);
+  content: "#";
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+}
+
+.docs-content__section p {
+  max-width: 700px;
+  margin: 0 0 1.05rem;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  line-height: 1.75;
+}
+
+.docs-code-block {
+  min-width: 0;
+  margin: 1rem 0 1.25rem;
+  overflow: hidden;
+  border: 1px solid #2d302b;
+  border-radius: 7px;
+  background: #171915;
+  color: #f5f2e9;
+}
+
+.docs-code-block__bar {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #30332d;
+  padding-left: 0.9rem;
+  color: #aaa99f;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+
+.docs-code-block__bar button {
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid #30332d;
+  padding: 0 0.9rem;
+  background: transparent;
+  color: #f5f2e9;
+  cursor: pointer;
+  font: inherit;
+}
+
+.docs-code-block__bar button:hover,
+.docs-code-block__bar button:focus-visible {
+  background: #242720;
+}
+
+.docs-code-block pre {
+  max-width: 100%;
+  margin: 0;
+  overflow-x: auto;
+  padding: 1rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+.docs-code-block code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.docs-note {
+  margin: 1.25rem 0;
+  border-left: 3px solid var(--gold);
+  padding: 0.2rem 0 0.2rem 1rem;
+}
+
+.docs-note strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+}
+
+.docs-note p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.docs-pager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.docs-pager__link {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 1rem;
+  background: var(--paper-bright);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.docs-pager__link:hover {
+  border-color: color-mix(in srgb, var(--gold-dark) 55%, var(--line));
+}
+
+.docs-pager__link span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.docs-pager__link strong {
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+}
+
+.docs-pager__link--next {
+  text-align: right;
+}
