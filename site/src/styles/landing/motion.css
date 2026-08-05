@@ -27,24 +27,51 @@
   .landing-hero__wave i,
   .capability-moment__copy,
   .capability-moment__signal,
-  .runtime-story__header,
-  .runtime-band__copy,
-  .runtime-band__signal,
-  .runtime-story__outro,
+  .runtime-wheel__rotor,
+  .runtime-wheel__track,
+  .runtime-wheel__header,
+  .runtime-wheel__footer > i::after,
+  .runtime-wheel__outro,
   .runtime-architecture__signal i {
     animation: none;
   }
 
   .capability-moment__copy,
   .capability-moment--right .capability-moment__copy,
-  .runtime-story__header,
-  .runtime-band__copy,
-  .runtime-band--right .runtime-band__copy,
-  .runtime-story__outro,
+  .runtime-wheel__header,
+  .runtime-wheel__outro,
   .model-preview__row,
   .landing-button {
     opacity: 1;
     transition: none;
     transform: none;
+  }
+
+  .runtime-wheel {
+    min-height: 0;
+  }
+
+  .runtime-wheel__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .runtime-wheel__roller {
+    height: auto;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .runtime-wheel__track {
+    display: grid;
+    height: auto;
+  }
+
+  .runtime-wheel__panel {
+    height: auto;
+    min-height: 190px;
+    border-top: 1px solid var(--tk-line-light);
   }
 }
