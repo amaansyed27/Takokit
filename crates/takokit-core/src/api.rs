@@ -14,6 +14,10 @@ pub struct DaemonIdentity {
     pub port: u16,
     pub started_at: u64,
     pub log_path: Option<PathBuf>,
+    /// Build that owns this daemon. Empty means a legacy identity that predates
+    /// build freshness checks and must be replaced before routing commands.
+    #[serde(default)]
+    pub build_id: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -386,6 +390,15 @@ fn default_training_model() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_daemon_identity_without_build_id_still_deserializes() {
+        let identity: DaemonIdentity = serde_json::from_str(
+            r#"{"instance_id":null,"mode":"direct","pid":1,"executable":"takokit","storage_root":".takokit","host":"127.0.0.1","port":5050,"started_at":1,"log_path":null}"#,
+        )
+        .expect("legacy identity");
+        assert!(identity.build_id.is_empty());
+    }
 
     #[test]
     fn speech_request_matches_openai_compatible_shape() {
