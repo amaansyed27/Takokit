@@ -19,6 +19,13 @@ const docsComponents = [
   "DocsSidebar",
   "DocsTableOfContents",
 ];
+const docsPages = [
+  "developers.js",
+  "getting-started.js",
+  "manage.js",
+  "voice-workflows.js",
+];
+const docsStyles = ["layout.css", "content.css", "responsive.css"];
 const landingStyles = [
   "foundation.css",
   "hero.css",
@@ -53,10 +60,12 @@ const required = [
   "src/components/landing/RollingPullCommand.jsx",
   ...docsComponents.map((name) => `src/components/docs/${name}.jsx`),
   "src/docs/content.js",
+  ...docsPages.map((name) => `src/docs/pages/${name}`),
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
-  "src/styles/docs.css",
+  "src/styles/docs/index.css",
+  ...docsStyles.map((name) => `src/styles/docs/${name}`),
   "src/styles/landing/index.css",
   ...landingStyles.map((name) => `src/styles/landing/${name}`),
 ];
@@ -166,13 +175,24 @@ for (const component of docsComponents) {
 if (!docsPage.includes("docs-shell") || !docsPage.includes("docs-content__section")) {
   throw new Error("documentation reading layout is missing");
 }
-const docsStyles = await readFile(resolve(siteRoot, "src/styles/docs.css"), "utf8");
-for (const selector of [".docs-sidebar", ".docs-content", ".docs-toc", ".docs-pager"]) {
-  if (!docsStyles.includes(selector)) throw new Error(`documentation styles are missing ${selector}`);
+
+const docsStyleIndex = await readFile(resolve(siteRoot, "src/styles/docs/index.css"), "utf8");
+for (const stylesheet of docsStyles) {
+  if (!docsStyleIndex.includes(stylesheet)) {
+    throw new Error(`documentation styles are missing ${stylesheet}`);
+  }
+}
+const docsLayout = await readFile(resolve(siteRoot, "src/styles/docs/layout.css"), "utf8");
+const docsContent = await readFile(resolve(siteRoot, "src/styles/docs/content.css"), "utf8");
+for (const selector of [".docs-sidebar", ".docs-toc"]) {
+  if (!docsLayout.includes(selector)) throw new Error(`documentation layout is missing ${selector}`);
+}
+for (const selector of [".docs-content", ".docs-pager"]) {
+  if (!docsContent.includes(selector)) throw new Error(`documentation content is missing ${selector}`);
 }
 
 const stylesIndex = await readFile(resolve(siteRoot, "src/styles/index.css"), "utf8");
-if (!stylesIndex.includes("docs.css")) throw new Error("documentation stylesheet is not loaded");
+if (!stylesIndex.includes("docs/index.css")) throw new Error("documentation stylesheet is not loaded");
 
 const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
 for (const stylesheet of landingStyles) {
