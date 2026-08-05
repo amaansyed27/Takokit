@@ -14,8 +14,16 @@ pub struct DaemonIdentity {
     pub port: u16,
     pub started_at: u64,
     pub log_path: Option<PathBuf>,
-    /// Build that owns this daemon. Empty means a legacy identity that predates
-    /// build freshness checks and must be replaced before routing commands.
+}
+
+/// Wire identity returned by `/v1/daemon/identity`.
+///
+/// `identity` remains the stable ownership contract. `build_id` is flattened
+/// into the same JSON object and defaults to empty for pre-freshness daemons.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DaemonBuildIdentity {
+    #[serde(flatten)]
+    pub identity: DaemonIdentity,
     #[serde(default)]
     pub build_id: String,
 }
@@ -393,11 +401,34 @@ mod tests {
 
     #[test]
     fn legacy_daemon_identity_without_build_id_still_deserializes() {
-        let identity: DaemonIdentity = serde_json::from_str(
+        let identity: DaemonBuildIdentity = serde_json::from_str(
             r#"{"instance_id":null,"mode":"direct","pid":1,"executable":"takokit","storage_root":".takokit","host":"127.0.0.1","port":5050,"started_at":1,"log_path":null}"#,
         )
         .expect("legacy identity");
         assert!(identity.build_id.is_empty());
+        assert_eq!(identity.identity.mode, DaemonMode::Direct);
+    }
+
+    #[test]
+    fn build_identity_serializes_as_one_flat_object() {
+        let identity = DaemonBuildIdentity {
+            identity: DaemonIdentity {
+                instance_id: None,
+                mode: DaemonMode::Direct,
+                pid: 1,
+                executable: PathBuf::from("takokit"),
+                storage_root: PathBuf::from(".takokit"),
+                host: "127.0.0.1".into(),
+                port: 5050,
+                started_at: 1,
+                log_path: None,
+            },
+            build_id: "fixture".into(),
+        };
+        let value = serde_json::to_value(identity).unwrap();
+        assert_eq!(value["mode"], "direct");
+        assert_eq!(value["build_id"], "fixture");
+        assert!(value.get("identity").is_none());
     }
 
     #[test]
