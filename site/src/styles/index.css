@@ -5,6 +5,6 @@
 @import "./platform.css";
 @import "./pages.css";
 @import "./detail.css";
-@import "./docs.css";
+@import "./docs/index.css";
 @import "./responsive.css";
 @import "./landing/index.css";
