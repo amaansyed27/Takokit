@@ -32,15 +32,10 @@ pub(crate) fn print_models(
     package_registry: &PackageRegistry,
     installed_registry: &InstalledRegistry,
 ) -> anyhow::Result<()> {
-    let models: Vec<_> = package_registry
-        .models()
-        .map_err(cli_error)?
-        .into_iter()
-        .map(|model| {
-            model_info_from_plan(package_registry, installed_registry, &model.id).map_err(cli_error)
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    print_serializable(&models)
+    let inventory = installed_registry
+        .installed_model_inventory(package_registry)
+        .map_err(cli_error)?;
+    print_serializable(&inventory)
 }
 
 pub(crate) fn print_runners(
