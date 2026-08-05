@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { RouteLink } from "../../app/router";
 
 const FEATURES = [
@@ -8,55 +9,100 @@ const FEATURES = [
 ];
 
 export function RuntimeAssembly() {
-  return (
-    <section className="runtime-wheel" id="features" aria-labelledby="runtime-wheel-title">
-      <div className="runtime-wheel__stage landing-shell">
-        <header className="runtime-wheel__header">
-          <p className="landing-kicker">Inside Takokit</p>
-          <h2 id="runtime-wheel-title">
-            The whole voice stack.
-            <span>One local runtime.</span>
-          </h2>
-        </header>
+  const [activeIndex, setActiveIndex] = useState(0);
+  const stepRefs = useRef([]);
 
-        <div className="runtime-wheel__scene">
-          <div className="runtime-wheel__pinwheel" aria-hidden="true">
-            <div className="runtime-wheel__rotor">
+  useEffect(() => {
+    const steps = stepRefs.current.filter(Boolean);
+    if (!steps.length || typeof IntersectionObserver === "undefined") return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        setActiveIndex(Number(entry.target.dataset.index));
+      });
+    }, {
+      rootMargin: "-38% 0px -38% 0px",
+      threshold: 0.01,
+    });
+
+    steps.forEach((step) => observer.observe(step));
+    return () => observer.disconnect();
+  }, []);
+
+  function selectStep(index) {
+    setActiveIndex(index);
+    stepRefs.current[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  return (
+    <section className="runtime-flow" id="features" aria-labelledby="runtime-flow-title">
+      <div className="runtime-flow__layout landing-shell">
+        <div className="runtime-flow__sticky">
+          <header className="runtime-flow__header">
+            <p className="landing-kicker">Inside Takokit</p>
+            <h2 id="runtime-flow-title">
+              The whole voice stack.
+              <span>One local runtime.</span>
+            </h2>
+          </header>
+
+          <div className="runtime-flow__wheel" aria-hidden="true">
+            <div
+              className="runtime-flow__rotor"
+              style={{ transform: `rotate(${activeIndex * 90}deg)` }}
+            >
               {FEATURES.map(([title], index) => (
                 <span
-                  className="runtime-wheel__spoke"
+                  className="runtime-flow__spoke"
                   key={title}
                   style={{ "--spoke-index": index }}
                 >
                   <i />
                 </span>
               ))}
-              <span className="runtime-wheel__hub">
+              <span className="runtime-flow__hub">
                 <img src="/brand/takokit-mark.svg" alt="" />
               </span>
             </div>
           </div>
 
-          <div className="runtime-wheel__roller">
-            <div className="runtime-wheel__track">
-              {FEATURES.map(([title, description], index) => (
-                <article className="runtime-wheel__panel" key={title}>
-                  <span>{String(index + 1).padStart(2, "0")} / 04</span>
-                  <h3>{title}.</h3>
-                  <p>{description}</p>
-                </article>
-              ))}
-            </div>
+          <div className="runtime-flow__progress" aria-label="Runtime feature navigation">
+            {FEATURES.map(([title], index) => (
+              <button
+                type="button"
+                className={activeIndex === index ? "is-active" : ""}
+                aria-label={`Show ${title}`}
+                aria-current={activeIndex === index ? "step" : undefined}
+                onClick={() => selectStep(index)}
+                key={title}
+              >
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <i />
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="runtime-wheel__footer" aria-hidden="true">
-          <span>Scroll through the runtime</span>
-          <i />
-        </div>
+        <ol className="runtime-flow__steps">
+          {FEATURES.map(([title, description], index) => (
+            <li
+              className={activeIndex === index ? "is-active" : ""}
+              data-index={index}
+              key={title}
+              ref={(node) => { stepRefs.current[index] = node; }}
+              onFocus={() => setActiveIndex(index)}
+              tabIndex={0}
+            >
+              <span>{String(index + 1).padStart(2, "0")} / 04</span>
+              <h3>{title}.</h3>
+              <p>{description}</p>
+            </li>
+          ))}
+        </ol>
       </div>
 
-      <div className="runtime-wheel__outro landing-shell">
+      <div className="runtime-flow__outro landing-shell">
         <img src="/brand/takokit-mark.svg" alt="" aria-hidden="true" />
         <div>
           <p className="landing-kicker">Takokit runtime</p>
