@@ -13,6 +13,12 @@ const landingComponents = [
   "RuntimeArchitecture",
   "FinalCTA",
 ];
+const docsComponents = [
+  "DocsCodeBlock",
+  "DocsPager",
+  "DocsSidebar",
+  "DocsTableOfContents",
+];
 const landingStyles = [
   "foundation.css",
   "hero.css",
@@ -45,9 +51,12 @@ const required = [
   "src/pages/DownloadPage.jsx",
   ...landingComponents.map((name) => `src/components/landing/${name}.jsx`),
   "src/components/landing/RollingPullCommand.jsx",
+  ...docsComponents.map((name) => `src/components/docs/${name}.jsx`),
+  "src/docs/content.js",
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
+  "src/styles/docs.css",
   "src/styles/landing/index.css",
   ...landingStyles.map((name) => `src/styles/landing/${name}`),
 ];
@@ -149,6 +158,21 @@ const architecture = await readFile(
 for (const step of ["Pull a model", "Run it locally", "Use any interface"]) {
   if (!architecture.includes(step)) throw new Error(`how-it-works section is missing ${step}`);
 }
+
+const docsPage = await readFile(resolve(siteRoot, "src/pages/DocsPage.jsx"), "utf8");
+for (const component of docsComponents) {
+  if (!docsPage.includes(component)) throw new Error(`documentation page is missing ${component}`);
+}
+if (!docsPage.includes("docs-shell") || !docsPage.includes("docs-content__section")) {
+  throw new Error("documentation reading layout is missing");
+}
+const docsStyles = await readFile(resolve(siteRoot, "src/styles/docs.css"), "utf8");
+for (const selector of [".docs-sidebar", ".docs-content", ".docs-toc", ".docs-pager"]) {
+  if (!docsStyles.includes(selector)) throw new Error(`documentation styles are missing ${selector}`);
+}
+
+const stylesIndex = await readFile(resolve(siteRoot, "src/styles/index.css"), "utf8");
+if (!stylesIndex.includes("docs.css")) throw new Error("documentation stylesheet is not loaded");
 
 const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
 for (const stylesheet of landingStyles) {
