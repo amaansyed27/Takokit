@@ -25,16 +25,18 @@
   .landing-hero__mark,
   .landing-hero__copy,
   .landing-hero__wave i,
-  .runtime-assembly__ingredient,
+  .capability-moment__copy,
+  .capability-moment__signal,
+  .runtime-band__copy,
+  .runtime-band__signal,
   .runtime-architecture__signal i {
     animation: none;
   }
 
-  .capability-strip header,
-  .capability-strip li,
-  .capability-strip__signal i,
-  .runtime-assembly__cards li,
-  .runtime-assembly__progress i,
+  .capability-moment__copy,
+  .capability-moment--right .capability-moment__copy,
+  .runtime-band__copy,
+  .runtime-band--right .runtime-band__copy,
   .model-preview__row,
   .landing-button {
     opacity: 1;
