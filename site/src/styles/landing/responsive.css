@@ -6,37 +6,83 @@
 
 @media (max-height: 760px) and (min-width: 901px) {
   .landing-hero__stage {
-    padding-block: 3rem 4rem;
+    padding-block: 1.4rem 2.4rem;
   }
 
   .landing-hero__mark {
-    width: 66px;
-    margin-bottom: 0.8rem;
+    width: 52px;
+    margin-bottom: 0.35rem;
   }
 
   .landing-hero h1 {
-    font-size: clamp(2.8rem, 4.2vw, 4rem);
+    font-size: clamp(2.55rem, 3.8vw, 3.45rem);
   }
 
   .landing-hero__summary {
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
   }
 
   .landing-hero .platform-install {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
+    padding-block: 0.7rem;
   }
 
-  .landing-hero .platform-install-note {
+  .landing-hero .platform-install-label {
+    margin-top: 0.45rem;
+  }
+
+  .landing-hero .platform-install-note,
+  .landing-hero__scroll {
     display: none;
   }
 
-  .capability-moment,
-  .runtime-band {
-    min-height: 560px;
+  .landing-hero .landing-actions {
+    margin-top: 0.65rem;
+  }
+
+  .runtime-wheel__stage {
+    gap: 0.9rem;
+    padding-block: 1.2rem 1rem;
+  }
+
+  .runtime-wheel__header h2 {
+    font-size: clamp(2.4rem, 4vw, 3.5rem);
+  }
+
+  .runtime-wheel__scene {
+    grid-template-columns: minmax(220px, 0.65fr) minmax(360px, 1fr);
+    gap: 3rem;
+  }
+
+  .runtime-wheel__pinwheel {
+    width: 230px;
+  }
+
+  .runtime-wheel__roller {
+    height: 172px;
+  }
+
+  .runtime-wheel__panel h3 {
+    font-size: clamp(3rem, 5.8vw, 4.8rem);
+  }
+
+  .runtime-wheel__panel p {
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
   }
 }
 
 @media (max-width: 1000px) {
+  .runtime-wheel__scene {
+    grid-template-columns: minmax(240px, 0.72fr) minmax(360px, 1fr);
+    gap: 3rem;
+  }
+
+  .runtime-wheel__pinwheel {
+    width: min(32vw, 310px);
+  }
+
   .model-preview__row {
     grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) 1rem;
   }
@@ -60,17 +106,72 @@
     display: none;
   }
 
-  .capability-moment,
-  .runtime-band {
+  .capability-moment {
     min-height: 560px;
   }
 
   .capability-moment__copy,
-  .capability-moment--right .capability-moment__copy,
-  .runtime-band__copy,
-  .runtime-band--right .runtime-band__copy {
+  .capability-moment--right .capability-moment__copy {
     opacity: 1;
     transform: none;
+  }
+
+  .runtime-wheel {
+    min-height: 0;
+  }
+
+  .runtime-wheel__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
+    gap: 3rem;
+    padding-block: 5.5rem;
+  }
+
+  .runtime-wheel__header {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+
+  .runtime-wheel__scene {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+
+  .runtime-wheel__pinwheel {
+    width: min(58vw, 300px);
+  }
+
+  .runtime-wheel__roller {
+    height: auto;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .runtime-wheel__track {
+    display: grid;
+    height: auto;
+    transform: none;
+  }
+
+  .runtime-wheel__panel {
+    height: auto;
+    min-height: 180px;
+    border-top: 1px solid var(--tk-line-light);
+    padding-block: 2rem;
+  }
+
+  .runtime-wheel__panel:last-child {
+    border-bottom: 1px solid var(--tk-line-light);
+  }
+
+  .runtime-wheel__footer {
+    display: none;
+  }
+
+  .runtime-wheel__outro {
+    min-height: auto;
   }
 
   .runtime-architecture__nodes {
@@ -104,7 +205,7 @@
   }
 
   .landing-hero__mark {
-    width: 72px;
+    width: 68px;
   }
 
   .landing-hero__wave {
@@ -112,20 +213,22 @@
   }
 
   .landing-hero h1 {
-    font-size: clamp(2.5rem, 11.8vw, 3.8rem);
+    font-size: clamp(2.35rem, 11vw, 3.5rem);
   }
 
   .landing-hero__summary {
-    font-size: 0.98rem;
+    font-size: 0.96rem;
   }
 
   .landing-hero .platform-install-head {
+    grid-template-columns: 1fr;
     align-items: stretch;
-    flex-direction: column;
+    gap: 0.8rem;
   }
 
   .landing-hero .platform-switcher {
     width: 100%;
+    justify-self: stretch;
   }
 
   .landing-hero .platform-switcher button {
@@ -134,6 +237,11 @@
 
   .landing-hero .command-bar {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landing-hero .command-bar code {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .landing-hero .command-bar button {
@@ -152,7 +260,6 @@
   }
 
   .capability-story__header,
-  .runtime-story__header,
   .model-preview__inner,
   .runtime-architecture__inner,
   .landing-closing > .landing-shell {
@@ -160,22 +267,19 @@
   }
 
   .capability-story__header h2,
-  .runtime-story__header h2,
+  .runtime-wheel__header h2,
   .model-preview__header h2,
   .runtime-architecture h2,
   .landing-closing__cta h2 {
-    font-size: clamp(2.2rem, 9.5vw, 3.4rem);
+    font-size: clamp(2.15rem, 9.2vw, 3.25rem);
   }
 
-  .capability-moment,
-  .runtime-band {
+  .capability-moment {
     min-height: auto;
   }
 
   .capability-moment__inner,
-  .capability-moment--right .capability-moment__inner,
-  .runtime-band__inner,
-  .runtime-band--right .runtime-band__inner {
+  .capability-moment--right .capability-moment__inner {
     min-height: 430px;
     grid-template-columns: 1fr;
     align-content: center;
@@ -184,9 +288,7 @@
   }
 
   .capability-moment__number,
-  .capability-moment--right .capability-moment__number,
-  .runtime-band__number,
-  .runtime-band--right .runtime-band__number {
+  .capability-moment--right .capability-moment__number {
     grid-column: 1;
     grid-row: auto;
     margin: 0;
@@ -194,22 +296,18 @@
   }
 
   .capability-moment__copy,
-  .capability-moment--right .capability-moment__copy,
-  .runtime-band__copy,
-  .runtime-band--right .runtime-band__copy {
+  .capability-moment--right .capability-moment__copy {
     grid-column: 1;
     grid-row: auto;
     justify-self: start;
     text-align: left;
   }
 
-  .capability-moment h3,
-  .runtime-band h3 {
-    font-size: clamp(3.2rem, 16vw, 5rem);
+  .capability-moment h3 {
+    font-size: clamp(3rem, 15vw, 4.8rem);
   }
 
-  .capability-moment--right p,
-  .runtime-band--right p {
+  .capability-moment--right p {
     margin-left: 0;
   }
 
@@ -222,25 +320,33 @@
     transform: none;
   }
 
-  .runtime-band__signal,
-  .runtime-band--right .runtime-band__signal {
-    right: -20%;
-    bottom: 10%;
-    left: -20%;
-    transform: none;
+  .runtime-wheel__stage {
+    padding-block: 4.5rem;
   }
 
-  .runtime-story__outro {
+  .runtime-wheel__pinwheel {
+    width: min(72vw, 250px);
+  }
+
+  .runtime-wheel__panel {
+    min-height: 160px;
+  }
+
+  .runtime-wheel__panel h3 {
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
+  }
+
+  .runtime-wheel__outro {
     grid-template-columns: 64px minmax(0, 1fr);
     gap: 1.2rem;
     padding-block: 4.5rem;
   }
 
-  .runtime-story__outro img {
+  .runtime-wheel__outro img {
     width: 58px;
   }
 
-  .runtime-story__outro h3 {
+  .runtime-wheel__outro h3 {
     font-size: clamp(1.8rem, 8.5vw, 2.8rem);
   }
 
@@ -305,23 +411,28 @@
 
 @media (max-width: 390px) {
   .landing-hero h1 {
-    font-size: clamp(2.2rem, 11.4vw, 3rem);
+    font-size: clamp(2.15rem, 10.8vw, 2.9rem);
   }
 
   .capability-moment__inner,
-  .capability-moment--right .capability-moment__inner,
-  .runtime-band__inner,
-  .runtime-band--right .runtime-band__inner {
+  .capability-moment--right .capability-moment__inner {
     min-height: 390px;
     padding-block: 4rem;
   }
 
-  .capability-moment h3,
-  .runtime-band h3 {
-    font-size: clamp(2.9rem, 15vw, 4.1rem);
+  .capability-moment h3 {
+    font-size: clamp(2.8rem, 14.5vw, 4rem);
   }
 
-  .runtime-story__outro {
+  .runtime-wheel__pinwheel {
+    width: min(76vw, 220px);
+  }
+
+  .runtime-wheel__panel h3 {
+    font-size: clamp(2.55rem, 13.5vw, 3.6rem);
+  }
+
+  .runtime-wheel__outro {
     grid-template-columns: 1fr;
   }
 }
