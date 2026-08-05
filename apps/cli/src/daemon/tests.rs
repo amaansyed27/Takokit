@@ -45,22 +45,23 @@ fn legacy_runtime_record_without_build_id_still_loads() {
 
 #[test]
 fn matching_build_is_current() {
-    let identity = test_info(std::env::temp_dir().as_path()).identity();
-    assert_eq!(build_freshness(&identity), BuildFreshness::Current);
+    let response = build_response(test_info(std::env::temp_dir().as_path()).identity(), current_build_id());
+    assert_eq!(build_freshness(&response), BuildFreshness::Current);
 }
 
 #[test]
 fn missing_build_requires_replacement() {
-    let mut identity = test_info(std::env::temp_dir().as_path()).identity();
-    identity.build_id.clear();
-    assert_eq!(build_freshness(&identity), BuildFreshness::Missing);
+    let response = build_response(test_info(std::env::temp_dir().as_path()).identity(), "");
+    assert_eq!(build_freshness(&response), BuildFreshness::Missing);
 }
 
 #[test]
 fn mismatched_build_requires_replacement() {
-    let mut identity = test_info(std::env::temp_dir().as_path()).identity();
-    identity.build_id = "older-build".to_string();
-    assert_eq!(build_freshness(&identity), BuildFreshness::Mismatched);
+    let response = build_response(
+        test_info(std::env::temp_dir().as_path()).identity(),
+        "older-build",
+    );
+    assert_eq!(build_freshness(&response), BuildFreshness::Mismatched);
 }
 
 #[test]
@@ -304,10 +305,17 @@ fn identity_validation_reports_ownership_field_mismatches() {
 fn build_freshness_does_not_change_ownership_validation() {
     let temp = tempfile::tempdir().unwrap();
     let info = test_info(temp.path());
-    let mut identity = info.identity();
-    identity.build_id = "stale".to_string();
+    let identity = info.identity();
+    let response = build_response(identity.clone(), "stale");
     assert!(verify_identity(&info, &identity).is_ok());
-    assert_eq!(build_freshness(&identity), BuildFreshness::Mismatched);
+    assert_eq!(build_freshness(&response), BuildFreshness::Mismatched);
+}
+
+fn build_response(identity: DaemonIdentity, build_id: &str) -> DaemonBuildIdentity {
+    DaemonBuildIdentity {
+        identity,
+        build_id: build_id.to_string(),
+    }
 }
 
 fn test_info(root: &std::path::Path) -> DaemonInfo {
