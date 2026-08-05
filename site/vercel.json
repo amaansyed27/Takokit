@@ -8,7 +8,7 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/v1/registry.json", "destination": "/api/v1/registry" },
-    { "source": "/((?!api/|v1/|assets/|brand/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|v1/|assets/|brand/).*)", "destination": "/" }
   ],
   "headers": [
     {

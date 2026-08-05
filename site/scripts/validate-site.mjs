@@ -104,8 +104,12 @@ if (
 ) {
   throw new Error("Vercel is not configured for the canonical Vite output");
 }
-if (!vercel.rewrites.some((rule) => rule.destination === "/index.html")) {
-  throw new Error("SPA rewrite is missing");
+if (
+  vercel.cleanUrls !== true ||
+  !vercel.rewrites.some((rule) => rule.destination === "/") ||
+  vercel.rewrites.some((rule) => rule.destination === "/index.html")
+) {
+  throw new Error("clean URL SPA rewrite is missing or contradictory");
 }
 if (!vercel.rewrites.some((rule) => rule.source === "/v1/registry.json")) {
   throw new Error("registry rewrite is missing");
