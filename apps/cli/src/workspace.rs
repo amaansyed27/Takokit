@@ -5,8 +5,8 @@ use takokit_core::{
     TranscriptionRequest, TranscriptionResponse,
 };
 use takokit_store::{
-    load_persisted_workspace, persist_workspace, resolve_workspace, LocalStore, WorkspaceStore,
-    WorkspaceSurface,
+    load_persisted_workspace, persist_workspace, resolve_workspace, LocalStore, WorkspaceSource,
+    WorkspaceStore, WorkspaceSurface,
 };
 use uuid::Uuid;
 
@@ -17,6 +17,7 @@ pub(crate) const SESSION_ENV: &str = "TAKOKIT_SESSION_ID";
 pub(crate) struct CliWorkspace {
     pub(crate) store: WorkspaceStore,
     pub(crate) session: Option<SessionRecord>,
+    pub(crate) source: WorkspaceSource,
 }
 
 impl CliWorkspace {
@@ -42,8 +43,7 @@ impl CliWorkspace {
         let current = std::env::current_dir().ok();
         let resolved = resolve_workspace(explicit.clone(), persisted, current, surface)?;
         if matches!(surface, WorkspaceSurface::Gui | WorkspaceSurface::Tui)
-            && (explicit.is_some()
-                || resolved.source != takokit_store::WorkspaceSource::CurrentDirectory)
+            && (explicit.is_some() || resolved.source == WorkspaceSource::Persisted)
         {
             persist_workspace(&global_root, &resolved.root)?;
         }
@@ -62,7 +62,11 @@ impl CliWorkspace {
                 _ => Some(store.create_session(Some(title))?),
             }
         };
-        let workspace = Self { store, session };
+        let workspace = Self {
+            store,
+            session,
+            source: resolved.source,
+        };
         workspace.export_environment();
         Ok(workspace)
     }
@@ -94,11 +98,17 @@ impl CliWorkspace {
 
     pub(crate) fn gui_query(&self) -> String {
         let mut query = format!(
-            "workspace={}",
+            "workspace={}&workspace_source={}",
             utf8_percent_encode(
                 &self.store.workspace_root().to_string_lossy(),
                 NON_ALPHANUMERIC
-            )
+            ),
+            match self.source {
+                WorkspaceSource::Explicit => "explicit",
+                WorkspaceSource::Persisted => "persisted",
+                WorkspaceSource::CurrentDirectory => "current_directory",
+                WorkspaceSource::SafeDefault => "safe_default",
+            }
         );
         if let Some(id) = self.active_session_id() {
             query.push_str("&session=");
@@ -200,13 +210,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn gui_query_contains_workspace_without_forcing_a_session() {
+    fn gui_query_contains_workspace_source_without_forcing_a_session() {
         let root = std::env::temp_dir().join(format!("takokit-cli-workspace-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let context =
             CliWorkspace::resolve(Some(root.clone()), None, true, "Takokit GUI").unwrap();
         let query = context.gui_query();
         assert!(query.contains("workspace="));
+        assert!(query.contains("workspace_source=explicit"));
         assert!(!query.contains("session="));
         assert!(!root.join(".tako").exists());
         let _ = std::fs::remove_dir_all(root);
