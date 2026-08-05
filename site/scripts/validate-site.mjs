@@ -13,6 +13,19 @@ const landingComponents = [
   "RuntimeArchitecture",
   "FinalCTA",
 ];
+const docsComponents = [
+  "DocsCodeBlock",
+  "DocsPager",
+  "DocsSidebar",
+  "DocsTableOfContents",
+];
+const docsPages = [
+  "developers.js",
+  "getting-started.js",
+  "manage.js",
+  "voice-workflows.js",
+];
+const docsStyles = ["layout.css", "content.css", "responsive.css"];
 const landingStyles = [
   "foundation.css",
   "hero.css",
@@ -29,7 +42,11 @@ const required = [
   "package.json",
   "vite.config.js",
   "vercel.json",
+  "DEPLOYMENT.md",
   "api/v1/registry.js",
+  "scripts/verify-deployment.mjs",
+  "public/install.ps1",
+  "public/install.sh",
   "src/main.jsx",
   "src/app/App.jsx",
   "src/app/router.js",
@@ -40,10 +57,15 @@ const required = [
   "src/pages/DocsPage.jsx",
   "src/pages/DownloadPage.jsx",
   ...landingComponents.map((name) => `src/components/landing/${name}.jsx`),
-  "src/hooks/useScrollProgress.js",
+  "src/components/landing/RollingPullCommand.jsx",
+  ...docsComponents.map((name) => `src/components/docs/${name}.jsx`),
+  "src/docs/content.js",
+  ...docsPages.map((name) => `src/docs/pages/${name}`),
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
+  "src/styles/docs/index.css",
+  ...docsStyles.map((name) => `src/styles/docs/${name}`),
   "src/styles/landing/index.css",
   ...landingStyles.map((name) => `src/styles/landing/${name}`),
 ];
@@ -61,14 +83,25 @@ for (const path of rootAssets) await access(resolve(repoRoot, path));
 const pkg = JSON.parse(await readFile(resolve(siteRoot, "package.json"), "utf8"));
 if (pkg.scripts.build !== "vite build") throw new Error("canonical site build is not Vite");
 if (pkg.scripts.build.includes("scripts/build.mjs")) throw new Error("obsolete static builder is active");
+if (pkg.scripts["verify:deployment"] !== "node scripts/verify-deployment.mjs") {
+  throw new Error("deployment verification command is missing");
+}
 
 const vite = await readFile(resolve(siteRoot, "vite.config.js"), "utf8");
 if (!vite.includes("takokit-root-brand-assets")) {
   throw new Error("the site is not serving canonical assets from the repository root");
 }
+if (!vite.includes("VERCEL_GIT_COMMIT_SHA") || !vite.includes("raw.githubusercontent.com")) {
+  throw new Error("Vercel root-isolation fallback is missing");
+}
 
 const vercel = JSON.parse(await readFile(resolve(siteRoot, "vercel.json"), "utf8"));
-if (vercel.framework !== "vite" || vercel.outputDirectory !== "dist") {
+if (
+  vercel.framework !== "vite" ||
+  vercel.installCommand !== "npm ci" ||
+  vercel.buildCommand !== "npm run build" ||
+  vercel.outputDirectory !== "dist"
+) {
   throw new Error("Vercel is not configured for the canonical Vite output");
 }
 if (!vercel.rewrites.some((rule) => rule.destination === "/index.html")) {
@@ -76,6 +109,11 @@ if (!vercel.rewrites.some((rule) => rule.destination === "/index.html")) {
 }
 if (!vercel.rewrites.some((rule) => rule.source === "/v1/registry.json")) {
   throw new Error("registry rewrite is missing");
+}
+for (const source of ["/assets/(.*)", "/brand/(.*)", "/install.ps1", "/install.sh"]) {
+  if (!vercel.headers.some((rule) => rule.source === source)) {
+    throw new Error(`Vercel headers are missing ${source}`);
+  }
 }
 
 const app = await readFile(resolve(siteRoot, "src/app/App.jsx"), "utf8");
@@ -90,6 +128,71 @@ for (const component of landingComponents) {
 }
 if (home.includes("WorkflowPinwheel")) throw new Error("obsolete landing pinwheel is still referenced");
 if (!home.includes("takokit-landing")) throw new Error("landing page root class is missing");
+
+const hero = await readFile(resolve(siteRoot, "src/components/landing/LandingHero.jsx"), "utf8");
+for (const requiredText of [
+  "Run open voice models locally.",
+  "RollingPullCommand",
+  "Download for Windows",
+  "Browse models",
+]) {
+  if (!hero.includes(requiredText)) throw new Error(`landing hero is missing: ${requiredText}`);
+}
+
+const rollingCommand = await readFile(
+  resolve(siteRoot, "src/components/landing/RollingPullCommand.jsx"),
+  "utf8",
+);
+if (!rollingCommand.includes("tako pull ${model}")) {
+  throw new Error("rolling pull command does not keep the command prefix stable");
+}
+for (const model of ["kokoro", "whisper-tiny", "chatterbox", "rvc"]) {
+  if (!rollingCommand.includes(model)) throw new Error(`rolling pull command is missing ${model}`);
+}
+
+const capabilities = await readFile(
+  resolve(siteRoot, "src/components/landing/ProductCapabilities.jsx"),
+  "utf8",
+);
+for (const task of ["speech", "transcription", "cloning", "conversion"]) {
+  if (!capabilities.includes(`/models?task=${task}`)) {
+    throw new Error(`homepage task shortcut is missing ${task}`);
+  }
+}
+
+const architecture = await readFile(
+  resolve(siteRoot, "src/components/landing/RuntimeArchitecture.jsx"),
+  "utf8",
+);
+for (const step of ["Pull a model", "Run it locally", "Use any interface"]) {
+  if (!architecture.includes(step)) throw new Error(`how-it-works section is missing ${step}`);
+}
+
+const docsPage = await readFile(resolve(siteRoot, "src/pages/DocsPage.jsx"), "utf8");
+for (const component of docsComponents) {
+  if (!docsPage.includes(component)) throw new Error(`documentation page is missing ${component}`);
+}
+if (!docsPage.includes("docs-shell") || !docsPage.includes("docs-content__section")) {
+  throw new Error("documentation reading layout is missing");
+}
+
+const docsStyleIndex = await readFile(resolve(siteRoot, "src/styles/docs/index.css"), "utf8");
+for (const stylesheet of docsStyles) {
+  if (!docsStyleIndex.includes(stylesheet)) {
+    throw new Error(`documentation styles are missing ${stylesheet}`);
+  }
+}
+const docsLayout = await readFile(resolve(siteRoot, "src/styles/docs/layout.css"), "utf8");
+const docsContent = await readFile(resolve(siteRoot, "src/styles/docs/content.css"), "utf8");
+for (const selector of [".docs-sidebar", ".docs-toc"]) {
+  if (!docsLayout.includes(selector)) throw new Error(`documentation layout is missing ${selector}`);
+}
+for (const selector of [".docs-content", ".docs-pager"]) {
+  if (!docsContent.includes(selector)) throw new Error(`documentation content is missing ${selector}`);
+}
+
+const stylesIndex = await readFile(resolve(siteRoot, "src/styles/index.css"), "utf8");
+if (!stylesIndex.includes("docs/index.css")) throw new Error("documentation stylesheet is not loaded");
 
 const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
 for (const stylesheet of landingStyles) {

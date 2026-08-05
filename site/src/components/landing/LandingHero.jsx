@@ -1,5 +1,5 @@
 import { RouteLink } from "../../app/router";
-import { PlatformInstall } from "../PlatformInstall";
+import { RollingPullCommand } from "./RollingPullCommand";
 
 export function LandingHero() {
   return (
@@ -19,11 +19,14 @@ export function LandingHero() {
             One runtime for speech generation, transcription, voice cloning, and conversion across Windows, Linux, and macOS.
           </p>
 
-          <PlatformInstall heading="Install Takokit" />
+          <div className="landing-hero__quickstart">
+            <span>Pull any supported model</span>
+            <RollingPullCommand />
+          </div>
 
           <div className="landing-actions">
-            <RouteLink href="/models" className="landing-button landing-button--primary">Explore models</RouteLink>
-            <RouteLink href="/docs" className="landing-button">Read documentation</RouteLink>
+            <RouteLink href="/download" className="landing-button landing-button--primary">Download for Windows</RouteLink>
+            <RouteLink href="/models" className="landing-button">Browse models</RouteLink>
           </div>
         </div>
 

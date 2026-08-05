@@ -2,6 +2,7 @@
 /apps/gui/node_modules/
 /apps/gui/dist/
 /.takokit/
+/.vercel/
 /.env
 *.log
 *.wav

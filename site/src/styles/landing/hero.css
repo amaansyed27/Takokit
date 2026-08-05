@@ -12,7 +12,7 @@
   min-height: calc(100svh - 68px);
   place-items: center;
   align-content: center;
-  padding-block: clamp(3.2rem, 6.5vh, 5.4rem) clamp(4rem, 8vh, 6rem);
+  padding-block: clamp(3.4rem, 7vh, 5.6rem) clamp(4.4rem, 9vh, 6.4rem);
   text-align: center;
 }
 
@@ -80,101 +80,60 @@
   line-height: 1.6;
 }
 
-.landing-hero .platform-install {
-  display: grid;
-  width: min(100%, 820px);
-  max-width: none;
-  margin: 1.35rem auto 0;
-  border-color: var(--tk-line);
-  padding-block: 1rem;
+.landing-hero__quickstart {
+  width: min(100%, 720px);
+  margin: 1.5rem auto 0;
   text-align: left;
 }
 
-.landing-hero .platform-install-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: clamp(1.5rem, 5vw, 4rem);
-}
-
-.landing-hero .platform-install-head > div:first-child {
-  min-width: 0;
-}
-
-.landing-hero .platform-install h2 {
-  margin: 0;
-  font-size: 1rem;
-  letter-spacing: 0;
-}
-
-.landing-hero .platform-install .eyebrow {
-  margin-bottom: 0.2rem;
-  color: var(--tk-yellow-deep);
+.landing-hero__quickstart > span {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--tk-muted);
   font-family: var(--font-technical);
-  font-size: 0.66rem;
+  font-size: 0.68rem;
 }
 
-.landing-hero .platform-switcher {
-  width: max-content;
-  justify-self: end;
-  border-color: var(--tk-line);
-}
-
-.landing-hero .platform-switcher button {
-  color: var(--tk-muted);
-  font-size: 0.73rem;
-}
-
-.landing-hero .platform-switcher button.is-active {
-  border-color: var(--tk-yellow);
-  color: var(--tk-ink);
-}
-
-.landing-hero .platform-install-label {
-  margin-top: 0.72rem;
-}
-
-.landing-hero .platform-install-label,
-.landing-hero .platform-install-note {
-  color: var(--tk-muted);
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.landing-hero .platform-install-note {
+.landing-hero__quickstart .command-bar {
   max-width: none;
-  margin-top: 0.1rem;
-}
-
-.landing-hero .command-bar {
-  grid-template-columns: minmax(0, 1fr) 96px;
-  width: 100%;
-  max-width: none;
-  min-height: 50px;
-  margin-block: 0.6rem;
+  min-height: 52px;
+  margin: 0;
   border-color: var(--tk-line);
   border-radius: 7px;
   background: var(--tk-surface);
 }
 
-.landing-hero .command-bar code {
+.landing-hero__quickstart .command-bar code {
   display: flex;
   min-width: 0;
   align-items: center;
-  padding: 0.82rem 1rem;
+  padding: 0.9rem 1rem;
   color: var(--tk-ink);
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   overflow-x: auto;
   overflow-y: hidden;
-  overflow-wrap: normal;
 }
 
-.landing-hero .command-bar button {
-  min-width: 0;
-  min-height: 50px;
+.landing-hero__quickstart .command-bar button {
+  min-width: 96px;
+  min-height: 52px;
   border-color: var(--tk-line);
   background: var(--tk-yellow);
   color: var(--tk-ink);
+}
+
+.rolling-pull-command__window {
+  display: inline-grid;
+  width: 13ch;
+  height: 1.35em;
+  align-items: center;
+  overflow: hidden;
+}
+
+.rolling-pull-command__model {
+  grid-area: 1 / 1;
+  animation: hero-model-roll 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
 }
 
 .landing-hero .landing-actions {
@@ -212,7 +171,18 @@
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
+@keyframes hero-model-roll {
+  from { opacity: 0; transform: translate3d(0, 100%, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
 @keyframes landing-wave {
   from { transform: scaleY(0.65); opacity: 0.35; }
   to { transform: scaleY(1.05); opacity: 0.88; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rolling-pull-command__model {
+    animation: none;
+  }
 }

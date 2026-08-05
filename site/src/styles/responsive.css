@@ -71,22 +71,6 @@
   .platform-tabs section:last-child {
     border-bottom: 0;
   }
-
-  .docs-layout {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-
-  .docs-nav {
-    position: static;
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 0.75rem;
-  }
-
-  .docs-nav section {
-    min-width: 180px;
-  }
 }
 
 @media (max-width: 700px) {
