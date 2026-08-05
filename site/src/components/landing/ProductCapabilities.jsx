@@ -7,24 +7,28 @@ const CAPABILITIES = [
     label: "TTS",
     description: "Turn text into speech with local voice models.",
     task: "speech",
+    href: "/models?task=speech",
   },
   {
     title: "Transcribe audio",
     label: "STT",
     description: "Turn recordings into searchable text on your machine.",
     task: "transcription",
+    href: "/models?task=transcription",
   },
   {
     title: "Clone a voice",
     label: "Consent required",
     description: "Create a reusable local voice profile from permitted audio.",
     task: "cloning",
+    href: "/models?task=cloning",
   },
   {
     title: "Convert a voice",
     label: "Voice conversion",
     description: "Transform recordings with a compatible custom voice package.",
     task: "conversion",
+    href: "/models?task=conversion",
   },
 ];
 
@@ -61,7 +65,7 @@ export function ProductCapabilities() {
       </header>
 
       <div className="capability-story__moments">
-        {CAPABILITIES.map(({ title, label, description, task }, index) => (
+        {CAPABILITIES.map(({ title, label, description, task, href }, index) => (
           <article
             className={`capability-moment ${index % 2 ? "capability-moment--right" : "capability-moment--left"}`}
             key={task}
@@ -71,7 +75,7 @@ export function ProductCapabilities() {
               <span className="capability-moment__number">{String(index + 1).padStart(2, "0")}</span>
               <RouteLink
                 className="capability-moment__copy"
-                href={`/models?task=${task}`}
+                href={href}
                 aria-label={`${title}: browse matching models`}
               >
                 <span className="capability-moment__label">{label}</span>
