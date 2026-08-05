@@ -44,6 +44,7 @@ const required = [
   "src/pages/DocsPage.jsx",
   "src/pages/DownloadPage.jsx",
   ...landingComponents.map((name) => `src/components/landing/${name}.jsx`),
+  "src/components/landing/RollingPullCommand.jsx",
   "src/models/registry.js",
   "src/models/filtering.js",
   "src/styles/index.css",
@@ -113,11 +114,22 @@ if (!home.includes("takokit-landing")) throw new Error("landing page root class 
 const hero = await readFile(resolve(siteRoot, "src/components/landing/LandingHero.jsx"), "utf8");
 for (const requiredText of [
   "Run open voice models locally.",
-  "tako pull kokoro",
+  "RollingPullCommand",
   "Download for Windows",
   "Browse models",
 ]) {
   if (!hero.includes(requiredText)) throw new Error(`landing hero is missing: ${requiredText}`);
+}
+
+const rollingCommand = await readFile(
+  resolve(siteRoot, "src/components/landing/RollingPullCommand.jsx"),
+  "utf8",
+);
+if (!rollingCommand.includes("tako pull ${model}")) {
+  throw new Error("rolling pull command does not keep the command prefix stable");
+}
+for (const model of ["kokoro", "whisper-tiny", "chatterbox", "rvc"]) {
+  if (!rollingCommand.includes(model)) throw new Error(`rolling pull command is missing ${model}`);
 }
 
 const capabilities = await readFile(
