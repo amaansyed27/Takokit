@@ -8,7 +8,7 @@ use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use takokit_core::{DaemonIdentity, DaemonMode, RuntimeConfig};
+use takokit_core::{DaemonBuildIdentity, DaemonIdentity, DaemonMode, RuntimeConfig};
 use takokit_package::run_automatic_uv_cleanup;
 use takokit_server::{run_server_with_listener, AppState};
 use takokit_store::LocalStore;
@@ -132,7 +132,6 @@ impl DaemonInfo {
             port: self.port,
             started_at: self.started_at,
             log_path: Some(self.log_path.clone()),
-            build_id: self.build_id.clone(),
         }
     }
 }
@@ -151,8 +150,8 @@ pub fn ensure_fresh_running(
         .with_context(|| format!("lock {}", store.daemon_start_lock_path().display()))?;
 
     let result = (|| {
-        if let Some((info, identity)) = verified_runtime(store, config)? {
-            match build_freshness(&identity) {
+        if let Some((info, response)) = verified_runtime(store, config)? {
+            match build_freshness(&response) {
                 BuildFreshness::Current => return Ok(info),
                 BuildFreshness::Missing => {
                     stop_locked(store, config)?.then_some(()).ok_or_else(|| {
@@ -160,7 +159,7 @@ pub fn ensure_fresh_running(
                     })?;
                 }
                 BuildFreshness::Mismatched => {
-                    let stale_build = identity.build_id.clone();
+                    let stale_build = response.build_id.clone();
                     stop_locked(store, config)?.then_some(()).ok_or_else(|| {
                         anyhow!(
                             "managed daemon build {stale_build} could not be stopped for replacement"
@@ -171,20 +170,20 @@ pub fn ensure_fresh_running(
         }
 
         let info = start_locked(store, config)?;
-        let (_, identity) = verified_runtime(store, config)?.ok_or_else(|| {
+        let (_, response) = verified_runtime(store, config)?.ok_or_else(|| {
             anyhow!(
                 "replacement daemon started but did not publish a verified identity; see {}",
                 log_path(store).display()
             )
         })?;
-        if build_freshness(&identity) != BuildFreshness::Current {
+        if build_freshness(&response) != BuildFreshness::Current {
             return Err(anyhow!(
                 "replacement daemon build verification failed: expected {}, got {}",
                 current_build_id(),
-                if identity.build_id.is_empty() {
+                if response.build_id.is_empty() {
                     "<missing>"
                 } else {
-                    identity.build_id.as_str()
+                    response.build_id.as_str()
                 }
             ));
         }
@@ -196,8 +195,8 @@ pub fn ensure_fresh_running(
 }
 
 fn start_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
-    if let Some((info, identity)) = verified_runtime(store, config)? {
-        if build_freshness(&identity) == BuildFreshness::Current {
+    if let Some((info, response)) = verified_runtime(store, config)? {
+        if build_freshness(&response) == BuildFreshness::Current {
             return Ok(info);
         }
     }
@@ -364,24 +363,24 @@ pub fn ensure_running(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Res
 fn verified_runtime(
     store: &LocalStore,
     config: &RuntimeConfig,
-) -> anyhow::Result<Option<(DaemonInfo, DaemonIdentity)>> {
+) -> anyhow::Result<Option<(DaemonInfo, DaemonBuildIdentity)>> {
     let Some(info) = read_info(store)? else {
         return Ok(None);
     };
-    let identity = match remote_identity(config) {
+    let response = match remote_identity(config) {
         Ok(identity) => identity,
         Err(_) => return Ok(None),
     };
-    verify_identity(&info, &identity).with_context(|| {
+    verify_identity(&info, &response.identity).with_context(|| {
         format!(
             "server at {} does not match the managed daemon runtime record",
             config.local_base_url()
         )
     })?;
-    Ok(Some((info, identity)))
+    Ok(Some((info, response)))
 }
 
-fn remote_identity(config: &RuntimeConfig) -> anyhow::Result<DaemonIdentity> {
+fn remote_identity(config: &RuntimeConfig) -> anyhow::Result<DaemonBuildIdentity> {
     ureq::get(&format!("{}/v1/daemon/identity", config.local_base_url()))
         .timeout(Duration::from_millis(300))
         .call()
@@ -393,7 +392,7 @@ fn remote_identity(config: &RuntimeConfig) -> anyhow::Result<DaemonIdentity> {
 fn wait_for_verified(
     store: &LocalStore,
     config: &RuntimeConfig,
-) -> anyhow::Result<Option<(DaemonInfo, DaemonIdentity)>> {
+) -> anyhow::Result<Option<(DaemonInfo, DaemonBuildIdentity)>> {
     let deadline = std::time::Instant::now() + IDENTITY_WAIT;
     loop {
         if let Some(runtime) = verified_runtime(store, config)? {
@@ -467,10 +466,10 @@ fn verify_identity(info: &DaemonInfo, identity: &DaemonIdentity) -> anyhow::Resu
     Ok(())
 }
 
-pub(crate) fn build_freshness(identity: &DaemonIdentity) -> BuildFreshness {
-    if identity.build_id.trim().is_empty() {
+pub(crate) fn build_freshness(response: &DaemonBuildIdentity) -> BuildFreshness {
+    if response.build_id.trim().is_empty() {
         BuildFreshness::Missing
-    } else if identity.build_id == current_build_id() {
+    } else if response.build_id == current_build_id() {
         BuildFreshness::Current
     } else {
         BuildFreshness::Mismatched
