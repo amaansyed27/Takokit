@@ -1,5 +1,6 @@
 mod forms;
 mod navigation;
+mod workspace;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -9,6 +10,17 @@ impl App {
     pub(super) fn handle_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return Some(TuiAction::Quit);
+        }
+        if self.pending_confirmation.is_some() {
+            return match key.code {
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => self.confirm_pending(),
+                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    self.cancel_confirmation();
+                    self.set_status("Destructive operation cancelled.");
+                    None
+                }
+                _ => None,
+            };
         }
         if self.show_help {
             if matches!(key.code, KeyCode::Esc | KeyCode::F(1) | KeyCode::Enter) {
@@ -20,6 +32,11 @@ impl App {
             || (!self.screen.accepts_text() && key.code == KeyCode::Char('?'))
         {
             self.show_help = true;
+            return None;
+        }
+        if !self.screen.accepts_text() && key.code == KeyCode::Char('w') {
+            self.screen = TuiScreen::Workspace;
+            self.workspace_field = super::app::WorkspaceField::Path;
             return None;
         }
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Enter {
@@ -47,6 +64,7 @@ impl App {
             TuiScreen::Runners => navigation::handle_runners(self, key),
             TuiScreen::System => navigation::handle_system(self, key),
             TuiScreen::Sessions => navigation::handle_sessions(self, key),
+            TuiScreen::Workspace => workspace::handle_workspace(self, key),
             TuiScreen::Activity => navigation::handle_activity(self, key),
         }
     }
@@ -74,6 +92,26 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
         TuiScreen::Sessions => app
             .selected_session()
             .map(|session| TuiAction::OpenSession(session.id)),
+        TuiScreen::Workspace => {
+            let path = app.workspace_input.trim().to_string();
+            if path.is_empty() {
+                app.workspace_field = super::app::WorkspaceField::Path;
+                app.set_status("Enter an absolute workspace path.");
+                None
+            } else {
+                Some(TuiAction::ChangeWorkspace(path))
+            }
+        }
         TuiScreen::Activity => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workspace_screen_accepts_text() {
+        assert!(TuiScreen::Workspace.accepts_text());
     }
 }
