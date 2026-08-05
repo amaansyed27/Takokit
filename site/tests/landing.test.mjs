@@ -24,12 +24,15 @@ test("homepage uses the simplified Takokit landing flow", async () => {
   assert.match(home, /className="takokit-landing"/);
 });
 
-test("hero keeps motion lightweight and preserves installation", async () => {
+test("hero keeps motion lightweight and aligns the installer", async () => {
   const hero = await source("src/components/landing/LandingHero.jsx");
+  const styles = await source("src/styles/landing/hero.css");
   assert.doesNotMatch(hero, /useScrollProgress/);
   assert.match(hero, /landing-hero__wave/);
   assert.match(hero, /PlatformInstall/);
   assert.match(hero, /Run open voice models locally/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 1fr\) auto/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 1fr\) 96px/);
 });
 
 test("capabilities use large typography with a lightweight reveal fallback", async () => {
@@ -44,19 +47,21 @@ test("capabilities use large typography with a lightweight reveal fallback", asy
   }
 });
 
-test("runtime story uses direct feature bands without per-frame scroll state", async () => {
+test("runtime story uses a four-spoke pinwheel and rolling feature text", async () => {
   const runtime = await source("src/components/landing/RuntimeAssembly.jsx");
   const styles = await source("src/styles/landing/assembly.css");
   for (const capability of ["Models", "Runners", "Every interface", "Local by default"]) {
     assert.ok(runtime.includes(capability), `missing ${capability}`);
   }
-  assert.match(runtime, /IntersectionObserver/);
-  assert.doesNotMatch(runtime, /useScrollProgress|useState/);
-  assert.match(runtime, /runtime-band/);
+  assert.doesNotMatch(runtime, /useScrollProgress|IntersectionObserver|useState/);
+  assert.match(runtime, /runtime-wheel__rotor/);
+  assert.match(runtime, /runtime-wheel__track/);
   assert.match(runtime, /Different workflows/);
   assert.match(runtime, /\/brand\/takokit-mark\.svg/);
-  assert.match(styles, /animation-timeline: view\(\)/);
-  assert.match(styles, /runtime-copy-left/);
+  assert.match(styles, /view-timeline-name: --runtime-wheel/);
+  assert.match(styles, /animation-timeline: --runtime-wheel/);
+  assert.match(styles, /runtime-wheel-turn/);
+  assert.match(styles, /runtime-text-roll/);
   assert.match(styles, /@supports not \(animation-timeline: view\(\)\)/);
 });
 
@@ -78,11 +83,11 @@ test("landing uses Dawnlight fonts with the Takokit palette", async () => {
   assert.match(vite, /assets\/svg-transparent\/512\.svg/);
 });
 
-test("responsive landing keeps the parallax stories readable on compact screens", async () => {
+test("responsive landing keeps the scroll stories readable on compact screens", async () => {
   const responsive = await source("src/styles/landing/responsive.css");
   assert.match(responsive, /max-width: 900px/);
   assert.match(responsive, /capability-moment/);
-  assert.match(responsive, /runtime-band/);
+  assert.match(responsive, /runtime-wheel/);
   assert.match(responsive, /max-width: 700px/);
   assert.match(responsive, /max-width: 390px/);
 });
