@@ -46,10 +46,15 @@ export const DOCS = {
     title: "Install Takokit",
     intro: "Takokit is currently source-distributed while Windows-first packaging is prepared.",
     sections: [
-      ["Prerequisites", "Install Rust stable, Node.js LTS, npm, and a compatible GPU driver only when the chosen model requires one."],
-      ["Build", "Run the GUI build first, then build the Rust workspace."],
+      ["Prerequisites", "Install Git, Rust stable, Node.js LTS, and npm. A compatible GPU driver is required only when the selected model requires a GPU."],
+      ["Build", "Build the React GUI assets first, then build the locked Rust workspace from the repository root."],
     ],
-    commands: ["cd apps/gui && npm ci && npm run build", "cargo build --release", ".\\target\\release\\tako.exe doctor"],
+    commands: [
+      "npm ci --prefix apps/gui",
+      "npm run build --prefix apps/gui",
+      "cargo build --release --locked",
+      ".\\target\\release\\tako.exe doctor",
+    ],
   },
   "pull-first-model": {
     title: "Pull your first model",
