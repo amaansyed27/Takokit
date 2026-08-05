@@ -7,12 +7,14 @@ use crate::tui::{
 
 pub(super) fn handle_home(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.home_index = shifted_index(app.home_index, HOME_ACTIONS.len(), -1),
+        KeyCode::Up | KeyCode::BackTab => {
+            app.home_index = shifted_index(app.home_index, HOME_ACTIONS.len(), -1)
+        }
         KeyCode::Down | KeyCode::Tab => {
             app.home_index = shifted_index(app.home_index, HOME_ACTIONS.len(), 1)
         }
-        KeyCode::Enter => open_home_item(app, app.home_index),
-        KeyCode::Char(character @ '1'..='7') => {
+        KeyCode::Enter | KeyCode::Char(' ') => open_home_item(app, app.home_index),
+        KeyCode::Char(character @ '1'..='8') => {
             let index = character as usize - '1' as usize;
             app.home_index = index;
             open_home_item(app, index);
@@ -31,17 +33,20 @@ pub(super) fn open_home_item(app: &mut App, index: usize) {
         3 => TuiScreen::Convert,
         4 => TuiScreen::Manage,
         5 => TuiScreen::Sessions,
+        6 => TuiScreen::Workspace,
         _ => TuiScreen::Activity,
     };
 }
 
 pub(super) fn handle_manage(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), -1),
+        KeyCode::Up | KeyCode::BackTab => {
+            app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), -1)
+        }
         KeyCode::Down | KeyCode::Tab => {
             app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), 1)
         }
-        KeyCode::Enter => open_manage_item(app, app.manage_index),
+        KeyCode::Enter | KeyCode::Char(' ') => open_manage_item(app, app.manage_index),
         KeyCode::Char(character @ '1'..='3') => {
             let index = character as usize - '1' as usize;
             app.manage_index = index;
@@ -63,18 +68,28 @@ pub(super) fn open_manage_item(app: &mut App, index: usize) {
 
 pub(super) fn handle_models(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.model_index = shifted_index(app.model_index, app.models.len(), -1),
-        KeyCode::Down => app.model_index = shifted_index(app.model_index, app.models.len(), 1),
-        KeyCode::Enter => return open_or_repair_selected_model(app),
+        KeyCode::Up | KeyCode::BackTab => {
+            app.model_index = shifted_index(app.model_index, app.models.len(), -1)
+        }
+        KeyCode::Down | KeyCode::Tab => {
+            app.model_index = shifted_index(app.model_index, app.models.len(), 1)
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => return open_or_repair_selected_model(app),
         KeyCode::Char('p') => {
             return app
                 .selected_model()
                 .map(|model| TuiAction::PullModel(model.id.clone()));
         }
-        KeyCode::Char('x') => {
-            return app
-                .selected_model()
-                .map(|model| TuiAction::RemoveModel(model.id.clone()));
+        KeyCode::Char('x') | KeyCode::Delete => {
+            if let Some(model) = app.selected_model().cloned() {
+                app.request_confirmation(
+                    format!(
+                        "Remove installed model {} ({})? Shared runners and protected caches will be retained. Enter/Y confirms; Esc/N cancels.",
+                        model.title, model.id
+                    ),
+                    TuiAction::RemoveModel(model.id),
+                );
+            }
         }
         KeyCode::Char('r') => return Some(TuiAction::Refresh),
         _ => {}
@@ -84,9 +99,13 @@ pub(super) fn handle_models(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 
 pub(super) fn handle_runners(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.runner_index = shifted_index(app.runner_index, app.runners.len(), -1),
-        KeyCode::Down => app.runner_index = shifted_index(app.runner_index, app.runners.len(), 1),
-        KeyCode::Enter => return runner_primary_action(app),
+        KeyCode::Up | KeyCode::BackTab => {
+            app.runner_index = shifted_index(app.runner_index, app.runners.len(), -1)
+        }
+        KeyCode::Down | KeyCode::Tab => {
+            app.runner_index = shifted_index(app.runner_index, app.runners.len(), 1)
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => return runner_primary_action(app),
         KeyCode::Char('p') => {
             return app
                 .selected_runner()
@@ -102,10 +121,16 @@ pub(super) fn handle_runners(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
                 .selected_runner()
                 .map(|runner| TuiAction::DoctorRunner(runner.id.clone()));
         }
-        KeyCode::Char('x') => {
-            return app
-                .selected_runner()
-                .map(|runner| TuiAction::RemoveRunner(runner.id.clone()));
+        KeyCode::Char('x') | KeyCode::Delete => {
+            if let Some(runner) = app.selected_runner().cloned() {
+                app.request_confirmation(
+                    format!(
+                        "Remove runner contract {} ({})? Models are not deleted. Enter/Y confirms; Esc/N cancels.",
+                        runner.title, runner.id
+                    ),
+                    TuiAction::RemoveRunner(runner.id),
+                );
+            }
         }
         KeyCode::Char('r') => return Some(TuiAction::Refresh),
         _ => {}
@@ -115,9 +140,13 @@ pub(super) fn handle_runners(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
 
 pub(super) fn handle_system(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.system_index = shifted_index(app.system_index, app.system.len(), -1),
-        KeyCode::Down => app.system_index = shifted_index(app.system_index, app.system.len(), 1),
-        KeyCode::Enter => {
+        KeyCode::Up | KeyCode::BackTab => {
+            app.system_index = shifted_index(app.system_index, app.system.len(), -1)
+        }
+        KeyCode::Down | KeyCode::Tab => {
+            app.system_index = shifted_index(app.system_index, app.system.len(), 1)
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => {
             return app
                 .selected_system()
                 .map(|row| TuiAction::RunSystem(row.action));
@@ -130,11 +159,13 @@ pub(super) fn handle_system(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 
 pub(super) fn handle_sessions(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     match key.code {
-        KeyCode::Up => app.session_index = shifted_index(app.session_index, app.sessions.len(), -1),
-        KeyCode::Down => {
+        KeyCode::Up | KeyCode::BackTab => {
+            app.session_index = shifted_index(app.session_index, app.sessions.len(), -1)
+        }
+        KeyCode::Down | KeyCode::Tab => {
             app.session_index = shifted_index(app.session_index, app.sessions.len(), 1)
         }
-        KeyCode::Enter => {
+        KeyCode::Enter | KeyCode::Char(' ') => {
             return app
                 .selected_session()
                 .map(|session| TuiAction::OpenSession(session.id));
@@ -182,7 +213,7 @@ pub(super) fn open_or_repair_selected_model(app: &mut App) -> Option<TuiAction> 
         app.set_convert_model(&model.id);
         app.screen = TuiScreen::Convert;
         app.convert_state.field = crate::tui::convert::ConvertField::Source;
-        app.set_status("Model selected. Enter source audio and a target RVC package.");
+        app.set_status("Model selected. Enter source audio and the target contract required by the selected conversion model.");
     } else {
         app.set_status("This model is installed, but it has no interactive TUI task.");
     }
@@ -198,4 +229,14 @@ pub(super) fn runner_primary_action(app: &App) -> Option<TuiAction> {
     } else {
         TuiAction::PullRunner(runner.id.clone())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn home_workspace_item_maps_to_workspace_screen() {
+        assert_eq!(HOME_ACTIONS[6].0, "Workspace");
+    }
 }
