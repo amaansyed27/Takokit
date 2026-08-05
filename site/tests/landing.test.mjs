@@ -44,18 +44,20 @@ test("capabilities use large typography with a lightweight reveal fallback", asy
   }
 });
 
-test("runtime story uses direct feature bands without scroll-driven React state", async () => {
+test("runtime story uses direct feature bands without per-frame scroll state", async () => {
   const runtime = await source("src/components/landing/RuntimeAssembly.jsx");
   const styles = await source("src/styles/landing/assembly.css");
   for (const capability of ["Models", "Runners", "Every interface", "Local by default"]) {
     assert.ok(runtime.includes(capability), `missing ${capability}`);
   }
-  assert.doesNotMatch(runtime, /useScrollProgress|IntersectionObserver|useState/);
+  assert.match(runtime, /IntersectionObserver/);
+  assert.doesNotMatch(runtime, /useScrollProgress|useState/);
   assert.match(runtime, /runtime-band/);
   assert.match(runtime, /Different workflows/);
   assert.match(runtime, /\/brand\/takokit-mark\.svg/);
   assert.match(styles, /animation-timeline: view\(\)/);
   assert.match(styles, /runtime-copy-left/);
+  assert.match(styles, /@supports not \(animation-timeline: view\(\)\)/);
 });
 
 test("landing uses Dawnlight fonts with the Takokit palette", async () => {
