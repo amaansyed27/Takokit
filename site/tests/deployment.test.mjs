@@ -35,3 +35,12 @@ test("registry API follows the deployed Git revision and exposes diagnostics", a
   assert.match(api, /X-Takokit-Registry-Ref/);
   assert.match(api, /stale-while-revalidate/);
 });
+
+test("root assets use separate Vite build and serve plugins", async () => {
+  const vite = await readFile(new URL("vite.config.js", root), "utf8");
+  assert.match(vite, /canonicalAssetsBuildPlugin/);
+  assert.match(vite, /canonicalAssetsServePlugin/);
+  assert.match(vite, /apply: "build"/);
+  assert.match(vite, /apply: "serve"/);
+  assert.match(vite, /this\.emitFile/);
+});
