@@ -1,0 +1,96 @@
+.runtime-architecture {
+  background: var(--tk-paper-soft);
+}
+
+.runtime-architecture__inner {
+  position: relative;
+  padding-block: clamp(5rem, 9vw, 7rem);
+}
+
+.runtime-architecture header {
+  max-width: 760px;
+  margin-bottom: 2.5rem;
+}
+
+.runtime-architecture h2 {
+  margin: 0;
+  font-size: clamp(2.2rem, 3.5vw, 3.25rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.runtime-architecture__nodes {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--tk-line);
+  list-style: none;
+}
+
+.runtime-architecture__nodes li {
+  position: relative;
+  min-width: 0;
+  min-height: 180px;
+  border-right: 1px solid var(--tk-line);
+  padding: 1.5rem 1.25rem;
+}
+
+.runtime-architecture__nodes li:last-child {
+  border-right: 0;
+}
+
+.runtime-architecture__nodes span {
+  color: var(--tk-yellow-deep);
+  font-family: var(--font-technical);
+  font-size: 0.68rem;
+}
+
+.runtime-architecture__nodes strong {
+  display: block;
+  margin-top: 1.2rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.runtime-architecture__nodes p {
+  margin: 0.55rem 0 0;
+  color: var(--tk-muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.runtime-architecture__nodes li > i {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: -0.45rem;
+  color: var(--tk-yellow-deep);
+  font-family: var(--font-technical);
+  font-size: 0.78rem;
+  font-style: normal;
+  transform: translateY(-50%);
+}
+
+.runtime-architecture__signal {
+  position: relative;
+  height: 2px;
+  margin-top: 1.35rem;
+  overflow: hidden;
+  background: var(--tk-line);
+}
+
+.runtime-architecture__signal i {
+  display: block;
+  width: 14%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--tk-yellow), transparent);
+  animation: architecture-signal 5.5s linear infinite;
+}
+
+@keyframes architecture-signal {
+  from { transform: translate3d(-120%, 0, 0); }
+  to { transform: translate3d(760%, 0, 0); }
+}

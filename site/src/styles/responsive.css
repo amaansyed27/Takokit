@@ -1,0 +1,263 @@
+@media (max-width: 900px) {
+  .hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding-block: 4.5rem;
+  }
+
+  .hero-mark {
+    min-height: 230px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding-top: 2rem;
+  }
+
+  .task-shortcuts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .task-shortcuts a:nth-child(2) {
+    border-right: 0;
+  }
+
+  .task-shortcuts a:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .recommended-row {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+
+  .recommended-row .status-badge {
+    grid-column: 1 / -1;
+  }
+
+  .model-detail-head {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .hardware-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hardware-grid div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .hardware-grid div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .variant-header,
+  .variant-row {
+    grid-template-columns: minmax(160px, 1fr) 1fr 120px;
+  }
+
+  .variant-header span:nth-child(4),
+  .variant-row > span:nth-child(4) {
+    display: none;
+  }
+
+  .platform-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-tabs section {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .platform-tabs section:last-child {
+    border-bottom: 0;
+  }
+
+  .docs-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .docs-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+  }
+
+  .docs-nav section {
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 700px) {
+  .shell {
+    width: min(calc(100% - 1.5rem), var(--max-width));
+  }
+
+  .menu-button {
+    display: block;
+  }
+
+  .site-nav {
+    position: absolute;
+    top: 68px;
+    right: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+    padding: 0.75rem;
+  }
+
+  .site-nav.is-open {
+    display: flex;
+  }
+
+  .site-nav a {
+    min-height: 44px;
+    padding: 0.65rem;
+  }
+
+  .page {
+    padding-block: 3rem 5rem;
+  }
+
+  .section {
+    padding-block: 4rem;
+  }
+
+  .section-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .hero h1 {
+    font-size: clamp(3rem, 16vw, 4.8rem);
+  }
+
+  .hero-mark {
+    display: none;
+  }
+
+  .task-shortcuts {
+    grid-template-columns: 1fr;
+  }
+
+  .task-shortcuts a,
+  .task-shortcuts a:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .task-shortcuts a:last-child {
+    border-bottom: 0;
+  }
+
+  .recommended-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .how-list {
+    grid-template-columns: 1fr;
+  }
+
+  .how-list li + li {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .model-row-link {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .model-row-facts {
+    justify-items: start;
+  }
+
+  .model-row-command {
+    display: block;
+  }
+
+  .control-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sort-control {
+    justify-content: space-between;
+  }
+
+  .filter-panel {
+    position: fixed;
+    top: 78px;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .filter-panel details {
+    grid-column: auto;
+  }
+
+  .hardware-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hardware-grid div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .variant-header {
+    display: none;
+  }
+
+  .variant-row {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .variant-row > span:nth-child(4) {
+    display: block;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer-intro {
+    grid-column: 1 / -1;
+  }
+
+  .command-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .command-bar button {
+    min-height: 42px;
+    border-top: 1px solid var(--ink);
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,77 @@
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .model-preview__row,
+    .runtime-architecture__nodes li,
+    .landing-closing__steps li {
+      animation: landing-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 24%;
+    }
+  }
+}
+
+@keyframes landing-reveal {
+  from {
+    opacity: 0.35;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero__mark,
+  .landing-hero__copy,
+  .landing-hero__wave i,
+  .capability-moment__copy,
+  .capability-moment__signal,
+  .runtime-wheel__rotor,
+  .runtime-wheel__track,
+  .runtime-wheel__header,
+  .runtime-wheel__footer > i::after,
+  .runtime-wheel__outro,
+  .runtime-architecture__signal i {
+    animation: none;
+  }
+
+  .capability-moment__copy,
+  .capability-moment--right .capability-moment__copy,
+  .runtime-wheel__header,
+  .runtime-wheel__outro,
+  .model-preview__row,
+  .landing-button {
+    opacity: 1;
+    transition: none;
+    transform: none;
+  }
+
+  .runtime-wheel {
+    min-height: 0;
+  }
+
+  .runtime-wheel__stage {
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .runtime-wheel__roller {
+    height: auto;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .runtime-wheel__track {
+    display: grid;
+    height: auto;
+  }
+
+  .runtime-wheel__panel {
+    height: auto;
+    min-height: 190px;
+    border-top: 1px solid var(--tk-line-light);
+  }
+}

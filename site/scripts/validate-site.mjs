@@ -1,48 +1,114 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { validateRegistry } from "../src/models/registry.js";
 
-const root = new URL("../", import.meta.url);
-for (const path of [
+const siteRoot = fileURLToPath(new URL("../", import.meta.url));
+const repoRoot = resolve(siteRoot, "..");
+const landingComponents = [
+  "LandingHero",
+  "ProductCapabilities",
+  "RuntimeAssembly",
+  "ModelLibraryPreview",
+  "RuntimeArchitecture",
+  "FinalCTA",
+];
+const landingStyles = [
+  "foundation.css",
+  "hero.css",
+  "capabilities.css",
+  "assembly.css",
+  "models.css",
+  "architecture.css",
+  "closing.css",
+  "responsive.css",
+  "motion.css",
+];
+const required = [
   "index.html",
+  "package.json",
   "vite.config.js",
-  "public/brand/takokit-mark.svg",
-  "public/brand/takokit-lockup.svg",
-  "src/main.jsx",
-  "src/App.jsx",
-  "src/router.js",
-  "src/registry.js",
-  "src/styles.css",
-  "src/components/Chrome.jsx",
-  "api/v1/registry.js",
   "vercel.json",
-]) {
-  await access(new URL(path, root));
+  "api/v1/registry.js",
+  "src/main.jsx",
+  "src/app/App.jsx",
+  "src/app/router.js",
+  "src/app/routes.js",
+  "src/pages/HomePage.jsx",
+  "src/pages/ModelsPage.jsx",
+  "src/pages/ModelDetailPage.jsx",
+  "src/pages/DocsPage.jsx",
+  "src/pages/DownloadPage.jsx",
+  ...landingComponents.map((name) => `src/components/landing/${name}.jsx`),
+  "src/hooks/useScrollProgress.js",
+  "src/models/registry.js",
+  "src/models/filtering.js",
+  "src/styles/index.css",
+  "src/styles/landing/index.css",
+  ...landingStyles.map((name) => `src/styles/landing/${name}`),
+];
+const rootAssets = [
+  "assets/svg-transparent/512.svg",
+  "assets/svg-white/512-white.svg",
+  "assets/favicon/favicon.ico",
+  "assets/favicon/favicon-32x32.png",
+  "assets/favicon/site.webmanifest",
+];
+
+for (const path of required) await access(resolve(siteRoot, path));
+for (const path of rootAssets) await access(resolve(repoRoot, path));
+
+const pkg = JSON.parse(await readFile(resolve(siteRoot, "package.json"), "utf8"));
+if (pkg.scripts.build !== "vite build") throw new Error("canonical site build is not Vite");
+if (pkg.scripts.build.includes("scripts/build.mjs")) throw new Error("obsolete static builder is active");
+
+const vite = await readFile(resolve(siteRoot, "vite.config.js"), "utf8");
+if (!vite.includes("takokit-root-brand-assets")) {
+  throw new Error("the site is not serving canonical assets from the repository root");
 }
 
-const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
-if (!pkg.dependencies.react || !pkg.dependencies.vite || !pkg.dependencies["@vitejs/plugin-react"]) {
-  throw new Error("React/Vite dependencies are missing");
+const vercel = JSON.parse(await readFile(resolve(siteRoot, "vercel.json"), "utf8"));
+if (vercel.framework !== "vite" || vercel.outputDirectory !== "dist") {
+  throw new Error("Vercel is not configured for the canonical Vite output");
+}
+if (!vercel.rewrites.some((rule) => rule.destination === "/index.html")) {
+  throw new Error("SPA rewrite is missing");
+}
+if (!vercel.rewrites.some((rule) => rule.source === "/v1/registry.json")) {
+  throw new Error("registry rewrite is missing");
 }
 
-const app = await readFile(new URL("src/App.jsx", root), "utf8");
-const router = await readFile(new URL("src/router.js", root), "utf8");
-if (router.includes("<a ")) {
-  throw new Error("src/router.js contains JSX but does not use a .jsx extension");
+const app = await readFile(resolve(siteRoot, "src/app/App.jsx"), "utf8");
+for (const page of ["HomePage", "ModelsPage", "ModelDetailPage", "DocsPage", "DownloadPage"]) {
+  if (!app.includes(page)) throw new Error(`app router is missing ${page}`);
 }
-const chrome = await readFile(new URL("src/components/Chrome.jsx", root), "utf8");
-for (const [name, source] of [["App.jsx", app], ["Chrome.jsx", chrome]]) {
-  if (source.includes("assets/brand/")) {
-    throw new Error(`${name} references the deleted legacy brand directory`);
-  }
+if (!app.includes("site--landing-home")) throw new Error("landing-specific site shell is missing");
+
+const home = await readFile(resolve(siteRoot, "src/pages/HomePage.jsx"), "utf8");
+for (const component of landingComponents) {
+  if (!home.includes(component)) throw new Error(`landing homepage is missing ${component}`);
 }
-for (const route of ["/library", "/docs", "/download"]) {
-  if (!app.includes(route)) throw new Error(`missing React route ${route}`);
+if (home.includes("WorkflowPinwheel")) throw new Error("obsolete landing pinwheel is still referenced");
+if (!home.includes("takokit-landing")) throw new Error("landing page root class is missing");
+
+const landingIndex = await readFile(resolve(siteRoot, "src/styles/landing/index.css"), "utf8");
+for (const stylesheet of landingStyles) {
+  if (!landingIndex.includes(stylesheet)) throw new Error(`landing styles are missing ${stylesheet}`);
+}
+if (landingIndex.includes("workflows.css")) throw new Error("obsolete pinwheel styles are still imported");
+
+const sourceEntries = await readdir(resolve(siteRoot, "src"), { recursive: true });
+if (sourceEntries.some((path) => String(path).includes("assets/base.css"))) {
+  throw new Error("obsolete static site source remains referenced");
 }
 
-const registryPath = new URL("../../registry/index.json", import.meta.url);
+const registryPath = process.env.TAKOKIT_REGISTRY_PATH || resolve(repoRoot, "registry/index.json");
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
-const releases = registry.models.reduce((total, model) => total + model.tags.length, 0);
-if (registry.schema_version !== 1 || registry.models.length !== 24 || releases !== 31) {
-  throw new Error(`unexpected registry shape: ${registry.models.length} families / ${releases} releases`);
-}
+const errors = validateRegistry(registry);
+if (errors.length) throw new Error(`registry validation failed:\n${errors.join("\n")}`);
 
-console.log("Takokit React site validation passed");
+const families = registry.models.length;
+const releases = registry.models.reduce((total, model) => total + model.tags.length, 0);
+if (families < 1 || releases < families) throw new Error("registry catalog is unexpectedly empty");
+
+console.log(`Takokit site validation passed: ${families} families / ${releases} releases`);

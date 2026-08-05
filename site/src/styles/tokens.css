@@ -1,0 +1,20 @@
+:root {
+  --paper: #fffdf4;
+  --paper-deep: #fff8d8;
+  --paper-bright: #ffffff;
+  --ink: #17140b;
+  --ink-soft: #3e3827;
+  --muted: #746b53;
+  --line: #e6dcae;
+  --gold: #ffd204;
+  --gold-dark: #806300;
+  --accent: #fdbd03;
+  --cream: #fde57e;
+  --danger: #92362d;
+  --success: #2d6b49;
+  --max-width: 1180px;
+  --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Space Mono", "Cascadia Mono", ui-monospace, monospace;
+  --font-mono: "Space Mono", "Cascadia Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  color-scheme: light;
+}
