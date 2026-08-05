@@ -27,16 +27,20 @@
   .landing-hero__wave i,
   .capability-moment__copy,
   .capability-moment__signal,
+  .runtime-story__header,
   .runtime-band__copy,
   .runtime-band__signal,
+  .runtime-story__outro,
   .runtime-architecture__signal i {
     animation: none;
   }
 
   .capability-moment__copy,
   .capability-moment--right .capability-moment__copy,
+  .runtime-story__header,
   .runtime-band__copy,
   .runtime-band--right .runtime-band__copy,
+  .runtime-story__outro,
   .model-preview__row,
   .landing-button {
     opacity: 1;
