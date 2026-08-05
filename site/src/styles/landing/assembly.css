@@ -219,3 +219,121 @@
 .runtime-flow__outro .landing-text-link {
   color: var(--tk-surface);
 }
+
+@media (max-height: 760px) and (min-width: 901px) {
+  .runtime-flow__sticky {
+    top: 78px;
+    min-height: calc(100svh - 92px);
+    padding-block: 1rem;
+  }
+
+  .runtime-flow__header h2 {
+    font-size: clamp(2.35rem, 4vw, 3.6rem);
+  }
+
+  .runtime-flow__wheel {
+    width: 180px;
+    margin-top: 1.4rem;
+  }
+
+  .runtime-flow__progress {
+    margin-top: 1rem;
+  }
+
+  .runtime-flow__steps li {
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .runtime-flow__layout {
+    grid-template-columns: minmax(280px, 0.72fr) minmax(360px, 1fr);
+    gap: 3rem;
+  }
+
+  .runtime-flow__wheel {
+    width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  .runtime-flow__layout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    padding-block: 5rem;
+  }
+
+  .runtime-flow__sticky {
+    position: relative;
+    top: 0;
+    min-height: auto;
+    padding-block: 0;
+  }
+
+  .runtime-flow__wheel {
+    width: 180px;
+    margin-top: 2rem;
+  }
+
+  .runtime-flow__progress {
+    display: none;
+  }
+
+  .runtime-flow__steps li {
+    min-height: auto;
+    padding-block: 3.5rem;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .runtime-flow__header h2 {
+    font-size: clamp(2.2rem, 9.2vw, 3.3rem);
+  }
+
+  .runtime-flow__wheel {
+    width: 150px;
+  }
+
+  .runtime-flow__steps h3 {
+    font-size: clamp(2.8rem, 13vw, 4.2rem);
+  }
+
+  .runtime-flow__outro {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 1.1rem;
+    padding-block: 4.5rem;
+  }
+
+  .runtime-flow__outro img {
+    width: 52px;
+  }
+
+  .runtime-flow__outro h3 {
+    font-size: clamp(1.8rem, 8.5vw, 2.8rem);
+  }
+}
+
+@media (max-width: 390px) {
+  .runtime-flow__steps h3 {
+    font-size: clamp(2.55rem, 12.8vw, 3.6rem);
+  }
+
+  .runtime-flow__outro {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runtime-flow__rotor,
+  .runtime-flow__progress button i,
+  .runtime-flow__steps li {
+    transition: none;
+  }
+
+  .runtime-flow__steps li {
+    opacity: 1;
+    transform: none;
+  }
+}
