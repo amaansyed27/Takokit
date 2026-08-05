@@ -47,18 +47,18 @@ npm install --global vercel@latest
 vercel login
 vercel link --repo
 vercel pull --yes --environment=preview
-vercel build
-$PreviewUrl = (vercel deploy --prebuilt | Select-Object -Last 1).Trim()
+$PreviewUrl = (vercel deploy --target=preview --logs --no-color | Select-Object -Last 1).Trim()
 $PreviewUrl
+vercel inspect $PreviewUrl
 npm run verify:deployment --prefix site -- $PreviewUrl
 ```
 
 During `vercel link --repo`, select the existing Takokit website project. Do not create a
-second production project. If the linked project reports a different Root Directory,
-change it to `site` before building.
+second production project. Confirm that its Root Directory is `site`; the remaining build
+settings are versioned in `site/vercel.json`.
 
-If preview deployment protection is enabled, set the automation bypass secret before the
-verification command:
+If preview deployment protection is enabled, either use `vercel curl` for individual checks
+or set the automation bypass secret before the repository verifier:
 
 ```powershell
 $env:VERCEL_AUTOMATION_BYPASS_SECRET = "YOUR_BYPASS_SECRET"
@@ -72,14 +72,29 @@ Only run this after the preview verification and manual checklist pass:
 ```powershell
 cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
 vercel pull --yes --environment=production
-vercel build --prod
-$ProductionUrl = (vercel deploy --prebuilt --prod | Select-Object -Last 1).Trim()
+$ProductionUrl = (vercel deploy --prod --logs --no-color | Select-Object -Last 1).Trim()
 $ProductionUrl
+vercel inspect $ProductionUrl
 npm run verify:deployment --prefix site -- $ProductionUrl
 ```
 
 A production deployment assigns the project's production domains. Confirm the URL and the
 registry response before removing or redirecting any older alias.
+
+## Optional local Vercel build
+
+The normal workflow above sends the source to Vercel for the build. To inspect Vercel's
+Build Output locally before deployment, run:
+
+```powershell
+cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
+vercel pull --yes --environment=preview
+vercel build
+```
+
+This creates `.vercel/output`. The direct deployment workflow remains the default because
+it preserves Vercel system variables during the build and avoids unnecessary prebuilt-path
+handling in a custom-root monorepo.
 
 ## What the automated deployment check covers
 
