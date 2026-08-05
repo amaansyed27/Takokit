@@ -47,22 +47,22 @@ test("capabilities use large typography with a lightweight reveal fallback", asy
   }
 });
 
-test("runtime story uses a four-spoke pinwheel and rolling feature text", async () => {
+test("runtime story uses a simple sticky wheel with discrete text steps", async () => {
   const runtime = await source("src/components/landing/RuntimeAssembly.jsx");
   const styles = await source("src/styles/landing/assembly.css");
   for (const capability of ["Models", "Runners", "Every interface", "Local by default"]) {
     assert.ok(runtime.includes(capability), `missing ${capability}`);
   }
-  assert.doesNotMatch(runtime, /useScrollProgress|IntersectionObserver|useState/);
-  assert.match(runtime, /runtime-wheel__rotor/);
-  assert.match(runtime, /runtime-wheel__track/);
+  assert.match(runtime, /IntersectionObserver/);
+  assert.match(runtime, /useState/);
+  assert.doesNotMatch(runtime, /useScrollProgress|runtime-wheel__track/);
+  assert.match(runtime, /runtime-flow__rotor/);
+  assert.match(runtime, /runtime-flow__steps/);
   assert.match(runtime, /Different workflows/);
   assert.match(runtime, /\/brand\/takokit-mark\.svg/);
-  assert.match(styles, /view-timeline-name: --runtime-wheel/);
-  assert.match(styles, /animation-timeline: --runtime-wheel/);
-  assert.match(styles, /runtime-wheel-turn/);
-  assert.match(styles, /runtime-text-roll/);
-  assert.match(styles, /@supports not \(animation-timeline: view\(\)\)/);
+  assert.match(styles, /position: sticky/);
+  assert.match(styles, /runtime-flow__steps li\.is-active/);
+  assert.doesNotMatch(styles, /animation-timeline: --runtime-wheel|runtime-text-roll/);
 });
 
 test("landing uses Dawnlight fonts with the Takokit palette", async () => {
@@ -85,9 +85,11 @@ test("landing uses Dawnlight fonts with the Takokit palette", async () => {
 
 test("responsive landing keeps the scroll stories readable on compact screens", async () => {
   const responsive = await source("src/styles/landing/responsive.css");
+  const assembly = await source("src/styles/landing/assembly.css");
   assert.match(responsive, /max-width: 900px/);
   assert.match(responsive, /capability-moment/);
-  assert.match(responsive, /runtime-wheel/);
-  assert.match(responsive, /max-width: 700px/);
-  assert.match(responsive, /max-width: 390px/);
+  assert.match(assembly, /max-width: 900px/);
+  assert.match(assembly, /runtime-flow__sticky/);
+  assert.match(assembly, /max-width: 700px/);
+  assert.match(assembly, /max-width: 390px/);
 });
