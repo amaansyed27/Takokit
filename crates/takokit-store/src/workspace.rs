@@ -136,7 +136,9 @@ impl WorkspaceStore {
     }
 
     pub fn list_sessions(&self, query: Option<&str>) -> TakokitResult<Vec<SessionSummary>> {
-        self.ensure_layout()?;
+        if !self.sessions_dir().is_dir() {
+            return Ok(Vec::new());
+        }
         let query = query.map(str::trim).filter(|value| !value.is_empty());
         let query_lower = query.map(str::to_lowercase);
         let mut sessions = Vec::new();
@@ -358,6 +360,16 @@ fn storage_error(error: impl std::fmt::Display) -> TakokitError {
 mod tests {
     use super::*;
     use takokit_core::{SessionEventState, SessionTask};
+
+    #[test]
+    fn listing_empty_workspace_does_not_create_tako() {
+        let root = std::env::temp_dir().join(format!("takokit-empty-workspace-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = WorkspaceStore::new(&root);
+        assert!(store.list_sessions(None).unwrap().is_empty());
+        assert!(!root.join(".tako").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn workspace_sessions_persist_events_outputs_and_search() {
