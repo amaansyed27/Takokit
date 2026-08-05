@@ -1,5 +1,5 @@
 import { RouteLink } from "../../app/router";
-import { CommandBar } from "../CommandBar";
+import { RollingPullCommand } from "./RollingPullCommand";
 
 export function LandingHero() {
   return (
@@ -20,8 +20,8 @@ export function LandingHero() {
           </p>
 
           <div className="landing-hero__quickstart">
-            <span>Start with a model</span>
-            <CommandBar label="Pull Kokoro">tako pull kokoro</CommandBar>
+            <span>Pull any supported model</span>
+            <RollingPullCommand />
           </div>
 
           <div className="landing-actions">
