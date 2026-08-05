@@ -56,13 +56,19 @@ test("documentation pagination follows the declared navigation order", () => {
 });
 
 test("documentation styles use a compact responsive three-column reading layout", async () => {
-  const styles = await source("src/styles/docs.css");
-  assert.match(styles, /grid-template-columns: 240px minmax\(0, 760px\) 190px/);
-  assert.match(styles, /docs-toc/);
-  assert.match(styles, /docs-sidebar__toggle/);
-  assert.match(styles, /max-width: 1120px/);
-  assert.match(styles, /max-width: 820px/);
-  assert.match(styles, /white-space: pre-wrap/);
+  const layout = await source("src/styles/docs/layout.css");
+  const content = await source("src/styles/docs/content.css");
+  const responsive = await source("src/styles/docs/responsive.css");
+  const index = await source("src/styles/docs/index.css");
+  assert.match(layout, /grid-template-columns: 240px minmax\(0, 760px\) 190px/);
+  assert.match(layout, /docs-toc/);
+  assert.match(responsive, /docs-sidebar__toggle/);
+  assert.match(responsive, /max-width: 1120px/);
+  assert.match(responsive, /max-width: 820px/);
+  assert.match(content, /white-space: pre-wrap/);
+  for (const stylesheet of ["layout.css", "content.css", "responsive.css"]) {
+    assert.ok(index.includes(stylesheet), `missing ${stylesheet} import`);
+  }
 });
 
 test("documentation code blocks provide contained copy feedback", async () => {
