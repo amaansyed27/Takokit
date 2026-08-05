@@ -11,8 +11,11 @@ pub async fn status(State(state): State<AppState>) -> Json<takokit_core::Runtime
     Json(state.status())
 }
 
-pub async fn daemon_identity(State(state): State<AppState>) -> Json<DaemonIdentity> {
-    Json(state.daemon_identity.clone())
+pub async fn daemon_identity(State(state): State<AppState>) -> Json<DaemonBuildIdentity> {
+    Json(DaemonBuildIdentity {
+        identity: state.daemon_identity.clone(),
+        build_id: state.build_id.clone(),
+    })
 }
 
 pub async fn daemon_shutdown(
@@ -42,6 +45,12 @@ pub async fn doctor(
     State(state): State<AppState>,
 ) -> Json<RunnerDetailResponse<serde_json::Value>> {
     let mut checks = vec![
+        doctor_check(
+            "daemon",
+            "build identifier",
+            !state.build_id.trim().is_empty(),
+            state.build_id.clone(),
+        ),
         doctor_check(
             "storage",
             "storage root",
@@ -158,6 +167,8 @@ pub async fn doctor(
 
     Json(RunnerDetailResponse {
         data: serde_json::json!({
+            "build_id": state.build_id,
+            "daemon": state.daemon_identity,
             "storage_root": state.store.root(),
             "server": state.config.bind_addr(),
             "checks": checks,
