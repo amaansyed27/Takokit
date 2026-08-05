@@ -3,6 +3,12 @@
 The canonical maintained public site is the React/Vite application in `site/`.
 There is no second static website implementation.
 
+## Release policy
+
+Do not deploy the slice branch. First complete the Slice 1 local checklist, merge the
+approved branch into `main`, update the local `main`, and run the complete site check again.
+Only the verified `main` commit may be deployed to Vercel.
+
 ## Vercel project settings
 
 Use these settings for the existing Takokit website project:
@@ -26,13 +32,10 @@ The old production alias pointed to a manually uploaded static deployment built 
 `takokit-library@0.1.0` and `node scripts/build.mjs`. It contained legacy HTML, CSS, and
 JavaScript, had no current Git branch metadata, and Vercel reported no detected framework.
 The maintained repository had already moved to React/Vite (`takokit-library@0.2.0`), but
-production was not building that source. Moving the alias to a verified Vite deployment
-removes that mismatch.
+production was not building that source. Deploying the verified React/Vite build from
+`main` removes that mismatch.
 
-## Preview deployment from PowerShell
-
-Run Vercel from the repository root because this is a monorepo project whose configured
-Root Directory is `site`.
+## Slice 1 verification before merge
 
 ```powershell
 cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
@@ -42,35 +45,39 @@ git pull --ff-only origin slice/website-library-deployment-finish
 
 npm ci --prefix site
 npm run check --prefix site
-
-npm install --global vercel@latest
-vercel login
-vercel link --repo
-vercel pull --yes --environment=preview
-$PreviewUrl = (vercel deploy --target=preview --logs --no-color | Select-Object -Last 1).Trim()
-$PreviewUrl
-vercel inspect $PreviewUrl
-npm run verify:deployment --prefix site -- $PreviewUrl
+npm run dev --prefix site
 ```
 
-During `vercel link --repo`, select the existing Takokit website project. Do not create a
-second production project. Confirm that its Root Directory is `site`; the remaining build
-settings are versioned in `site/vercel.json`.
+Complete the manual browser checklist before approving the merge. No Vercel deployment is
+needed at this stage.
 
-If preview deployment protection is enabled, either use `vercel curl` for individual checks
-or set the automation bypass secret before the repository verifier:
+## Link the existing Vercel project after merge
 
-```powershell
-$env:VERCEL_AUTOMATION_BYPASS_SECRET = "YOUR_BYPASS_SECRET"
-npm run verify:deployment --prefix site -- $PreviewUrl
-```
-
-## Production deployment
-
-Only run this after the preview verification and manual checklist pass:
+Run Vercel from the repository root because this is a monorepo project whose configured
+Root Directory is `site`.
 
 ```powershell
 cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
+npm install --global vercel@latest
+vercel login
+vercel link --repo
+```
+
+Select the existing Takokit website project. Do not create another project. Confirm that
+its Root Directory is `site`; the remaining build settings are versioned in
+`site/vercel.json`.
+
+## Production deployment from verified main
+
+```powershell
+cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
+git fetch origin
+git switch main
+git pull --ff-only origin main
+
+npm ci --prefix site
+npm run check --prefix site
+
 vercel pull --yes --environment=production
 $ProductionUrl = (vercel deploy --prod --logs --no-color | Select-Object -Last 1).Trim()
 $ProductionUrl
@@ -81,20 +88,25 @@ npm run verify:deployment --prefix site -- $ProductionUrl
 A production deployment assigns the project's production domains. Confirm the URL and the
 registry response before removing or redirecting any older alias.
 
-## Optional local Vercel build
+If deployment protection applies to the production URL, set the configured automation
+bypass secret before the verifier:
 
-The normal workflow above sends the source to Vercel for the build. To inspect Vercel's
-Build Output locally before deployment, run:
+```powershell
+$env:VERCEL_AUTOMATION_BYPASS_SECRET = "YOUR_BYPASS_SECRET"
+npm run verify:deployment --prefix site -- $ProductionUrl
+```
+
+## Optional local Vercel build after merge
+
+To inspect Vercel's Build Output locally before production deployment:
 
 ```powershell
 cd D:\TheDawnlightGroup\DawnlightLabs\Takokit
-vercel pull --yes --environment=preview
-vercel build
+vercel pull --yes --environment=production
+vercel build --prod
 ```
 
-This creates `.vercel/output`. The direct deployment workflow remains the default because
-it preserves Vercel system variables during the build and avoids unnecessary prebuilt-path
-handling in a custom-root monorepo.
+This creates `.vercel/output` without assigning a production domain.
 
 ## What the automated deployment check covers
 
