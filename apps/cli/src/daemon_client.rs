@@ -16,15 +16,27 @@ pub struct Client {
 
 impl Client {
     pub fn ensure(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Self> {
-        let info = crate::daemon::ensure_running(store, config)?;
+        let info = crate::daemon::ensure_fresh_running(store, config)?;
         let url = format!("{}/v1/daemon/identity", config.local_base_url());
         let identity: DaemonIdentity = ureq::get(&url)
+            .timeout(Duration::from_secs(2))
             .call()
             .map_err(|error| request_error("GET", &url, error))?
             .into_json()
             .with_context(|| format!("decode daemon identity response from {url}"))?;
         if identity.mode != DaemonMode::Managed || identity.instance_id != Some(info.instance_id) {
             return Err(anyhow!("managed daemon identity verification failed"));
+        }
+        if identity.build_id != crate::daemon::current_build_id() {
+            return Err(anyhow!(
+                "managed daemon freshness verification failed: expected build {}, got {}; command was not routed",
+                crate::daemon::current_build_id(),
+                if identity.build_id.trim().is_empty() {
+                    "<missing>"
+                } else {
+                    identity.build_id.as_str()
+                }
+            ));
         }
         Ok(Self {
             base: config.local_base_url(),
