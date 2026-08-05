@@ -73,9 +73,10 @@ function contentType(pathname) {
   return "application/octet-stream";
 }
 
-function canonicalAssetsPlugin() {
+function canonicalAssetsBuildPlugin() {
   return {
-    name: "takokit-root-brand-assets",
+    name: "takokit-root-brand-assets-build",
+    apply: "build",
     async buildStart() {
       for (const [publicPath, asset] of brandAssets) {
         this.emitFile({
@@ -85,6 +86,13 @@ function canonicalAssetsPlugin() {
         });
       }
     },
+  };
+}
+
+function canonicalAssetsServePlugin() {
+  return {
+    name: "takokit-root-brand-assets-serve",
+    apply: "serve",
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const pathname = request.url?.split("?", 1)[0] || "";
@@ -108,6 +116,7 @@ function canonicalAssetsPlugin() {
 function localRegistryPlugin() {
   return {
     name: "takokit-local-registry",
+    apply: "serve",
     configureServer(server) {
       server.middlewares.use("/v1/registry.json", async (_request, response) => {
         try {
@@ -126,7 +135,12 @@ function localRegistryPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), canonicalAssetsPlugin(), localRegistryPlugin()],
+  plugins: [
+    react(),
+    canonicalAssetsBuildPlugin(),
+    canonicalAssetsServePlugin(),
+    localRegistryPlugin(),
+  ],
   build: {
     outDir: "dist",
     emptyOutDir: true,
