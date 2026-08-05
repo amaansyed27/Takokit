@@ -23,9 +23,9 @@ impl RequestWorkspace {
         let requested = session_id_from_headers(headers);
         let selected = match requested {
             Some(id) => Some(id),
-            None => store.active_session()?.filter(|id| {
-                store.session_dir(*id).join("session.json").is_file()
-            }),
+            None => store
+                .active_session()?
+                .filter(|id| store.session_dir(*id).join("session.json").is_file()),
         };
         let session = store.open_session(selected, Some(title))?;
         Ok(Self { store, session })
@@ -106,8 +106,7 @@ mod tests {
 
     #[test]
     fn missing_session_header_reuses_active_session() {
-        let root =
-            std::env::temp_dir().join(format!("takokit-server-active-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("takokit-server-active-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let store = WorkspaceStore::new(&root);
         let session = store.create_session(Some("active")).unwrap();
@@ -131,8 +130,7 @@ mod tests {
 
     #[test]
     fn reading_workspace_context_does_not_create_tako() {
-        let root =
-            std::env::temp_dir().join(format!("takokit-server-readonly-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("takokit-server-readonly-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let mut headers = HeaderMap::new();
         headers.insert(

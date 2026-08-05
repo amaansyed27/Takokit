@@ -7,7 +7,12 @@ fn main() {
 
     let build_id = explicit_build_id()
         .or_else(git_build_id)
-        .unwrap_or_else(|| format!("version-{}", env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "unknown".into())));
+        .unwrap_or_else(|| {
+            format!(
+                "version-{}",
+                env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "unknown".into())
+            )
+        });
 
     println!("cargo:rustc-env=TAKOKIT_BUILD_ID={build_id}");
 }

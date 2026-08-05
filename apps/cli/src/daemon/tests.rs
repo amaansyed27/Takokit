@@ -45,7 +45,10 @@ fn legacy_runtime_record_without_build_id_still_loads() {
 
 #[test]
 fn matching_build_is_current() {
-    let response = build_response(test_info(std::env::temp_dir().as_path()).identity(), current_build_id());
+    let response = build_response(
+        test_info(std::env::temp_dir().as_path()).identity(),
+        current_build_id(),
+    );
     assert_eq!(build_freshness(&response), BuildFreshness::Current);
 }
 

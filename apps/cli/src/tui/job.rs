@@ -47,12 +47,7 @@ impl CommandJob {
         let cancellation_requested = Arc::new(AtomicBool::new(false));
         let worker_cancellation = cancellation_requested.clone();
         thread::spawn(move || {
-            let result = execute_cli(
-                &args,
-                worker_label,
-                worker_pid,
-                worker_cancellation,
-            );
+            let result = execute_cli(&args, worker_label, worker_pid, worker_cancellation);
             let _ = sender.send(result);
         });
         Self {

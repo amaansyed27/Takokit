@@ -40,9 +40,15 @@ pub fn resolve_workspace(
     surface: WorkspaceSurface,
 ) -> TakokitResult<ResolvedWorkspace> {
     let (path, source) = if let Some(path) = explicit {
-        (absolute(path, current_dir.as_deref())?, WorkspaceSource::Explicit)
+        (
+            absolute(path, current_dir.as_deref())?,
+            WorkspaceSource::Explicit,
+        )
     } else if let Some(path) = persisted {
-        (absolute(path, current_dir.as_deref())?, WorkspaceSource::Persisted)
+        (
+            absolute(path, current_dir.as_deref())?,
+            WorkspaceSource::Persisted,
+        )
     } else if matches!(surface, WorkspaceSurface::Cli | WorkspaceSurface::Tui) {
         let current = current_dir.ok_or_else(|| {
             TakokitError::Storage("cannot resolve the current workspace directory".to_string())
@@ -59,7 +65,9 @@ pub fn resolve_workspace(
 pub fn safe_default_workspace() -> TakokitResult<PathBuf> {
     let base = dirs::document_dir()
         .or_else(dirs::home_dir)
-        .ok_or_else(|| TakokitError::Storage("cannot locate the user home directory".to_string()))?;
+        .ok_or_else(|| {
+            TakokitError::Storage("cannot locate the user home directory".to_string())
+        })?;
     Ok(base.join("Takokit"))
 }
 
@@ -131,9 +139,8 @@ pub fn validate_workspace_root(path: &Path, explicitly_selected: bool) -> Takoki
         }
     }
 
-    let existing = nearest_existing_ancestor(path).ok_or_else(|| {
-        workspace_error(path, "no existing writable parent directory was found")
-    })?;
+    let existing = nearest_existing_ancestor(path)
+        .ok_or_else(|| workspace_error(path, "no existing writable parent directory was found"))?;
     let metadata = fs::metadata(&existing).map_err(storage_error)?;
     if !metadata.is_dir() {
         return Err(workspace_error(
@@ -225,10 +232,7 @@ fn nearest_existing_ancestor(path: &Path) -> Option<PathBuf> {
 }
 
 fn workspace_error(path: &Path, message: &str) -> TakokitError {
-    TakokitError::Storage(format!(
-        "invalid workspace {}: {message}",
-        path.display()
-    ))
+    TakokitError::Storage(format!("invalid workspace {}: {message}", path.display()))
 }
 
 fn storage_error(error: impl std::fmt::Display) -> TakokitError {
@@ -262,13 +266,8 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let workspace = temporary.path().join("voice project");
         fs::create_dir_all(&workspace).unwrap();
-        let resolved = resolve_workspace(
-            None,
-            None,
-            Some(workspace.clone()),
-            WorkspaceSurface::Cli,
-        )
-        .unwrap();
+        let resolved =
+            resolve_workspace(None, None, Some(workspace.clone()), WorkspaceSurface::Cli).unwrap();
         assert_eq!(resolved.root, workspace);
         assert_eq!(resolved.source, WorkspaceSource::CurrentDirectory);
         assert!(!resolved.root.join(".tako").exists());
@@ -317,7 +316,10 @@ mod tests {
         let global = temporary.path().join("global");
         let workspace = temporary.path().join("selected");
         persist_workspace(&global, &workspace).unwrap();
-        assert_eq!(load_persisted_workspace(&global).unwrap(), Some(workspace.clone()));
+        assert_eq!(
+            load_persisted_workspace(&global).unwrap(),
+            Some(workspace.clone())
+        );
         assert!(!workspace.join(".tako").exists());
     }
 }

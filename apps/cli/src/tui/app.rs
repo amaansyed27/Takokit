@@ -27,7 +27,10 @@ pub const HOME_ACTIONS: [(&str, &str); 8] = [
     ),
     ("Manage", "Inspect models, runners, and the local service"),
     ("Sessions", "Open prior work or start a clean session"),
-    ("Workspace", "View or change the project-specific .tako location"),
+    (
+        "Workspace",
+        "View or change the project-specific .tako location",
+    ),
     ("Activity", "Read the complete result from the latest task"),
 ];
 
@@ -367,11 +370,7 @@ impl App {
     pub fn reload_sessions(&mut self) -> anyhow::Result<()> {
         self.sessions = self.workspace_store.list_sessions(None)?;
         if let Some(persisted) = self.workspace_store.active_session()? {
-            if self
-                .sessions
-                .iter()
-                .any(|session| session.id == persisted)
-            {
+            if self.sessions.iter().any(|session| session.id == persisted) {
                 self.active_session = Some(persisted);
             }
         }

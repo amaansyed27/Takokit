@@ -5,7 +5,10 @@ fn both_cli_binaries_expose_the_same_nonempty_build_identifier() {
     let takokit = build_id(env!("CARGO_BIN_EXE_takokit"));
     let tako = build_id(env!("CARGO_BIN_EXE_tako"));
     assert!(!takokit.is_empty(), "takokit build identifier is empty");
-    assert_eq!(takokit, tako, "tako and takokit must identify the same build");
+    assert_eq!(
+        takokit, tako,
+        "tako and takokit must identify the same build"
+    );
 }
 
 fn build_id(executable: &str) -> String {

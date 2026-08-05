@@ -194,15 +194,19 @@ fn render_confirmation(frame: &mut Frame<'_>, app: &App) {
     let area = widgets::centered_rect(70, 32, frame.area());
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(app.confirmation_message.as_deref().unwrap_or("Confirm operation?"))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: false })
-            .block(
-                Block::default()
-                    .title(" Confirmation ")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::White)),
-            ),
+        Paragraph::new(
+            app.confirmation_message
+                .as_deref()
+                .unwrap_or("Confirm operation?"),
+        )
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: false })
+        .block(
+            Block::default()
+                .title(" Confirmation ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White)),
+        ),
         area,
     );
 }

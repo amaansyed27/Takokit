@@ -213,8 +213,7 @@ mod tests {
     fn gui_query_contains_workspace_source_without_forcing_a_session() {
         let root = std::env::temp_dir().join(format!("takokit-cli-workspace-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
-        let context =
-            CliWorkspace::resolve(Some(root.clone()), None, true, "Takokit GUI").unwrap();
+        let context = CliWorkspace::resolve(Some(root.clone()), None, true, "Takokit GUI").unwrap();
         let query = context.gui_query();
         assert!(query.contains("workspace="));
         assert!(query.contains("workspace_source=explicit"));
@@ -231,8 +230,7 @@ mod tests {
         let stale = Uuid::new_v4();
         store.set_active_session(stale).unwrap();
 
-        let context =
-            CliWorkspace::resolve(Some(root.clone()), None, false, "recovered").unwrap();
+        let context = CliWorkspace::resolve(Some(root.clone()), None, false, "recovered").unwrap();
 
         assert_ne!(context.session_id(), stale);
         assert!(context
@@ -249,8 +247,7 @@ mod tests {
 
     #[test]
     fn explicit_missing_session_still_fails() {
-        let root =
-            std::env::temp_dir().join(format!("takokit-cli-explicit-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("takokit-cli-explicit-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let missing = Uuid::new_v4();
 
