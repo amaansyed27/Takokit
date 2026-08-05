@@ -84,6 +84,17 @@ export type ModelInstallResponse = {
   logs_path: string;
 };
 
+export type ModelRemovalReport = {
+  model_id: string;
+  installed: boolean;
+  dry_run: boolean;
+  removed?: boolean;
+  reclaim_bytes?: number;
+  reclaimable_paths?: string[];
+  retained_shared_paths?: string[];
+  message?: string;
+};
+
 export type VoiceSummary = {
   id: string;
   name: string;
@@ -96,12 +107,15 @@ export type VoiceSummary = {
 
 export type RuntimeSnapshot = {
   storagePath: string;
+  workspacePath: string;
+  buildId: string;
   server: {
     status: "offline" | "online";
     url: string;
     uptime: string;
   };
   models: ModelSummary[];
+  catalogModels: ModelSummary[];
   runners: RunnerSummary[];
   voices: VoiceSummary[];
   capabilities: CapabilitySummary[];
@@ -113,6 +127,9 @@ export type SpeechApiRequest = {
   input: string;
   voice?: string;
   response_format?: "wav" | "mp3" | "json";
+  language?: string;
+  instruction?: string;
+  reference_text?: string;
 };
 
 export type SpeechApiResponse = {
@@ -135,6 +152,7 @@ export type TranscriptionApiResponse = {
   id: string;
   model: string;
   text: string;
+  output_path?: string;
 };
 
 export type RvcF0Method = "rmvpe" | "harvest" | "crepe" | "pm";
@@ -235,6 +253,8 @@ export type DoctorCheck = {
 };
 
 export type DoctorResponse = {
+  build_id?: string;
+  daemon?: Record<string, unknown>;
   storage_root: string;
   server: string;
   checks: DoctorCheck[];
