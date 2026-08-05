@@ -20,8 +20,14 @@ pub struct RequestWorkspace {
 impl RequestWorkspace {
     pub fn from_headers(headers: &HeaderMap, title: &str) -> Result<Self, TakokitError> {
         let store = store_from_headers(headers)?;
-        let session_id = session_id_from_headers(headers);
-        let session = store.open_session(session_id, Some(title))?;
+        let requested = session_id_from_headers(headers);
+        let selected = match requested {
+            Some(id) => Some(id),
+            None => store.active_session()?.filter(|id| {
+                store.session_dir(*id).join("session.json").is_file()
+            }),
+        };
+        let session = store.open_session(selected, Some(title))?;
         Ok(Self { store, session })
     }
 
@@ -95,6 +101,23 @@ mod tests {
         let context = RequestWorkspace::from_headers(&headers, "fallback").unwrap();
         assert_eq!(context.session_id(), session.summary.id);
         assert_eq!(context.store.workspace_root(), root.as_path());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn missing_session_header_reuses_active_session() {
+        let root =
+            std::env::temp_dir().join(format!("takokit-server-active-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = WorkspaceStore::new(&root);
+        let session = store.create_session(Some("active")).unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            WORKSPACE_HEADER,
+            HeaderValue::from_str(&encoded_workspace_header(&root.to_string_lossy())).unwrap(),
+        );
+        let context = RequestWorkspace::from_headers(&headers, "fallback").unwrap();
+        assert_eq!(context.session_id(), session.summary.id);
         let _ = std::fs::remove_dir_all(root);
     }
 
