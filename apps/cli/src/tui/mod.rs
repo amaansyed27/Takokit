@@ -12,7 +12,7 @@ use std::{io, time::Duration};
 use app::{App, TuiAction, TuiScreen};
 use catalog::SystemAction;
 use crossterm::event::{self, Event, KeyEventKind};
-use job::CommandJob;
+use job::{CommandJob, OperationState};
 use takokit_core::RuntimeConfig;
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
@@ -34,15 +34,17 @@ pub async fn run_launcher(
         workspace,
     )?;
     let mut active_job: Option<CommandJob> = None;
+    let mut quit_after_job = false;
 
     ratatui::run(|terminal| -> io::Result<()> {
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
                 let success = result.success();
+                let cancelled = result.state == OperationState::Cancelled;
                 state.running_label = None;
                 state.last_label = Some(result.label.clone());
-                state.set_status(if success {
+                state.set_status(if success || cancelled {
                     result.output
                 } else {
                     format!("Task failed.\n\n{}", result.output)
@@ -58,6 +60,9 @@ pub async fn run_launcher(
                     state.screen = TuiScreen::Activity;
                 }
                 active_job = None;
+                if quit_after_job {
+                    return Ok(());
+                }
             }
 
             terminal.draw(|frame| ui::render(frame, &state))?;
@@ -75,10 +80,14 @@ pub async fn run_launcher(
             };
             match action {
                 TuiAction::Quit => {
-                    if active_job.is_some() {
-                        state.set_status(
-                            "A task is still running. Let it finish before exiting so no installer or model pull is left detached.",
-                        );
+                    if let Some(job) = active_job.as_ref() {
+                        if !quit_after_job {
+                            job.cancel();
+                            quit_after_job = true;
+                            state.set_status(
+                                "Cancelling the active task and waiting for it to stop cleanly…",
+                            );
+                        }
                     } else {
                         return Ok(());
                     }
