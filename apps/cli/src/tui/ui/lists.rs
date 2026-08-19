@@ -129,7 +129,7 @@ pub fn render_sessions(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .map(|session| {
                 (
                     session.title.clone(),
-                    if session.id == active {
+                    if active == Some(session.id) {
                         "active".to_string()
                     } else {
                         format!("{} events", session.event_count)
