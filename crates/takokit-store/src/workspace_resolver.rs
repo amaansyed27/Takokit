@@ -148,13 +148,29 @@ pub fn validate_workspace_root(path: &Path, explicitly_selected: bool) -> Takoki
             "nearest existing workspace parent is not a directory",
         ));
     }
-    if metadata.permissions().readonly() {
+    if directory_permissions_are_read_only(&metadata) {
         return Err(workspace_error(
             path,
             "workspace directory is read-only; choose a writable user directory",
         ));
     }
     Ok(())
+}
+
+fn directory_permissions_are_read_only(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        // On Windows, std::fs::Permissions::readonly() reflects the FILE_ATTRIBUTE_READONLY
+        // bit. That attribute is not a reliable indication that a directory is unwritable;
+        // normal user directories (including Documents/OneDrive folders) may carry it.
+        // Actual ACL/access failures are surfaced when Takokit creates session/output data.
+        let _ = metadata;
+        false
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.permissions().readonly()
+    }
 }
 
 fn absolute(path: PathBuf, current_dir: Option<&Path>) -> TakokitResult<PathBuf> {
