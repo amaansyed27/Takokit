@@ -39,7 +39,7 @@ pub async fn run_launcher(
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
-                let success = result.success;
+                let success = result.success();
                 state.running_label = None;
                 state.last_label = Some(result.label.clone());
                 state.set_status(if success {
@@ -105,6 +105,15 @@ pub async fn run_launcher(
                         state.set_status(format!("Could not create session: {error:#}"));
                     } else {
                         state.screen = TuiScreen::Sessions;
+                    }
+                }
+                TuiAction::ChangeWorkspace(path) => {
+                    if active_job.is_some() {
+                        state.set_status("Wait for the current task before changing workspaces.");
+                    } else if let Err(error) = state.switch_workspace(&path) {
+                        state.set_status(format!("Could not change workspace: {error:#}"));
+                    } else {
+                        state.screen = TuiScreen::Workspace;
                     }
                 }
                 action => {
@@ -221,7 +230,8 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
         TuiAction::Quit
         | TuiAction::Refresh
         | TuiAction::OpenSession(_)
-        | TuiAction::NewSession => return None,
+        | TuiAction::NewSession
+        | TuiAction::ChangeWorkspace(_) => return None,
     };
     let mut args = app.workspace_args();
     args.extend(command);
