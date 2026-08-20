@@ -14,7 +14,7 @@ pub fn render_workspace(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),
+            Constraint::Length(6),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Min(5),
@@ -30,6 +30,9 @@ pub fn render_workspace(frame: &mut Frame<'_>, area: Rect, app: &App) {
             Line::from(""),
             Line::from(
                 "Sessions, transcripts and outputs live under <workspace>/.tako. Models, runners and adapters remain global under .takokit.",
+            ),
+            Line::from(
+                "Tip: paste or drag a folder into the terminal. Relative paths are resolved from the current workspace.",
             ),
         ]))
         .wrap(Wrap { trim: false }),
