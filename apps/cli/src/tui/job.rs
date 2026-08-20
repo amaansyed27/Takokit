@@ -1,4 +1,5 @@
 use std::{
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -95,13 +96,29 @@ fn execute_cli(
             }
         }
     };
-    let mut child = match Command::new(executable)
-        .args(args)
+    let normalized_args = args
+        .iter()
+        .map(|arg| normalize_terminal_argument(arg))
+        .collect::<Vec<_>>();
+    let workspace_dir = normalized_args
+        .windows(2)
+        .find(|pair| pair[0] == "--workspace")
+        .map(|pair| PathBuf::from(&pair[1]))
+        .filter(|path| path.is_dir());
+
+    let mut command = Command::new(executable);
+    command
+        .args(&normalized_args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
+        .stderr(Stdio::piped());
+    if let Some(workspace_dir) = workspace_dir {
+        // TUI file inputs should behave like project-relative paths. This also makes drag/drop
+        // and short values such as `samples/reference.wav` useful instead of requiring a full
+        // absolute path from the shell that launched Takokit.
+        command.current_dir(workspace_dir);
+    }
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
             return CommandResult {
@@ -166,6 +183,31 @@ fn execute_cli(
     }
 }
 
+fn normalize_terminal_argument(argument: &str) -> String {
+    let value = argument.trim();
+    if value.len() >= 2 {
+        let quoted = (value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\''));
+        if quoted {
+            let inner = &value[1..value.len() - 1];
+            if looks_like_path(inner) {
+                return inner.to_string();
+            }
+        }
+    }
+    argument.to_string()
+}
+
+fn looks_like_path(value: &str) -> bool {
+    let path = Path::new(value);
+    path.is_absolute()
+        || value.starts_with("./")
+        || value.starts_with(".\\")
+        || value.starts_with("../")
+        || value.starts_with("..\\")
+        || value.starts_with('~')
+}
+
 #[cfg(windows)]
 fn terminate_process_tree(pid: u32) {
     let _ = Command::new("taskkill")
@@ -222,5 +264,24 @@ mod tests {
         assert_ne!(OperationState::Failed, OperationState::Cancelled);
         assert_eq!(OperationState::Starting, OperationState::Starting);
         assert_eq!(OperationState::Running, OperationState::Running);
+    }
+
+    #[test]
+    fn terminal_dragged_paths_drop_shell_quotes_without_touching_normal_text() {
+        let absolute = if cfg!(windows) {
+            r#""C:\Voice Projects\sample.wav""#
+        } else {
+            r#""/tmp/Voice Projects/sample.wav""#
+        };
+        let expected = if cfg!(windows) {
+            r#"C:\Voice Projects\sample.wav"#
+        } else {
+            "/tmp/Voice Projects/sample.wav"
+        };
+        assert_eq!(normalize_terminal_argument(absolute), expected);
+        assert_eq!(
+            normalize_terminal_argument(r#""say this exactly""#),
+            r#""say this exactly""#
+        );
     }
 }
