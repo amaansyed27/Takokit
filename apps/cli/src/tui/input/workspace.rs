@@ -5,6 +5,8 @@ use crate::tui::{
     editor::edit_text,
 };
 
+use super::normalize_path_field;
+
 pub(super) fn handle_workspace(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         app.workspace_field = if key.code == KeyCode::BackTab {
@@ -30,10 +32,10 @@ pub(super) fn handle_workspace(app: &mut App, key: KeyEvent) -> Option<TuiAction
         }
         WorkspaceField::Apply => {
             if matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) {
-                let path = app.workspace_input.trim().to_string();
+                let path = normalize_path_field(&app.workspace_input);
                 if path.is_empty() {
                     app.workspace_field = WorkspaceField::Path;
-                    app.set_status("Enter an absolute workspace path.");
+                    app.set_status("Paste, drag, or enter a workspace folder path.");
                     return None;
                 }
                 return Some(TuiAction::ChangeWorkspace(path));
@@ -52,5 +54,13 @@ mod tests {
         let value = "D:\\Voice Projects\\आवाज़".to_string();
         let action = TuiAction::ChangeWorkspace(value.clone());
         assert_eq!(action, TuiAction::ChangeWorkspace(value));
+    }
+
+    #[test]
+    fn workspace_accepts_dragged_quoted_path() {
+        assert_eq!(
+            normalize_path_field(r#""D:\Voice Projects\आवाज़""#),
+            r#"D:\Voice Projects\आवाज़"#
+        );
     }
 }
