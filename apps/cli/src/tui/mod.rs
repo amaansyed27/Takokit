@@ -11,13 +11,31 @@ use std::{io, time::Duration};
 
 use app::{App, TuiAction, TuiScreen};
 use catalog::SystemAction;
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::{
+    event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyEventKind},
+    execute,
+};
 use job::{CommandJob, OperationState};
 use takokit_core::RuntimeConfig;
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
 
 use crate::workspace::CliWorkspace;
+
+struct BracketedPasteGuard;
+
+impl BracketedPasteGuard {
+    fn enable() -> io::Result<Self> {
+        execute!(io::stdout(), EnableBracketedPaste)?;
+        Ok(Self)
+    }
+}
+
+impl Drop for BracketedPasteGuard {
+    fn drop(&mut self) {
+        let _ = execute!(io::stdout(), DisableBracketedPaste);
+    }
+}
 
 pub async fn run_launcher(
     config: &RuntimeConfig,
@@ -36,6 +54,7 @@ pub async fn run_launcher(
     let mut active_job: Option<CommandJob> = None;
     let mut quit_after_job = false;
     let mut last_rendered_screen: Option<TuiScreen> = None;
+    let _paste_guard = BracketedPasteGuard::enable()?;
 
     ratatui::run(|terminal| -> io::Result<()> {
         loop {
@@ -74,8 +93,14 @@ pub async fn run_launcher(
             if !event::poll(Duration::from_millis(120))? {
                 continue;
             }
-            let Event::Key(key) = event::read()? else {
-                continue;
+            let input_event = event::read()?;
+            let key = match input_event {
+                Event::Paste(text) => {
+                    state.handle_paste(&text);
+                    continue;
+                }
+                Event::Key(key) => key,
+                _ => continue,
             };
             if key.kind == KeyEventKind::Release {
                 continue;
