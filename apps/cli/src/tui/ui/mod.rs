@@ -142,16 +142,16 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             "↑/↓ choose · Enter open · 1–8 shortcut · W workspace · R refresh · F1 help · Esc quit"
         }
         TuiScreen::Speak => {
-            "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home"
+            "Tab next field · ↑/↓ model · Ctrl+U clear · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Transcribe => {
-            "Tab next field · ↑/↓ model · Enter continue · Ctrl+Enter run · Esc home"
+            "F2 browse · Ctrl+U clear · Home/End edit · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Clone => {
-            "Tab next field · ↑/↓ model · Space consent · Ctrl+Enter run · Esc home"
+            "F2 browse audio · Ctrl+U clear · Space consent · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Convert => {
-            "Tab next field · arrows model/F0 · Space consent · Ctrl+Enter run · Esc home"
+            "F2 browse path · Ctrl+U clear · arrows model/F0 · Space consent · Ctrl+Enter run"
         }
         TuiScreen::Manage => "↑/↓ choose · Enter open · 1–3 shortcut · W workspace · R refresh · Esc home",
         TuiScreen::Models => {
@@ -162,8 +162,10 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         }
         TuiScreen::System => "↑/↓ select · Enter run · R refresh · Esc back",
         TuiScreen::Sessions => "↑/↓ select · Enter open · N new · R refresh · Esc home",
-        TuiScreen::Workspace => "Tab field · Enter continue · Ctrl+Enter switch · Esc home",
-        TuiScreen::Activity => "↑/↓ or PgUp/PgDn scroll · Home/End jump · Esc home",
+        TuiScreen::Workspace => "F2 browse · Ctrl+U clear · Ctrl+Enter switch · Esc home",
+        TuiScreen::Activity => {
+            "P play latest audio · O open outputs · ↑/↓ or PgUp/PgDn scroll · Esc home"
+        }
     };
     frame.render_widget(
         Paragraph::new(text)
@@ -178,7 +180,7 @@ fn render_help(frame: &mut Frame<'_>, app: &App) {
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nStart on Home and choose a task with ↑/↓ and Enter, or press its number.\n\nSpeak, Transcribe, Clone, Convert\n  Tab moves through fields. Arrow keys change the exact model variant and RVC F0 method. Ctrl+Enter runs the task.\n  A successful conversion means execution passed only. The output must still be reviewed for intelligibility, similarity, and artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. Switching changes sessions and outputs only; installed models remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows complete output or errors, including paths and backend details.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
+            "Takokit TUI\n\nStart on Home and choose a task with ↑/↓ and Enter, or press its number.\n\nSpeak, Transcribe, Clone, Convert\n  Tab moves through fields. F2 opens a native path picker on path fields. Paste/drag and workspace-relative paths also work. Ctrl+U clears the focused text field. Ctrl+Enter runs the task and opens Activity so the complete result stays visible.\n  A successful conversion means execution passed only. The output must still be reviewed for intelligibility, similarity, and artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. F2 browses for a folder. Switching changes sessions and outputs only; installed models remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows complete output or errors, including paths and backend details. Press P to play the newest audio output in the system player or O to open the active session's output folder.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
         )
         .wrap(Wrap { trim: false })
         .block(
