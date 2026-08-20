@@ -96,6 +96,35 @@ pub fn field<'a>(title: &'a str, value: impl Into<Text<'a>>, focused: bool) -> P
     )
 }
 
+pub fn render_text_input(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &str,
+    value: &str,
+    placeholder: &str,
+    focused: bool,
+    cursor: usize,
+) {
+    let visible = if value.is_empty() { placeholder } else { value };
+    let scroll = if focused && !value.is_empty() {
+        input_horizontal_scroll(cursor, area.width.saturating_sub(2) as usize)
+    } else {
+        0
+    };
+    frame.render_widget(
+        field(title, visible, focused).scroll((0, scroll.min(u16::MAX as usize) as u16)),
+        area,
+    );
+    if focused {
+        set_input_cursor(frame, area, cursor.saturating_sub(scroll));
+    }
+}
+
+fn input_horizontal_scroll(cursor: usize, inner_width: usize) -> usize {
+    let width = inner_width.max(1);
+    cursor.saturating_sub(width.saturating_sub(1))
+}
+
 pub fn primary_button<'a>(label: &'a str, focused: bool) -> Paragraph<'a> {
     Paragraph::new(label)
         .alignment(Alignment::Center)
@@ -164,4 +193,16 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(vertical[1])[1]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn long_input_scroll_tracks_cursor() {
+        assert_eq!(input_horizontal_scroll(5, 20), 0);
+        assert_eq!(input_horizontal_scroll(25, 20), 6);
+        assert_eq!(input_horizontal_scroll(10, 1), 10);
+    }
 }
