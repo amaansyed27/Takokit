@@ -54,9 +54,14 @@ pub async fn run_launcher(
     let mut active_job: Option<CommandJob> = None;
     let mut quit_after_job = false;
     let mut last_rendered_screen: Option<TuiScreen> = None;
-    let _paste_guard = BracketedPasteGuard::enable()?;
 
     ratatui::run(|terminal| -> io::Result<()> {
+        // ratatui::run initializes raw mode and the alternate screen before invoking
+        // this closure. Bracketed paste must therefore be enabled here, after that
+        // initialization, otherwise terminal setup can reset the mode and Windows
+        // Terminal will replay clipboard contents as ordinary navigation keys.
+        let _paste_guard = BracketedPasteGuard::enable()?;
+
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
