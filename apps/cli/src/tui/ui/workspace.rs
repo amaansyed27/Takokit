@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use super::widgets::{centered_rect, field, primary_button, set_input_cursor};
+use super::widgets::{centered_rect, primary_button, render_text_input};
 use crate::tui::app::{App, WorkspaceField};
 
 pub fn render_workspace(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -32,20 +32,21 @@ pub fn render_workspace(frame: &mut Frame<'_>, area: Rect, app: &App) {
                 "Sessions, transcripts and outputs live under <workspace>/.tako. Models, runners and adapters remain global under .takokit.",
             ),
             Line::from(
-                "Tip: paste or drag a folder into the terminal. Relative paths are resolved from the current workspace.",
+                "F2 opens a folder picker. You can also paste/drag a path, use Ctrl+U to clear, or enter a relative path.",
             ),
         ]))
         .wrap(Wrap { trim: false }),
         rows[0],
     );
 
-    frame.render_widget(
-        field(
-            "Workspace path",
-            app.workspace_input.as_str(),
-            app.workspace_field == WorkspaceField::Path,
-        ),
+    render_text_input(
+        frame,
         rows[1],
+        "Workspace path · F2 browse",
+        app.workspace_input.as_str(),
+        r#"C:\Users\you\Documents\Takokit"#,
+        app.workspace_field == WorkspaceField::Path,
+        app.workspace_input_cursor,
     );
     frame.render_widget(
         primary_button(
@@ -63,8 +64,4 @@ pub fn render_workspace(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .style(Style::default().add_modifier(Modifier::DIM)),
         rows[3],
     );
-
-    if app.workspace_field == WorkspaceField::Path {
-        set_input_cursor(frame, rows[1], app.workspace_input_cursor);
-    }
 }
