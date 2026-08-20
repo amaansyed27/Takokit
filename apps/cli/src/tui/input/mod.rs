@@ -1,5 +1,6 @@
 mod forms;
 mod navigation;
+mod picker;
 mod workspace;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -96,7 +97,7 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
             let path = normalize_path_field(&app.workspace_input);
             if path.is_empty() {
                 app.workspace_field = super::app::WorkspaceField::Path;
-                app.set_status("Paste, drag, or enter a workspace folder path.");
+                app.set_status("Paste, drag, browse, or enter a workspace folder path.");
                 None
             } else {
                 Some(TuiAction::ChangeWorkspace(path))
