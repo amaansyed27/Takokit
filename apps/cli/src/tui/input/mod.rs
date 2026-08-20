@@ -93,16 +93,28 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
             .selected_session()
             .map(|session| TuiAction::OpenSession(session.id)),
         TuiScreen::Workspace => {
-            let path = app.workspace_input.trim().to_string();
+            let path = normalize_path_field(&app.workspace_input);
             if path.is_empty() {
                 app.workspace_field = super::app::WorkspaceField::Path;
-                app.set_status("Enter an absolute workspace path.");
+                app.set_status("Paste, drag, or enter a workspace folder path.");
                 None
             } else {
                 Some(TuiAction::ChangeWorkspace(path))
             }
         }
         TuiScreen::Activity => None,
+    }
+}
+
+pub(super) fn normalize_path_field(value: &str) -> String {
+    let value = value.trim();
+    if value.len() >= 2
+        && ((value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\'')))
+    {
+        value[1..value.len() - 1].to_string()
+    } else {
+        value.to_string()
     }
 }
 
@@ -113,5 +125,14 @@ mod tests {
     #[test]
     fn workspace_screen_accepts_text() {
         assert!(TuiScreen::Workspace.accepts_text());
+    }
+
+    #[test]
+    fn pasted_path_quotes_are_removed() {
+        assert_eq!(
+            normalize_path_field(r#""C:\Voice Projects\Demo""#),
+            r#"C:\Voice Projects\Demo"#
+        );
+        assert_eq!(normalize_path_field("../other-project"), "../other-project");
     }
 }
