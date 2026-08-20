@@ -6,13 +6,29 @@ use crate::tui::{
     app::{App, SpeakField, TranscribeField, TuiAction, TuiScreen},
     clone::CloneField,
     convert::{ConvertField, F0_METHODS},
-    editor::{edit_text, shifted_index},
+    editor::{edit_text, insert_text, shifted_index},
 };
 
 use super::{normalize_path_field, picker};
 
 pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
-    if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+    if app.speak_field == SpeakField::Text {
+        match key.code {
+            KeyCode::BackTab => {
+                app.speak_field = SpeakField::Voice;
+                return None;
+            }
+            KeyCode::Tab => {
+                insert_text(&mut app.speak_text, &mut app.speak_text_cursor, "    ");
+                return None;
+            }
+            KeyCode::Enter => {
+                insert_text(&mut app.speak_text, &mut app.speak_text_cursor, "\n");
+                return None;
+            }
+            _ => {}
+        }
+    } else if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         app.speak_field = if key.code == KeyCode::BackTab {
             app.speak_field.previous()
         } else {
@@ -44,9 +60,6 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
         SpeakField::Text => {
             if edit_text(&mut app.speak_text, &mut app.speak_text_cursor, key) {
                 return None;
-            }
-            if key.code == KeyCode::Enter {
-                app.speak_field = SpeakField::Submit;
             }
         }
         SpeakField::Submit => {
