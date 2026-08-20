@@ -35,6 +35,7 @@ pub async fn run_launcher(
     )?;
     let mut active_job: Option<CommandJob> = None;
     let mut quit_after_job = false;
+    let mut last_rendered_screen: Option<TuiScreen> = None;
 
     ratatui::run(|terminal| -> io::Result<()> {
         loop {
@@ -65,6 +66,10 @@ pub async fn run_launcher(
                 }
             }
 
+            if last_rendered_screen != Some(state.screen) {
+                terminal.clear()?;
+                last_rendered_screen = Some(state.screen);
+            }
             terminal.draw(|frame| ui::render(frame, &state))?;
             if !event::poll(Duration::from_millis(120))? {
                 continue;
