@@ -150,7 +150,7 @@ fn runner_not_implemented(message: impl Into<String>) -> TakokitError {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, process::Command};
+    use std::{ffi::OsStr, path::Path, process::Command};
 
     use takokit_core::{CapabilityKind, ErrorCode, SpeechRequest, TakokitError};
     use takokit_package::{resolve_execution_plan, InstalledRegistry, PackageRegistry};
@@ -162,21 +162,19 @@ mod tests {
         let mut command = Command::new("python");
         configure_runner_command(&mut command);
 
-        let envs = command
-            .get_envs()
-            .filter_map(|(key, value)| value.map(|value| (key, value)))
-            .collect::<std::collections::HashMap<_, _>>();
+        let python_utf8 = command.get_envs().find_map(|(key, value)| {
+            (key == OsStr::new("PYTHONUTF8"))
+                .then_some(value)
+                .flatten()
+        });
+        let python_io_encoding = command.get_envs().find_map(|(key, value)| {
+            (key == OsStr::new("PYTHONIOENCODING"))
+                .then_some(value)
+                .flatten()
+        });
 
-        assert_eq!(
-            envs.get(std::ffi::OsStr::new("PYTHONUTF8"))
-                .map(|value| value.as_os_str()),
-            Some(std::ffi::OsStr::new("1"))
-        );
-        assert_eq!(
-            envs.get(std::ffi::OsStr::new("PYTHONIOENCODING"))
-                .map(|value| value.as_os_str()),
-            Some(std::ffi::OsStr::new("utf-8"))
-        );
+        assert_eq!(python_utf8, Some(OsStr::new("1")));
+        assert_eq!(python_io_encoding, Some(OsStr::new("utf-8")));
     }
 
     #[tokio::test]
