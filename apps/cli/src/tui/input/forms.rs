@@ -19,7 +19,7 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
                 return None;
             }
             KeyCode::Tab => {
-                insert_text(&mut app.speak_text, &mut app.speak_text_cursor, "    ");
+                app.speak_field = SpeakField::Submit;
                 return None;
             }
             KeyCode::Enter => {
@@ -64,7 +64,7 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
         }
         SpeakField::Submit => {
             if key.code == KeyCode::Enter {
-                return submit_speak(app);
+                app.set_status("Press Ctrl+Enter to generate speech.");
             }
         }
     }
