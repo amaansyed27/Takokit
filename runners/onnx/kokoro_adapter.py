@@ -23,7 +23,9 @@ def fail(message: str) -> None:
 
 def main() -> None:
     try:
-        request = json.load(sys.stdin)
+        # Rust serializes runner requests as UTF-8 JSON. Decode the pipe explicitly
+        # instead of inheriting the Windows ANSI code page for sys.stdin.
+        request = json.loads(sys.stdin.buffer.read().decode("utf-8"))
         text = str(request["input"]).strip()
         if not text:
             fail("speech input cannot be empty")
