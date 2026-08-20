@@ -16,6 +16,14 @@ use self::python_managed::PythonManagedRunner;
 use self::whispercpp::WhisperCppRunner;
 
 pub(crate) fn configure_runner_command(command: &mut std::process::Command) {
+    // Runner requests are serialized as UTF-8 JSON. Python otherwise inherits the
+    // Windows ANSI code page for piped stdio, which corrupts non-ASCII paths such
+    // as `Voice Project ü` into mojibake (`Voice Project Ã¼`). Force a stable UTF-8
+    // process boundary for every managed runner rather than relying on the host locale.
+    command
+        .env("PYTHONUTF8", "1")
+        .env("PYTHONIOENCODING", "utf-8");
+
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -142,12 +150,34 @@ fn runner_not_implemented(message: impl Into<String>) -> TakokitError {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{path::Path, process::Command};
 
     use takokit_core::{CapabilityKind, ErrorCode, SpeechRequest, TakokitError};
     use takokit_package::{resolve_execution_plan, InstalledRegistry, PackageRegistry};
 
-    use super::execute_speech;
+    use super::{configure_runner_command, execute_speech};
+
+    #[test]
+    fn runner_commands_force_utf8_stdio() {
+        let mut command = Command::new("python");
+        configure_runner_command(&mut command);
+
+        let envs = command
+            .get_envs()
+            .filter_map(|(key, value)| value.map(|value| (key, value)))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        assert_eq!(
+            envs.get(std::ffi::OsStr::new("PYTHONUTF8"))
+                .map(|value| value.as_os_str()),
+            Some(std::ffi::OsStr::new("1"))
+        );
+        assert_eq!(
+            envs.get(std::ffi::OsStr::new("PYTHONIOENCODING"))
+                .map(|value| value.as_os_str()),
+            Some(std::ffi::OsStr::new("utf-8"))
+        );
+    }
 
     #[tokio::test]
     async fn kokoro_executor_requires_verified_model_and_voice_artifacts() {
