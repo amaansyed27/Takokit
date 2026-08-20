@@ -1,11 +1,15 @@
+use std::path::Path;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::{
-    app::{App, SpeakField, TranscribeField, TuiAction},
+    app::{App, SpeakField, TranscribeField, TuiAction, TuiScreen},
     clone::CloneField,
     convert::{ConvertField, F0_METHODS},
     editor::{edit_text, shifted_index},
 };
+
+use super::{normalize_path_field, picker};
 
 pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
@@ -77,6 +81,13 @@ pub(super) fn handle_transcribe(app: &mut App, key: KeyEvent) -> Option<TuiActio
             _ => {}
         },
         TranscribeField::Audio => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.transcribe_audio = path;
+                    app.transcribe_audio_cursor = app.transcribe_audio.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.transcribe_audio,
                 &mut app.transcribe_audio_cursor,
@@ -138,6 +149,13 @@ pub(super) fn handle_clone(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
             }
         }
         CloneField::Sample => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.clone_state.sample = path;
+                    app.clone_state.sample_cursor = app.clone_state.sample.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.clone_state.sample,
                 &mut app.clone_state.sample_cursor,
@@ -192,6 +210,13 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
             _ => {}
         },
         ConvertField::Source => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.convert_state.source = path;
+                    app.convert_state.source_cursor = app.convert_state.source.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.convert_state.source,
                 &mut app.convert_state.source_cursor,
@@ -204,6 +229,13 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
             }
         }
         ConvertField::Target => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_folder(app) {
+                    app.convert_state.target = path;
+                    app.convert_state.target_cursor = app.convert_state.target.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.convert_state.target,
                 &mut app.convert_state.target_cursor,
@@ -281,6 +313,28 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
     None
 }
 
+fn browse_audio(app: &mut App) -> Option<String> {
+    match picker::pick_audio_file(Path::new(&app.workspace_root)) {
+        Ok(Some(path)) => Some(path.display().to_string()),
+        Ok(None) => None,
+        Err(error) => {
+            app.set_status(error);
+            None
+        }
+    }
+}
+
+fn browse_folder(app: &mut App) -> Option<String> {
+    match picker::pick_folder(Path::new(&app.workspace_root)) {
+        Ok(Some(path)) => Some(path.display().to_string()),
+        Ok(None) => None,
+        Err(error) => {
+            app.set_status(error);
+            None
+        }
+    }
+}
+
 fn edit_numeric(value: &mut String, cursor: &mut usize, key: KeyEvent, field: &mut ConvertField) {
     if edit_text(value, cursor, key) {
         return;
@@ -304,11 +358,14 @@ pub(super) fn submit_speak(app: &mut App) -> Option<TuiAction> {
         app.speak_field = SpeakField::Text;
         return None;
     }
-    Some(TuiAction::Speak {
+    let action = TuiAction::Speak {
         model: model.id,
         voice: app.speak_voice.trim().to_string(),
         text,
-    })
+    };
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
 pub(super) fn submit_transcribe(app: &mut App) -> Option<TuiAction> {
@@ -319,16 +376,19 @@ pub(super) fn submit_transcribe(app: &mut App) -> Option<TuiAction> {
     if !model.executable {
         return Some(TuiAction::PullModel(model.id));
     }
-    let audio = app.transcribe_audio.trim().to_string();
+    let audio = normalize_path_field(&app.transcribe_audio);
     if audio.is_empty() {
-        app.set_status("Enter the path to a local audio file first.");
+        app.set_status("Enter, browse, paste, or drag a local audio file first.");
         app.transcribe_field = TranscribeField::Audio;
         return None;
     }
-    Some(TuiAction::Transcribe {
+    let action = TuiAction::Transcribe {
         model: model.id,
         audio,
-    })
+    };
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
 pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
@@ -342,14 +402,14 @@ pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
         return Some(TuiAction::PullModel(model.id));
     }
     let name = app.clone_state.name.trim().to_string();
-    let sample = app.clone_state.sample.trim().to_string();
+    let sample = normalize_path_field(&app.clone_state.sample);
     if name.is_empty() {
         app.set_status("Enter a profile name before creating the voice.");
         app.clone_state.field = CloneField::Name;
         return None;
     }
     if sample.is_empty() {
-        app.set_status("Enter a local reference-audio path.");
+        app.set_status("Enter, browse, paste, or drag a local reference-audio path.");
         app.clone_state.field = CloneField::Sample;
         return None;
     }
@@ -358,11 +418,14 @@ pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
         app.clone_state.field = CloneField::Consent;
         return None;
     }
-    Some(TuiAction::CloneVoice {
+    let action = TuiAction::CloneVoice {
         model: model.id,
         name,
         sample,
-    })
+    };
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
 pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
@@ -375,15 +438,15 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
     if !model.executable {
         return Some(TuiAction::PullModel(model.id));
     }
-    let source = app.convert_state.source.trim().to_string();
-    let target = app.convert_state.target.trim().to_string();
+    let source = normalize_path_field(&app.convert_state.source);
+    let target = normalize_path_field(&app.convert_state.target);
     if source.is_empty() {
-        app.set_status("Enter the source-audio path.");
+        app.set_status("Enter, browse, paste, or drag the source-audio path.");
         app.convert_state.field = ConvertField::Source;
         return None;
     }
     if target.is_empty() {
-        app.set_status("Enter the target RVC package or checkpoint path.");
+        app.set_status("Enter or browse the target RVC package or checkpoint path.");
         app.convert_state.field = ConvertField::Target;
         return None;
     }
@@ -400,7 +463,7 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
     let filter_radius =
         parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?;
 
-    Some(TuiAction::ConvertVoice {
+    let action = TuiAction::ConvertVoice {
         model: model.id,
         source,
         target,
@@ -410,7 +473,10 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
         rms_mix_rate,
         protect,
         filter_radius,
-    })
+    };
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
 fn parse_float(
