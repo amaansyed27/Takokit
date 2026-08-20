@@ -2,6 +2,11 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub fn edit_text(value: &mut String, cursor: &mut usize, key: KeyEvent) -> bool {
     match key.code {
+        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            value.clear();
+            *cursor = 0;
+            true
+        }
         KeyCode::Char(character)
             if !key
                 .modifiers
@@ -84,5 +89,18 @@ mod tests {
             KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)
         ));
         assert_eq!(value, "ac");
+    }
+
+    #[test]
+    fn ctrl_u_clears_text_field() {
+        let mut value = "C:\\very\\long\\path.wav".to_string();
+        let mut cursor = value.chars().count();
+        assert!(edit_text(
+            &mut value,
+            &mut cursor,
+            KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL)
+        ));
+        assert!(value.is_empty());
+        assert_eq!(cursor, 0);
     }
 }
