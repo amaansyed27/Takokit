@@ -1,5 +1,15 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+pub fn insert_text(value: &mut String, cursor: &mut usize, text: &str) {
+    let mut characters = value.chars().collect::<Vec<_>>();
+    let insert_at = (*cursor).min(characters.len());
+    let inserted = text.chars().collect::<Vec<_>>();
+    let inserted_len = inserted.len();
+    characters.splice(insert_at..insert_at, inserted);
+    *value = characters.into_iter().collect();
+    *cursor = insert_at + inserted_len;
+}
+
 pub fn edit_text(value: &mut String, cursor: &mut usize, key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -12,10 +22,8 @@ pub fn edit_text(value: &mut String, cursor: &mut usize, key: KeyEvent) -> bool 
                 .modifiers
                 .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
         {
-            let mut characters = value.chars().collect::<Vec<_>>();
-            characters.insert((*cursor).min(characters.len()), character);
-            *value = characters.into_iter().collect();
-            *cursor += 1;
+            let mut buffer = [0_u8; 4];
+            insert_text(value, cursor, character.encode_utf8(&mut buffer));
             true
         }
         KeyCode::Left => {
@@ -102,5 +110,14 @@ mod tests {
         ));
         assert!(value.is_empty());
         assert_eq!(cursor, 0);
+    }
+
+    #[test]
+    fn pasted_multiline_unicode_text_is_inserted_atomically() {
+        let mut value = "Start  end".to_string();
+        let mut cursor = 6;
+        insert_text(&mut value, &mut cursor, "hello\nनमस्ते ü");
+        assert_eq!(value, "Start hello\nनमस्ते ü end");
+        assert_eq!(cursor, 20);
     }
 }
