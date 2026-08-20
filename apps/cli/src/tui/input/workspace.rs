@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::{
@@ -5,7 +7,7 @@ use crate::tui::{
     editor::edit_text,
 };
 
-use super::normalize_path_field;
+use super::{normalize_path_field, picker};
 
 pub(super) fn handle_workspace(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
@@ -19,6 +21,17 @@ pub(super) fn handle_workspace(app: &mut App, key: KeyEvent) -> Option<TuiAction
 
     match app.workspace_field {
         WorkspaceField::Path => {
+            if key.code == KeyCode::F(2) {
+                match picker::pick_folder(Path::new(&app.workspace_root)) {
+                    Ok(Some(path)) => {
+                        app.workspace_input = path.display().to_string();
+                        app.workspace_input_cursor = app.workspace_input.chars().count();
+                    }
+                    Ok(None) => {}
+                    Err(error) => app.set_status(error),
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.workspace_input,
                 &mut app.workspace_input_cursor,
@@ -35,7 +48,7 @@ pub(super) fn handle_workspace(app: &mut App, key: KeyEvent) -> Option<TuiAction
                 let path = normalize_path_field(&app.workspace_input);
                 if path.is_empty() {
                     app.workspace_field = WorkspaceField::Path;
-                    app.set_status("Paste, drag, or enter a workspace folder path.");
+                    app.set_status("Browse, paste, drag, or enter a workspace folder path.");
                     return None;
                 }
                 return Some(TuiAction::ChangeWorkspace(path));
