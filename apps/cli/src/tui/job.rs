@@ -113,9 +113,6 @@ fn execute_cli(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     if let Some(workspace_dir) = workspace_dir {
-        // TUI file inputs should behave like project-relative paths. This also makes drag/drop
-        // and short values such as `samples/reference.wav` useful instead of requiring a full
-        // absolute path from the shell that launched Takokit.
         command.current_dir(workspace_dir);
     }
     let mut child = match command.spawn() {
@@ -143,7 +140,8 @@ fn execute_cli(
         }
     };
     pid.store(0, Ordering::SeqCst);
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stdout_raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stdout = render_tui_stdout(&stdout_raw);
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     let rendered = combine_output(&stdout, &stderr);
     if cancellation_requested.load(Ordering::SeqCst) {
@@ -180,6 +178,150 @@ fn execute_cli(
             ),
             state: OperationState::Failed,
         }
+    }
+}
+
+fn render_tui_stdout(stdout: &str) -> String {
+    if stdout.is_empty() {
+        return String::new();
+    }
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout) else {
+        return stdout.to_string();
+    };
+    let Some(map) = value.as_object() else {
+        return stdout.to_string();
+    };
+
+    if map.contains_key("consent_affirmed")
+        && map.contains_key("sample_path")
+        && map.contains_key("model_id")
+    {
+        return render_voice_profile(map);
+    }
+    if map.contains_key("execution_status")
+        && map.contains_key("target_voice")
+        && map.contains_key("output_path")
+    {
+        return render_voice_conversion(map);
+    }
+    if map.contains_key("output_path") && map.contains_key("engine") {
+        return render_audio_output(map);
+    }
+    if map.contains_key("text") && map.contains_key("model") {
+        return render_transcription(map);
+    }
+    stdout.to_string()
+}
+
+fn render_voice_profile(map: &serde_json::Map<String, serde_json::Value>) -> String {
+    let name = value_text(map, "name", "saved voice");
+    let id = value_text(map, "id", "unknown");
+    let model = value_text(map, "model_id", "unknown");
+    let sample = value_text(map, "sample_path", "unknown");
+    format!(
+        "Cloned voice saved\n\n  Name       {name}\n  Voice ID   {id}\n  Model      {model}\n  Reference  {sample}\n\nNext: open Speak, select {model}, move to Voice, and use ↑/↓ to choose {id}."
+    )
+}
+
+fn render_voice_conversion(map: &serde_json::Map<String, serde_json::Value>) -> String {
+    let model = value_text(map, "model", "unknown");
+    let output = value_text(map, "output_path", "unknown");
+    let execution = value_text(map, "execution_status", "unknown").replace('_', " ");
+    let quality = value_text(map, "quality_status", "not evaluated").replace('_', " ");
+    let bytes = map
+        .get("bytes")
+        .and_then(serde_json::Value::as_u64)
+        .map(bytes_label)
+        .unwrap_or_else(|| "unknown".to_string());
+    let target = map
+        .get("checkpoint")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|checkpoint| checkpoint.get("target_reference_path"))
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| map.get("target_voice").and_then(serde_json::Value::as_str))
+        .unwrap_or("unknown");
+    let target_label = if model == "rvc" {
+        "Target package"
+    } else {
+        "Target reference"
+    };
+    let mut result = format!(
+        "Voice conversion complete\n\n  Model             {model}\n  Execution         {execution}\n  Listening quality {quality}\n  Output            {output}\n  Size              {bytes}\n  {target_label:<17} {target}\n"
+    );
+    if model == "rvc" {
+        if let Some(settings) = map
+            .get("effective_settings")
+            .and_then(serde_json::Value::as_object)
+        {
+            result.push_str("\nRVC settings");
+            for (key, label) in [
+                ("f0_method", "F0"),
+                ("pitch_shift", "Pitch"),
+                ("index_rate", "Index"),
+                ("rms_mix_rate", "RMS mix"),
+                ("protect", "Protect"),
+                ("filter_radius", "Filter"),
+            ] {
+                if let Some(value) = settings.get(key) {
+                    result.push_str(&format!("\n  {label:<10} {}", scalar(value)));
+                }
+            }
+            result.push('\n');
+        }
+    }
+    result.push_str(
+        "\nReview by listening: the words should remain unchanged, while the voice should move toward the target. Press P to play the result or O to open the output folder.",
+    );
+    result
+}
+
+fn render_audio_output(map: &serde_json::Map<String, serde_json::Value>) -> String {
+    let model = value_text(map, "model", "unknown");
+    let engine = value_text(map, "engine", "unknown");
+    let output = value_text(map, "output_path", "unknown");
+    let bytes = map
+        .get("bytes")
+        .and_then(serde_json::Value::as_u64)
+        .map(bytes_label)
+        .unwrap_or_else(|| "unknown".to_string());
+    format!(
+        "Speech ready\n\n  Model   {model}\n  Engine  {engine}\n  Size    {bytes}\n  Output  {output}\n\nPress P to play the newest audio output or O to open the output folder."
+    )
+}
+
+fn render_transcription(map: &serde_json::Map<String, serde_json::Value>) -> String {
+    let model = value_text(map, "model", "unknown");
+    let text = value_text(map, "text", "");
+    format!("Transcription complete\n\n  Model  {model}\n\n{text}")
+}
+
+fn value_text(
+    map: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    fallback: &str,
+) -> String {
+    map.get(key)
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn scalar(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(value) => value.clone(),
+        serde_json::Value::Bool(value) => value.to_string(),
+        serde_json::Value::Number(value) => value.to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn bytes_label(bytes: u64) -> String {
+    if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{bytes} B")
     }
 }
 
@@ -283,5 +425,26 @@ mod tests {
             normalize_terminal_argument(r#""say this exactly""#),
             r#""say this exactly""#
         );
+    }
+
+    #[test]
+    fn voice_profile_result_explains_the_next_speak_step() {
+        let rendered = render_tui_stdout(
+            r#"{"id":"my-voice","name":"My Voice","model_id":"openvoice","sample_path":"voice.wav","consent_affirmed":true}"#,
+        );
+        assert!(rendered.contains("Cloned voice saved"));
+        assert!(rendered.contains("use ↑/↓ to choose my-voice"));
+        assert!(!rendered.contains("consent_affirmed"));
+    }
+
+    #[test]
+    fn openvoice_conversion_result_uses_reference_language_not_rvc_internals() {
+        let rendered = render_tui_stdout(
+            r#"{"model":"openvoice","output_path":"out.wav","bytes":1024,"execution_status":"passed","quality_status":"not_evaluated","target_voice":"reference.wav","checkpoint":{"target_reference_path":"reference.wav"},"effective_settings":{"f0_method":"rmvpe"}}"#,
+        );
+        assert!(rendered.contains("Target reference"));
+        assert!(rendered.contains("words should remain unchanged"));
+        assert!(!rendered.contains("RVC settings"));
+        assert!(!rendered.contains("checkpoint"));
     }
 }
