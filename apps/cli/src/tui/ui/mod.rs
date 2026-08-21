@@ -98,9 +98,11 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
             ]),
             Line::from(Span::styled(
                 format!(
-                    "{ready_models} ready model{} · {ready_runners} ready runner{} · session {session_short} · workspace {}",
+                    "{ready_models} ready model{} · {ready_runners} ready runner{} · {} saved voice{} · session {session_short} · workspace {}",
                     if ready_models == 1 { "" } else { "s" },
                     if ready_runners == 1 { "" } else { "s" },
+                    app.voice_profiles.len(),
+                    if app.voice_profiles.len() == 1 { "" } else { "s" },
                     app.workspace_root
                 ),
                 Style::default().add_modifier(Modifier::DIM),
@@ -142,18 +144,20 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             "↑/↓ choose · Enter open · 1–8 shortcut · W workspace · R refresh · F1 help · Esc quit"
         }
         TuiScreen::Speak => {
-            "Tab next field · ↑/↓ model · Ctrl+U clear · Ctrl+Enter run · Esc home"
+            "Tab next · ↑/↓ model or saved voice · Ctrl+U clear · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Transcribe => {
             "F2 browse · Ctrl+U clear · Home/End edit · Ctrl+Enter run · Esc home"
         }
         TuiScreen::Clone => {
-            "F2 browse audio · Ctrl+U clear · Space consent · Ctrl+Enter run · Esc home"
+            "F2 reference audio · Space consent · Ctrl+Enter save voice · Esc home"
         }
         TuiScreen::Convert => {
-            "F2 browse path · Ctrl+U clear · arrows model/F0 · Space consent · Ctrl+Enter run"
+            "F2 source/target · Space consent · Ctrl+Enter convert · P plays result in Activity"
         }
-        TuiScreen::Manage => "↑/↓ choose · Enter open · 1–3 shortcut · W workspace · R refresh · Esc home",
+        TuiScreen::Manage => {
+            "↑/↓ choose · Enter open · 1–3 shortcut · W workspace · R refresh · Esc home"
+        }
         TuiScreen::Models => {
             "↑/↓ select · Enter use/repair · P repair · X remove with confirmation · R refresh · Esc back"
         }
@@ -176,11 +180,11 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn render_help(frame: &mut Frame<'_>, app: &App) {
-    let area = widgets::centered_rect(76, 78, frame.area());
+    let area = widgets::centered_rect(78, 82, frame.area());
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nStart on Home and choose a task with ↑/↓ and Enter, or press its number.\n\nSpeak, Transcribe, Clone, Convert\n  Tab moves through fields. F2 opens a native path picker on path fields. Paste/drag and workspace-relative paths also work. Ctrl+U clears the focused text field. Ctrl+Enter runs the task and opens Activity so the complete result stays visible.\n  A successful conversion means execution passed only. The output must still be reviewed for intelligibility, similarity, and artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. F2 browses for a folder. Switching changes sessions and outputs only; installed models remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows complete output or errors, including paths and backend details. Press P to play the newest audio output in the system player or O to open the active session's output folder.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
+            "Takokit TUI\n\nVoice workflows\n  Speak: Text → speech. Choose a TTS model, then use ↑/↓ on Voice to cycle compatible saved cloned voices. You can still type a voice ID manually.\n\n  Create Voice: Reference audio → reusable cloned voice. Takokit saves the consent-backed voice locally. After it finishes, open Speak, select the same compatible model, choose the saved voice, and enter text.\n\n  Convert Voice: Existing speech audio → target voice. The original words stay the same; the voice/timbre changes toward the target. OpenVoice uses target reference audio. RVC uses a target RVC package and exposes its tuning controls.\n\nTranscribe\n  Audio → text. F2 opens a native audio picker; paste/drag and workspace-relative paths also work.\n\nRunning tasks\n  Tab moves through fields. Ctrl+U clears the focused text field. Ctrl+Enter runs. Results open in Activity. A successful conversion proves execution only; listen before judging similarity or artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. F2 browses for a folder. Switching changes sessions and outputs only; installed models and saved voices remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows a human-readable result, output paths, and next actions. Press P to play the newest audio output in the system player or O to open the active session output folder.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
         )
         .wrap(Wrap { trim: false })
         .block(
