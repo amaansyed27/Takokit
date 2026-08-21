@@ -14,7 +14,7 @@ use crate::tui::{
 };
 
 pub fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let form = centered_rect(82, 94, area);
+    let form = centered_rect(84, 94, area);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -30,8 +30,8 @@ pub fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_intro(
         frame,
         rows[0],
-        "Generate speech",
-        "Select an installed TTS model, enter text, and save a local WAV.",
+        "Speak · text → voice",
+        "Enter text and choose a built-in voice or one you created from reference audio.",
     );
     let model = app.selected_speak_model();
     let model_label = model
@@ -45,10 +45,16 @@ pub fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
         ),
         rows[1],
     );
+    let saved_voice_count = app.compatible_saved_voice_count();
+    let voice_label = if saved_voice_count == 0 {
+        "Voice · type a voice ID"
+    } else {
+        "Voice · ↑/↓ saved voices · type ID"
+    };
     render_text_input(
         frame,
         rows[2],
-        "Voice",
+        voice_label,
         app.speak_voice.as_str(),
         "default",
         app.speak_field == SpeakField::Voice,
@@ -76,9 +82,17 @@ pub fn render_speak(frame: &mut Frame<'_>, area: Rect, app: &App) {
         primary_button(label, app.speak_field == SpeakField::Submit),
         rows[4],
     );
+    let hint = if saved_voice_count == 0 {
+        "Tab fields · Ctrl+Enter runs · Create Voice on Home saves cloned voices for compatible models"
+            .to_string()
+    } else {
+        format!(
+            "Tab fields · ↑/↓ on Voice cycles {saved_voice_count} saved cloned voice{} · Ctrl+Enter runs",
+            if saved_voice_count == 1 { "" } else { "s" }
+        )
+    };
     frame.render_widget(
-        Paragraph::new("Tab moves between fields · Ctrl+U clears field · Ctrl+Enter runs · Esc returns home")
-            .style(Style::default().add_modifier(Modifier::DIM)),
+        Paragraph::new(hint).style(Style::default().add_modifier(Modifier::DIM)),
         rows[5],
     );
 
@@ -103,8 +117,8 @@ pub fn render_transcribe(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_intro(
         frame,
         rows[0],
-        "Transcribe audio",
-        "Choose an installed STT model. F2 browses; drag/paste and workspace-relative paths also work.",
+        "Transcribe · audio → text",
+        "Choose an installed STT model and a local audio file.",
     );
     let model = app.selected_transcribe_model();
     let model_label = model
@@ -144,7 +158,7 @@ pub fn render_transcribe(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let form = centered_rect(82, 96, area);
+    let form = centered_rect(86, 96, area);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -161,8 +175,8 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_intro(
         frame,
         rows[0],
-        "Clone a voice",
-        "Create a reusable local voice profile from consented reference audio.",
+        "Create Voice · reference audio → reusable cloned voice",
+        "This saves the voice locally. Afterwards open Speak and select it in the Voice field.",
     );
     let model = app.selected_clone_model();
     let model_label = model
@@ -179,7 +193,7 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_text_input(
         frame,
         rows[2],
-        "Profile name",
+        "Voice name",
         app.clone_state.name.as_str(),
         "My voice",
         app.clone_state.field == CloneField::Name,
@@ -207,7 +221,7 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
         rows[4],
     );
     let label = match model {
-        Some(model) if model.executable => "Create voice profile",
+        Some(model) if model.executable => "Save cloned voice",
         Some(_) => "Repair model",
         None => "No cloning model installed",
     };
@@ -216,8 +230,10 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
         rows[5],
     );
     frame.render_widget(
-        Paragraph::new("F2 browse audio · Ctrl+U clear · Space consent · Ctrl+Enter runs")
-            .style(Style::default().add_modifier(Modifier::DIM)),
+        Paragraph::new(
+            "F2 reference audio · Space consent · Ctrl+Enter saves · saved voice appears in Speak",
+        )
+        .style(Style::default().add_modifier(Modifier::DIM)),
         rows[6],
     );
 }
@@ -252,8 +268,8 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_intro(
         frame,
         rows[0],
-        "Convert a voice",
-        "RVC package conversion. A valid WAV proves execution only; listening review is required for quality.",
+        "Convert Voice · audio → target voice",
+        "The spoken words stay the same. RVC changes the voice using the selected target package.",
     );
     let model_label = model
         .map(|model| format!("{}  ·  {}", model.title, model.state))
@@ -269,7 +285,7 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
     render_text_input(
         frame,
         rows[2],
-        "Source audio · F2 browse",
+        "Source speech audio · F2 browse",
         app.convert_state.source.as_str(),
         r#"samples\source.wav"#,
         app.convert_state.field == ConvertField::Source,
@@ -345,7 +361,7 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
         rows[10],
     );
     let label = match model {
-        Some(model) if model.executable => "Run conversion",
+        Some(model) if model.executable => "Convert voice",
         Some(_) => "Repair model",
         None => "No conversion model installed",
     };
@@ -354,8 +370,10 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
         rows[11],
     );
     frame.render_widget(
-        Paragraph::new("F2 browses path fields · Ctrl+U clears · result opens in Activity for review.")
-            .style(Style::default().add_modifier(Modifier::DIM)),
+        Paragraph::new(
+            "Words should remain unchanged · voice should move toward the target · review by listening",
+        )
+        .style(Style::default().add_modifier(Modifier::DIM)),
         rows[12],
     );
 
@@ -383,7 +401,7 @@ fn render_reference_convert(
     app: &App,
     model: Option<&crate::tui::catalog::ModelRow>,
 ) {
-    let form = centered_rect(86, 78, area);
+    let form = centered_rect(88, 78, area);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -400,8 +418,8 @@ fn render_reference_convert(
     render_intro(
         frame,
         rows[0],
-        "Convert a voice",
-        "Reference-audio conversion. Select source and target audio; backend-specific RVC controls are hidden.",
+        "Convert Voice · audio → target voice",
+        "The spoken words stay the same. The source voice should move toward the target reference voice.",
     );
     let model_label = model
         .map(|model| format!("{}  ·  {}", model.title, model.state))
@@ -417,7 +435,7 @@ fn render_reference_convert(
     render_text_input(
         frame,
         rows[2],
-        "Source audio · F2 browse",
+        "Source speech audio · F2 browse",
         app.convert_state.source.as_str(),
         r#"samples\source.wav"#,
         app.convert_state.field == ConvertField::Source,
@@ -426,7 +444,7 @@ fn render_reference_convert(
     render_text_input(
         frame,
         rows[3],
-        "Target reference audio · F2 browse",
+        "Target voice reference · F2 browse",
         app.convert_state.target.as_str(),
         r#"samples\reference.wav"#,
         app.convert_state.field == ConvertField::Target,
@@ -445,7 +463,7 @@ fn render_reference_convert(
         rows[4],
     );
     let label = match model {
-        Some(model) if model.executable => "Run conversion",
+        Some(model) if model.executable => "Convert voice",
         Some(_) => "Repair model",
         None => "No conversion model installed",
     };
@@ -454,8 +472,10 @@ fn render_reference_convert(
         rows[5],
     );
     frame.render_widget(
-        Paragraph::new("F2 browses audio · Ctrl+U clears · Space consent · Ctrl+Enter runs · result opens in Activity.")
-            .style(Style::default().add_modifier(Modifier::DIM)),
+        Paragraph::new(
+            "F2 source/target audio · Space consent · Ctrl+Enter runs · P plays the result in Activity",
+        )
+        .style(Style::default().add_modifier(Modifier::DIM)),
         rows[6],
     );
 }
