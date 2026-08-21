@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
-use takokit_core::{RuntimeConfig, SessionSummary};
+use takokit_core::{RuntimeConfig, SessionSummary, VoiceProfile};
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::{
-    persist_workspace, resolve_workspace, LocalStore, WorkspaceStore, WorkspaceSurface,
+    persist_workspace, resolve_workspace, LocalStore, VoiceProfileStore, WorkspaceStore,
+    WorkspaceSurface,
 };
 use uuid::Uuid;
 
@@ -18,12 +19,15 @@ use super::{
 };
 
 pub const HOME_ACTIONS: [(&str, &str); 8] = [
-    ("Speak", "Generate speech with an installed TTS model"),
-    ("Transcribe", "Turn a local audio file into text"),
-    ("Clone voice", "Create a consented local voice profile"),
+    ("Speak", "Text → speech using a built-in or cloned voice"),
+    ("Transcribe", "Audio → text with an installed speech model"),
+    (
+        "Create voice",
+        "Reference audio → reusable cloned voice for Speak",
+    ),
     (
         "Convert voice",
-        "Run conversion and review execution separately from quality",
+        "Audio → another voice while keeping the original words",
     ),
     ("Manage", "Inspect models, runners, and the local service"),
     ("Sessions", "Open prior work or start a clean session"),
@@ -31,7 +35,7 @@ pub const HOME_ACTIONS: [(&str, &str); 8] = [
         "Workspace",
         "View or change the project-specific .tako location",
     ),
-    ("Activity", "Read the complete result from the latest task"),
+    ("Activity", "Review the latest result, output path, and next action"),
 ];
 
 pub const MANAGE_ACTIONS: [(&str, &str); 3] = [
@@ -103,7 +107,7 @@ impl TuiScreen {
             Self::Home => "Home",
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
-            Self::Clone => "Clone voice",
+            Self::Clone => "Create voice",
             Self::Convert => "Convert voice",
             Self::Manage => "Manage",
             Self::Models => "Installed models",
@@ -211,6 +215,7 @@ pub struct App {
     pub runners: Vec<RunnerRow>,
     pub system: Vec<SystemRow>,
     pub sessions: Vec<SessionSummary>,
+    pub voice_profiles: Vec<VoiceProfile>,
     pub model_index: usize,
     pub runner_index: usize,
     pub system_index: usize,
@@ -259,6 +264,7 @@ impl App {
         let (tts_models, stt_models) = capability_indexes(&models);
         let clone_state = super::clone::CloneState::new(&models);
         let convert_state = ConvertState::new(&models);
+        let voice_profiles = VoiceProfileStore::new(store.voices_dir()).list()?;
         let sessions = workspace.store.list_sessions(None)?;
         let active_session = workspace
             .active_session_id()
@@ -290,6 +296,7 @@ impl App {
             runners,
             system: system_rows(),
             sessions,
+            voice_profiles,
             model_index: 0,
             runner_index: 0,
             system_index: 0,
@@ -361,6 +368,8 @@ impl App {
         );
         self.clone_state.reload_models(&self.models);
         self.convert_state.reload_models(&self.models);
+        self.voice_profiles = VoiceProfileStore::new(store.voices_dir()).list()?;
+        self.normalize_speak_voice_for_model();
         self.storage_root = store.root().display().to_string();
         self.server = config.local_base_url();
         self.reload_sessions()?;
@@ -507,9 +516,69 @@ impl App {
             .and_then(|index| self.models.get(*index))
     }
 
+    pub fn compatible_speak_voice_ids(&self) -> Vec<String> {
+        let Some(model) = self.selected_speak_model() else {
+            return vec!["default".to_string()];
+        };
+        let mut voices = vec!["default".to_string()];
+        voices.extend(
+            self.voice_profiles
+                .iter()
+                .filter(|profile| profile.model_id == model.id)
+                .map(|profile| profile.id.clone()),
+        );
+        voices
+    }
+
+    pub fn compatible_saved_voice_count(&self) -> usize {
+        self.compatible_speak_voice_ids().len().saturating_sub(1)
+    }
+
+    pub fn cycle_speak_voice(&mut self, delta: isize) {
+        let voices = self.compatible_speak_voice_ids();
+        if voices.is_empty() {
+            return;
+        }
+        let current = voices
+            .iter()
+            .position(|voice| voice == &self.speak_voice)
+            .unwrap_or(0);
+        let len = voices.len() as isize;
+        let next = (current as isize + delta).rem_euclid(len) as usize;
+        self.speak_voice = voices[next].clone();
+        self.speak_voice_cursor = self.speak_voice.chars().count();
+    }
+
+    pub fn normalize_speak_voice_for_model(&mut self) {
+        let voices = self.compatible_speak_voice_ids();
+        if voices.iter().any(|voice| voice == &self.speak_voice) {
+            if self.speak_voice == "default"
+                && self
+                    .selected_speak_model()
+                    .is_some_and(|model| model.voice_cloning)
+                && voices.len() > 1
+            {
+                self.speak_voice = voices[1].clone();
+                self.speak_voice_cursor = self.speak_voice.chars().count();
+            }
+            return;
+        }
+        self.speak_voice = if self
+            .selected_speak_model()
+            .is_some_and(|model| model.voice_cloning)
+            && voices.len() > 1
+        {
+            voices[1].clone()
+        } else {
+            "default".to_string()
+        };
+        self.speak_voice_cursor = self.speak_voice.chars().count();
+    }
+
     pub fn set_speak_model(&mut self, id: &str) {
         self.speak_model_index =
             find_capability_index(&self.models, &self.tts_models, Some(id), id);
+        self.normalize_speak_voice_for_model();
     }
 
     pub fn set_transcribe_model(&mut self, id: &str) {
@@ -554,7 +623,7 @@ mod tests {
     fn home_starts_with_primary_tasks_and_has_workspace_access() {
         assert_eq!(HOME_ACTIONS[0].0, "Speak");
         assert_eq!(HOME_ACTIONS[1].0, "Transcribe");
-        assert_eq!(HOME_ACTIONS[2].0, "Clone voice");
+        assert_eq!(HOME_ACTIONS[2].0, "Create voice");
         assert_eq!(HOME_ACTIONS[3].0, "Convert voice");
         assert!(HOME_ACTIONS.iter().any(|item| item.0 == "Workspace"));
     }
