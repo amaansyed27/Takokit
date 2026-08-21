@@ -40,16 +40,29 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
         SpeakField::Model => match key.code {
             KeyCode::Left | KeyCode::Up => {
                 app.speak_model_index =
-                    shifted_index(app.speak_model_index, app.tts_models.len(), -1)
+                    shifted_index(app.speak_model_index, app.tts_models.len(), -1);
+                app.normalize_speak_voice_for_model();
             }
             KeyCode::Right | KeyCode::Down => {
                 app.speak_model_index =
-                    shifted_index(app.speak_model_index, app.tts_models.len(), 1)
+                    shifted_index(app.speak_model_index, app.tts_models.len(), 1);
+                app.normalize_speak_voice_for_model();
             }
             KeyCode::Enter => app.speak_field = SpeakField::Voice,
             _ => {}
         },
         SpeakField::Voice => {
+            match key.code {
+                KeyCode::Up => {
+                    app.cycle_speak_voice(-1);
+                    return None;
+                }
+                KeyCode::Down => {
+                    app.cycle_speak_voice(1);
+                    return None;
+                }
+                _ => {}
+            }
             if edit_text(&mut app.speak_voice, &mut app.speak_voice_cursor, key) {
                 return None;
             }
@@ -457,7 +470,7 @@ pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
     let name = app.clone_state.name.trim().to_string();
     let sample = normalize_path_field(&app.clone_state.sample);
     if name.is_empty() {
-        app.set_status("Enter a profile name before creating the voice.");
+        app.set_status("Enter a voice name before saving the cloned voice.");
         app.clone_state.field = CloneField::Name;
         return None;
     }
@@ -499,7 +512,7 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
         return None;
     }
     if target.is_empty() {
-        app.set_status("Enter or browse the target voice audio or RVC package/checkpoint path.");
+        app.set_status("Enter or browse the target voice reference or RVC package/checkpoint path.");
         app.convert_state.field = ConvertField::Target;
         return None;
     }
