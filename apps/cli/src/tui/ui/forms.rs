@@ -223,6 +223,12 @@ pub fn render_clone(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let model = app.selected_convert_model();
+    if !model.is_some_and(|model| model.id == "rvc") {
+        render_reference_convert(frame, area, app, model);
+        return;
+    }
+
     let form = centered_rect(90, 100, area);
     let rows = Layout::default()
         .direction(Direction::Vertical)
@@ -247,9 +253,8 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
         frame,
         rows[0],
         "Convert a voice",
-        "A valid WAV proves execution only. Listening review is required for quality.",
+        "RVC package conversion. A valid WAV proves execution only; listening review is required for quality.",
     );
-    let model = app.selected_convert_model();
     let model_label = model
         .map(|model| format!("{}  ·  {}", model.title, model.state))
         .unwrap_or_else(|| "No installed conversion model".to_string());
@@ -370,6 +375,89 @@ pub fn render_convert(frame: &mut Frame<'_>, area: Rect, app: &App) {
         }
         _ => {}
     }
+}
+
+fn render_reference_convert(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    app: &App,
+    model: Option<&crate::tui::catalog::ModelRow>,
+) {
+    let form = centered_rect(86, 78, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(2),
+        ])
+        .split(form);
+
+    render_intro(
+        frame,
+        rows[0],
+        "Convert a voice",
+        "Reference-audio conversion. Select source and target audio; backend-specific RVC controls are hidden.",
+    );
+    let model_label = model
+        .map(|model| format!("{}  ·  {}", model.title, model.state))
+        .unwrap_or_else(|| "No installed conversion model".to_string());
+    frame.render_widget(
+        field(
+            "Model · ↑/↓ change",
+            model_label,
+            app.convert_state.field == ConvertField::Model,
+        ),
+        rows[1],
+    );
+    render_text_input(
+        frame,
+        rows[2],
+        "Source audio · F2 browse",
+        app.convert_state.source.as_str(),
+        r#"samples\source.wav"#,
+        app.convert_state.field == ConvertField::Source,
+        app.convert_state.source_cursor,
+    );
+    render_text_input(
+        frame,
+        rows[3],
+        "Target reference audio · F2 browse",
+        app.convert_state.target.as_str(),
+        r#"samples\reference.wav"#,
+        app.convert_state.field == ConvertField::Target,
+        app.convert_state.target_cursor,
+    );
+    frame.render_widget(
+        field(
+            "Consent · Space toggles",
+            if app.convert_state.consent {
+                "[x] I own these voices or have explicit permission."
+            } else {
+                "[ ] Explicit source and target permission is required."
+            },
+            app.convert_state.field == ConvertField::Consent,
+        ),
+        rows[4],
+    );
+    let label = match model {
+        Some(model) if model.executable => "Run conversion",
+        Some(_) => "Repair model",
+        None => "No conversion model installed",
+    };
+    frame.render_widget(
+        primary_button(label, app.convert_state.field == ConvertField::Submit),
+        rows[5],
+    );
+    frame.render_widget(
+        Paragraph::new("F2 browses audio · Ctrl+U clears · Space consent · Ctrl+Enter runs · result opens in Activity.")
+            .style(Style::default().add_modifier(Modifier::DIM)),
+        rows[6],
+    );
 }
 
 fn render_convert_value(
