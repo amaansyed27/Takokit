@@ -56,10 +56,6 @@ pub async fn run_launcher(
     let mut last_rendered_screen: Option<TuiScreen> = None;
 
     ratatui::run(|terminal| -> io::Result<()> {
-        // ratatui::run initializes raw mode and the alternate screen before invoking
-        // this closure. Bracketed paste must therefore be enabled here, after that
-        // initialization, otherwise terminal setup can reset the mode and Windows
-        // Terminal will replay clipboard contents as ordinary navigation keys.
         let _paste_guard = BracketedPasteGuard::enable()?;
 
         loop {
@@ -130,7 +126,7 @@ pub async fn run_launcher(
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
                         Ok(()) => {
-                            state.set_status("Local model, runner, and session state refreshed.")
+                            state.set_status("Local model, runner, voice, and session state refreshed.")
                         }
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
                     }
@@ -209,7 +205,7 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
             name,
             sample,
         } => (
-            format!("Creating voice profile {name}"),
+            format!("Saving cloned voice {name}"),
             vec![
                 "clone".into(),
                 sample,
@@ -230,30 +226,34 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
             rms_mix_rate,
             protect,
             filter_radius,
-        } => (
-            format!("Converting voice with {model}"),
-            vec![
+        } => {
+            let mut command = vec![
                 "convert".into(),
                 source,
                 "--target-voice".into(),
                 target,
                 "--model".into(),
-                model,
-                "--f0-method".into(),
-                f0_method,
-                "--pitch-shift".into(),
-                pitch_shift.to_string(),
-                "--index-rate".into(),
-                index_rate.to_string(),
-                "--rms-mix-rate".into(),
-                rms_mix_rate.to_string(),
-                "--protect".into(),
-                protect.to_string(),
-                "--filter-radius".into(),
-                filter_radius.to_string(),
-                "--consent".into(),
-            ],
-        ),
+                model.clone(),
+            ];
+            if model == "rvc" {
+                command.extend([
+                    "--f0-method".into(),
+                    f0_method,
+                    "--pitch-shift".into(),
+                    pitch_shift.to_string(),
+                    "--index-rate".into(),
+                    index_rate.to_string(),
+                    "--rms-mix-rate".into(),
+                    rms_mix_rate.to_string(),
+                    "--protect".into(),
+                    protect.to_string(),
+                    "--filter-radius".into(),
+                    filter_radius.to_string(),
+                ]);
+            }
+            command.push("--consent".into());
+            (format!("Converting voice with {model}"), command)
+        }
         TuiAction::PullRunner(runner) => (
             format!("Adding {runner}"),
             vec!["runner".into(), "pull".into(), runner],
