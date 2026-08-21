@@ -14,12 +14,12 @@ use super::{normalize_path_field, picker};
 pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if app.speak_field == SpeakField::Text {
         match key.code {
-            KeyCode::BackTab => {
-                app.speak_field = SpeakField::Voice;
-                return None;
-            }
             KeyCode::Tab => {
                 app.speak_field = SpeakField::Submit;
+                return None;
+            }
+            KeyCode::BackTab => {
+                app.speak_field = SpeakField::Voice;
                 return None;
             }
             KeyCode::Enter => {
@@ -62,11 +62,7 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
                 return None;
             }
         }
-        SpeakField::Submit => {
-            if key.code == KeyCode::Enter {
-                app.set_status("Press Ctrl+Enter to generate speech.");
-            }
-        }
+        SpeakField::Submit => {}
     }
     None
 }
@@ -243,7 +239,12 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
         }
         ConvertField::Target => {
             if key.code == KeyCode::F(2) {
-                if let Some(path) = browse_folder(app) {
+                let selected = if selected_conversion_model_is_rvc(app) {
+                    browse_folder(app)
+                } else {
+                    browse_audio(app)
+                };
+                if let Some(path) = selected {
                     app.convert_state.target = path;
                     app.convert_state.target_cursor = app.convert_state.target.chars().count();
                 }
@@ -324,6 +325,12 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
         }
     }
     None
+}
+
+fn selected_conversion_model_is_rvc(app: &App) -> bool {
+    app.selected_convert_model()
+        .map(|model| model.id == "rvc")
+        .unwrap_or(false)
 }
 
 fn browse_audio(app: &mut App) -> Option<String> {
@@ -459,7 +466,7 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
         return None;
     }
     if target.is_empty() {
-        app.set_status("Enter or browse the target RVC package or checkpoint path.");
+        app.set_status("Enter or browse the target voice audio or RVC package/checkpoint path.");
         app.convert_state.field = ConvertField::Target;
         return None;
     }
