@@ -9,6 +9,9 @@ pub(super) fn is_voice_conversion_report(map: &Map<String, Value>) -> bool {
 
 pub(super) fn format_voice_conversion(map: &Map<String, Value>) -> String {
     let mut lines = Vec::new();
+    let model = text(map, "model");
+    let is_rvc = model.eq_ignore_ascii_case("rvc");
+
     lines.push("Voice conversion complete".to_string());
     lines.push(format!(
         "  {:<20} {}",
@@ -39,51 +42,76 @@ pub(super) fn format_voice_conversion(map: &Map<String, Value>) -> String {
         lines.push(format!("  {:<20} {} bytes", "size", bytes));
     }
 
-    if let Some(settings) = map.get("effective_settings").and_then(Value::as_object) {
-        lines.push(String::new());
-        lines.push("Effective RVC settings".to_string());
-        for (key, label) in [
-            ("f0_method", "F0 method"),
-            ("pitch_shift", "pitch shift"),
-            ("index_rate", "index rate"),
-            ("rms_mix_rate", "RMS mix rate"),
-            ("protect", "protect"),
-            ("filter_radius", "filter radius"),
-        ] {
-            if let Some(value) = settings.get(key) {
-                lines.push(format!("  {label:<20} {}", scalar(value)));
+    if is_rvc {
+        if let Some(settings) = map.get("effective_settings").and_then(Value::as_object) {
+            lines.push(String::new());
+            lines.push("Effective RVC settings".to_string());
+            for (key, label) in [
+                ("f0_method", "F0 method"),
+                ("pitch_shift", "pitch shift"),
+                ("index_rate", "index rate"),
+                ("rms_mix_rate", "RMS mix rate"),
+                ("protect", "protect"),
+                ("filter_radius", "filter radius"),
+            ] {
+                if let Some(value) = settings.get(key) {
+                    lines.push(format!("  {label:<20} {}", scalar(value)));
+                }
             }
         }
     }
 
     if let Some(checkpoint) = map.get("checkpoint").and_then(Value::as_object) {
         lines.push(String::new());
-        lines.push("Target package evidence".to_string());
-        for (key, label) in [
-            ("checkpoint_path", "checkpoint"),
-            ("checkpoint_sha256", "checkpoint SHA-256"),
-            ("index_path", "index"),
-            ("index_sha256", "index SHA-256"),
-            ("pairing_status", "pairing"),
-            ("target_reference_path", "target reference"),
-        ] {
-            if let Some(value) = checkpoint.get(key).filter(|value| !value.is_null()) {
-                lines.push(format!("  {label:<20} {}", scalar(value)));
+        if is_rvc {
+            lines.push("Target package evidence".to_string());
+            for (key, label) in [
+                ("checkpoint_path", "checkpoint"),
+                ("checkpoint_sha256", "checkpoint SHA-256"),
+                ("index_path", "index"),
+                ("index_sha256", "index SHA-256"),
+                ("pairing_status", "pairing"),
+                ("target_reference_path", "target reference"),
+            ] {
+                if let Some(value) = checkpoint.get(key).filter(|value| !value.is_null()) {
+                    lines.push(format!("  {label:<20} {}", scalar(value)));
+                }
             }
-        }
-        lines.push(format!(
-            "  {:<20} {}",
-            "quality baseline",
-            if checkpoint
-                .get("quality_baseline_ready")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
+            lines.push(format!(
+                "  {:<20} {}",
+                "quality baseline",
+                if checkpoint
+                    .get("quality_baseline_ready")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    "package is ready for human comparison"
+                } else {
+                    "not established; execution cannot be promoted to a quality pass"
+                }
+            ));
+        } else {
+            lines.push("Target reference".to_string());
+            if let Some(value) = checkpoint
+                .get("target_reference_path")
+                .filter(|value| !value.is_null())
             {
-                "package is ready for human comparison"
-            } else {
-                "not established; execution cannot be promoted to a quality pass"
+                lines.push(format!("  {:<20} {}", "reference audio", scalar(value)));
             }
-        ));
+            lines.push(format!(
+                "  {:<20} {}",
+                "quality baseline",
+                if checkpoint
+                    .get("quality_baseline_ready")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    "reference is ready for human comparison"
+                } else {
+                    "not established; execution cannot be promoted to a quality pass"
+                }
+            ));
+        }
     }
 
     if let Some(notice) = map.get("quality_notice").and_then(Value::as_str) {
@@ -149,6 +177,36 @@ mod tests {
         let rendered = format_voice_conversion(map);
         assert!(rendered.contains("execution            passed"));
         assert!(rendered.contains("perceptual quality   not evaluated"));
+        assert!(rendered.contains("Effective RVC settings"));
         assert!(rendered.contains("cannot be promoted to a quality pass"));
+    }
+
+    #[test]
+    fn openvoice_uses_reference_audio_language() {
+        let value = serde_json::json!({
+            "model": "openvoice",
+            "output_path": "conversion.wav",
+            "bytes": 2048,
+            "execution_status": "passed",
+            "quality_status": "not_evaluated",
+            "quality_review_required": true,
+            "effective_settings": {
+                "f0_method": "rmvpe",
+                "pitch_shift": 0
+            },
+            "checkpoint": {
+                "checkpoint_path": "owned-reference.wav",
+                "checkpoint_sha256": "not-applicable",
+                "pairing_status": "not_applicable",
+                "target_reference_path": "owned-reference.wav",
+                "quality_baseline_ready": true
+            }
+        });
+        let map = value.as_object().expect("conversion object");
+        let rendered = format_voice_conversion(map);
+        assert!(rendered.contains("Target reference"));
+        assert!(rendered.contains("reference audio      owned-reference.wav"));
+        assert!(!rendered.contains("Effective RVC settings"));
+        assert!(!rendered.contains("checkpoint SHA-256"));
     }
 }
