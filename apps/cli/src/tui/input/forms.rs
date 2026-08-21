@@ -191,11 +191,12 @@ pub(super) fn handle_clone(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 }
 
 pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
+    let is_rvc = selected_conversion_model_is_rvc(app);
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         app.convert_state.field = if key.code == KeyCode::BackTab {
-            app.convert_state.field.previous()
+            previous_convert_field(app.convert_state.field, is_rvc)
         } else {
-            app.convert_state.field.next()
+            next_convert_field(app.convert_state.field, is_rvc)
         };
         return None;
     }
@@ -239,7 +240,7 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
         }
         ConvertField::Target => {
             if key.code == KeyCode::F(2) {
-                let selected = if selected_conversion_model_is_rvc(app) {
+                let selected = if is_rvc {
                     browse_folder(app)
                 } else {
                     browse_audio(app)
@@ -258,7 +259,11 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
                 return None;
             }
             if key.code == KeyCode::Enter {
-                app.convert_state.field = ConvertField::F0Method;
+                app.convert_state.field = if is_rvc {
+                    ConvertField::F0Method
+                } else {
+                    ConvertField::Consent
+                };
             }
         }
         ConvertField::F0Method => match key.code {
@@ -325,6 +330,34 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
         }
     }
     None
+}
+
+fn next_convert_field(field: ConvertField, is_rvc: bool) -> ConvertField {
+    if is_rvc {
+        return field.next();
+    }
+    match field {
+        ConvertField::Model => ConvertField::Source,
+        ConvertField::Source => ConvertField::Target,
+        ConvertField::Target => ConvertField::Consent,
+        ConvertField::Consent => ConvertField::Submit,
+        ConvertField::Submit => ConvertField::Model,
+        _ => ConvertField::Consent,
+    }
+}
+
+fn previous_convert_field(field: ConvertField, is_rvc: bool) -> ConvertField {
+    if is_rvc {
+        return field.previous();
+    }
+    match field {
+        ConvertField::Model => ConvertField::Submit,
+        ConvertField::Source => ConvertField::Model,
+        ConvertField::Target => ConvertField::Source,
+        ConvertField::Consent => ConvertField::Target,
+        ConvertField::Submit => ConvertField::Consent,
+        _ => ConvertField::Target,
+    }
 }
 
 fn selected_conversion_model_is_rvc(app: &App) -> bool {
@@ -451,7 +484,7 @@ pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
 pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
     let Some(model) = app.selected_convert_model().cloned() else {
         app.set_status(
-            "No voice-conversion model is installed. Install RVC through the library first.",
+            "No voice-conversion model is installed. Install a conversion-capable model through the library first.",
         );
         return None;
     };
@@ -476,18 +509,25 @@ pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
         return None;
     }
 
-    let pitch_shift = parse_number::<i32>(app, ConvertField::PitchShift, "pitch shift", -24, 24)?;
-    let index_rate = parse_float(app, ConvertField::IndexRate, "index rate", 0.0, 1.0)?;
-    let rms_mix_rate = parse_float(app, ConvertField::RmsMixRate, "RMS mix rate", 0.0, 1.0)?;
-    let protect = parse_float(app, ConvertField::Protect, "protect", 0.0, 0.5)?;
-    let filter_radius =
-        parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?;
+    let is_rvc = model.id == "rvc";
+    let (f0_method, pitch_shift, index_rate, rms_mix_rate, protect, filter_radius) = if is_rvc {
+        (
+            app.convert_state.f0_method().to_string(),
+            parse_number::<i32>(app, ConvertField::PitchShift, "pitch shift", -24, 24)?,
+            parse_float(app, ConvertField::IndexRate, "index rate", 0.0, 1.0)?,
+            parse_float(app, ConvertField::RmsMixRate, "RMS mix rate", 0.0, 1.0)?,
+            parse_float(app, ConvertField::Protect, "protect", 0.0, 0.5)?,
+            parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?,
+        )
+    } else {
+        ("rmvpe".to_string(), 0, 0.75, 0.25, 0.33, 3)
+    };
 
     let action = TuiAction::ConvertVoice {
         model: model.id,
         source,
         target,
-        f0_method: app.convert_state.f0_method().to_string(),
+        f0_method,
         pitch_shift,
         index_rate,
         rms_mix_rate,
@@ -544,5 +584,26 @@ where
             app.convert_state.field = field;
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reference_conversion_navigation_skips_rvc_only_fields() {
+        assert_eq!(
+            next_convert_field(ConvertField::Target, false),
+            ConvertField::Consent
+        );
+        assert_eq!(
+            previous_convert_field(ConvertField::Consent, false),
+            ConvertField::Target
+        );
+        assert_eq!(
+            next_convert_field(ConvertField::Target, true),
+            ConvertField::F0Method
+        );
     }
 }
