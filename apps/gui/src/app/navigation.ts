@@ -3,12 +3,12 @@ import {
   AudioWaveform,
   Box,
   Boxes,
+  CircleGauge,
   History,
   House,
-  Server,
   Settings,
   Speech,
-  User
+  UserRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -30,15 +30,39 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-export const navItems: NavItem[] = [
-  { id: "home", label: "Home", icon: House },
-  { id: "models", label: "Models", icon: Box },
-  { id: "runners", label: "Runners", icon: Boxes },
-  { id: "voices", label: "Voices", icon: User },
-  { id: "speak", label: "Speak", icon: AudioLines },
-  { id: "transcribe", label: "Transcribe", icon: Speech },
-  { id: "convert", label: "Convert", icon: AudioWaveform },
-  { id: "history", label: "History", icon: History },
-  { id: "diagnostics", label: "Diagnostics", icon: Server },
-  { id: "settings", label: "Settings", icon: Settings }
+export type NavSection = {
+  label?: string;
+  items: NavItem[];
+};
+
+export const navSections: NavSection[] = [
+  {
+    items: [{ id: "home", label: "Home", icon: House }]
+  },
+  {
+    label: "Create",
+    items: [
+      { id: "speak", label: "Speak", icon: AudioLines },
+      { id: "transcribe", label: "Transcribe", icon: Speech },
+      { id: "convert", label: "Convert voice", icon: AudioWaveform }
+    ]
+  },
+  {
+    label: "Library",
+    items: [
+      { id: "voices", label: "Voices", icon: UserRound },
+      { id: "models", label: "Models", icon: Box },
+      { id: "runners", label: "Runners", icon: Boxes }
+    ]
+  },
+  {
+    label: "System",
+    items: [
+      { id: "history", label: "History", icon: History },
+      { id: "diagnostics", label: "Diagnostics", icon: CircleGauge },
+      { id: "settings", label: "Settings", icon: Settings }
+    ]
+  }
 ];
+
+export const navItems = navSections.flatMap((section) => section.items);
