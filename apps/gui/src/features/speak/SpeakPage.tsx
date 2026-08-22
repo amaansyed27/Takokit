@@ -1,203 +1,264 @@
-import { useMemo, useState } from "react";
-import { ChevronDown, Waves } from "lucide-react";
+import { Check, Copy, Gauge, Sparkles, Volume2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { Section } from "../../components/ui/Section";
-import { Select } from "../../components/ui/Select";
-import { Table, TableRow } from "../../components/ui/Table";
-import { TextArea } from "../../components/ui/TextArea";
-import { Tooltip } from "../../components/ui/Tooltip";
-import { useMockGeneration } from "../../hooks/useMockGeneration";
-import { installRunner, pullModel, pullRunner } from "../../lib/api";
+import { ProductButton } from "../../components/ui/ProductButton";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
+import { ProductSelect } from "../../components/ui/ProductSelect";
+import { useSpeechGeneration } from "../../hooks/useSpeechGeneration";
 
 export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
-  const ttsModels = useMemo(() => runtime.models.filter((model) => model.capabilities.includes("tts")), [runtime.models]);
+  const ttsModels = useMemo(
+    () => runtime.models.filter((model) => model.capabilities.includes("tts")),
+    [runtime.models]
+  );
+  const initialModel = ttsModels.find((item) => item.id === "kokoro" && item.executable) ?? ttsModels.find((item) => item.executable) ?? ttsModels[0];
   const [text, setText] = useState("");
-  const [model, setModel] = useState(ttsModels.find((item) => item.id === "kokoro" && item.executable)?.id ?? ttsModels[0]?.id ?? "");
-  const [voice, setVoice] = useState(runtime.voices[0]?.id ?? "");
+  const [model, setModel] = useState(initialModel?.id ?? "");
+  const [voice, setVoice] = useState("default");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [language, setLanguage] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [referenceText, setReferenceText] = useState("");
+  const { error, generate, isGenerating, result, clearResult } = useSpeechGeneration();
+
   const selectedModel = ttsModels.find((item) => item.id === model) ?? ttsModels[0];
-  const selectedVoice = runtime.voices.find((item) => item.id === voice) ?? runtime.voices[0];
-  const { error, generate, isGenerating, result } = useMockGeneration();
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const apiUnavailable = runtime.server.status !== "online";
-  const requiredRunner = selectedModel ? runtime.runners.find((runner) => runner.id === selectedModel.runner) : undefined;
-  const canGenerate = Boolean(selectedModel?.executable && !apiUnavailable);
-  const blocker = apiUnavailable
-    ? "Start takokit serve or takokit gui to use the local API."
+  const compatibleVoices = useMemo(() => {
+    if (!selectedModel) return [];
+    return runtime.voices.filter((item) =>
+      item.model === selectedModel.id || item.model === selectedModel.family
+    );
+  }, [runtime.voices, selectedModel]);
+  const supportsSavedVoices = Boolean(selectedModel?.capabilities.includes("voice_cloning"));
+  const supportsGuidance = Boolean(selectedModel && (selectedModel.id.includes("qwen3") || selectedModel.family.includes("qwen3")));
+  const serverOnline = runtime.server.status === "online";
+  const canGenerate = Boolean(serverOnline && selectedModel?.executable && text.trim() && !isGenerating);
+  const blocker = !serverOnline
+    ? "Local runtime is offline."
     : selectedModel?.executable
       ? null
-      : selectedModel?.missing.join("; ") || "This TTS model is not executable today.";
+      : selectedModel?.missing.join("; ") || "This model needs attention before it can run.";
 
-  async function runAction(label: string, action: () => Promise<void>) {
-    setBusyAction(label);
-    setNotice(null);
-    try {
-      await action();
-      setNotice("Local runtime state updated. Refreshing the page data may change executable state.");
-    } catch (caught) {
-      setNotice(caught instanceof Error ? caught.message : "Takokit API action failed.");
-    } finally {
-      setBusyAction(null);
+  useEffect(() => {
+    if (!selectedModel) return;
+    if (supportsSavedVoices && compatibleVoices.length > 0) {
+      const currentStillValid = compatibleVoices.some((item) => item.id === voice);
+      if (!currentStillValid) setVoice(compatibleVoices[0].id);
+      return;
     }
+    if (voice !== "default") setVoice("default");
+  }, [selectedModel, supportsSavedVoices, compatibleVoices, voice]);
+
+  useEffect(() => {
+    clearResult();
+  }, [model, voice]);
+
+  const voiceOptions = [
+    ...(!supportsSavedVoices || compatibleVoices.length === 0 ? [{ value: "default", label: "Default voice" }] : []),
+    ...compatibleVoices.map((item) => ({ value: item.id, label: item.name }))
+  ];
+
+  async function submit() {
+    if (!canGenerate || !selectedModel) return;
+    await generate({
+      model: selectedModel.id,
+      voice,
+      input: text,
+      language: language.trim() || undefined,
+      instruction: instruction.trim() || undefined,
+      reference_text: referenceText.trim() || undefined,
+      response_format: "wav"
+    });
   }
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Speak</h1>
-        <p>TTS through the local Live Audio API surface. Real models only run when their planner state is executable.</p>
-      </header>
+    <section className="tk-page tk-speak-page">
+      <ProductPageHeader
+        eyebrow="Text to speech"
+        title="Speak"
+        description="Write your script, choose a local model and voice, then generate a WAV directly into the active workspace."
+      />
 
-      <form
-        className="section"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!canGenerate) return;
-          void generate({ model, voice, input: text });
-        }}
-      >
-        <div className="form-grid">
-          <Tooltip content={`License: ${selectedModel?.license ?? "unknown"}. Backend: ${selectedModel?.backend ?? "mock"}.`}>
+      <div className="tk-speak-studio">
+        <form
+          className="tk-speak-editor"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <div className="tk-speak-editor__header">
             <div>
-              <Select
-                label="Model"
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                hint={`${selectedModel?.family ?? "local"} - ${selectedModel?.lifecycleState ?? "unknown"} - ${selectedModel?.backend ?? "runtime"}`}
-                options={ttsModels.map((item) => ({ value: item.id, label: item.name }))}
-              />
+              <span className="tk-editor-label">Script</span>
+              <small>{text.length.toLocaleString()} / 5,000</small>
             </div>
-          </Tooltip>
+            {selectedModel ? (
+              <span className={selectedModel.executable ? "tk-model-state is-ready" : "tk-model-state"}>
+                <span className="tk-status-dot is-online" />
+                {selectedModel.executable ? "Ready" : "Needs attention"}
+              </span>
+            ) : null}
+          </div>
 
-          <Select
-            label="Voice"
-            value={voice}
-            onChange={(event) => setVoice(event.target.value)}
-            hint={selectedVoice?.label}
-            options={runtime.voices.map((item) => ({ value: item.id, label: item.name }))}
-          />
-        </div>
-
-        <div className="speak-input-grid">
-          <TextArea
-            label="Text input"
+          <textarea
+            className="tk-script-input"
             value={text}
-            onChange={(event) => setText(event.target.value)}
             maxLength={5000}
-            placeholder="Enter text to speak..."
-            error={error ?? undefined}
-            count={`${text.length} / 5000`}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Type or paste the text you want Takokit to speak…"
+            aria-label="Speech text"
           />
 
-          <aside className="generation-actions">
-            <div className="generation-actions__meta">
-              <strong>TTS + Live Audio API</strong>
-              <span>{selectedModel?.executable ? "Selected model can run through the local API." : blocker}</span>
+          {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
+
+          <div className="tk-speak-editor__footer">
+            <span>{selectedModel?.name ?? "No TTS model installed"}</span>
+            <ProductButton tone="primary" type="submit" loading={isGenerating} disabled={!canGenerate}>
+              <Volume2 size={16} strokeWidth={1.9} />
+              {isGenerating ? "Generating" : "Generate speech"}
+            </ProductButton>
+          </div>
+        </form>
+
+        <aside className="tk-speak-controls" aria-label="Speech settings">
+          <div className="tk-control-section">
+            <div className="tk-control-section__heading">
+              <span>Voice setup</span>
+              <small>Local</small>
             </div>
-            <span className="badge-list">
-              <Badge tone={selectedModel?.executable ? "success" : "warning"}>{selectedModel?.executable ? "executable" : "blocked"}</Badge>
-              <Badge tone={selectedModel?.id === "mock-tts" ? "neutral" : "warning"}>{selectedModel?.id === "mock-tts" ? "internal test path" : selectedModel?.runnerRuntimeState ?? "unknown"}</Badge>
-            </span>
-            <Button variant="primary" type="submit" loading={isGenerating} disabled={!canGenerate}>
-              <Waves size={16} /> Generate Speech
-            </Button>
-            <span className="action-cluster">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={apiUnavailable || !selectedModel || selectedModel.status === "installed"}
-                loading={busyAction === "pull-model"}
-                onClick={() => selectedModel && runAction("pull-model", () => pullModel(selectedModel.id).then(() => undefined))}
-              >
-                Pull model
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={apiUnavailable || !requiredRunner || requiredRunner.installed}
-                loading={busyAction === "pull-runner"}
-                onClick={() => requiredRunner && runAction("pull-runner", () => pullRunner(requiredRunner.id).then(() => undefined))}
-              >
-                Pull runner
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={apiUnavailable || !requiredRunner?.installed || requiredRunner.install_state === "ready"}
-                loading={busyAction === "install-runner"}
-                onClick={() => requiredRunner && runAction("install-runner", () => installRunner(requiredRunner.id).then(() => undefined))}
-              >
-                Install runner
-              </Button>
-            </span>
-            <button className="button button--secondary" type="button" onClick={() => setAdvancedOpen((open) => !open)}>
-              <span>Advanced Options</span>
-              <ChevronDown size={16} aria-hidden="true" />
-            </button>
-          </aside>
-        </div>
 
-        <div className={advancedOpen ? "advanced-panel open surface" : "advanced-panel surface"}>
-          <div className="settings-row">
-            <span>Temperature</span>
-            <strong>Default</strong>
-          </div>
-          <div className="settings-row">
-            <span>Output format</span>
-            <strong>WAV</strong>
-          </div>
-        </div>
-      </form>
+            <ProductSelect
+              label="Model"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              options={ttsModels.map((item) => ({ value: item.id, label: item.name }))}
+              hint={selectedModel ? `${selectedModel.runtime} · ${selectedModel.runner}` : "Install a TTS model first."}
+            />
 
-      <Section title="Output">
-        <div className={result ? "audio-output surface revealed" : "audio-output surface"}>
-          {result ? (
-            <div className="detail-grid output-detail">
-              <span><strong>Model</strong>{result.model}</span>
-              <span><strong>Engine</strong>{result.engine}</span>
-              <span><strong>Content type</strong>{result.content_type}</span>
-              <span><strong>Bytes</strong>{result.bytes}</span>
-              <span><strong>Sample rate</strong>{result.sample_rate ? `${result.sample_rate} Hz` : "not reported"}</span>
-              <span><strong>Output path</strong>{result.output_path}</span>
+            <ProductSelect
+              label="Voice"
+              value={voice}
+              onChange={(event) => setVoice(event.target.value)}
+              options={voiceOptions}
+              hint={supportsSavedVoices
+                ? compatibleVoices.length > 0
+                  ? `${compatibleVoices.length} compatible saved ${compatibleVoices.length === 1 ? "voice" : "voices"}`
+                  : "Create a compatible voice profile first."
+                : "This model uses its default local voice."}
+              disabled={voiceOptions.length === 0}
+            />
+          </div>
+
+          {selectedModel ? (
+            <div className="tk-selected-model">
+              <div className="tk-selected-model__title">
+                <span className="tk-selected-model__icon"><Gauge size={16} strokeWidth={1.8} /></span>
+                <div>
+                  <strong>{selectedModel.name}</strong>
+                  <span>{selectedModel.family}</span>
+                </div>
+              </div>
+              <dl>
+                <div><dt>Backend</dt><dd>{selectedModel.backend}</dd></div>
+                <div><dt>Runtime</dt><dd>{selectedModel.runtime}</dd></div>
+                <div><dt>License</dt><dd>{selectedModel.license}</dd></div>
+              </dl>
+              {blocker ? (
+                <div className="tk-model-blocker">
+                  <span>{blocker}</span>
+                  <button type="button" onClick={() => onNavigate("models")}>Manage model →</button>
+                </div>
+              ) : (
+                <div className="tk-model-ready"><Check size={14} strokeWidth={2} /> Executable locally</div>
+              )}
             </div>
           ) : (
-            <div className="empty-state">
-              <strong>No speech output yet</strong>
-              <p>Audio saved locally will appear here after a successful API response.</p>
+            <div className="tk-model-blocker">
+              <span>No installed text-to-speech model is available.</span>
+              <button type="button" onClick={() => onNavigate("models")}>Open model library →</button>
             </div>
           )}
-          <div className="audio-output__footer">
-            <span className={result ? "reveal-note" : ""}>{result ? "Audio saved locally at the path above." : "No output path yet."}</span>
+
+          {supportsGuidance ? (
+            <div className="tk-advanced-wrap">
+              <button className="tk-advanced-toggle" type="button" onClick={() => setAdvancedOpen((value) => !value)}>
+                <span><Sparkles size={14} strokeWidth={1.8} /> Model controls</span>
+                <span>{advancedOpen ? "Hide" : "Show"}</span>
+              </button>
+              {advancedOpen ? (
+                <div className="tk-advanced-fields">
+                  <label className="tk-field">
+                    <span className="tk-field__label">Language</span>
+                    <input className="tk-input" value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="Optional" />
+                  </label>
+                  <label className="tk-field">
+                    <span className="tk-field__label">Instruction</span>
+                    <textarea className="tk-input tk-input--textarea" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Optional delivery or style guidance" />
+                  </label>
+                  <label className="tk-field">
+                    <span className="tk-field__label">Reference text</span>
+                    <textarea className="tk-input tk-input--textarea" value={referenceText} onChange={(event) => setReferenceText(event.target.value)} placeholder="Only when the selected model requires it" />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </aside>
+      </div>
+
+      <section className="tk-speak-result" aria-live="polite">
+        <div className="tk-section-heading">
+          <div>
+            <h2>Output</h2>
+            <p>Your generated WAV is written into the active Takokit session.</p>
           </div>
         </div>
-      </Section>
 
-      <Section title="Installed models">
-        <Table columns={["Model", "Capabilities", "Size", "Backend", "Status"]} ariaLabel="Installed text to speech models">
-          {ttsModels.slice(0, 3).map((item) => (
-            <TableRow key={item.id}>
-              <strong>{item.name}</strong>
-              <span className="badge-list">
-                <Badge tone="neutral">TTS</Badge>
-                {item.capabilities.includes("live_audio") ? <Badge tone="neutral">Live Audio</Badge> : null}
-              </span>
-              <span>{item.size ?? "-"}</span>
-              <Tooltip content={`${item.runtime} runner, ${item.license} license label`}>
-                <span>{item.backend}</span>
-              </Tooltip>
-              <Badge tone={item.executable ? "success" : "warning"}>{item.executable ? "executable" : item.lifecycleState}</Badge>
-            </TableRow>
-          ))}
-        </Table>
-        {notice && <p className="notice-line">{notice}</p>}
-        {blocker && <p className="notice-line">Selected blocker: {blocker} Next: {selectedModel?.nextCommand}</p>}
-        <Button className="align-start" variant="ghost" type="button" onClick={() => onNavigate("models")}>
-          View all models
-        </Button>
-      </Section>
+        {result ? (
+          <div className="tk-result-card">
+            <div className="tk-result-card__icon"><Volume2 size={18} strokeWidth={1.8} /></div>
+            <div className="tk-result-card__body">
+              <div className="tk-result-card__heading">
+                <div>
+                  <strong>Speech ready</strong>
+                  <span>{result.model} · {result.engine}</span>
+                </div>
+                <span className="tk-result-success"><Check size={13} strokeWidth={2.2} /> Saved</span>
+              </div>
+              <div className="tk-result-meta">
+                <span>{formatBytes(result.bytes)}</span>
+                {result.sample_rate ? <span>{result.sample_rate.toLocaleString()} Hz</span> : null}
+                <span>{result.content_type}</span>
+              </div>
+              <div className="tk-output-path">
+                <code title={result.output_path}>{result.output_path}</code>
+                <button type="button" onClick={() => void navigator.clipboard.writeText(result.output_path)} title="Copy output path">
+                  <Copy size={14} strokeWidth={1.8} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="tk-result-empty">
+            <Volume2 size={19} strokeWidth={1.7} />
+            <div>
+              <strong>No speech generated yet</strong>
+              <span>Your latest local result will appear here.</span>
+            </div>
+          </div>
+        )}
+      </section>
     </section>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; index < units.length && value >= 1024; index += 1) {
+    value /= 1024;
+    unit = units[index];
+  }
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
 }
