@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { AudioWaveform, ChevronRight } from "lucide-react";
 import { navSections, type PageId } from "../../app/navigation";
 import type { RuntimeSnapshot } from "../../lib/types";
 
@@ -14,7 +14,9 @@ export function ProductSidebar({ activePage, onNavigate, runtime }: ProductSideb
   return (
     <aside className="tk-sidebar">
       <button className="tk-brand" type="button" onClick={() => onNavigate("home")}>
-        <span className="tk-brand__mark" aria-hidden="true">T</span>
+        <span className="tk-brand__mark" aria-hidden="true">
+          <AudioWaveform size={17} strokeWidth={1.9} />
+        </span>
         <span className="tk-brand__copy">
           <strong>Takokit</strong>
           <small>Local voice runtime</small>
@@ -37,9 +39,9 @@ export function ProductSidebar({ activePage, onNavigate, runtime }: ProductSideb
                     aria-current={active ? "page" : undefined}
                     onClick={() => onNavigate(item.id)}
                   >
-                    <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+                    <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
                     <span>{item.label}</span>
-                    {active ? <ChevronRight className="tk-nav-item__arrow" size={14} aria-hidden="true" /> : null}
+                    {active ? <ChevronRight className="tk-nav-item__arrow" size={13} aria-hidden="true" /> : null}
                   </button>
                 );
               })}
