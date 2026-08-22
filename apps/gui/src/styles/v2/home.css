@@ -1,0 +1,117 @@
+.tk-home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 36px;
+}
+
+.tk-home-hero__status {
+  display: grid;
+  gap: 5px;
+  min-width: 220px;
+  padding: 15px 0 3px 24px;
+  border-left: 1px solid var(--tk-line);
+}
+
+.tk-home-hero__status > span {
+  color: var(--tk-text-secondary);
+  font-size: 11px;
+}
+
+.tk-home-hero__status > strong {
+  color: var(--tk-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tk-home-hero__status > small {
+  overflow: hidden;
+  color: var(--tk-text-tertiary);
+  font-family: var(--tk-font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-home-library {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 14px;
+}
+
+.tk-home-library__primary,
+.tk-home-library__secondary {
+  display: grid;
+  gap: 15px;
+  min-height: 180px;
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-surface);
+  padding: 22px;
+}
+
+.tk-home-library__primary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.tk-home-library__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.tk-home-library__copy strong {
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.tk-home-library__copy p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--tk-text-secondary);
+  font-family: var(--tk-font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.tk-home-library__secondary {
+  align-content: space-between;
+}
+
+.tk-home-library__secondary dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.tk-home-library__secondary dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.tk-home-library__secondary dt {
+  color: var(--tk-text-secondary);
+}
+
+.tk-home-library__secondary dd {
+  margin: 0;
+  color: var(--tk-text);
+  font-weight: 600;
+}
+
+@media (max-width: 840px) {
+  .tk-home-hero,
+  .tk-home-library {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-home-hero__status {
+    min-width: 0;
+    border-left: 0;
+    border-top: 1px solid var(--tk-line);
+    padding: 16px 0 0;
+  }
+}
