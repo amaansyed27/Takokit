@@ -1,0 +1,208 @@
+.tk-runtime-control {
+  position: relative;
+}
+
+.tk-runtime-trigger {
+  display: inline-grid;
+  grid-template-columns: 7px auto 14px;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  border: 1px solid var(--tk-line);
+  border-radius: 9px;
+  background: var(--tk-control);
+  color: var(--tk-text-secondary);
+  padding: 0 9px 0 10px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 560;
+  transition: background var(--tk-transition), border-color var(--tk-transition), color var(--tk-transition);
+}
+
+.tk-runtime-trigger:hover,
+.tk-runtime-trigger[aria-expanded="true"] {
+  border-color: var(--tk-line-strong);
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-runtime-trigger__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tk-text-tertiary);
+}
+
+.tk-runtime-trigger__dot.is-online {
+  background: var(--tk-success);
+  box-shadow: 0 0 0 3px var(--tk-accent-soft);
+}
+
+.tk-runtime-trigger svg {
+  color: var(--tk-text-tertiary);
+  transform: rotate(90deg);
+  transition: transform var(--tk-transition);
+}
+
+.tk-runtime-trigger svg.is-open {
+  transform: rotate(-90deg);
+}
+
+.tk-runtime-popover {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  width: min(370px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--tk-line-strong);
+  border-radius: 14px;
+  background: var(--tk-surface-strong);
+  color: var(--tk-text);
+  box-shadow: var(--tk-shadow-lg);
+  animation: tk-runtime-open 130ms ease-out;
+}
+
+@keyframes tk-runtime-open {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tk-runtime-popover__header {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  padding: 17px;
+}
+
+.tk-runtime-popover__header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.tk-runtime-popover__header strong {
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.tk-runtime-popover__header span:not(.tk-runtime-popover__icon) {
+  color: var(--tk-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.tk-runtime-popover__icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tk-surface-soft);
+  color: var(--tk-text-tertiary);
+}
+
+.tk-runtime-popover__icon.is-online {
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-runtime-popover__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+  background: var(--tk-surface);
+}
+
+.tk-runtime-stat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.tk-runtime-stat + .tk-runtime-stat {
+  border-left: 1px solid var(--tk-line);
+}
+
+.tk-runtime-stat svg,
+.tk-runtime-stat span {
+  color: var(--tk-text-tertiary);
+}
+
+.tk-runtime-stat span {
+  font-size: 9.5px;
+}
+
+.tk-runtime-stat strong {
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 570;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-runtime-popover__meta {
+  display: grid;
+  gap: 9px;
+  padding: 14px 17px;
+}
+
+.tk-runtime-popover__meta > div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.tk-runtime-popover__meta span {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-runtime-popover__meta code {
+  overflow: hidden;
+  color: var(--tk-text-secondary);
+  font-family: var(--tk-font-mono);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-runtime-popover__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border-top: 1px solid var(--tk-line);
+  background: var(--tk-line);
+}
+
+.tk-runtime-popover__actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  border: 0;
+  background: var(--tk-surface);
+  color: var(--tk-text-secondary);
+  font: inherit;
+  font-size: 10.5px;
+}
+
+.tk-runtime-popover__actions button:hover {
+  background: var(--tk-surface-hover);
+  color: var(--tk-text);
+}
+
+@media (max-width: 640px) {
+  .tk-runtime-trigger span:not(.tk-runtime-trigger__dot) {
+    display: none;
+  }
+
+  .tk-runtime-trigger {
+    grid-template-columns: 7px 14px;
+  }
+}
