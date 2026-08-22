@@ -4,6 +4,7 @@ import { Sidebar } from "../components/layout/Sidebar";
 import { Button } from "../components/ui/Button";
 import type { RuntimeSnapshot } from "../lib/types";
 import type { PageId } from "./navigation";
+import "./AppShell.css";
 
 type AppShellProps = {
   activePage: PageId;
@@ -19,7 +20,7 @@ export function AppShell({ activePage, onNavigate, onChangeWorkspace, runtime, c
       <Sidebar activePage={activePage} onNavigate={onNavigate} runtime={runtime} />
       <div className="app-shell__content">
         <div className="workspace-bar">
-          <div>
+          <div className="workspace-bar__path">
             <span>Active workspace</span>
             <strong title={runtime.workspacePath}>{runtime.workspacePath}</strong>
           </div>
