@@ -34,5 +34,5 @@ function workspaceDisplayName(path: string): string {
   if (!path || path === "Not selected") return "Choose workspace";
   const normalized = path.replace(/[\\/]+$/, "");
   const parts = normalized.split(/[\\/]/).filter(Boolean);
-  return parts.at(-1) ?? path;
+  return parts.length > 0 ? parts[parts.length - 1] : path;
 }
