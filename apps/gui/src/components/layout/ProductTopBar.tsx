@@ -1,14 +1,16 @@
-import { FolderOpen, Moon, Server, Sun } from "lucide-react";
+import { FolderOpen, Moon, Sun } from "lucide-react";
+import type { PageId } from "../../app/navigation";
 import { useTheme } from "../../hooks/useTheme";
 import type { RuntimeSnapshot } from "../../lib/types";
+import { RuntimeControl } from "../runtime/RuntimeControl";
 
 type ProductTopBarProps = {
   runtime: RuntimeSnapshot;
   onChangeWorkspace: () => void;
+  onNavigate: (page: PageId) => void;
 };
 
-export function ProductTopBar({ runtime, onChangeWorkspace }: ProductTopBarProps) {
-  const online = runtime.server.status === "online";
+export function ProductTopBar({ runtime, onChangeWorkspace, onNavigate }: ProductTopBarProps) {
   const workspaceName = workspaceDisplayName(runtime.workspacePath);
   const { theme, toggleTheme } = useTheme();
 
@@ -32,10 +34,7 @@ export function ProductTopBar({ runtime, onChangeWorkspace }: ProductTopBarProps
         >
           {theme === "dark" ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
         </button>
-        <span className={online ? "tk-runtime-pill is-online" : "tk-runtime-pill"}>
-          <Server size={14} strokeWidth={1.8} aria-hidden="true" />
-          {online ? "Local runtime" : "Offline"}
-        </span>
+        <RuntimeControl runtime={runtime} onNavigate={onNavigate} />
       </div>
     </header>
   );
