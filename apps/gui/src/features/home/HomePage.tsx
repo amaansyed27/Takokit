@@ -1,94 +1,113 @@
-import { AudioWaveform, Box, FileAudio, Mic, Server, Volume2 } from "lucide-react";
+import {
+  AudioWaveform,
+  Box,
+  FileAudio,
+  Settings2,
+  UserRoundPlus,
+  Volume2
+} from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Section } from "../../components/ui/Section";
-import { StatTile } from "../../components/ui/StatTile";
-import { Tooltip } from "../../components/ui/Tooltip";
-import { useServerStatus } from "../../hooks/useServerStatus";
+import { ProductActionCard } from "../../components/ui/ProductActionCard";
+import { ProductMetric } from "../../components/ui/ProductMetric";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 
 export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
-  const ready = runtime.models.filter((model) => model.executable).length;
-  const status = useServerStatus(runtime);
+  const readyModels = runtime.models.filter((model) => model.executable).length;
+  const readyRunners = runtime.runners.filter((runner) => runner.install_state === "ready").length;
+  const serverOnline = runtime.server.status === "online";
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Local voice runtime</h1>
-        <p>Use installed models, manage local voices, and run speech, transcription, or conversion tasks.</p>
-      </header>
-
-      <div className="stats-grid" aria-label="Runtime summary">
-        <StatTile label="Installed models" value={runtime.models.length} detail="Verified locally" />
-        <StatTile label="Ready" value={ready} detail="Executable now" />
-        <StatTile label="Voices" value={runtime.voices.length} detail="Profiles available" />
-        <Tooltip content={`Local server at ${status.url}`}>
-          <div>
-            <StatTile label="Server" value={status.label} detail={status.uptime} />
-          </div>
-        </Tooltip>
+    <section className="tk-page">
+      <div className="tk-home-hero">
+        <ProductPageHeader
+          eyebrow="Local-first audio AI"
+          title="Create with your local voice models."
+          description="Generate speech, transcribe audio, clone voices, and convert recordings without leaving your machine."
+        />
+        <div className="tk-home-hero__status">
+          <span>Runtime</span>
+          <strong>{serverOnline ? "Ready on this device" : "Unavailable"}</strong>
+          <small>{runtime.server.url}</small>
+        </div>
       </div>
 
-      <Section title="Quick actions" description="Start from the common paths.">
-        <div className="quick-actions">
-          <button className="quick-action" type="button" onClick={() => onNavigate("speak")}>
-            <Volume2 size={18} />
-            <strong>Generate speech</strong>
-            <span>Installed TTS models</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("transcribe")}>
-            <FileAudio size={18} />
-            <strong>Transcribe audio</strong>
-            <span>Installed STT models</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("convert")}>
-            <AudioWaveform size={18} />
-            <strong>Convert voice</strong>
-            <span>Execution and quality gates</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
-            <Mic size={18} />
-            <strong>Add voice</strong>
-            <span>Consent required</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("models")}>
-            <Box size={18} />
-            <strong>Manage models</strong>
-            <span>Installed only</span>
-          </button>
-        </div>
-      </Section>
+      <div className="tk-metrics" aria-label="Runtime summary">
+        <ProductMetric label="Models" value={runtime.models.length} detail={`${readyModels} ready to run`} />
+        <ProductMetric label="Voices" value={runtime.voices.length} detail="Saved profiles" />
+        <ProductMetric label="Runners" value={readyRunners} detail={`${runtime.runners.length} available`} />
+        <ProductMetric label="Mode" value="Local" detail={serverOnline ? "Daemon connected" : "Daemon offline"} />
+      </div>
 
-      <Section title="Available tasks" description="Capabilities exposed by the local runtime.">
-        <div className="capability-strip">
-          {runtime.capabilities.map((capability) => (
-            <div className="capability-chip" key={capability.id}>
-              <strong>{capability.label}</strong>
-              <span>{capability.description}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Runtime boundary">
-        <div className="runtime-boundary">
-          <div className="boundary-grid" aria-hidden="true">
-            <span>cli</span>
-            <span>server</span>
-            <span>gui</span>
-            <span>adapters</span>
-            <span>runners</span>
+      <section className="tk-section">
+        <div className="tk-section-heading">
+          <div>
+            <h2>Create</h2>
+            <p>Choose what you want to make. Takokit will only show settings the selected model actually supports.</p>
           </div>
-          <p>Rust CLI, daemon, browser GUI, storage, safety, and runners stay separated.</p>
-          <Badge tone="success"><Server size={12} /> Local-first</Badge>
         </div>
-      </Section>
+        <div className="tk-action-grid">
+          <ProductActionCard
+            icon={Volume2}
+            title="Speak"
+            description="Turn text into speech using a local TTS model or one of your saved voices."
+            meta={`${runtime.models.filter((model) => model.capabilities.includes("tts")).length} installed TTS models`}
+            onClick={() => onNavigate("speak")}
+          />
+          <ProductActionCard
+            icon={FileAudio}
+            title="Transcribe"
+            description="Turn an audio file into text with an installed speech-to-text model."
+            meta={`${runtime.models.filter((model) => model.capabilities.includes("stt")).length} installed STT models`}
+            onClick={() => onNavigate("transcribe")}
+          />
+          <ProductActionCard
+            icon={UserRoundPlus}
+            title="Create a voice"
+            description="Create a reusable consent-backed voice profile from reference audio."
+            meta={`${runtime.voices.length} saved voices`}
+            onClick={() => onNavigate("voices")}
+          />
+          <ProductActionCard
+            icon={AudioWaveform}
+            title="Convert voice"
+            description="Keep the spoken words while changing the voice toward a reference or RVC target."
+            meta={`${runtime.models.filter((model) => model.capabilities.includes("voice_conversion")).length} conversion models`}
+            onClick={() => onNavigate("convert")}
+          />
+        </div>
+      </section>
 
-      <Section title="Recent outputs">
-        <div className="empty-state">
-          <strong>No generated audio yet</strong>
-          <p>{runtime.modeNote}</p>
+      <section className="tk-section">
+        <div className="tk-section-heading">
+          <div>
+            <h2>Your local library</h2>
+            <p>Models, runners, and voice profiles stay under Takokit-managed local storage.</p>
+          </div>
         </div>
-      </Section>
+        <div className="tk-home-library">
+          <div className="tk-home-library__primary">
+            <div className="tk-home-library__copy">
+              <Box size={22} strokeWidth={1.7} aria-hidden="true" />
+              <strong>Models & runtimes</strong>
+              <p>Browse the model library, pull new models, repair broken installs, remove models safely, and inspect the runner each model uses.</p>
+            </div>
+            <button className="tk-text-button" type="button" onClick={() => onNavigate("models")}>Manage models →</button>
+          </div>
+          <div className="tk-home-library__secondary">
+            <div className="tk-home-library__copy">
+              <Settings2 size={20} strokeWidth={1.7} aria-hidden="true" />
+              <strong>Runtime health</strong>
+            </div>
+            <dl>
+              <div><dt>Installed</dt><dd>{runtime.models.length}</dd></div>
+              <div><dt>Ready</dt><dd>{readyModels}</dd></div>
+              <div><dt>Runner runtimes</dt><dd>{readyRunners}</dd></div>
+              <div><dt>Server</dt><dd>{serverOnline ? "Online" : "Offline"}</dd></div>
+            </dl>
+            <button className="tk-text-button" type="button" onClick={() => onNavigate("diagnostics")}>Open diagnostics →</button>
+          </div>
+        </div>
+      </section>
     </section>
   );
 }
