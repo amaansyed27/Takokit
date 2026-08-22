@@ -1,4 +1,7 @@
 @import "./tokens.css";
 @import "./shell.css";
 @import "./components.css";
+@import "./controls.css";
+@import "./runtime.css";
 @import "./home.css";
+@import "./speak.css";
