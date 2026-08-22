@@ -18,7 +18,7 @@ export function AppShell({ activePage, onNavigate, onChangeWorkspace, runtime, c
     <div className="tk-shell">
       <ProductSidebar activePage={activePage} onNavigate={onNavigate} runtime={runtime} />
       <div className="tk-shell__workspace">
-        <ProductTopBar runtime={runtime} onChangeWorkspace={onChangeWorkspace} />
+        <ProductTopBar runtime={runtime} onChangeWorkspace={onChangeWorkspace} onNavigate={onNavigate} />
         <MainContent pageId={activePage}>{children}</MainContent>
       </div>
     </div>
