@@ -18,10 +18,16 @@
   --tk-accent-strong: #b5c7b7;
   --tk-accent-soft: rgba(156, 177, 159, 0.12);
   --tk-danger: #e1867c;
+  --tk-danger-soft: rgba(225, 134, 124, 0.1);
   --tk-warning: #d6a765;
+  --tk-warning-soft: rgba(214, 167, 101, 0.1);
   --tk-success: #8eb395;
+  --tk-primary-button: #ececec;
+  --tk-primary-button-hover: #ffffff;
+  --tk-primary-button-text: #181818;
   --tk-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.16), 0 10px 30px rgba(0, 0, 0, 0.1);
   --tk-shadow-hover: 0 14px 40px rgba(0, 0, 0, 0.18);
+  --tk-shadow-lg: 0 22px 70px rgba(0, 0, 0, 0.34), 0 4px 14px rgba(0, 0, 0, 0.18);
   --tk-radius-sm: 10px;
   --tk-radius-md: 14px;
   --tk-radius-lg: 18px;
@@ -52,8 +58,14 @@
   --tk-accent-strong: #415a46;
   --tk-accent-soft: rgba(89, 115, 94, 0.1);
   --tk-danger: #a84f46;
+  --tk-danger-soft: rgba(168, 79, 70, 0.08);
   --tk-warning: #9a6b2e;
+  --tk-warning-soft: rgba(154, 107, 46, 0.08);
   --tk-success: #4f7058;
+  --tk-primary-button: #1f1f1e;
+  --tk-primary-button-hover: #10100f;
+  --tk-primary-button-text: #f7f6f2;
   --tk-shadow-sm: 0 1px 2px rgba(19, 18, 16, 0.035), 0 10px 28px rgba(19, 18, 16, 0.035);
   --tk-shadow-hover: 0 14px 34px rgba(19, 18, 16, 0.075);
+  --tk-shadow-lg: 0 22px 60px rgba(19, 18, 16, 0.16), 0 3px 10px rgba(19, 18, 16, 0.08);
 }
