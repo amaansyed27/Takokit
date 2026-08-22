@@ -1,4 +1,5 @@
-import { FolderOpen, Server } from "lucide-react";
+import { FolderOpen, Moon, Server, Sun } from "lucide-react";
+import { useTheme } from "../../hooks/useTheme";
 import type { RuntimeSnapshot } from "../../lib/types";
 
 type ProductTopBarProps = {
@@ -9,6 +10,7 @@ type ProductTopBarProps = {
 export function ProductTopBar({ runtime, onChangeWorkspace }: ProductTopBarProps) {
   const online = runtime.server.status === "online";
   const workspaceName = workspaceDisplayName(runtime.workspacePath);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="tk-topbar">
@@ -21,6 +23,15 @@ export function ProductTopBar({ runtime, onChangeWorkspace }: ProductTopBarProps
       </button>
 
       <div className="tk-topbar__meta">
+        <button
+          className="tk-icon-button"
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+        >
+          {theme === "dark" ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
+        </button>
         <span className={online ? "tk-runtime-pill is-online" : "tk-runtime-pill"}>
           <Server size={14} strokeWidth={1.8} aria-hidden="true" />
           {online ? "Local runtime" : "Offline"}
