@@ -146,7 +146,7 @@
 
 .tk-input--textarea {
   min-height: 74px;
-  resize: vertical;
+  resize: none;
   padding: 10px 11px;
   line-height: 1.45;
 }
