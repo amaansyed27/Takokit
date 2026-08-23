@@ -22,20 +22,11 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
 
   return (
     <section className="tk-page tk-home-page">
-      <div className="tk-home-hero">
-        <ProductPageHeader
-          eyebrow="Local workspace"
-          title="What do you want to create?"
-          description="Run speech, transcription, cloning, and conversion locally. Takokit only shows controls supported by the model you choose."
-        />
-        <div className="tk-home-hero__status" aria-label="Runtime status">
-          <span className={serverOnline ? "tk-status-dot is-online" : "tk-status-dot"} aria-hidden="true" />
-          <div>
-            <strong>{serverOnline ? "Runtime ready" : "Runtime offline"}</strong>
-            <small>{readyModels} models ready on this device</small>
-          </div>
-        </div>
-      </div>
+      <ProductPageHeader
+        eyebrow="Local workspace"
+        title="What do you want to create?"
+        description="Run speech, transcription, cloning, and conversion locally. Takokit only shows controls supported by the model you choose."
+      />
 
       <section className="tk-section">
         <div className="tk-action-grid tk-home-actions">
