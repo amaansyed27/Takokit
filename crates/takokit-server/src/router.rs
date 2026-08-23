@@ -17,6 +17,8 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/daemon/shutdown", post(handlers::daemon_shutdown))
         .route("/v1/ps", get(handlers::ps))
         .route("/v1/doctor", get(handlers::doctor))
+        .route("/v1/system/picker/audio", get(handlers::pick_audio_file))
+        .route("/v1/system/picker/folder", get(handlers::pick_folder))
         .route("/v1/test/launch", get(handlers::launch_test))
         .route("/v1/capabilities", get(handlers::capabilities))
         .route("/v1/models", get(handlers::models))
