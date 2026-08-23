@@ -5,16 +5,22 @@ import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
 import { useSpeechGeneration } from "../../hooks/useSpeechGeneration";
+import { consumeSpeakIntent } from "../../lib/workflowIntent";
 
 export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   const ttsModels = useMemo(
     () => runtime.models.filter((model) => model.capabilities.includes("tts")),
     [runtime.models]
   );
-  const initialModel = ttsModels.find((item) => item.id === "kokoro" && item.executable) ?? ttsModels.find((item) => item.executable) ?? ttsModels[0];
+  const speakIntent = useMemo(() => consumeSpeakIntent(), []);
+  const initialModel = ttsModels.find((item) =>
+    speakIntent?.modelId && (item.id === speakIntent.modelId || item.family === speakIntent.modelId) && item.executable
+  ) ?? ttsModels.find((item) => item.id === "kokoro" && item.executable)
+    ?? ttsModels.find((item) => item.executable)
+    ?? ttsModels[0];
   const [text, setText] = useState("");
   const [model, setModel] = useState(initialModel?.id ?? "");
-  const [voice, setVoice] = useState("default");
+  const [voice, setVoice] = useState(speakIntent?.voiceId ?? "default");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [language, setLanguage] = useState("");
   const [instruction, setInstruction] = useState("");
