@@ -79,36 +79,30 @@ pub async fn storage_overview(
     let workspace = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
     let storage_root = state.store.root().to_path_buf();
     let workspace_root = workspace.workspace_root().to_path_buf();
-
-    let models = state.store.models_dir();
-    let runners = state.store.runners_dir();
-    let voices = state.store.voices_dir();
-    let blobs = state.store.blobs_dir();
-    let cache = state.store.cache_dir();
-    let logs = state.store.logs_dir();
-    let manifests = state.store.manifests_dir();
-    let workspace_tako = workspace_root.join(".tako");
+    let workspace_bytes = directory_size(&workspace_root.join(".tako"));
 
     let paths = vec![
-        ("models", "Models", models),
-        ("runners", "Runners", runners),
-        ("voices", "Voices", voices),
-        ("blobs", "Shared blobs", blobs),
-        ("cache", "Cache", cache),
-        ("logs", "Logs", logs),
-        ("manifests", "Manifests", manifests),
-        ("workspace", "Workspace data", workspace_tako),
+        ("models", "Models", state.store.models_dir()),
+        ("runners", "Runners", state.store.runners_dir()),
+        ("voices", "Voices", state.store.voices_dir()),
+        ("blobs", "Shared blobs", state.store.blobs_dir()),
+        ("cache", "Cache", state.store.cache_dir()),
+        ("logs", "Logs", state.store.logs_dir()),
+        ("manifests", "Manifests", state.store.manifests_dir()),
+        ("workspace", "Workspace data", workspace_root.join(".tako")),
     ];
 
     let entries = paths
         .into_iter()
         .map(|(id, label, path)| {
+            let bytes = directory_size(&path);
+            let exists = path.exists();
             serde_json::json!({
                 "id": id,
                 "label": label,
                 "path": path,
-                "bytes": directory_size(&path),
-                "exists": path.exists(),
+                "bytes": bytes,
+                "exists": exists,
             })
         })
         .collect::<Vec<_>>();
@@ -118,7 +112,7 @@ pub async fn storage_overview(
             "storage_root": storage_root,
             "workspace_root": workspace_root,
             "total_bytes": directory_size(state.store.root()),
-            "workspace_bytes": directory_size(&workspace_root.join(".tako")),
+            "workspace_bytes": workspace_bytes,
             "entries": entries,
         }),
     }))
@@ -371,7 +365,7 @@ fn runner_doctor_check(
         _ => ("warn", format!("{runner_id} state: {state}")),
     };
     serde_json::json!({
-        "section": section,
+        "section": "runner",
         "label": label,
         "status": status,
         "detail": detail,
