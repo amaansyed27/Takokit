@@ -24,6 +24,14 @@ export async function createVoiceProfile(
   return body.data;
 }
 
+export async function removeVoiceProfile(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/v1/voices/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: workspaceHeaders()
+  });
+  if (!response.ok) throw new Error(await responseError(response));
+}
+
 async function responseError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: { code?: string; message?: string } };
