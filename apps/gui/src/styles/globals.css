@@ -1,11 +1,1 @@
-@import "./tokens.css";
-@import "./motion.css";
-@import "./base.css";
-@import "./shell.css";
-@import "./components.css";
-@import "./data-panels.css";
-@import "./voice-settings.css";
-@import "./voice-profiles.css";
-@import "./history.css";
-@import "./responsive.css";
 @import "./v2/index.css";
