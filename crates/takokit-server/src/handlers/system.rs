@@ -1,4 +1,7 @@
 use super::*;
+use axum::http::HeaderMap;
+use serde::Deserialize;
+use std::path::Path;
 
 pub async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
@@ -41,9 +44,7 @@ pub async fn ps(State(state): State<AppState>) -> Json<RunnersResponse<ProcessIn
     })
 }
 
-pub async fn pick_audio_file(
-    headers: axum::http::HeaderMap,
-) -> Result<Json<serde_json::Value>, ApiError> {
+pub async fn pick_audio_file(headers: HeaderMap) -> Result<Json<serde_json::Value>, ApiError> {
     let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
     let initial_dir = store.workspace_root().to_path_buf();
     let selected = tokio::task::spawn_blocking(move || {
@@ -58,21 +59,101 @@ pub async fn pick_audio_file(
     })))
 }
 
-pub async fn pick_folder(
-    headers: axum::http::HeaderMap,
-) -> Result<Json<serde_json::Value>, ApiError> {
+pub async fn pick_folder(headers: HeaderMap) -> Result<Json<serde_json::Value>, ApiError> {
     let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
     let initial_dir = store.workspace_root().to_path_buf();
-    let selected = tokio::task::spawn_blocking(move || {
-        crate::native_picker::pick_folder(&initial_dir)
-    })
-    .await
-    .map_err(|error| ApiError(TakokitError::Execution(format!("folder picker task failed: {error}"))))?
-    .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+    let selected = tokio::task::spawn_blocking(move || crate::native_picker::pick_folder(&initial_dir))
+        .await
+        .map_err(|error| ApiError(TakokitError::Execution(format!("folder picker task failed: {error}"))))?
+        .map_err(|error| ApiError(TakokitError::Execution(error)))?;
 
     Ok(Json(serde_json::json!({
         "path": selected.map(|path| path.display().to_string())
     })))
+}
+
+pub async fn storage_overview(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<RunnerDetailResponse<serde_json::Value>>, ApiError> {
+    let workspace = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
+    let storage_root = state.store.root().to_path_buf();
+    let workspace_root = workspace.workspace_root().to_path_buf();
+
+    let models = state.store.models_dir();
+    let runners = state.store.runners_dir();
+    let voices = state.store.voices_dir();
+    let blobs = state.store.blobs_dir();
+    let cache = state.store.cache_dir();
+    let logs = state.store.logs_dir();
+    let manifests = state.store.manifests_dir();
+    let workspace_tako = workspace_root.join(".tako");
+
+    let paths = vec![
+        ("models", "Models", models),
+        ("runners", "Runners", runners),
+        ("voices", "Voices", voices),
+        ("blobs", "Shared blobs", blobs),
+        ("cache", "Cache", cache),
+        ("logs", "Logs", logs),
+        ("manifests", "Manifests", manifests),
+        ("workspace", "Workspace data", workspace_tako),
+    ];
+
+    let entries = paths
+        .into_iter()
+        .map(|(id, label, path)| {
+            serde_json::json!({
+                "id": id,
+                "label": label,
+                "path": path,
+                "bytes": directory_size(&path),
+                "exists": path.exists(),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(Json(RunnerDetailResponse {
+        data: serde_json::json!({
+            "storage_root": storage_root,
+            "workspace_root": workspace_root,
+            "total_bytes": directory_size(state.store.root()),
+            "workspace_bytes": directory_size(&workspace_root.join(".tako")),
+            "entries": entries,
+        }),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OpenLocationRequest {
+    pub target: String,
+}
+
+pub async fn open_location(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<OpenLocationRequest>,
+) -> Result<StatusCode, ApiError> {
+    let workspace = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
+    let path = match request.target.as_str() {
+        "storage" => state.store.root().to_path_buf(),
+        "workspace" => workspace.workspace_root().to_path_buf(),
+        "logs" => state.store.logs_dir(),
+        "voices" => state.store.voices_dir(),
+        _ => {
+            return Err(ApiError(TakokitError::InvalidRequest(
+                "unsupported storage location".to_string(),
+            )))
+        }
+    };
+
+    let path_for_task = path.clone();
+    tokio::task::spawn_blocking(move || open_path(&path_for_task))
+        .await
+        .map_err(|error| ApiError(TakokitError::Execution(format!("open location task failed: {error}"))))?
+        .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn doctor(
@@ -225,6 +306,46 @@ pub async fn capabilities() -> Json<CapabilitiesResponse> {
     })
 }
 
+fn directory_size(path: &Path) -> u64 {
+    if path.is_file() {
+        return std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+    }
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| directory_size(&entry.path()))
+        .sum()
+}
+
+#[cfg(windows)]
+fn open_path(path: &Path) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open {}: {error}", path.display()))
+}
+
+#[cfg(target_os = "macos")]
+fn open_path(path: &Path) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open {}: {error}", path.display()))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn open_path(path: &Path) -> Result<(), String> {
+    std::process::Command::new("xdg-open")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open {}: {error}", path.display()))
+}
+
 fn doctor_check(
     section: &'static str,
     label: &'static str,
@@ -250,7 +371,7 @@ fn runner_doctor_check(
         _ => ("warn", format!("{runner_id} state: {state}")),
     };
     serde_json::json!({
-        "section": "runner",
+        "section": section,
         "label": label,
         "status": status,
         "detail": detail,
