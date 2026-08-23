@@ -1,0 +1,42 @@
+.tk-runners-page { display: grid; gap: 24px; }
+.tk-runners-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
+.tk-runner-list, .tk-runner-inspector { overflow: hidden; border: 1px solid var(--tk-line); border-radius: 14px; background: var(--tk-surface); }
+.tk-runner-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.tk-runner-row + .tk-runner-row { border-top: 1px solid var(--tk-line); }
+.tk-runner-row.is-active { background: var(--tk-surface-soft); }
+.tk-runner-row__main { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 15px; gap: 12px; align-items: center; border: 0; background: transparent; color: var(--tk-text); padding: 15px 16px; text-align: left; font: inherit; }
+.tk-runner-row__main:hover { background: var(--tk-surface-hover); }
+.tk-runner-row__icon, .tk-runner-inspector__icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--tk-surface-strong); color: var(--tk-text-secondary); }
+.tk-runner-row__copy { display: grid; gap: 3px; min-width: 0; }
+.tk-runner-row__copy strong { font-size: 12px; font-weight: 610; }
+.tk-runner-row__copy small { color: var(--tk-text-tertiary); font: 9px var(--tk-font-mono); }
+.tk-runner-row__copy > span { overflow: hidden; color: var(--tk-text-secondary); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.tk-runner-row__actions { display: flex; align-items: center; gap: 5px; padding: 10px 12px 10px 0; }
+.tk-runner-row__actions .tk-button { min-height: 32px; padding-inline: 10px; font-size: 10px; }
+.tk-runner-inspector { position: sticky; top: 0; }
+.tk-runner-inspector__header { display: grid; grid-template-columns: 38px minmax(0, 1fr) 32px; gap: 10px; align-items: center; padding: 17px; border-bottom: 1px solid var(--tk-line); }
+.tk-runner-inspector__header > div { display: grid; gap: 2px; min-width: 0; }
+.tk-runner-inspector__header strong { font-size: 12px; }
+.tk-runner-inspector__header span { color: var(--tk-text-tertiary); font: 9px var(--tk-font-mono); }
+.tk-runner-health { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--tk-line); }
+.tk-runner-health > div { display: grid; gap: 4px; padding: 12px; }
+.tk-runner-health > div + div { border-left: 1px solid var(--tk-line); }
+.tk-runner-health span { color: var(--tk-text-tertiary); font-size: 8.5px; }
+.tk-runner-health strong { overflow: hidden; font-size: 9px; font-weight: 570; text-overflow: ellipsis; white-space: nowrap; }
+.tk-runner-models { display: grid; gap: 6px; margin: 14px 17px; padding: 12px; border-radius: 10px; background: var(--tk-surface-soft); }
+.tk-runner-models span { color: var(--tk-text-tertiary); font-size: 8.5px; text-transform: uppercase; letter-spacing: .07em; }
+.tk-runner-models strong { font-size: 9.5px; font-weight: 550; }
+.tk-adapter-list { display: grid; border-top: 1px solid var(--tk-line); }
+.tk-adapter-list__heading { display: grid; gap: 3px; padding: 14px 17px 10px; }
+.tk-adapter-list__heading strong { font-size: 10.5px; }
+.tk-adapter-list__heading span { color: var(--tk-text-tertiary); font-size: 9px; }
+.tk-adapter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 17px; border-top: 1px solid var(--tk-line); }
+.tk-adapter-row > div { display: grid; gap: 2px; }
+.tk-adapter-row strong { font-size: 9.5px; font-weight: 550; }
+.tk-adapter-row span { color: var(--tk-text-tertiary); font-size: 8.5px; }
+.tk-adapter-row .tk-button { min-height: 28px; padding: 0 9px; font-size: 9px; }
+.tk-adapter-status { border-radius: 999px; background: var(--tk-surface-strong); padding: 4px 7px; color: var(--tk-text-tertiary) !important; }
+.tk-adapter-status.is-ready { background: var(--tk-accent-soft); color: var(--tk-success) !important; }
+.is-spinning { animation: tk-spin 750ms linear infinite; }
+@media (max-width: 1000px) { .tk-runners-layout { grid-template-columns: 1fr; } .tk-runner-inspector { position: static; } }
+@media (max-width: 720px) { .tk-runner-row { grid-template-columns: 1fr; } .tk-runner-row__actions { padding: 0 14px 12px 64px; } .tk-runner-row__main { grid-template-columns: 38px minmax(0,1fr) auto; } .tk-runner-row__main > svg:last-child { display:none; } }
