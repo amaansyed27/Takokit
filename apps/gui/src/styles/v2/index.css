@@ -3,8 +3,16 @@
 @import "./components.css";
 @import "./controls.css";
 @import "./runtime.css";
+@import "./workspace.css";
 @import "./home.css";
 @import "./speak.css";
 @import "./transcribe.css";
 @import "./voices.css";
 @import "./convert.css";
+@import "./models.css";
+@import "./runners.css";
+@import "./history-v2.css";
+@import "./storage.css";
+@import "./diagnostics.css";
+@import "./settings.css";
+@import "./finish.css";
