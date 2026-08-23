@@ -1,0 +1,524 @@
+.tk-voices-page {
+  gap: 28px;
+}
+
+.tk-voice-create-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  align-items: start;
+  gap: 14px;
+}
+
+.tk-voice-create,
+.tk-voice-model-panel {
+  overflow: hidden;
+  border: 1px solid var(--tk-line);
+  border-radius: 14px;
+  background: var(--tk-surface);
+}
+
+.tk-voice-create__header,
+.tk-voice-create__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.tk-voice-create__header {
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.tk-voice-create__header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tk-voice-create__header span {
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 610;
+}
+
+.tk-voice-create__header small,
+.tk-voice-create__footer > span {
+  color: var(--tk-text-tertiary);
+  font-size: 10px;
+}
+
+.tk-voice-create__header > svg {
+  color: var(--tk-text-tertiary);
+}
+
+.tk-voice-create__body {
+  display: grid;
+  gap: 17px;
+  padding: 18px;
+}
+
+.tk-voice-create__footer {
+  border-top: 1px solid var(--tk-line);
+  background: var(--tk-surface-soft);
+}
+
+.tk-reference-audio {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 96px;
+  border: 1px dashed var(--tk-line-strong);
+  border-radius: 12px;
+  background: var(--tk-surface-soft);
+  padding: 15px;
+  transition: border-color var(--tk-transition), background var(--tk-transition);
+}
+
+.tk-reference-audio.is-selected {
+  border-style: solid;
+  border-color: rgba(142, 179, 149, 0.24);
+  background: var(--tk-accent-soft);
+}
+
+.tk-reference-audio__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--tk-control);
+  color: var(--tk-text-secondary);
+}
+
+.tk-reference-audio.is-selected .tk-reference-audio__icon {
+  color: var(--tk-success);
+}
+
+.tk-reference-audio__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tk-reference-audio__copy strong {
+  overflow: hidden;
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 610;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-reference-audio__copy span {
+  color: var(--tk-text-secondary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.tk-reference-audio__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tk-subtle-icon-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-subtle-icon-button:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-voice-path-field {
+  display: grid;
+  gap: 7px;
+}
+
+.tk-voice-path-field > span {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-voice-path-field input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--tk-control);
+  color: var(--tk-text);
+  padding: 0 11px;
+  font-family: var(--tk-font-mono);
+  font-size: 10px;
+}
+
+.tk-voice-path-field input:focus {
+  border-color: var(--tk-line-strong);
+  box-shadow: 0 0 0 3px var(--tk-accent-soft);
+}
+
+.tk-consent-card {
+  display: grid;
+  grid-template-columns: auto 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+  background: var(--tk-surface-soft);
+  padding: 13px;
+  cursor: pointer;
+  transition: border-color var(--tk-transition), background var(--tk-transition);
+}
+
+.tk-consent-card.is-checked {
+  border-color: rgba(142, 179, 149, 0.24);
+  background: var(--tk-accent-soft);
+}
+
+.tk-consent-card > input {
+  width: 15px;
+  height: 15px;
+  margin: 8px 0 0;
+  accent-color: var(--tk-success);
+}
+
+.tk-consent-card__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tk-control);
+  color: var(--tk-text-tertiary);
+}
+
+.tk-consent-card.is-checked .tk-consent-card__icon {
+  color: var(--tk-success);
+}
+
+.tk-consent-card__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.tk-consent-card__copy strong {
+  color: var(--tk-text);
+  font-size: 11px;
+  font-weight: 590;
+  line-height: 1.4;
+}
+
+.tk-consent-card__copy small {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.tk-field__label em {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 450;
+}
+
+.tk-voice-model-panel {
+  display: grid;
+  align-content: start;
+}
+
+.tk-created-voice {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid rgba(142, 179, 149, 0.22);
+  border-radius: 14px;
+  background: var(--tk-accent-soft);
+  padding: 14px 16px;
+}
+
+.tk-created-voice__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tk-surface);
+  color: var(--tk-success);
+}
+
+.tk-created-voice > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tk-created-voice strong {
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 610;
+}
+
+.tk-created-voice span {
+  color: var(--tk-text-secondary);
+  font-size: 10.5px;
+}
+
+.tk-created-voice code {
+  color: var(--tk-text);
+  font-family: var(--tk-font-mono);
+  font-size: 10px;
+}
+
+.tk-created-voice__actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tk-created-voice__actions > button:not(.tk-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--tk-text-secondary);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 10.5px;
+}
+
+.tk-created-voice__actions > button:not(.tk-button):hover {
+  color: var(--tk-text);
+}
+
+.tk-voice-library {
+  display: grid;
+  gap: 14px;
+}
+
+.tk-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tk-voice-card {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--tk-line);
+  border-radius: 14px;
+  background: var(--tk-surface);
+}
+
+.tk-voice-card__main {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 15px;
+}
+
+.tk-voice-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tk-control);
+  color: var(--tk-text-tertiary);
+}
+
+.tk-voice-avatar.is-local {
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-voice-card__main > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tk-voice-card__main strong {
+  overflow: hidden;
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 610;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-voice-card__main div > span {
+  overflow: hidden;
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-voice-kind {
+  border-radius: 999px;
+  background: var(--tk-control);
+  color: var(--tk-text-tertiary);
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 560;
+}
+
+.tk-voice-kind.is-local {
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-voice-card__id {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+  margin: 0 15px 13px;
+  border-radius: 9px;
+  background: var(--tk-surface-soft);
+  padding: 5px 5px 5px 9px;
+}
+
+.tk-voice-card__id code {
+  overflow: hidden;
+  color: var(--tk-text-secondary);
+  font-family: var(--tk-font-mono);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-voice-card__id button,
+.tk-voice-remove {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-voice-card__id button:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-voice-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--tk-line);
+  padding: 10px 13px;
+  background: var(--tk-surface-soft);
+}
+
+.tk-voice-card__footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-voice-card__footer > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tk-voice-use {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-secondary);
+  padding: 0 7px;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 560;
+}
+
+.tk-voice-use:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-voice-remove:hover {
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+}
+
+@media (max-width: 920px) {
+  .tk-voice-create-studio {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-voice-model-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tk-voice-model-panel .tk-selected-model {
+    border-top: 0;
+    border-left: 1px solid var(--tk-line);
+  }
+}
+
+@media (max-width: 760px) {
+  .tk-voice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-created-voice {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .tk-created-voice__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 620px) {
+  .tk-reference-audio {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .tk-reference-audio__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .tk-voice-model-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-voice-model-panel .tk-selected-model {
+    border-top: 1px solid var(--tk-line);
+    border-left: 0;
+  }
+
+  .tk-voice-create__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
