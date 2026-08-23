@@ -4,6 +4,7 @@ import {
   Box,
   Boxes,
   CircleGauge,
+  HardDrive,
   History,
   House,
   Settings,
@@ -21,6 +22,7 @@ export type PageId =
   | "transcribe"
   | "convert"
   | "history"
+  | "storage"
   | "diagnostics"
   | "settings";
 
@@ -59,6 +61,7 @@ export const navSections: NavSection[] = [
     label: "System",
     items: [
       { id: "history", label: "History", icon: History },
+      { id: "storage", label: "Storage", icon: HardDrive },
       { id: "diagnostics", label: "Diagnostics", icon: CircleGauge },
       { id: "settings", label: "Settings", icon: Settings }
     ]
