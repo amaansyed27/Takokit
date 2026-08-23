@@ -1,5 +1,6 @@
-import { AudioWaveform, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { navSections, type PageId } from "../../app/navigation";
+import takokitMark from "../../assets/takokit-mark.svg";
 import type { RuntimeSnapshot } from "../../lib/types";
 
 type ProductSidebarProps = {
@@ -15,7 +16,7 @@ export function ProductSidebar({ activePage, onNavigate, runtime }: ProductSideb
     <aside className="tk-sidebar">
       <button className="tk-brand" type="button" onClick={() => onNavigate("home")}>
         <span className="tk-brand__mark" aria-hidden="true">
-          <AudioWaveform size={17} strokeWidth={1.9} />
+          <img src={takokitMark} alt="" />
         </span>
         <span className="tk-brand__copy">
           <strong>Takokit</strong>
