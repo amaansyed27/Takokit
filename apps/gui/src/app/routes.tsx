@@ -6,6 +6,7 @@ import { RunnersPage } from "../features/runners/RunnersPage";
 import { ServerPage } from "../features/server/ServerPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { SpeakPage } from "../features/speak/SpeakPage";
+import { StoragePage } from "../features/storage/StoragePage";
 import { TranscribePage } from "../features/transcribe/TranscribePage";
 import { VoicesPage } from "../features/voices/VoicesPage";
 import type { RuntimeSnapshot } from "../lib/types";
@@ -31,6 +32,7 @@ export const routes: AppRoute[] = [
   { id: "transcribe", component: TranscribePage },
   { id: "convert", component: ConvertPage },
   { id: "history", component: HistoryPage },
+  { id: "storage", component: StoragePage },
   { id: "diagnostics", component: ServerPage },
   { id: "settings", component: SettingsPage }
 ];
