@@ -1,0 +1,37 @@
+.tk-diagnostics-page { display: grid; gap: 24px; }
+.tk-diagnostics-layout { display: grid; grid-template-columns: minmax(0,1fr) 310px; gap: 14px; align-items: start; }
+.tk-diagnostics-checks { display: grid; gap: 12px; }
+.tk-doctor-group { overflow: hidden; border: 1px solid var(--tk-line); border-radius: 14px; background: var(--tk-surface); }
+.tk-doctor-group__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--tk-line); }
+.tk-doctor-group__header span { color: var(--tk-text-secondary); font-size: 10px; font-weight: 620; text-transform: capitalize; }
+.tk-doctor-group__header strong { color: var(--tk-text-tertiary); font-size: 8.5px; font-weight: 520; }
+.tk-doctor-check { display: grid; grid-template-columns: 28px minmax(0,1fr) 32px; gap: 9px; align-items: center; padding: 10px 12px 10px 16px; }
+.tk-doctor-check + .tk-doctor-check { border-top: 1px solid var(--tk-line); }
+.tk-doctor-check__icon { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 7px; background: var(--tk-surface-strong); color: var(--tk-text-tertiary); }
+.tk-doctor-check__icon.is-ok { background: var(--tk-accent-soft); color: var(--tk-success); }
+.tk-doctor-check__icon.is-warn { background: var(--tk-warning-soft); color: var(--tk-warning); }
+.tk-doctor-check__icon.is-fail { background: var(--tk-danger-soft); color: var(--tk-danger); }
+.tk-doctor-check > div { display: grid; gap: 2px; min-width: 0; }
+.tk-doctor-check strong { font-size: 9.5px; font-weight: 560; }
+.tk-doctor-check span:not(.tk-doctor-check__icon) { overflow: hidden; color: var(--tk-text-tertiary); font-size: 8.5px; text-overflow: ellipsis; white-space: nowrap; }
+.tk-diagnostics-side { display: grid; gap: 12px; position: sticky; top: 0; }
+.tk-diagnostics-card { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; border: 1px solid var(--tk-line); border-radius: 14px; background: var(--tk-surface); padding: 15px; }
+.tk-diagnostics-card__icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: var(--tk-surface-strong); color: var(--tk-text-secondary); }
+.tk-diagnostics-card > div:not(.tk-diagnostics-card__actions) { display: grid; gap: 3px; }
+.tk-diagnostics-card strong { font-size: 10.5px; }
+.tk-diagnostics-card span { color: var(--tk-text-tertiary); font-size: 9px; line-height: 1.45; }
+.tk-diagnostics-card dl, .tk-diagnostics-card code, .tk-diagnostics-card > .tk-button, .tk-diagnostics-card__actions { grid-column: 1 / -1; }
+.tk-diagnostics-card dl { display: grid; gap: 0; margin: 4px 0 0; }
+.tk-diagnostics-card dl div { display: grid; grid-template-columns: 58px minmax(0,1fr); gap: 8px; padding: 6px 0; border-top: 1px solid var(--tk-line); }
+.tk-diagnostics-card dt { color: var(--tk-text-tertiary); font-size: 8.5px; }
+.tk-diagnostics-card dd { overflow: hidden; margin: 0; color: var(--tk-text-secondary); font-size: 8.5px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.tk-diagnostics-card code { overflow: hidden; border-radius: 8px; background: var(--tk-surface-soft); color: var(--tk-text-tertiary); padding: 9px; font: 8px var(--tk-font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.tk-diagnostics-card .tk-button { width: 100%; }
+.tk-diagnostics-card__actions { display: flex; gap: 10px; padding-top: 4px; }
+.tk-diagnostics-card__actions button { border: 0; background: transparent; color: var(--tk-accent-strong); padding: 0; font: inherit; font-size: 9px; }
+.tk-diagnostics-offline { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; gap: 11px; align-items: center; border: 1px solid var(--tk-warning); border-radius: 12px; background: var(--tk-warning-soft); padding: 13px 14px; color: var(--tk-warning); }
+.tk-diagnostics-offline div { display: grid; gap: 2px; }
+.tk-diagnostics-offline strong { font-size: 10.5px; }
+.tk-diagnostics-offline span { font-size: 9px; }
+@media (max-width: 960px) { .tk-diagnostics-layout { grid-template-columns: 1fr; } .tk-diagnostics-side { position: static; grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 760px) { .tk-diagnostics-side { grid-template-columns: 1fr; } .tk-diagnostics-offline { grid-template-columns: 28px minmax(0,1fr); } .tk-diagnostics-offline .tk-button { grid-column: 1 / -1; } }
