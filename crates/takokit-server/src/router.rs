@@ -48,6 +48,7 @@ pub fn server_router(state: AppState) -> Router {
             get(handlers::runner).delete(handlers::remove_runner),
         )
         .route("/v1/voices", get(handlers::voices))
+        .route("/v1/voices/:id", axum::routing::delete(handlers::remove_voice))
         .route("/v1/audio/speech", post(handlers::speech))
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
         .route("/v1/audio/conversions", post(handlers::convert_voice))
