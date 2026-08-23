@@ -99,6 +99,20 @@ impl VoiceProfileStore {
         Ok(profiles)
     }
 
+    pub fn remove(&self, id: &str) -> TakokitResult<VoiceProfile> {
+        let id = voice_id(id)?;
+        let profile = self.get(&id)?;
+        let directory = self.root.join(&id);
+        if !directory.is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "voice profile directory is missing: {}",
+                directory.display()
+            )));
+        }
+        std::fs::remove_dir_all(&directory).map_err(storage_error)?;
+        Ok(profile)
+    }
+
     pub fn resolve_reference(&self, id_or_path: &str) -> TakokitResult<PathBuf> {
         let path = PathBuf::from(id_or_path);
         if path.is_file() {
@@ -173,6 +187,23 @@ mod tests {
             profile.sample_path
         );
         assert_eq!(store.list().unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn removes_local_voice_profile_directory() {
+        let root = std::env::temp_dir().join(format!("takokit-voice-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let sample = root.join("sample.wav");
+        std::fs::write(&sample, b"RIFF").unwrap();
+        let store = VoiceProfileStore::new(root.join("voices"));
+        let profile = store
+            .create("Disposable Voice", "openvoice", &sample, true, Some("owner".into()))
+            .unwrap();
+        let removed = store.remove(&profile.id).unwrap();
+        assert_eq!(removed.id, profile.id);
+        assert!(store.list().unwrap().is_empty());
+        assert!(!root.join("voices").join(profile.id).exists());
         let _ = std::fs::remove_dir_all(root);
     }
 
