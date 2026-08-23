@@ -1,0 +1,25 @@
+.tk-workspace-backdrop { position: fixed; z-index: 120; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.48); backdrop-filter: blur(5px); padding: 20px; }
+.tk-workspace-dialog { width: min(620px,100%); overflow: hidden; border: 1px solid var(--tk-line-strong); border-radius: 16px; background: var(--tk-surface); box-shadow: var(--tk-shadow-lg); }
+.tk-workspace-dialog__header { display: grid; grid-template-columns: 38px minmax(0,1fr) 30px; gap: 11px; align-items: start; padding: 18px; border-bottom: 1px solid var(--tk-line); }
+.tk-workspace-dialog__icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--tk-surface-strong); color: var(--tk-text-secondary); }
+.tk-workspace-dialog__header > div { display: grid; gap: 4px; }
+.tk-workspace-dialog__header > div > span { color: var(--tk-accent); font-size: 8px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.tk-workspace-dialog__header h2 { margin: 0; font-size: 17px; font-weight: 620; letter-spacing: -.02em; }
+.tk-workspace-dialog__header p { margin: 0; color: var(--tk-text-tertiary); font-size: 9.5px; line-height: 1.5; }
+.tk-workspace-dialog__body { display: grid; gap: 15px; padding: 18px; }
+.tk-workspace-path { display: grid; gap: 7px; }
+.tk-workspace-path > span { color: var(--tk-text-secondary); font-size: 9.5px; font-weight: 560; }
+.tk-workspace-path > div { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; }
+.tk-workspace-path input { min-height: 40px; border: 1px solid var(--tk-line); border-radius: 10px; outline: 0; background: var(--tk-control); color: var(--tk-text); padding: 0 11px; font: 9.5px var(--tk-font-mono); }
+.tk-workspace-path input:focus { border-color: var(--tk-line-strong); box-shadow: 0 0 0 3px var(--tk-accent-soft); }
+.tk-workspace-recents { display: grid; overflow: hidden; border: 1px solid var(--tk-line); border-radius: 11px; }
+.tk-workspace-recents__heading { display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--tk-line); padding: 10px 12px; color: var(--tk-text-tertiary); }
+.tk-workspace-recents__heading span { font-size: 9px; }
+.tk-workspace-recents > button { display: grid; gap: 2px; border: 0; border-top: 1px solid var(--tk-line); background: transparent; color: var(--tk-text); padding: 10px 12px; text-align: left; font: inherit; }
+.tk-workspace-recents > button:first-of-type { border-top: 0; }
+.tk-workspace-recents > button:hover, .tk-workspace-recents > button.is-active { background: var(--tk-surface-soft); }
+.tk-workspace-recents strong { font-size: 9.5px; font-weight: 560; }
+.tk-workspace-recents span { overflow: hidden; color: var(--tk-text-tertiary); font: 8px var(--tk-font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.tk-workspace-dialog__actions { display: flex; justify-content: flex-end; gap: 7px; border-top: 1px solid var(--tk-line); padding: 12px 18px; }
+.tk-inline-warning { border-radius: 9px; background: var(--tk-warning-soft); color: var(--tk-warning); padding: 10px 11px; font-size: 9.5px; }
+@media (max-width: 560px) { .tk-workspace-path > div { grid-template-columns: 1fr; } .tk-workspace-dialog__header { grid-template-columns: 34px minmax(0,1fr) 28px; } }
