@@ -56,9 +56,9 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
     [conversionModels]
   );
 
-  const [mode, setMode] = useState<ConversionMode>(referenceModels.length > 0 ? "reference" : "rvc");
+  const [mode, setMode] = useState<ConversionMode>("reference");
   const modeModels = mode === "rvc" ? rvcModels : referenceModels;
-  const [model, setModel] = useState(modeModels.find((item) => item.executable)?.id ?? modeModels[0]?.id ?? "");
+  const [model, setModel] = useState("");
   const [sourcePath, setSourcePath] = useState("");
   const [targetPath, setTargetPath] = useState("");
   const [sourcePickerBusy, setSourcePickerBusy] = useState(false);
