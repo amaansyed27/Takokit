@@ -41,6 +41,40 @@ pub async fn ps(State(state): State<AppState>) -> Json<RunnersResponse<ProcessIn
     })
 }
 
+pub async fn pick_audio_file(
+    headers: axum::http::HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
+    let initial_dir = store.workspace_root().to_path_buf();
+    let selected = tokio::task::spawn_blocking(move || {
+        crate::native_picker::pick_audio_file(&initial_dir)
+    })
+    .await
+    .map_err(|error| ApiError(TakokitError::Execution(format!("audio picker task failed: {error}"))))?
+    .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+
+    Ok(Json(serde_json::json!({
+        "path": selected.map(|path| path.display().to_string())
+    })))
+}
+
+pub async fn pick_folder(
+    headers: axum::http::HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
+    let initial_dir = store.workspace_root().to_path_buf();
+    let selected = tokio::task::spawn_blocking(move || {
+        crate::native_picker::pick_folder(&initial_dir)
+    })
+    .await
+    .map_err(|error| ApiError(TakokitError::Execution(format!("folder picker task failed: {error}"))))?
+    .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+
+    Ok(Json(serde_json::json!({
+        "path": selected.map(|path| path.display().to_string())
+    })))
+}
+
 pub async fn doctor(
     State(state): State<AppState>,
 ) -> Json<RunnerDetailResponse<serde_json::Value>> {
