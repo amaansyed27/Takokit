@@ -1,9 +1,9 @@
-import { Clock3, FileAudio, FileText, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Clock3, FileAudio, FileText, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { Section } from "../../components/ui/Section";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { ProductButton } from "../../components/ui/ProductButton";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import {
   createSession,
   getSession,
@@ -23,10 +23,11 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
   const [record, setRecord] = useState<SessionRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const activeSession = getWorkspaceContext().session;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void refreshSessions(query), 180);
+    const timer = window.setTimeout(() => void refreshSessions(query), 160);
     return () => window.clearTimeout(timer);
   }, [query]);
 
@@ -37,15 +38,9 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
     }
     let cancelled = false;
     void getSession(selectedId)
-      .then((next) => {
-        if (!cancelled) setRecord(next);
-      })
-      .catch((error) => {
-        if (!cancelled) setNotice(error instanceof Error ? error.message : "Could not read the session.");
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((next) => { if (!cancelled) setRecord(next); })
+      .catch((error) => { if (!cancelled) setNotice(error instanceof Error ? error.message : "Session could not be read."); });
+    return () => { cancelled = true; };
   }, [selectedId]);
 
   async function refreshSessions(search = query) {
@@ -59,7 +54,7 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
         return next[0]?.id ?? null;
       });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not load project history.");
+      setNotice(error instanceof Error ? error.message : "Project history could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -72,11 +67,11 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
       const next = await createSession();
       setSelectedId(next.summary.id);
       setRecord(next);
-      await refreshSessions("");
       setQuery("");
-      setNotice("New project session created and activated.");
+      await refreshSessions("");
+      await onRefresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not create a session.");
+      setNotice(error instanceof Error ? error.message : "A new session could not be created.");
     } finally {
       setLoading(false);
     }
@@ -90,9 +85,9 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
       const next = await resumeSession(selectedId);
       setRecord(next);
       await onRefresh();
-      setNotice(`Opened ${next.summary.title}. New output will be added to this session.`);
+      await refreshSessions();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not open the session.");
+      setNotice(error instanceof Error ? error.message : "The session could not be opened.");
     } finally {
       setLoading(false);
     }
@@ -104,114 +99,76 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
     setNotice(null);
     try {
       await removeSession(selectedId);
+      setDeleteOpen(false);
       setSelectedId(null);
       setRecord(null);
       await refreshSessions();
-      setNotice("Session removed from this project.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not remove the session.");
+      setNotice(error instanceof Error ? error.message : "The session could not be removed.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <section className="page">
-      <header className="page__header history-header">
-        <div>
-          <h1>History</h1>
-          <p>Search and reopen sessions saved in this project&apos;s <code>.tako</code> directory.</p>
-        </div>
-        <Button type="button" variant="primary" loading={loading} onClick={() => void createNew()}>
-          <Plus size={16} /> New session
-        </Button>
-      </header>
+    <section className="tk-page tk-history-page">
+      <ProductPageHeader
+        eyebrow="Workspace activity"
+        title="History"
+        description="Reopen past sessions, review transcripts, and play generated audio saved inside this workspace."
+        actions={<ProductButton tone="primary" loading={loading} onClick={() => void createNew()}><Plus size={15} /> New session</ProductButton>}
+      />
 
-      <div className="history-search">
-        <Search size={17} aria-hidden="true" />
-        <input
-          className="search-input"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search transcripts, text, models, titles, or errors…"
-          aria-label="Search session history"
-        />
-      </div>
+      <label className="tk-history-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions, models, transcripts, or errors" /></label>
+      {notice ? <div className="tk-inline-error" role="status">{notice}</div> : null}
 
-      <div className="history-layout">
-        <Section title={`Sessions · ${sessions.length}`}>
-          <div className="history-list">
+      <div className="tk-history-layout">
+        <aside className="tk-history-sessions">
+          <div className="tk-system-panel__header"><div><h2>Sessions</h2><p>{sessions.length} in this workspace</p></div></div>
+          <div className="tk-history-session-list">
             {sessions.map((session) => (
-              <button
-                className={session.id === selectedId ? "history-session active" : "history-session"}
-                key={session.id}
-                type="button"
-                onClick={() => setSelectedId(session.id)}
-              >
-                <span>
-                  <strong>{session.title}</strong>
-                  <small>{formatTime(session.updated_at)}</small>
-                </span>
-                <span className="badge-list">
-                  {session.id === activeSession ? <Badge tone="success">active</Badge> : null}
-                  <Badge tone="neutral">{session.event_count} events</Badge>
-                  <Badge tone="neutral">{session.output_count} outputs</Badge>
-                </span>
+              <button className={session.id === selectedId ? "tk-history-session is-active" : "tk-history-session"} key={session.id} type="button" onClick={() => setSelectedId(session.id)}>
+                <div><strong>{session.title}</strong><span>{formatTime(session.updated_at)}</span></div>
+                <div className="tk-history-session__meta">
+                  {session.id === activeSession ? <span className="is-active">Active</span> : null}
+                  <span>{session.output_count} outputs</span>
+                  <span>{session.event_count} events</span>
+                </div>
               </button>
             ))}
-            {!loading && sessions.length === 0 ? (
-              <div className="empty-state">
-                <strong>No matching sessions</strong>
-                <p>Generate speech or a transcript, or create a new session.</p>
-              </div>
-            ) : null}
+            {!loading && sessions.length === 0 ? <div className="tk-system-empty"><Clock3 size={20} /><div><strong>No sessions found</strong><span>Run a workflow or create a new session.</span></div></div> : null}
           </div>
-        </Section>
+        </aside>
 
-        <Section title={record?.summary.title ?? "Session details"}>
+        <section className="tk-history-detail">
           {record ? (
-            <div className="history-detail">
-              <div className="history-actions">
-                <Button type="button" variant="primary" loading={loading} onClick={() => void resumeSelected()}>
-                  <RotateCcw size={16} /> Open session
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={record.summary.id === activeSession}
-                  onClick={() => void deleteSelected()}
-                >
-                  <Trash2 size={16} /> Delete
-                </Button>
+            <>
+              <header className="tk-history-detail__header">
+                <div><span>{record.summary.id === activeSession ? "Active session" : "Saved session"}</span><h2>{record.summary.title}</h2><p>{formatTime(record.summary.updated_at)} · {record.summary.output_count} outputs</p></div>
+                <div className="tk-history-detail__actions">
+                  {record.summary.id !== activeSession ? <ProductButton tone="secondary" loading={loading} onClick={() => void resumeSelected()}><RotateCcw size={14} /> Open session</ProductButton> : null}
+                  {record.summary.id !== activeSession ? <button className="tk-row-icon-action is-danger" type="button" title="Delete session" onClick={() => setDeleteOpen(true)}><Trash2 size={15} /></button> : null}
+                </div>
+              </header>
+              <div className="tk-history-timeline">
+                {record.events.slice().reverse().map((event) => <HistoryEvent key={event.id} event={event} />)}
+                {record.events.length === 0 ? <div className="tk-system-empty"><Clock3 size={20} /><div><strong>Empty session</strong><span>New Takokit workflow activity will appear here.</span></div></div> : null}
               </div>
-              <div className="detail-grid">
-                <span><strong>Session ID</strong>{record.summary.id}</span>
-                <span><strong>Workspace</strong>{record.summary.workspace_root}</span>
-                <span><strong>Created</strong>{formatTime(record.summary.created_at)}</span>
-                <span><strong>Updated</strong>{formatTime(record.summary.updated_at)}</span>
-              </div>
-              <div className="history-events">
-                {record.events.slice().reverse().map((event) => (
-                  <HistoryEvent key={event.id} event={event} />
-                ))}
-                {record.events.length === 0 ? (
-                  <div className="empty-state">
-                    <strong>Empty session</strong>
-                    <p>New speech, transcription, cloning, and training activity will appear here.</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <Clock3 size={24} />
-              <strong>Select a session</strong>
-              <p>Its activity, transcripts, and generated audio will appear here.</p>
-            </div>
-          )}
-        </Section>
+            </>
+          ) : <div className="tk-history-empty"><Clock3 size={25} /><strong>Select a session</strong><span>Its workflow timeline and outputs will appear here.</span></div>}
+        </section>
       </div>
-      {notice ? <p className="notice-line">{notice}</p> : null}
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete this session?"
+        description={<div className="tk-confirm-copy"><p>This removes the selected workspace session and its saved session data. The active session cannot be deleted.</p></div>}
+        confirmLabel="Delete session"
+        destructive
+        busy={loading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void deleteSelected()}
+      />
     </section>
   );
 }
@@ -221,65 +178,42 @@ function HistoryEvent({ event }: { event: SessionEvent }) {
   const [loading, setLoading] = useState(false);
   const audio = useMemo(() => isAudio(event.output_path), [event.output_path]);
 
-  useEffect(() => () => {
-    if (outputUrl) URL.revokeObjectURL(outputUrl);
-  }, [outputUrl]);
+  useEffect(() => () => { if (outputUrl) URL.revokeObjectURL(outputUrl); }, [outputUrl]);
 
   async function loadOutput() {
     if (!event.output_path) return;
     setLoading(true);
     try {
       const url = await loadSessionOutput(event.session_id, event.output_path);
-      setOutputUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous);
-        return url;
-      });
+      setOutputUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return url; });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <article className="history-event">
-      <header>
-        <span className="history-event__icon">{audio ? <FileAudio size={17} /> : <FileText size={17} />}</span>
-        <div>
-          <strong>{taskLabel(event.task)}</strong>
-          <small>{formatTime(event.timestamp)} · {event.model ?? "no model"}</small>
-        </div>
-        <Badge tone={event.state === "completed" ? "success" : event.state === "failed" ? "warning" : "neutral"}>
-          {event.state}
-        </Badge>
-      </header>
-      {event.input ? <p>{event.input}</p> : null}
-      {event.text ? <pre className="history-transcript">{event.text}</pre> : null}
-      {event.message ? <p className="notice-line">{event.message}</p> : null}
-      {event.output_path ? (
-        <div className="history-output">
-          <span>{outputFilename(event.output_path)}</span>
-          {!outputUrl ? (
-            <Button type="button" variant="ghost" loading={loading} onClick={() => void loadOutput()}>
-              Load output
-            </Button>
-          ) : audio ? (
-            <audio controls src={outputUrl} preload="metadata" />
-          ) : (
-            <a href={outputUrl} download={outputFilename(event.output_path)}>Open output</a>
-          )}
-        </div>
-      ) : null}
+    <article className="tk-history-event">
+      <div className="tk-history-event__rail"><span className={event.state === "failed" ? "is-failed" : event.state === "completed" ? "is-complete" : ""} /></div>
+      <div className="tk-history-event__body">
+        <header>
+          <span className="tk-history-event__icon">{audio ? <FileAudio size={16} /> : <FileText size={16} />}</span>
+          <div><strong>{taskLabel(event.task)}</strong><span>{formatTime(event.timestamp)} · {event.model ?? "Takokit"}</span></div>
+          <span className={event.state === "failed" ? "tk-event-state is-failed" : event.state === "completed" ? "tk-event-state is-complete" : "tk-event-state"}>{event.state}</span>
+        </header>
+        {event.input ? <p className="tk-history-event__input">{event.input}</p> : null}
+        {event.text ? <div className="tk-history-event__text">{event.text}</div> : null}
+        {event.message ? <p className="tk-history-event__message">{event.message}</p> : null}
+        {event.output_path ? (
+          <div className="tk-history-output">
+            <div><strong>{outputFilename(event.output_path)}</strong><span title={event.output_path}>{event.output_path}</span></div>
+            {!outputUrl ? <ProductButton tone="ghost" loading={loading} onClick={() => void loadOutput()}><Play size={13} /> {audio ? "Play" : "Open"}</ProductButton> : audio ? <audio controls src={outputUrl} preload="metadata" /> : <a href={outputUrl} download={outputFilename(event.output_path)}>Download output</a>}
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 }
 
-function isAudio(path?: string): boolean {
-  return Boolean(path && /\.(wav|mp3|flac|ogg)$/i.test(path));
-}
-
-function formatTime(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString();
-}
-
-function taskLabel(task: SessionEvent["task"]): string {
-  return task.split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
-}
+function isAudio(path?: string): boolean { return Boolean(path && /\.(wav|mp3|flac|ogg|m4a|aac|wma)$/i.test(path)); }
+function formatTime(timestamp: number): string { return new Date(timestamp * 1000).toLocaleString(); }
+function taskLabel(task: SessionEvent["task"]): string { return task.split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" "); }
