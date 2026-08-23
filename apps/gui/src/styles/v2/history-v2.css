@@ -1,0 +1,57 @@
+.tk-history-page { display: grid; gap: 20px; }
+.tk-history-search { display: flex; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--tk-line); border-radius: 10px; background: var(--tk-control); color: var(--tk-text-tertiary); padding: 0 12px; }
+.tk-history-search:focus-within { border-color: var(--tk-line-strong); box-shadow: 0 0 0 3px var(--tk-accent-soft); }
+.tk-history-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--tk-text); font: inherit; font-size: 11.5px; }
+.tk-history-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
+.tk-history-sessions, .tk-history-detail { overflow: hidden; min-height: 520px; border: 1px solid var(--tk-line); border-radius: 14px; background: var(--tk-surface); }
+.tk-history-session-list { display: grid; }
+.tk-history-session { display: grid; gap: 9px; width: 100%; border: 0; border-top: 1px solid var(--tk-line); background: transparent; color: var(--tk-text); padding: 13px 16px; text-align: left; font: inherit; }
+.tk-history-session:first-child { border-top: 0; }
+.tk-history-session:hover, .tk-history-session.is-active { background: var(--tk-surface-soft); }
+.tk-history-session.is-active { box-shadow: inset 2px 0 0 var(--tk-accent); }
+.tk-history-session > div:first-child { display: grid; gap: 3px; }
+.tk-history-session strong { overflow: hidden; font-size: 10.5px; font-weight: 580; text-overflow: ellipsis; white-space: nowrap; }
+.tk-history-session span { color: var(--tk-text-tertiary); font-size: 9px; }
+.tk-history-session__meta { display: flex; flex-wrap: wrap; gap: 5px; }
+.tk-history-session__meta span { border-radius: 999px; background: var(--tk-surface-strong); padding: 3px 6px; font-size: 8px; }
+.tk-history-session__meta span.is-active { background: var(--tk-accent-soft); color: var(--tk-success); }
+.tk-history-detail { display: grid; align-content: start; }
+.tk-history-detail__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--tk-line); }
+.tk-history-detail__header > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.tk-history-detail__header > div:first-child > span { color: var(--tk-accent); font-size: 8.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+.tk-history-detail__header h2 { margin: 0; font-size: 17px; font-weight: 620; letter-spacing: -.02em; }
+.tk-history-detail__header p { margin: 0; color: var(--tk-text-tertiary); font-size: 9.5px; }
+.tk-history-detail__actions { display: flex; align-items: center; gap: 6px; }
+.tk-history-detail__actions .tk-button { min-height: 32px; font-size: 9.5px; }
+.tk-history-timeline { display: grid; padding: 6px 20px 20px; }
+.tk-history-event { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.tk-history-event__rail { position: relative; display: flex; justify-content: center; }
+.tk-history-event__rail::after { position: absolute; top: 21px; bottom: -1px; width: 1px; background: var(--tk-line); content: ""; }
+.tk-history-event:last-child .tk-history-event__rail::after { display: none; }
+.tk-history-event__rail > span { z-index: 1; width: 7px; height: 7px; margin-top: 20px; border: 2px solid var(--tk-surface); border-radius: 50%; background: var(--tk-text-tertiary); box-shadow: 0 0 0 1px var(--tk-line-strong); }
+.tk-history-event__rail > span.is-complete { background: var(--tk-success); }
+.tk-history-event__rail > span.is-failed { background: var(--tk-danger); }
+.tk-history-event__body { display: grid; gap: 10px; min-width: 0; padding: 12px 0 18px; }
+.tk-history-event__body > header { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+.tk-history-event__icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--tk-surface-strong); color: var(--tk-text-secondary); }
+.tk-history-event__body > header div { display: grid; gap: 2px; min-width: 0; }
+.tk-history-event__body > header strong { font-size: 10.5px; font-weight: 580; }
+.tk-history-event__body > header span:not(.tk-history-event__icon):not(.tk-event-state) { color: var(--tk-text-tertiary); font-size: 8.5px; }
+.tk-event-state { border-radius: 999px; background: var(--tk-surface-strong); color: var(--tk-text-tertiary); padding: 4px 7px; font-size: 8px; text-transform: capitalize; }
+.tk-event-state.is-complete { background: var(--tk-accent-soft); color: var(--tk-success); }
+.tk-event-state.is-failed { background: var(--tk-danger-soft); color: var(--tk-danger); }
+.tk-history-event__input, .tk-history-event__message { margin: 0; color: var(--tk-text-secondary); font-size: 10px; line-height: 1.5; }
+.tk-history-event__text { border-left: 2px solid var(--tk-line-strong); color: var(--tk-text-secondary); padding: 3px 0 3px 11px; font-size: 10.5px; line-height: 1.6; white-space: pre-wrap; }
+.tk-history-event__message { color: var(--tk-text-tertiary); }
+.tk-history-output { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; border: 1px solid var(--tk-line); border-radius: 10px; background: var(--tk-surface-soft); padding: 9px 10px 9px 12px; }
+.tk-history-output > div { display: grid; gap: 2px; min-width: 0; }
+.tk-history-output strong { font-size: 9.5px; font-weight: 560; }
+.tk-history-output span { overflow: hidden; color: var(--tk-text-tertiary); font: 8px var(--tk-font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.tk-history-output audio { width: min(320px, 45vw); height: 30px; }
+.tk-history-output a { color: var(--tk-accent-strong); font-size: 9px; }
+.tk-history-output .tk-button { min-height: 28px; font-size: 9px; }
+.tk-history-empty { display: grid; justify-items: center; gap: 7px; align-self: center; padding: 90px 20px; color: var(--tk-text-tertiary); text-align: center; }
+.tk-history-empty strong { color: var(--tk-text); font-size: 12px; }
+.tk-history-empty span { font-size: 10px; }
+@media (max-width: 900px) { .tk-history-layout { grid-template-columns: 1fr; } .tk-history-sessions, .tk-history-detail { min-height: auto; } }
+@media (max-width: 600px) { .tk-history-detail__header { align-items: flex-start; flex-direction: column; } .tk-history-output { align-items: stretch; flex-direction: column; } .tk-history-output audio { width: 100%; } }
