@@ -49,6 +49,17 @@
   color: var(--tk-text-secondary);
 }
 
+.tk-button--danger {
+  border-color: rgba(225, 134, 124, 0.22);
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+}
+
+.tk-button--danger:not(:disabled):hover {
+  border-color: rgba(225, 134, 124, 0.38);
+  background: rgba(225, 134, 124, 0.16);
+}
+
 .tk-button__content {
   display: inline-flex;
   align-items: center;
@@ -149,4 +160,95 @@
   resize: none;
   padding: 10px 11px;
   line-height: 1.45;
+}
+
+.tk-dialog-backdrop {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.46);
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.tk-dialog {
+  width: min(440px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--tk-line-strong);
+  border-radius: 16px;
+  background: var(--tk-surface-strong);
+  box-shadow: var(--tk-shadow-lg);
+  animation: tk-dialog-in 140ms ease-out;
+}
+
+@keyframes tk-dialog-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tk-dialog__header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 30px;
+  align-items: start;
+  gap: 12px;
+  padding: 18px;
+}
+
+.tk-dialog__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tk-warning-soft);
+  color: var(--tk-warning);
+}
+
+.tk-dialog__icon.is-danger {
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+}
+
+.tk-dialog__header > div {
+  display: grid;
+  gap: 6px;
+}
+
+.tk-dialog__header strong {
+  color: var(--tk-text);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.tk-dialog__description {
+  color: var(--tk-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.tk-dialog__close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-dialog__close:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--tk-line);
+  padding: 12px 14px;
+  background: var(--tk-surface);
 }
