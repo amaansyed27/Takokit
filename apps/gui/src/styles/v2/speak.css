@@ -4,9 +4,9 @@
 
 .tk-speak-studio {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  align-items: start;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .tk-speak-editor,
@@ -18,7 +18,8 @@
 
 .tk-speak-editor {
   display: grid;
-  min-height: 510px;
+  grid-template-rows: auto minmax(360px, 1fr) auto auto;
+  min-height: 500px;
   overflow: hidden;
 }
 
@@ -28,7 +29,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 13px 16px;
 }
 
 .tk-speak-editor__header {
@@ -60,21 +61,27 @@
 
 .tk-script-input {
   width: 100%;
-  min-height: 410px;
-  resize: vertical;
+  height: 100%;
+  min-height: 360px;
+  resize: none;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--tk-text);
   padding: 24px;
   font-family: var(--tk-font-sans);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 410;
   line-height: 1.7;
+  caret-color: var(--tk-accent-strong);
 }
 
 .tk-script-input::placeholder {
   color: var(--tk-text-tertiary);
+}
+
+.tk-script-input:focus {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tk-surface) 98%, var(--tk-accent) 2%), var(--tk-surface));
 }
 
 .tk-model-state {
@@ -103,6 +110,7 @@
 
 .tk-speak-controls {
   display: grid;
+  align-content: start;
   gap: 0;
   overflow: hidden;
 }
@@ -413,11 +421,11 @@
 
 @media (max-width: 620px) {
   .tk-speak-editor {
-    min-height: 440px;
+    min-height: 430px;
   }
 
   .tk-script-input {
-    min-height: 330px;
+    min-height: 320px;
     padding: 18px;
     font-size: 15px;
   }
