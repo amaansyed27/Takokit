@@ -1,72 +1,69 @@
+import { Check, HardDrive, Moon, ShieldCheck, Sun } from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Section } from "../../components/ui/Section";
-import { Tooltip } from "../../components/ui/Tooltip";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
+import { useTheme, type TakokitTheme } from "../../hooks/useTheme";
 
-export function SettingsPage({ runtime }: RouteComponentProps) {
+export function SettingsPage({ runtime, onNavigate }: RouteComponentProps) {
+  const { theme, setTheme } = useTheme();
+
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Settings</h1>
-        <p>Local paths and safe defaults.</p>
-      </header>
+    <section className="tk-page tk-settings-page">
+      <ProductPageHeader
+        eyebrow="Preferences"
+        title="Settings"
+        description="Small, explicit preferences for the local GUI. Runtime lifecycle and storage management live in their dedicated pages."
+      />
 
-      <Section title="Storage">
-        <div className="settings-group">
-          <p>Files stay under the Takokit storage root.</p>
-          <div className="settings-list">
-            <div className="settings-row"><span>Storage root</span><code>{runtime.storagePath}</code></div>
-            <div className="settings-row"><span>Models</span><code>{runtime.storagePath}/models</code></div>
-            <div className="settings-row"><span>Runners</span><code>{runtime.storagePath}/runners</code></div>
-            <div className="settings-row"><span>Blobs</span><code>{runtime.storagePath}/blobs</code></div>
-            <div className="settings-row"><span>Manifests</span><code>{runtime.storagePath}/manifests</code></div>
-            <div className="settings-row"><span>Voices</span><code>{runtime.storagePath}/voices</code></div>
-            <div className="settings-row"><span>Outputs</span><code>{runtime.storagePath}/outputs</code></div>
-          </div>
+      <section className="tk-settings-section">
+        <div className="tk-settings-section__heading"><div><h2>Appearance</h2><p>Choose the interface that is easiest on your eyes. This preference stays on this browser.</p></div></div>
+        <div className="tk-theme-options">
+          <ThemeOption theme="dark" active={theme === "dark"} title="Dark" description="Graphite canvas with soft grey surfaces." icon={<Moon size={18} />} onSelect={setTheme} />
+          <ThemeOption theme="light" active={theme === "light"} title="Light" description="Warm off-white paper-like surfaces." icon={<Sun size={18} />} onSelect={setTheme} />
         </div>
-      </Section>
+      </section>
 
-      <Section title="Runtime">
-        <div className="settings-group">
-          <p>No hidden remote calls.</p>
-          <div className="settings-row"><span>Theme</span><Badge>Paper</Badge></div>
-          <div className="settings-row"><span>Runtime mode</span><Badge tone="success">Local</Badge></div>
-          <div className="settings-row">
-            <span>Safety and consent</span>
-            <Tooltip content="Voice cloning consent gates are planned before runner wiring.">
-              <Badge tone="warning">Required for cloning</Badge>
-            </Tooltip>
-          </div>
+      <section className="tk-settings-section">
+        <div className="tk-settings-section__heading"><div><h2>Local runtime</h2><p>The GUI is a client of the same Takokit runtime used by CLI and TUI.</p></div></div>
+        <div className="tk-settings-facts">
+          <Fact label="Status" value={runtime.server.status === "online" ? "Connected locally" : "Offline"} />
+          <Fact label="Workspace" value={runtime.workspacePath} />
+          <Fact label="Storage root" value={runtime.storagePath} />
+          <Fact label="Local API" value={runtime.server.url} />
+          <Fact label="Build" value={runtime.buildId} mono />
         </div>
-      </Section>
+        <div className="tk-settings-links">
+          <button type="button" onClick={() => onNavigate("storage")}><HardDrive size={15} /> Storage</button>
+          <button type="button" onClick={() => onNavigate("diagnostics")}>Diagnostics →</button>
+        </div>
+      </section>
 
-      <Section title="Controls" description="Safe by default.">
-        <div className="settings-group">
-          <div className="setting-switch-grid">
-            <div className="setting-toggle-row">
-              <div>
-                <strong>No hidden cloud calls</strong>
-                <span>Remote providers disabled.</span>
-              </div>
-              <span className="switch" aria-hidden="true" />
-            </div>
-            <div className="setting-toggle-row">
-              <div>
-                <strong>Consent gate for cloning</strong>
-                <span>Required before clone or train.</span>
-              </div>
-              <span className="switch" aria-hidden="true" />
-            </div>
-            <div className="setting-toggle-row">
-              <div>
-                <strong>Auto-download models</strong>
-                <span>User initiated only.</span>
-              </div>
-              <span className="switch is-off" aria-hidden="true" />
-            </div>
-          </div>
+      <section className="tk-settings-section">
+        <div className="tk-settings-section__heading"><div><h2>Safety and behavior</h2><p>These are enforced product rules, not decorative toggles.</p></div></div>
+        <div className="tk-policy-list">
+          <Policy title="Local-first execution" description="Takokit workflows execute through the selected local models and runners. The GUI does not silently switch to a cloud provider." />
+          <Policy title="Explicit voice consent" description="Creating or converting a voice requires an affirmative ownership or permission gate before the request is accepted." />
+          <Policy title="User-initiated model downloads" description="Models and runners are installed only when you explicitly start a pull, install, or repair action." />
+          <Policy title="Workspace isolation" description="Sessions and outputs stay under the selected workspace while models, runners, and reusable voices remain in the global Takokit store." />
         </div>
-      </Section>
+      </section>
     </section>
   );
+}
+
+function ThemeOption({ theme, active, title, description, icon, onSelect }: { theme: TakokitTheme; active: boolean; title: string; description: string; icon: JSX.Element; onSelect: (theme: TakokitTheme) => void }) {
+  return (
+    <button className={active ? "tk-theme-option is-active" : "tk-theme-option"} type="button" onClick={() => onSelect(theme)}>
+      <span className="tk-theme-option__preview"><span /><span /><span /></span>
+      <span className="tk-theme-option__copy"><span>{icon}<strong>{title}</strong></span><small>{description}</small></span>
+      {active ? <Check className="tk-theme-option__check" size={15} /> : null}
+    </button>
+  );
+}
+
+function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return <div><span>{label}</span><strong className={mono ? "is-mono" : ""} title={value}>{value}</strong></div>;
+}
+
+function Policy({ title, description }: { title: string; description: string }) {
+  return <div className="tk-policy-row"><span><ShieldCheck size={16} /></span><div><strong>{title}</strong><p>{description}</p></div></div>;
 }
