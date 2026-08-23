@@ -261,3 +261,19 @@ export type DoctorResponse = {
   executable_models: string[];
   logs_path: string;
 };
+
+export type StorageEntry = {
+  id: "models" | "runners" | "voices" | "blobs" | "cache" | "logs" | "manifests" | "workspace";
+  label: string;
+  path: string;
+  bytes: number;
+  exists: boolean;
+};
+
+export type StorageOverview = {
+  storage_root: string;
+  workspace_root: string;
+  total_bytes: number;
+  workspace_bytes: number;
+  entries: StorageEntry[];
+};
