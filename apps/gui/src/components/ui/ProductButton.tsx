@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ProductButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
-  tone?: "primary" | "secondary" | "ghost";
+  tone?: "primary" | "secondary" | "ghost" | "danger";
   loading?: boolean;
 };
 
