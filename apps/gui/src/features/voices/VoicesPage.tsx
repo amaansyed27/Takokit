@@ -127,38 +127,40 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
       <ProductPageHeader
         eyebrow="Voice cloning"
         title="Voices"
-        description="Create a reusable voice from reference audio, then use it directly from Speak. Local profiles stay in Takokit-managed storage on this device."
+        description="Create a reusable local voice from one clean reference recording, then use it directly from Speak."
       />
 
-      <div className="tk-voice-create-studio">
-        <section className="tk-voice-create" aria-label="Create a voice">
-          <div className="tk-voice-create__header">
+      <div className="tk-voice-studio">
+        <section className="tk-voice-builder" aria-label="Create a voice">
+          <header className="tk-voice-builder__header">
             <div>
-              <span>Create a voice</span>
-              <small>Reference audio → reusable voice</small>
+              <span className="tk-voice-builder__eyebrow">Instant clone</span>
+              <h2>Create a voice</h2>
+              <p>A short, clean recording is enough for supported cloning models.</p>
             </div>
-            <UserRoundPlus size={17} strokeWidth={1.8} />
-          </div>
+            <span className="tk-voice-builder__icon"><UserRoundPlus size={20} strokeWidth={1.7} /></span>
+          </header>
 
-          <div className="tk-voice-create__body">
-            <label className="tk-field">
+          <div className="tk-voice-builder__body">
+            <label className="tk-field tk-voice-name-field">
               <span className="tk-field__label">Voice name</span>
               <input
                 className="tk-input"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="My narration voice"
+                placeholder="For example, Studio narrator"
               />
-              <span className="tk-field__hint">This becomes the friendly name shown in Speak.</span>
+              <span className="tk-field__hint">This is the name you will see later in Speak.</span>
             </label>
 
-            <div className={samplePath ? "tk-reference-audio is-selected" : "tk-reference-audio"}>
-              <span className="tk-reference-audio__icon"><Mic2 size={22} strokeWidth={1.7} /></span>
-              <div className="tk-reference-audio__copy">
-                <strong>{samplePath ? displayFileName(samplePath) : "Choose reference audio"}</strong>
-                <span>{samplePath ? "Reference ready for cloning." : "Use a clean, single-speaker recording with minimal background noise."}</span>
+            <div className={samplePath ? "tk-voice-reference is-selected" : "tk-voice-reference"}>
+              <span className="tk-voice-reference__icon"><Mic2 size={23} strokeWidth={1.7} /></span>
+              <div className="tk-voice-reference__copy">
+                <span>Reference audio</span>
+                <strong>{samplePath ? displayFileName(samplePath) : "Choose a clean voice recording"}</strong>
+                <p>{samplePath ? "Ready to create a reusable voice profile." : "Best results come from one speaker, clear speech, and little background noise."}</p>
               </div>
-              <div className="tk-reference-audio__actions">
+              <div className="tk-voice-reference__actions">
                 <ProductButton
                   type="button"
                   tone={samplePath ? "secondary" : "primary"}
@@ -176,53 +178,58 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
               </div>
             </div>
 
-            <label className="tk-voice-path-field">
-              <span>Or enter a local path</span>
+            <details className="tk-voice-manual-path">
+              <summary>Enter a local path instead</summary>
               <input
                 value={samplePath}
                 onChange={(event) => setSamplePath(event.target.value)}
                 placeholder="C:\\path\\to\\reference.wav"
                 spellCheck={false}
               />
-            </label>
+            </details>
 
-            <label className={consent ? "tk-consent-card is-checked" : "tk-consent-card"}>
+            <label className={consent ? "tk-voice-consent is-checked" : "tk-voice-consent"}>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              <span className="tk-consent-card__icon"><ShieldCheck size={18} strokeWidth={1.8} /></span>
-              <span className="tk-consent-card__copy">
+              <span className="tk-voice-consent__check">{consent ? <Check size={14} strokeWidth={2.4} /> : null}</span>
+              <span className="tk-voice-consent__icon"><ShieldCheck size={18} strokeWidth={1.8} /></span>
+              <span className="tk-voice-consent__copy">
                 <strong>I own this voice or have explicit permission to use it.</strong>
                 <small>Takokit requires this confirmation before creating a reusable voice profile.</small>
               </span>
             </label>
 
-            <label className="tk-field">
-              <span className="tk-field__label">Consent note <em>optional</em></span>
+            <details className="tk-voice-consent-note">
+              <summary>Add a consent note <span>Optional</span></summary>
               <input
                 className="tk-input"
                 value={consentNote}
                 onChange={(event) => setConsentNote(event.target.value)}
                 placeholder="For example: I recorded and own this voice."
               />
-            </label>
+            </details>
 
             {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
           </div>
 
-          <div className="tk-voice-create__footer">
-            <span>{selectedModel?.name ?? "No cloning model installed"}</span>
+          <footer className="tk-voice-builder__footer">
+            <div>
+              <span>Clone with</span>
+              <strong>{selectedModel?.name ?? "No compatible model installed"}</strong>
+            </div>
             <ProductButton tone="primary" type="button" loading={busy} disabled={!canCreate} onClick={() => void createProfile()}>
               <UserRoundPlus size={16} strokeWidth={1.9} />
-              {busy ? "Creating" : "Create voice"}
+              {busy ? "Creating voice" : "Create voice"}
             </ProductButton>
-          </div>
+          </footer>
         </section>
 
-        <aside className="tk-voice-model-panel" aria-label="Voice cloning model">
-          <div className="tk-control-section">
-            <div className="tk-control-section__heading">
-              <span>Cloning setup</span>
-              <small>Local</small>
-            </div>
+        <aside className="tk-voice-setup" aria-label="Voice cloning setup">
+          <div className="tk-voice-setup__header">
+            <span>Cloning setup</span>
+            <small>Local</small>
+          </div>
+
+          <div className="tk-voice-setup__body">
             <ProductSelect
               label="Model"
               value={model}
@@ -230,37 +237,40 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
               options={cloningModels.map((item) => ({ value: item.id, label: item.name }))}
               hint={selectedModel ? `${selectedModel.runtime} · ${selectedModel.runner}` : "Install a cloning model first."}
             />
-          </div>
 
-          {selectedModel ? (
-            <div className="tk-selected-model">
-              <div className="tk-selected-model__title">
-                <span className="tk-selected-model__icon"><Gauge size={16} strokeWidth={1.8} /></span>
-                <div>
-                  <strong>{selectedModel.name}</strong>
-                  <span>{selectedModel.family}</span>
+            <div className="tk-voice-flow" aria-label="Instant cloning flow">
+              <div><span>1</span><p><strong>Reference</strong><small>Choose a clean voice recording.</small></p></div>
+              <div><span>2</span><p><strong>Create</strong><small>Takokit stores a reusable local profile.</small></p></div>
+              <div><span>3</span><p><strong>Speak</strong><small>Select the saved voice from Text to Speech.</small></p></div>
+            </div>
+
+            {selectedModel ? (
+              <div className="tk-voice-model-summary">
+                <div className="tk-voice-model-summary__title">
+                  <span><Gauge size={16} strokeWidth={1.8} /></span>
+                  <div><strong>{selectedModel.name}</strong><small>{selectedModel.family}</small></div>
                 </div>
+                <dl>
+                  <div><dt>Backend</dt><dd>{selectedModel.backend}</dd></div>
+                  <div><dt>Runtime</dt><dd>{selectedModel.runtime}</dd></div>
+                  <div><dt>License</dt><dd>{selectedModel.license}</dd></div>
+                </dl>
+                {blocker ? (
+                  <div className="tk-model-blocker">
+                    <span>{blocker}</span>
+                    <button type="button" onClick={() => onNavigate("models")}>Manage model →</button>
+                  </div>
+                ) : (
+                  <div className="tk-model-ready"><Check size={14} strokeWidth={2} /> Ready for instant cloning</div>
+                )}
               </div>
-              <dl>
-                <div><dt>Backend</dt><dd>{selectedModel.backend}</dd></div>
-                <div><dt>Runtime</dt><dd>{selectedModel.runtime}</dd></div>
-                <div><dt>License</dt><dd>{selectedModel.license}</dd></div>
-              </dl>
-              {blocker ? (
-                <div className="tk-model-blocker">
-                  <span>{blocker}</span>
-                  <button type="button" onClick={() => onNavigate("models")}>Manage model →</button>
-                </div>
-              ) : (
-                <div className="tk-model-ready"><Check size={14} strokeWidth={2} /> Ready for voice creation</div>
-              )}
-            </div>
-          ) : (
-            <div className="tk-model-blocker">
-              <span>No installed voice-cloning model is available.</span>
-              <button type="button" onClick={() => onNavigate("models")}>Open model library →</button>
-            </div>
-          )}
+            ) : (
+              <div className="tk-model-blocker">
+                <span>No installed voice-cloning model is available.</span>
+                <button type="button" onClick={() => onNavigate("models")}>Open model library →</button>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
 
@@ -269,7 +279,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
           <span className="tk-created-voice__icon"><Check size={18} strokeWidth={2} /></span>
           <div>
             <strong>{createdProfile.name} is ready</strong>
-            <span>Saved as <code>{createdProfile.id}</code> for {createdProfile.model_id}.</span>
+            <span>Saved locally and ready to use in Speak.</span>
           </div>
           <div className="tk-created-voice__actions">
             <button type="button" onClick={() => void navigator.clipboard.writeText(createdProfile.id)}>
@@ -283,63 +293,61 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
       ) : null}
 
       <section className="tk-voice-library">
-        <div className="tk-section-heading">
+        <div className="tk-section-heading tk-voice-library__heading">
           <div>
-            <h2>Voice library</h2>
-            <p>{localVoices.length} saved locally{builtInVoices.length > 0 ? ` · ${builtInVoices.length} built-in` : ""}</p>
+            <h2>Your voices</h2>
+            <p>{localVoices.length > 0 ? `${localVoices.length} reusable ${localVoices.length === 1 ? "voice" : "voices"} saved on this device` : "Create your first reusable voice above"}</p>
           </div>
         </div>
 
-        {runtime.voices.length > 0 ? (
-          <div className="tk-voice-grid">
-            {runtime.voices.map((voice) => {
-              const local = voice.source === "local-profile";
-              return (
-                <article className="tk-voice-card" key={`${voice.source}-${voice.id}`}>
-                  <div className="tk-voice-card__main">
-                    <span className={local ? "tk-voice-avatar is-local" : "tk-voice-avatar"}><Mic2 size={18} strokeWidth={1.7} /></span>
-                    <div>
-                      <strong>{voice.name}</strong>
-                      <span>{local ? "Saved voice" : "Built-in voice"} · {voice.model === "none" ? "model-defined" : voice.model}</span>
-                    </div>
-                    <span className={local ? "tk-voice-kind is-local" : "tk-voice-kind"}>{local ? "Local" : "Built-in"}</span>
-                  </div>
-
-                  <div className="tk-voice-card__id">
-                    <code>{voice.id}</code>
-                    <button type="button" title="Copy voice ID" onClick={() => void navigator.clipboard.writeText(voice.id)}>
-                      <Copy size={14} strokeWidth={1.8} />
+        {localVoices.length > 0 ? (
+          <div className="tk-voice-list">
+            {localVoices.map((voice) => (
+              <article className="tk-voice-row" key={`${voice.source}-${voice.id}`}>
+                <span className="tk-voice-row__avatar"><Mic2 size={19} strokeWidth={1.7} /></span>
+                <div className="tk-voice-row__identity">
+                  <strong>{voice.name}</strong>
+                  <span>Saved voice · {voice.model === "none" ? "model-defined" : voice.model}</span>
+                </div>
+                <div className="tk-voice-row__badges">
+                  <span className="is-local">Local</span>
+                  <span><ShieldCheck size={12} strokeWidth={1.8} /> Consent-backed</span>
+                </div>
+                <div className="tk-voice-row__actions">
+                  {voice.model !== "none" ? (
+                    <button className="tk-voice-use" type="button" onClick={() => useInSpeak(voice.id, voice.model)}>
+                      Use in Speak <ArrowRight size={13} strokeWidth={1.9} />
                     </button>
-                  </div>
-
-                  <div className="tk-voice-card__footer">
-                    <span>{local ? <><ShieldCheck size={13} strokeWidth={1.8} /> Consent-backed</> : "Available locally"}</span>
-                    <div>
-                      {local && voice.model !== "none" ? (
-                        <button className="tk-voice-use" type="button" onClick={() => useInSpeak(voice.id, voice.model)}>
-                          Use in Speak <ArrowRight size={13} strokeWidth={1.9} />
-                        </button>
-                      ) : null}
-                      {local ? (
-                        <button className="tk-voice-remove" type="button" title={`Remove ${voice.name}`} onClick={() => setRemoveTarget(voice)}>
-                          <Trash2 size={14} strokeWidth={1.8} />
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                  ) : null}
+                  <button className="tk-voice-icon-action" type="button" title="Copy voice ID" onClick={() => void navigator.clipboard.writeText(voice.id)}>
+                    <Copy size={14} strokeWidth={1.8} />
+                  </button>
+                  <button className="tk-voice-icon-action is-danger" type="button" title={`Remove ${voice.name}`} onClick={() => setRemoveTarget(voice)}>
+                    <Trash2 size={14} strokeWidth={1.8} />
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
         ) : (
           <div className="tk-result-empty">
             <Mic2 size={19} strokeWidth={1.7} />
-            <div>
-              <strong>No voices yet</strong>
-              <span>Create a consent-backed voice above to use it in Speak.</span>
-            </div>
+            <div><strong>No saved voices yet</strong><span>Create an instant clone above, then use it from Speak.</span></div>
           </div>
         )}
+
+        {builtInVoices.length > 0 ? (
+          <div className="tk-built-in-voices">
+            <div className="tk-built-in-voices__heading"><span>Built-in voices</span><small>Provided by installed models</small></div>
+            {builtInVoices.map((voice) => (
+              <div className="tk-built-in-voice" key={`${voice.source}-${voice.id}`}>
+                <span><Mic2 size={16} strokeWidth={1.7} /></span>
+                <div><strong>{voice.name}</strong><small>{voice.model === "none" ? "Model-defined voice" : voice.model}</small></div>
+                <em>Built-in</em>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <ConfirmDialog
