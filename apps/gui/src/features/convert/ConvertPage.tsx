@@ -19,6 +19,7 @@ import { ProductSelect } from "../../components/ui/ProductSelect";
 import { useVoiceConversion } from "../../hooks/useVoiceConversion";
 import { pickAudioFile, pickFolder } from "../../lib/nativePicker";
 import type { RvcF0Method } from "../../lib/types";
+import { consumeCloneIntent } from "../../lib/workflowIntent";
 
 type ConversionMode = "reference" | "rvc";
 
@@ -56,12 +57,13 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
     () => conversionModels.filter((item) => item.id === "rvc"),
     [conversionModels]
   );
+  const cloneIntent = useMemo(() => consumeCloneIntent(), []);
 
-  const [mode, setMode] = useState<ConversionMode>("reference");
+  const [mode, setMode] = useState<ConversionMode>(cloneIntent?.mode ?? "reference");
   const modeModels = mode === "rvc" ? rvcModels : referenceModels;
   const [model, setModel] = useState("");
-  const [sourcePath, setSourcePath] = useState("");
-  const [targetPath, setTargetPath] = useState("");
+  const [sourcePath, setSourcePath] = useState(cloneIntent?.sourcePath ?? "");
+  const [targetPath, setTargetPath] = useState(cloneIntent?.targetPath ?? "");
   const [sourcePickerBusy, setSourcePickerBusy] = useState(false);
   const [targetPickerBusy, setTargetPickerBusy] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
@@ -277,6 +279,10 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
                 </label>
               </div>
             </details>
+
+            <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>
+              Choose source audio from workspace Files →
+            </button>
 
             {mode === "rvc" ? (
               <div className="tk-convert-advanced">
