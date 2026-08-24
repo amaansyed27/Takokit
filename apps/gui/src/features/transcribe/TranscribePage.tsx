@@ -1,5 +1,5 @@
 import { Check, Copy, FileAudio, FileText, FolderOpen, Gauge, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ProductButton } from "../../components/ui/ProductButton";
@@ -34,10 +34,6 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
       ? null
       : selectedModel?.missing.join("; ") || "This model needs attention before it can run.";
   const fileName = displayFileName(filePath);
-
-  useEffect(() => {
-    clearResult();
-  }, [model, filePath]);
 
   async function browseAudio() {
     setPickerBusy(true);
@@ -191,8 +187,13 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
         <div className="tk-section-heading">
           <div>
             <h2>Transcript</h2>
-            <p>The latest transcription result from this workspace session.</p>
+            <p>The latest result stays here across navigation until you clear it.</p>
           </div>
+          {result || error ? (
+            <ProductButton tone="ghost" type="button" disabled={isTranscribing} onClick={clearResult}>
+              <X size={14} /> Clear
+            </ProductButton>
+          ) : null}
         </div>
 
         {result ? (
@@ -229,6 +230,14 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
                 </button>
               </div>
             ) : null}
+          </div>
+        ) : isTranscribing ? (
+          <div className="tk-result-empty">
+            <FileText size={19} strokeWidth={1.7} />
+            <div>
+              <strong>Transcribing audio…</strong>
+              <span>You can switch pages. Takokit will keep this process active.</span>
+            </div>
           </div>
         ) : (
           <div className="tk-result-empty">
