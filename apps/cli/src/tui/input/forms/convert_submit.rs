@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
+pub(in crate::tui::input) fn submit_convert(app: &mut App) -> Option<TuiAction> {
     let Some(model) = app.selected_convert_model().cloned() else {
         app.set_status(
             "No voice-conversion model is installed. Install a conversion-capable model through the library first.",
