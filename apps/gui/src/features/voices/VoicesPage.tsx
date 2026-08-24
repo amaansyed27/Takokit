@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { AudioRecorder } from "../../components/audio/AudioRecorder";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ProductButton } from "../../components/ui/ProductButton";
@@ -21,19 +22,20 @@ import { useVoiceProfileCreation } from "../../hooks/useVoiceProfileCreation";
 import { pickAudioFile } from "../../lib/nativePicker";
 import type { VoiceSummary } from "../../lib/types";
 import { removeVoiceProfile } from "../../lib/voices";
-import { setSpeakIntent } from "../../lib/workflowIntent";
+import { consumeVoiceIntent, setSpeakIntent } from "../../lib/workflowIntent";
 
 export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentProps) {
   const cloningModels = useMemo(
     () => runtime.models.filter((item) => item.capabilities.includes("voice_cloning")),
     [runtime.models]
   );
+  const voiceIntent = useMemo(() => consumeVoiceIntent(), []);
   const initialModel = cloningModels.find((item) => item.id === "openvoice" && item.executable)
     ?? cloningModels.find((item) => item.executable)
     ?? cloningModels[0];
 
   const [name, setName] = useState("");
-  const [samplePath, setSamplePath] = useState("");
+  const [samplePath, setSamplePath] = useState(voiceIntent?.samplePath ?? "");
   const [model, setModel] = useState(initialModel?.id ?? "");
   const [consent, setConsent] = useState(false);
   const [consentNote, setConsentNote] = useState("");
@@ -125,7 +127,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
       <ProductPageHeader
         eyebrow="Voice cloning"
         title="Voices"
-        description="Create a reusable local voice from one clean reference recording, then use it directly from Speak."
+        description="Create a reusable local voice from a clean reference recording. Browse an existing clip, reuse Files, or record one right here."
       />
 
       <div className="tk-voice-studio">
@@ -176,6 +178,12 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
               </div>
             </div>
 
+            <AudioRecorder
+              compact
+              label="Record a reference now"
+              onSaved={(file) => setSamplePath(file.path)}
+            />
+
             {samplePath ? <LocalAudioPlayer path={samplePath} compact label="Reference audio" /> : null}
 
             <details className="tk-voice-manual-path">
@@ -187,6 +195,10 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
                 spellCheck={false}
               />
             </details>
+
+            <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>
+              Choose from workspace Files →
+            </button>
 
             <label className={consent ? "tk-voice-consent is-checked" : "tk-voice-consent"}>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
@@ -239,7 +251,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
             />
 
             <div className="tk-voice-flow" aria-label="Instant cloning flow">
-              <div><span>1</span><p><strong>Reference</strong><small>Choose a clean voice recording.</small></p></div>
+              <div><span>1</span><p><strong>Reference</strong><small>Choose or record a clean voice sample.</small></p></div>
               <div><span>2</span><p><strong>Create</strong><small>Takokit stores a reusable local profile.</small></p></div>
               <div><span>3</span><p><strong>Speak</strong><small>Select the saved voice from Text to Speech.</small></p></div>
             </div>
