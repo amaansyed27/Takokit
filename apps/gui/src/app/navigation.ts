@@ -46,7 +46,7 @@ export const navSections: NavSection[] = [
     items: [
       { id: "speak", label: "Speak", icon: AudioLines },
       { id: "transcribe", label: "Transcribe", icon: Speech },
-      { id: "convert", label: "Convert voice", icon: AudioWaveform }
+      { id: "convert", label: "Clone audio", icon: AudioWaveform }
     ]
   },
   {
