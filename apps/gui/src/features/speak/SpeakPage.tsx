@@ -1,6 +1,7 @@
 import { Check, Copy, Gauge, Sparkles, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
@@ -235,6 +236,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
                 {result.sample_rate ? <span>{result.sample_rate.toLocaleString()} Hz</span> : null}
                 <span>{result.content_type}</span>
               </div>
+              <LocalAudioPlayer path={result.output_path} label="Generated speech" />
               <div className="tk-output-path">
                 <code title={result.output_path}>{result.output_path}</code>
                 <button type="button" onClick={() => void navigator.clipboard.writeText(result.output_path)} title="Copy output path">
