@@ -1,0 +1,48 @@
+name: Slice 2 finalizer
+
+on:
+  push:
+    branches:
+      - slice/interactive-stabilization
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: slice/interactive-stabilization
+          fetch-depth: 0
+
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Split oversized modules
+        run: python scripts/slice2_finalize_refactor.py
+
+      - name: Format Rust
+        run: cargo fmt --all
+
+      - name: Refresh lockfile
+        run: cargo check -p takokit-server --tests
+
+      - name: Commit finalized sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No finalizer changes to commit."
+            exit 0
+          fi
+          git commit -m "Refactor oversized Slice 2 modules and format"
+          git push origin HEAD:slice/interactive-stabilization
