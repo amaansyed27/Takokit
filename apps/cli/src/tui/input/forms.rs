@@ -13,8 +13,8 @@ use super::{normalize_path_field, picker};
 
 mod clone_submit;
 mod convert_submit;
-use clone_submit::submit_clone;
-use convert_submit::submit_convert;
+pub(super) use self::clone_submit::submit_clone;
+pub(super) use self::convert_submit::submit_convert;
 
 pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if app.speak_field == SpeakField::Text {
