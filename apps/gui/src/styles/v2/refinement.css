@@ -1,0 +1,618 @@
+/* Final product-level refinement for the non-studio management surfaces.
+   Home, Speak and Transcribe establish the reference density and typography. */
+
+.tk-inline-error,
+.runtime-error span {
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.runtime-error strong {
+  font-size: 11.5px;
+}
+
+/* Convert */
+.tk-convert-page {
+  gap: 28px;
+}
+
+.tk-convert-mode-switch {
+  width: min(820px, 100%);
+  gap: 5px;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.tk-convert-mode-switch > button {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 62px;
+  padding: 10px 13px;
+}
+
+.tk-convert-mode-switch__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.tk-convert-mode-switch strong {
+  font-size: 12.5px;
+}
+
+.tk-convert-mode-switch small {
+  font-size: 10.5px;
+}
+
+.tk-convert-studio {
+  grid-template-columns: minmax(0, 1fr) 310px;
+}
+
+.tk-convert-workflow__header,
+.tk-convert-workflow__footer {
+  padding: 14px 16px;
+}
+
+.tk-convert-workflow__header > div > span {
+  font-size: 12px;
+}
+
+.tk-convert-workflow__header small,
+.tk-convert-workflow__footer > span {
+  font-size: 10.5px;
+}
+
+.tk-convert-path {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  min-height: 112px;
+  gap: 15px;
+  padding: 18px;
+}
+
+.tk-convert-path__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+}
+
+.tk-convert-path > div > span {
+  font-size: 9.5px;
+}
+
+.tk-convert-path strong {
+  font-size: 13px;
+}
+
+.tk-convert-path small {
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.tk-convert-manual-paths summary,
+.tk-convert-evidence summary {
+  font-size: 10.5px;
+}
+
+.tk-convert-advanced > button {
+  min-height: 44px;
+  font-size: 10.5px;
+}
+
+.tk-consent-card strong {
+  font-size: 11.5px;
+}
+
+.tk-consent-card small {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tk-convert-model-empty strong,
+.tk-convert-explainer strong {
+  font-size: 11.5px;
+}
+
+.tk-convert-model-empty span,
+.tk-convert-explainer p {
+  font-size: 10.5px;
+}
+
+.tk-convert-result-card__header strong {
+  font-size: 12.5px;
+}
+
+.tk-convert-result-card__header span:not(.tk-convert-result-card__icon):not(.tk-result-success),
+.tk-convert-result-card__summary span {
+  font-size: 10px;
+}
+
+/* History */
+.tk-history-page {
+  gap: 24px;
+}
+
+.tk-history-search {
+  min-height: 42px;
+  border-radius: 11px;
+  padding-inline: 13px;
+}
+
+.tk-history-search input {
+  font-size: 12px;
+}
+
+.tk-history-layout {
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.tk-history-sessions,
+.tk-history-detail {
+  min-height: 560px;
+  border-radius: 15px;
+}
+
+.tk-history-session {
+  gap: 9px;
+  padding: 15px 17px;
+}
+
+.tk-history-session strong {
+  font-size: 12px;
+  font-weight: 590;
+}
+
+.tk-history-session span {
+  font-size: 9.5px;
+}
+
+.tk-history-session__meta span {
+  padding: 4px 7px;
+  font-size: 8.5px;
+}
+
+.tk-history-detail__header {
+  padding: 20px 22px;
+}
+
+.tk-history-detail__header > div:first-child > span {
+  font-size: 9px;
+}
+
+.tk-history-detail__header h2 {
+  font-size: 19px;
+}
+
+.tk-history-detail__header p {
+  font-size: 10.5px;
+}
+
+.tk-history-timeline {
+  padding: 8px 22px 24px;
+}
+
+.tk-history-event {
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.tk-history-event__body {
+  gap: 11px;
+  padding: 14px 0 21px;
+}
+
+.tk-history-event__body > header {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.tk-history-event__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.tk-history-event__body > header strong {
+  font-size: 12px;
+}
+
+.tk-history-event__body > header span:not(.tk-history-event__icon):not(.tk-event-state) {
+  font-size: 9.5px;
+}
+
+.tk-event-state {
+  padding: 5px 8px;
+  font-size: 8.5px;
+}
+
+.tk-history-event__input,
+.tk-history-event__message {
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.tk-history-event__text {
+  padding: 6px 0 6px 13px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.tk-history-output {
+  min-height: 52px;
+  padding: 10px 11px 10px 13px;
+}
+
+.tk-history-output strong {
+  font-size: 10.5px;
+}
+
+.tk-history-output span {
+  font-size: 8.5px;
+}
+
+/* Storage */
+.tk-storage-page {
+  gap: 28px;
+}
+
+.tk-storage-summary,
+.tk-diagnostics-summary {
+  border-top-color: var(--tk-line);
+  border-bottom-color: var(--tk-line);
+}
+
+.tk-system-metric {
+  gap: 6px;
+  padding: 20px 22px;
+}
+
+.tk-system-metric span {
+  font-size: 10.5px;
+}
+
+.tk-system-metric strong {
+  font-size: 24px;
+}
+
+.tk-system-metric small {
+  font-size: 10px;
+}
+
+.tk-storage-layout {
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 18px;
+}
+
+.tk-system-panel,
+.tk-storage-actions,
+.tk-system-empty,
+.tk-system-loading {
+  border-radius: 15px;
+}
+
+.tk-system-panel__header {
+  padding: 19px 21px;
+}
+
+.tk-system-panel__header h2 {
+  font-size: 15px;
+}
+
+.tk-system-panel__header p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tk-storage-row {
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 24px;
+  padding: 16px 21px;
+}
+
+.tk-storage-row__copy {
+  gap: 5px;
+}
+
+.tk-storage-row__copy strong {
+  font-size: 12.5px;
+}
+
+.tk-storage-row__copy code {
+  font-size: 9.5px;
+}
+
+.tk-storage-row__amount > strong {
+  font-size: 11.5px;
+}
+
+.tk-storage-meter {
+  height: 5px;
+}
+
+.tk-storage-actions {
+  gap: 9px;
+  padding: 18px;
+}
+
+.tk-storage-actions > div:first-child {
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 11px;
+  padding-bottom: 12px;
+}
+
+.tk-storage-actions__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.tk-storage-actions strong {
+  font-size: 12px;
+}
+
+.tk-storage-actions span {
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.tk-storage-actions__note {
+  margin-top: 10px;
+  padding: 14px;
+}
+
+.tk-storage-actions__note button {
+  font-size: 10.5px;
+}
+
+.tk-system-empty,
+.tk-system-loading {
+  padding: 20px;
+}
+
+.tk-system-empty strong {
+  font-size: 12.5px;
+}
+
+.tk-system-empty span,
+.tk-system-loading {
+  font-size: 11px;
+}
+
+/* Diagnostics */
+.tk-diagnostics-page {
+  gap: 28px;
+}
+
+.tk-diagnostics-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+}
+
+.tk-diagnostics-checks {
+  gap: 13px;
+}
+
+.tk-doctor-group {
+  border-radius: 15px;
+}
+
+.tk-doctor-group__header {
+  padding: 15px 17px;
+}
+
+.tk-doctor-group__header span {
+  font-size: 11.5px;
+}
+
+.tk-doctor-group__header strong {
+  font-size: 9.5px;
+}
+
+.tk-doctor-check {
+  grid-template-columns: 32px minmax(0, 1fr) 34px;
+  gap: 11px;
+  padding: 12px 13px 12px 17px;
+}
+
+.tk-doctor-check__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.tk-doctor-check > div {
+  gap: 3px;
+}
+
+.tk-doctor-check strong {
+  font-size: 10.5px;
+}
+
+.tk-doctor-check span:not(.tk-doctor-check__icon) {
+  overflow: visible;
+  font-size: 9.5px;
+  line-height: 1.45;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.tk-diagnostics-side {
+  gap: 13px;
+}
+
+.tk-diagnostics-card {
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 11px;
+  border-radius: 15px;
+  padding: 17px;
+}
+
+.tk-diagnostics-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.tk-diagnostics-card strong {
+  font-size: 11.5px;
+}
+
+.tk-diagnostics-card span {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tk-diagnostics-card dl div {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 9px;
+  padding: 7px 0;
+}
+
+.tk-diagnostics-card dt,
+.tk-diagnostics-card dd {
+  font-size: 9.5px;
+}
+
+.tk-diagnostics-card code {
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+
+.tk-diagnostics-card__actions button {
+  font-size: 10px;
+}
+
+.tk-diagnostics-offline {
+  padding: 14px 15px;
+}
+
+.tk-diagnostics-offline strong {
+  font-size: 11.5px;
+}
+
+.tk-diagnostics-offline span {
+  font-size: 10px;
+}
+
+/* Settings */
+.tk-settings-page {
+  max-width: 980px;
+  gap: 28px;
+}
+
+.tk-settings-section {
+  border-radius: 15px;
+}
+
+.tk-settings-section__heading {
+  padding: 19px 20px;
+}
+
+.tk-settings-section__heading h2 {
+  font-size: 15px;
+}
+
+.tk-settings-section__heading p {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.tk-theme-options {
+  gap: 12px;
+  padding: 18px;
+}
+
+.tk-theme-option {
+  gap: 14px;
+  border-radius: 13px;
+  padding: 14px;
+}
+
+.tk-theme-option__preview {
+  height: 76px;
+  grid-template-columns: 44px 1fr;
+  grid-template-rows: 14px 56px;
+  border-radius: 9px;
+}
+
+.tk-theme-option__copy strong {
+  font-size: 11.5px;
+}
+
+.tk-theme-option__copy small {
+  font-size: 10px;
+}
+
+.tk-settings-facts > div {
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 48px;
+  padding: 0 20px;
+}
+
+.tk-settings-facts span {
+  font-size: 10.5px;
+}
+
+.tk-settings-facts strong {
+  font-size: 10.5px;
+}
+
+.tk-settings-facts strong.is-mono {
+  font-size: 9px;
+}
+
+.tk-settings-links {
+  gap: 18px;
+  padding: 14px 20px;
+}
+
+.tk-settings-links button {
+  font-size: 10.5px;
+}
+
+.tk-policy-row {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.tk-policy-row > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.tk-policy-row strong {
+  font-size: 11px;
+}
+
+.tk-policy-row p {
+  margin-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .tk-history-layout,
+  .tk-storage-layout,
+  .tk-diagnostics-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-diagnostics-side {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .tk-convert-mode-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-history-sessions,
+  .tk-history-detail {
+    min-height: auto;
+  }
+}
