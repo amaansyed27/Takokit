@@ -83,7 +83,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
     : !selectedModel
       ? mode === "rvc"
         ? "RVC is not installed in this runtime."
-        : "No installed reference-voice conversion model is available."
+        : "No installed reference-cloning model is available."
       : selectedModel.executable
         ? null
         : selectedModel.missing.join("; ") || "This model needs attention before it can run.";
@@ -98,6 +98,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
       !targetPickerBusy
   );
   const qualityPassed = review.words && review.timbre && review.similarity && review.artifacts;
+  const resultIsRvc = result?.model === "rvc";
 
   useEffect(() => {
     if (modeModels.some((item) => item.id === model)) return;
@@ -105,7 +106,6 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
   }, [mode, modeModels, model]);
 
   useEffect(() => {
-    clearResult();
     setReview(emptyReview);
   }, [mode, model, sourcePath, targetPath]);
 
@@ -163,12 +163,12 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
   return (
     <section className="tk-page tk-convert-page">
       <ProductPageHeader
-        eyebrow="Voice conversion"
-        title="Convert voice"
-        description="Keep the spoken words while changing the voice. Use a reference recording for OpenVoice, or an RVC package when you need checkpoint-based conversion."
+        eyebrow="Voice-to-voice cloning"
+        title="Clone audio"
+        description="Keep the words and timing from an existing recording while cloning a target voice onto it. Use a reference recording with OpenVoice or an RVC checkpoint package."
       />
 
-      <div className="tk-convert-mode-switch" role="tablist" aria-label="Conversion type">
+      <div className="tk-convert-mode-switch" role="tablist" aria-label="Cloning type">
         <button
           className={mode === "reference" ? "is-active" : ""}
           type="button"
@@ -178,8 +178,8 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
         >
           <span className="tk-convert-mode-switch__icon"><FileAudio size={17} strokeWidth={1.8} /></span>
           <span>
-            <strong>Reference voice</strong>
-            <small>Audio → same words in a target reference voice</small>
+            <strong>Reference clone</strong>
+            <small>Audio → same words cloned toward a reference voice</small>
           </span>
         </button>
         <button
@@ -191,8 +191,8 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
         >
           <span className="tk-convert-mode-switch__icon"><AudioWaveform size={17} strokeWidth={1.8} /></span>
           <span>
-            <strong>RVC</strong>
-            <small>Audio → voice using a local checkpoint package</small>
+            <strong>RVC clone</strong>
+            <small>Audio → voice cloned with a local checkpoint package</small>
           </span>
         </button>
       </div>
@@ -202,7 +202,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
           <span><CircleAlert size={19} strokeWidth={1.8} /></span>
           <div>
             <strong>Local runtime is unavailable</strong>
-            <p>Takokit could not load the current models and runners. Retry the local runtime before starting a conversion.</p>
+            <p>Takokit could not load the current models and runners. Retry the local runtime before starting a clone.</p>
           </div>
           <ProductButton type="button" tone="secondary" onClick={() => void onRefresh()}>
             Retry runtime
@@ -210,10 +210,10 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
         </section>
       ) : (
         <div className="tk-convert-studio">
-          <section className="tk-convert-workflow" aria-label="Voice conversion input">
+          <section className="tk-convert-workflow" aria-label="Voice cloning input">
             <div className="tk-convert-workflow__header">
               <div>
-                <span>{mode === "rvc" ? "RVC conversion" : "Reference conversion"}</span>
+                <span>{mode === "rvc" ? "RVC clone" : "Reference clone"}</span>
                 <small>{mode === "rvc" ? "Checkpoint based" : "Reference audio"}</small>
               </div>
               {selectedModel?.executable ? (
@@ -311,7 +311,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               <span className="tk-consent-card__icon"><ShieldCheck size={18} strokeWidth={1.8} /></span>
               <span>
                 <strong>Voice permission</strong>
-                <small>I own these voices or have explicit permission to perform this conversion.</small>
+                <small>I own these voices or have explicit permission to perform this cloning operation.</small>
               </span>
             </label>
 
@@ -319,7 +319,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
             {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
 
             <div className="tk-convert-workflow__footer">
-              <span>{selectedModel?.name ?? (mode === "rvc" ? "RVC not installed" : "No reference conversion model")}</span>
+              <span>{selectedModel?.name ?? (mode === "rvc" ? "RVC not installed" : "No reference-cloning model")}</span>
               <ProductButton
                 tone="primary"
                 type="button"
@@ -328,15 +328,15 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
                 onClick={() => void submit()}
               >
                 <AudioWaveform size={16} strokeWidth={1.9} />
-                {isConverting ? "Converting" : "Convert voice"}
+                {isConverting ? "Cloning" : "Clone voice"}
               </ProductButton>
             </div>
           </section>
 
-          <aside className="tk-convert-controls" aria-label="Conversion model">
+          <aside className="tk-convert-controls" aria-label="Cloning model">
             <div className="tk-control-section">
               <div className="tk-control-section__heading">
-                <span>Conversion setup</span>
+                <span>Cloning setup</span>
                 <small>Local</small>
               </div>
               {modeModels.length > 0 ? (
@@ -350,7 +350,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               ) : (
                 <div className="tk-convert-model-empty">
                   <strong>{mode === "rvc" ? "RVC is not installed" : "No compatible model installed"}</strong>
-                  <span>{mode === "rvc" ? "Install RVC from Models to use checkpoint conversion." : "Install a model with voice-conversion support."}</span>
+                  <span>{mode === "rvc" ? "Install RVC from Models to use checkpoint cloning." : "Install a model with voice-to-voice cloning support."}</span>
                   <button type="button" onClick={() => onNavigate("models")}>Open Models →</button>
                 </div>
               )}
@@ -383,11 +383,11 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
             ) : null}
 
             <div className="tk-convert-explainer">
-              <strong>{mode === "rvc" ? "What RVC changes" : "What stays the same"}</strong>
+              <strong>{mode === "rvc" ? "What RVC changes" : "What the clone does"}</strong>
               <p>
                 {mode === "rvc"
-                  ? "Takokit preserves the source speech content while applying the selected RVC target and tuning settings."
-                  : "The source words stay unchanged. OpenVoice changes the vocal identity toward the target reference recording."}
+                  ? "Takokit preserves the source speech content while applying the selected RVC voice and tuning settings."
+                  : "The source words and timing stay unchanged. OpenVoice clones the vocal identity toward the target reference recording."}
               </p>
             </div>
           </aside>
@@ -397,9 +397,14 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
       <section className="tk-convert-result" aria-live="polite">
         <div className="tk-section-heading">
           <div>
-            <h2>Output</h2>
-            <p>Execution success and listening quality are tracked separately.</p>
+            <h2>Cloned audio</h2>
+            <p>The latest result stays here across navigation until you clear it. Listening quality remains a separate human check.</p>
           </div>
+          {result || error ? (
+            <ProductButton tone="ghost" type="button" disabled={isConverting} onClick={clearResult}>
+              <X size={14} /> Clear
+            </ProductButton>
+          ) : null}
         </div>
 
         {result ? (
@@ -408,7 +413,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               <div>
                 <span className="tk-convert-result-card__icon"><AudioWaveform size={18} strokeWidth={1.8} /></span>
                 <div>
-                  <strong>Conversion complete</strong>
+                  <strong>Cloning complete</strong>
                   <span>{result.model} · {formatBytes(result.bytes)}</span>
                 </div>
               </div>
@@ -417,11 +422,11 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
 
             <div className="tk-convert-result-card__summary">
               <div><span>Quality</span><strong>{result.quality_status.replace(/_/g, " ")}</strong></div>
-              <div><span>Target</span><strong>{displayFileName(mode === "rvc" ? result.checkpoint.checkpoint_path : result.checkpoint.target_reference_path ?? result.target_voice)}</strong></div>
+              <div><span>Target</span><strong>{displayFileName(resultIsRvc ? result.checkpoint.checkpoint_path : result.checkpoint.target_reference_path ?? result.target_voice)}</strong></div>
               <div><span>Review</span><strong>{result.quality_review_required ? "Listening required" : "Not required"}</strong></div>
             </div>
 
-            <LocalAudioPlayer path={result.output_path} label="Converted audio" />
+            <LocalAudioPlayer path={result.output_path} label="Cloned audio" />
 
             <div className="tk-output-path">
               <code title={result.output_path}>{result.output_path}</code>
@@ -434,7 +439,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               <div className="tk-listening-review">
                 <div>
                   <strong>Listening review</strong>
-                  <span>Compare the source, target and output before calling this a quality pass.</span>
+                  <span>Compare the source, target and cloned output before calling this a quality pass.</span>
                 </div>
                 <div className="tk-listening-review__items">
                   <ReviewItem checked={review.words} label="Words remain intelligible and unchanged" onChange={(checked) => setReview((current) => ({ ...current, words: checked }))} />
@@ -449,7 +454,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               </div>
             ) : null}
 
-            {mode === "rvc" ? (
+            {resultIsRvc ? (
               <details className="tk-convert-evidence">
                 <summary>RVC execution details</summary>
                 <dl>
@@ -463,12 +468,20 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               </details>
             ) : null}
           </div>
+        ) : isConverting ? (
+          <div className="tk-result-empty">
+            <AudioWaveform size={19} strokeWidth={1.7} />
+            <div>
+              <strong>Cloning voice…</strong>
+              <span>You can switch pages. Takokit will keep this process active.</span>
+            </div>
+          </div>
         ) : (
           <div className="tk-result-empty">
             <AudioWaveform size={19} strokeWidth={1.7} />
             <div>
-              <strong>No conversion yet</strong>
-              <span>Choose a source, target and executable conversion model.</span>
+              <strong>No cloned audio yet</strong>
+              <span>Choose a source, target and executable cloning model.</span>
             </div>
           </div>
         )}
