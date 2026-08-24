@@ -4,6 +4,7 @@ import {
   Box,
   Boxes,
   CircleGauge,
+  Files,
   HardDrive,
   History,
   House,
@@ -18,6 +19,7 @@ export type PageId =
   | "models"
   | "runners"
   | "voices"
+  | "files"
   | "speak"
   | "transcribe"
   | "convert"
@@ -53,6 +55,7 @@ export const navSections: NavSection[] = [
     label: "Library",
     items: [
       { id: "voices", label: "Voices", icon: UserRound },
+      { id: "files", label: "Files", icon: Files },
       { id: "models", label: "Models", icon: Box },
       { id: "runners", label: "Runners", icon: Boxes }
     ]
