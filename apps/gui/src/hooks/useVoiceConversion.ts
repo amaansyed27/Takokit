@@ -1,33 +1,29 @@
-import { useState } from "react";
 import { convertSessionVoice } from "../lib/sessionInference";
 import type { VoiceConversionApiRequest, VoiceConversionApiResponse } from "../lib/types";
+import { createWorkflowStore, useWorkflowStore } from "../lib/workflowState";
+
+const cloningWorkflow = createWorkflowStore<VoiceConversionApiResponse>();
 
 export function useVoiceConversion() {
-  const [isConverting, setIsConverting] = useState(false);
-  const [result, setResult] = useState<VoiceConversionApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const state = useWorkflowStore(cloningWorkflow);
 
   async function convert(request: VoiceConversionApiRequest): Promise<VoiceConversionApiResponse | null> {
-    if (isConverting) return null;
-    setIsConverting(true);
-    setError(null);
-    setResult(null);
+    if (!cloningWorkflow.start()) return null;
     try {
       const response = await convertSessionVoice(request);
-      setResult(response);
+      cloningWorkflow.succeed(response);
       return response;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Voice conversion failed.");
+      cloningWorkflow.fail(caught instanceof Error ? caught.message : "Voice cloning failed.");
       return null;
-    } finally {
-      setIsConverting(false);
     }
   }
 
-  function clearResult() {
-    setResult(null);
-    setError(null);
-  }
-
-  return { clearResult, convert, error, isConverting, result };
+  return {
+    clearResult: cloningWorkflow.clear,
+    convert,
+    error: state.error,
+    isConverting: state.running,
+    result: state.result
+  };
 }
