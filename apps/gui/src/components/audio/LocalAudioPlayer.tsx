@@ -9,7 +9,7 @@ type LocalAudioPlayerProps = {
   label?: string;
 };
 
-export function LocalAudioPlayer({ path, compact = false, defer = false, label = "Audio preview" }: LocalAudioPlayerProps) {
+export function LocalAudioPlayer({ path, compact = false, defer = true, label = "Audio preview" }: LocalAudioPlayerProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +42,10 @@ export function LocalAudioPlayer({ path, compact = false, defer = false, label =
     void audioRef.current?.play().catch(() => undefined);
     setShouldAutoplay(false);
   }, [url, shouldAutoplay]);
+
+  useEffect(() => () => {
+    if (url) URL.revokeObjectURL(url);
+  }, [url]);
 
   async function load(autoplay: boolean) {
     if (!path.trim() || loading) return;
