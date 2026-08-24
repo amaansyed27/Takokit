@@ -1,44 +1,40 @@
-import { useState } from "react";
 import { transcribeSessionAudio } from "../lib/sessionInference";
 import type { TranscriptionApiResponse } from "../lib/types";
+import { createWorkflowStore, useWorkflowStore } from "../lib/workflowState";
 
 type TranscriptionInput = {
   model: string;
   filePath: string;
 };
 
+const transcriptionWorkflow = createWorkflowStore<TranscriptionApiResponse>();
+
 export function useTranscription() {
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [result, setResult] = useState<TranscriptionApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const state = useWorkflowStore(transcriptionWorkflow);
 
   async function transcribe(input: TranscriptionInput) {
     if (!input.filePath.trim()) {
-      setError("Choose an audio file before transcribing.");
+      transcriptionWorkflow.fail("Choose an audio file before transcribing.");
       return;
     }
-
-    setIsTranscribing(true);
-    setError(null);
+    if (!transcriptionWorkflow.start()) return;
 
     try {
       const response = await transcribeSessionAudio({
         model: input.model,
         file_path: input.filePath
       });
-      setResult(response);
+      transcriptionWorkflow.succeed(response);
     } catch (caught) {
-      setResult(null);
-      setError(caught instanceof Error ? caught.message : "Transcription failed.");
-    } finally {
-      setIsTranscribing(false);
+      transcriptionWorkflow.fail(caught instanceof Error ? caught.message : "Transcription failed.");
     }
   }
 
-  function clearResult() {
-    setResult(null);
-    setError(null);
-  }
-
-  return { clearResult, error, isTranscribing, result, transcribe };
+  return {
+    clearResult: transcriptionWorkflow.clear,
+    error: state.error,
+    isTranscribing: state.running,
+    result: state.result,
+    transcribe
+  };
 }
