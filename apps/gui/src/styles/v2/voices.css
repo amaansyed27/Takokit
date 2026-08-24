@@ -1,4 +1,5 @@
 .tk-voices-page {
+  display: grid;
   gap: 28px;
 }
 
@@ -45,7 +46,7 @@
 .tk-voice-create__header small,
 .tk-voice-create__footer > span {
   color: var(--tk-text-tertiary);
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .tk-voice-create__header > svg {
@@ -54,8 +55,8 @@
 
 .tk-voice-create__body {
   display: grid;
-  gap: 17px;
-  padding: 18px;
+  gap: 18px;
+  padding: 20px;
 }
 
 .tk-voice-create__footer {
@@ -65,29 +66,29 @@
 
 .tk-reference-audio {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 13px;
-  min-height: 96px;
+  gap: 15px;
+  min-height: 118px;
   border: 1px dashed var(--tk-line-strong);
-  border-radius: 12px;
+  border-radius: 13px;
   background: var(--tk-surface-soft);
-  padding: 15px;
+  padding: 18px;
   transition: border-color var(--tk-transition), background var(--tk-transition);
 }
 
 .tk-reference-audio.is-selected {
   border-style: solid;
-  border-color: rgba(142, 179, 149, 0.24);
+  border-color: rgba(142, 179, 149, 0.25);
   background: var(--tk-accent-soft);
 }
 
 .tk-reference-audio__icon {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   place-items: center;
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--tk-control);
   color: var(--tk-text-secondary);
 }
@@ -98,14 +99,14 @@
 
 .tk-reference-audio__copy {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
 .tk-reference-audio__copy strong {
   overflow: hidden;
   color: var(--tk-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 610;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -113,8 +114,8 @@
 
 .tk-reference-audio__copy span {
   color: var(--tk-text-secondary);
-  font-size: 10.5px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .tk-reference-audio__actions {
@@ -146,20 +147,20 @@
 
 .tk-voice-path-field > span {
   color: var(--tk-text-tertiary);
-  font-size: 9.5px;
+  font-size: 10px;
 }
 
 .tk-voice-path-field input {
   width: 100%;
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid var(--tk-line);
   border-radius: 10px;
   outline: 0;
   background: var(--tk-control);
   color: var(--tk-text);
-  padding: 0 11px;
+  padding: 0 12px;
   font-family: var(--tk-font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .tk-voice-path-field input:focus {
@@ -169,33 +170,33 @@
 
 .tk-consent-card {
   display: grid;
-  grid-template-columns: auto 34px minmax(0, 1fr);
+  grid-template-columns: auto 36px minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
+  gap: 11px;
   border: 1px solid var(--tk-line);
   border-radius: 12px;
   background: var(--tk-surface-soft);
-  padding: 13px;
+  padding: 14px;
   cursor: pointer;
   transition: border-color var(--tk-transition), background var(--tk-transition);
 }
 
 .tk-consent-card.is-checked {
-  border-color: rgba(142, 179, 149, 0.24);
+  border-color: rgba(142, 179, 149, 0.25);
   background: var(--tk-accent-soft);
 }
 
 .tk-consent-card > input {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   margin: 8px 0 0;
   accent-color: var(--tk-success);
 }
 
 .tk-consent-card__icon {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: 9px;
   background: var(--tk-control);
@@ -213,15 +214,15 @@
 
 .tk-consent-card__copy strong {
   color: var(--tk-text);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 590;
   line-height: 1.4;
 }
 
 .tk-consent-card__copy small {
   color: var(--tk-text-tertiary);
-  font-size: 9.5px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .tk-field__label em {
@@ -238,19 +239,19 @@
 
 .tk-created-voice {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 13px;
+  gap: 14px;
   border: 1px solid rgba(142, 179, 149, 0.22);
   border-radius: 14px;
   background: var(--tk-accent-soft);
-  padding: 14px 16px;
+  padding: 15px 17px;
 }
 
 .tk-created-voice__icon {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border-radius: 10px;
   background: var(--tk-surface);
@@ -259,13 +260,13 @@
 
 .tk-created-voice > div:nth-child(2) {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 .tk-created-voice strong {
   color: var(--tk-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 610;
 }
 
@@ -283,14 +284,14 @@
 .tk-created-voice__actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .tk-created-voice__actions > button:not(.tk-button) {
   display: inline-flex;
+  min-height: 34px;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
   border: 0;
   background: transparent;
   color: var(--tk-text-secondary);
@@ -310,30 +311,30 @@
 
 .tk-voice-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 9px;
 }
 
 .tk-voice-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
   overflow: hidden;
   border: 1px solid var(--tk-line);
-  border-radius: 14px;
+  border-radius: 13px;
   background: var(--tk-surface);
 }
 
 .tk-voice-card__main {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 11px;
-  padding: 15px;
+  gap: 12px;
+  padding: 15px 16px;
 }
 
 .tk-voice-avatar {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border-radius: 10px;
   background: var(--tk-control);
@@ -347,14 +348,14 @@
 
 .tk-voice-card__main > div {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 .tk-voice-card__main strong {
   overflow: hidden;
   color: var(--tk-text);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 610;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -363,7 +364,7 @@
 .tk-voice-card__main div > span {
   overflow: hidden;
   color: var(--tk-text-tertiary);
-  font-size: 9.5px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -372,8 +373,8 @@
   border-radius: 999px;
   background: var(--tk-control);
   color: var(--tk-text-tertiary);
-  padding: 4px 7px;
-  font-size: 9px;
+  padding: 5px 8px;
+  font-size: 9.5px;
   font-weight: 560;
 }
 
@@ -383,40 +384,7 @@
 }
 
 .tk-voice-card__id {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  align-items: center;
-  gap: 6px;
-  margin: 0 15px 13px;
-  border-radius: 9px;
-  background: var(--tk-surface-soft);
-  padding: 5px 5px 5px 9px;
-}
-
-.tk-voice-card__id code {
-  overflow: hidden;
-  color: var(--tk-text-secondary);
-  font-family: var(--tk-font-mono);
-  font-size: 9.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tk-voice-card__id button,
-.tk-voice-remove {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--tk-text-tertiary);
-}
-
-.tk-voice-card__id button:hover {
-  background: var(--tk-control-hover);
-  color: var(--tk-text);
+  display: none;
 }
 
 .tk-voice-card__footer {
@@ -424,8 +392,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-top: 1px solid var(--tk-line);
-  padding: 10px 13px;
+  border-left: 1px solid var(--tk-line);
+  padding: 11px 13px;
   background: var(--tk-surface-soft);
 }
 
@@ -445,22 +413,33 @@
 
 .tk-voice-use {
   display: inline-flex;
+  min-height: 30px;
   align-items: center;
   gap: 5px;
-  min-height: 28px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--tk-text-secondary);
-  padding: 0 7px;
+  padding: 0 8px;
   font: inherit;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 560;
 }
 
 .tk-voice-use:hover {
   background: var(--tk-control-hover);
   color: var(--tk-text);
+}
+
+.tk-voice-remove {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
 }
 
 .tk-voice-remove:hover {
@@ -481,15 +460,20 @@
     border-top: 0;
     border-left: 1px solid var(--tk-line);
   }
-}
 
-@media (max-width: 760px) {
-  .tk-voice-grid {
+  .tk-voice-card {
     grid-template-columns: 1fr;
   }
 
+  .tk-voice-card__footer {
+    border-top: 1px solid var(--tk-line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
   .tk-created-voice {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
   .tk-created-voice__actions {
@@ -500,7 +484,7 @@
 
 @media (max-width: 620px) {
   .tk-reference-audio {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 48px minmax(0, 1fr);
   }
 
   .tk-reference-audio__actions {
