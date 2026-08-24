@@ -1,24 +1,27 @@
 import { Check, Copy, FileAudio, FileText, FolderOpen, Gauge, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { AudioRecorder } from "../../components/audio/AudioRecorder";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
 import { useTranscription } from "../../hooks/useTranscription";
 import { pickAudioFile } from "../../lib/nativePicker";
+import { consumeTranscribeIntent } from "../../lib/workflowIntent";
 
 export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
   const sttModels = useMemo(
     () => runtime.models.filter((item) => item.capabilities.includes("stt")),
     [runtime.models]
   );
+  const transcribeIntent = useMemo(() => consumeTranscribeIntent(), []);
   const initialModel = sttModels.find((item) => item.id === "whisper-base" && item.executable)
     ?? sttModels.find((item) => item.executable)
     ?? sttModels[0];
 
   const [model, setModel] = useState(initialModel?.id ?? "");
-  const [filePath, setFilePath] = useState("");
+  const [filePath, setFilePath] = useState(transcribeIntent?.filePath ?? "");
   const [pickerBusy, setPickerBusy] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const { clearResult, error, isTranscribing, result, transcribe } = useTranscription();
@@ -58,7 +61,7 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
       <ProductPageHeader
         eyebrow="Speech to text"
         title="Transcribe"
-        description="Choose an audio file and a local speech-to-text model. Takokit writes the transcript into the active workspace session."
+        description="Choose an audio file or record one now, then transcribe it with a local speech-to-text model."
       />
 
       <div className="tk-transcribe-studio">
@@ -66,7 +69,7 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
           <div className="tk-transcribe-source__header">
             <div>
               <span>Audio</span>
-              <small>Local file</small>
+              <small>File or microphone</small>
             </div>
             {filePath ? (
               <button
@@ -90,7 +93,7 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
               <span>
                 {filePath
                   ? "Ready for local transcription."
-                  : "WAV, MP3, FLAC, OGG, M4A, AAC and WMA are supported by the native picker."}
+                  : "Browse an existing recording, use Files, or record directly below."}
               </span>
             </div>
             <ProductButton
@@ -104,6 +107,12 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
             </ProductButton>
           </div>
 
+          <AudioRecorder
+            compact
+            label="Record audio to transcribe"
+            onSaved={(file) => setFilePath(file.path)}
+          />
+
           {filePath ? <LocalAudioPlayer path={filePath} compact label="Selected audio" /> : null}
 
           <label className="tk-transcribe-path-field">
@@ -115,6 +124,10 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
               spellCheck={false}
             />
           </label>
+
+          <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>
+            Browse workspace Files →
+          </button>
 
           {pickerError ? <div className="tk-inline-error" role="alert">{pickerError}</div> : null}
           {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
@@ -244,7 +257,7 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
             <FileText size={19} strokeWidth={1.7} />
             <div>
               <strong>No transcript yet</strong>
-              <span>Choose an audio file and run a local STT model.</span>
+              <span>Choose or record audio and run a local STT model.</span>
             </div>
           </div>
         )}
