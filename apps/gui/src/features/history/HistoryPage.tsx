@@ -130,7 +130,7 @@ export function HistoryPage({ onRefresh }: RouteComponentProps) {
       <ProductPageHeader
         eyebrow="Workspace activity"
         title="History"
-        description="Every local generation, transcription, cloning, and conversion lives in a workspace session. Reopen one whenever you need it."
+        description="Every local generation, transcription, reusable voice creation, and voice-to-voice cloning run lives in a workspace session. Reopen one whenever you need it."
       />
 
       <div className="tk-history-toolbar">
@@ -345,6 +345,8 @@ function formatCompactTime(timestamp: number): string {
 }
 
 function taskLabel(task: SessionEvent["task"]): string {
+  if (task === "voice_conversion") return "Voice-to-voice cloning";
+  if (task === "voice_cloning") return "Create voice";
   return task
     .split("_")
     .map((part) => part[0].toUpperCase() + part.slice(1))
