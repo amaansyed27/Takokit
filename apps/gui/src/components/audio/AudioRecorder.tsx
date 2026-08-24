@@ -13,6 +13,8 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
   const [saving, setSaving] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const recordingRef = useRef(false);
+  const savingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -25,7 +27,7 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
   useEffect(() => () => cleanup(), []);
 
   async function start() {
-    if (recording || saving) return;
+    if (recordingRef.current || savingRef.current) return;
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Microphone recording is not available in this browser.");
@@ -61,6 +63,7 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
       processorRef.current = processor;
       muteRef.current = mute;
       setSeconds(0);
+      recordingRef.current = true;
       setRecording(true);
       timerRef.current = window.setInterval(() => {
         setSeconds((current) => {
@@ -78,7 +81,9 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
   }
 
   async function stop() {
-    if (!recording || saving) return;
+    if (!recordingRef.current || savingRef.current) return;
+    recordingRef.current = false;
+    savingRef.current = true;
     setRecording(false);
     setSaving(true);
     if (timerRef.current !== null) {
@@ -101,11 +106,13 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The recording could not be saved.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   function cancel() {
+    recordingRef.current = false;
     setRecording(false);
     setSeconds(0);
     chunksRef.current = [];
@@ -127,6 +134,7 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
   }
 
   function cleanup() {
+    recordingRef.current = false;
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
