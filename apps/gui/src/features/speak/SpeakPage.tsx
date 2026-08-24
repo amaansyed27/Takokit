@@ -1,4 +1,4 @@
-import { Check, Copy, Gauge, Sparkles, Volume2 } from "lucide-react";
+import { Check, Copy, Gauge, Sparkles, Volume2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
@@ -54,10 +54,6 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
     }
     if (voice !== "default") setVoice("default");
   }, [selectedModel, supportsSavedVoices, compatibleVoices, voice]);
-
-  useEffect(() => {
-    clearResult();
-  }, [model, voice]);
 
   const voiceOptions = [
     ...(!supportsSavedVoices || compatibleVoices.length === 0 ? [{ value: "default", label: "Default voice" }] : []),
@@ -216,8 +212,13 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
         <div className="tk-section-heading">
           <div>
             <h2>Output</h2>
-            <p>Your generated WAV is written into the active Takokit session.</p>
+            <p>The latest result stays here while you move around Takokit. Clear it when you are finished.</p>
           </div>
+          {result || error ? (
+            <ProductButton tone="ghost" type="button" disabled={isGenerating} onClick={clearResult}>
+              <X size={14} /> Clear
+            </ProductButton>
+          ) : null}
         </div>
 
         {result ? (
@@ -243,6 +244,14 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
                   <Copy size={14} strokeWidth={1.8} />
                 </button>
               </div>
+            </div>
+          </div>
+        ) : isGenerating ? (
+          <div className="tk-result-empty">
+            <Volume2 size={19} strokeWidth={1.7} />
+            <div>
+              <strong>Generating speech…</strong>
+              <span>You can switch pages. This process will stay active here.</span>
             </div>
           </div>
         ) : (
