@@ -1,39 +1,35 @@
-import { useState } from "react";
 import { generateSessionSpeech } from "../lib/sessionInference";
 import type { SpeechApiRequest, SpeechApiResponse } from "../lib/types";
+import { createWorkflowStore, useWorkflowStore } from "../lib/workflowState";
+
+const speechWorkflow = createWorkflowStore<SpeechApiResponse>();
 
 export function useSpeechGeneration() {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [result, setResult] = useState<SpeechApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const state = useWorkflowStore(speechWorkflow);
 
   async function generate(request: SpeechApiRequest) {
     if (!request.input.trim()) {
-      setError("Enter some text before generating speech.");
+      speechWorkflow.fail("Enter some text before generating speech.");
       return;
     }
-
-    setIsGenerating(true);
-    setError(null);
+    if (!speechWorkflow.start()) return;
 
     try {
       const response = await generateSessionSpeech({
         ...request,
         response_format: request.response_format ?? "wav"
       });
-      setResult(response);
+      speechWorkflow.succeed(response);
     } catch (caught) {
-      setResult(null);
-      setError(caught instanceof Error ? caught.message : "Speech generation failed.");
-    } finally {
-      setIsGenerating(false);
+      speechWorkflow.fail(caught instanceof Error ? caught.message : "Speech generation failed.");
     }
   }
 
-  function clearResult() {
-    setResult(null);
-    setError(null);
-  }
-
-  return { error, generate, isGenerating, result, clearResult };
+  return {
+    error: state.error,
+    generate,
+    isGenerating: state.running,
+    result: state.result,
+    clearResult: speechWorkflow.clear
+  };
 }
