@@ -18,14 +18,14 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
   const serverOnline = runtime.server.status === "online";
   const ttsModels = runtime.models.filter((model) => model.capabilities.includes("tts")).length;
   const sttModels = runtime.models.filter((model) => model.capabilities.includes("stt")).length;
-  const conversionModels = runtime.models.filter((model) => model.capabilities.includes("voice_conversion")).length;
+  const cloningModels = runtime.models.filter((model) => model.capabilities.includes("voice_conversion")).length;
 
   return (
     <section className="tk-page tk-home-page">
       <ProductPageHeader
         eyebrow="Local workspace"
         title="What do you want to create?"
-        description="Run speech, transcription, cloning, and conversion locally. Takokit only shows controls supported by the model you choose."
+        description="Run speech, transcription, reusable voice creation, and voice-to-voice cloning locally. Takokit only shows controls supported by the model you choose."
       />
 
       <section className="tk-section">
@@ -53,9 +53,9 @@ export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
           />
           <ProductActionCard
             icon={AudioWaveform}
-            title="Convert voice"
-            description="Keep the spoken words while changing the voice toward a reference or RVC target."
-            meta={`${conversionModels} conversion models ready`}
+            title="Clone audio"
+            description="Keep the words and timing from an existing recording while cloning a reference or RVC voice onto it."
+            meta={`${cloningModels} cloning models ready`}
             onClick={() => onNavigate("convert")}
           />
         </div>
