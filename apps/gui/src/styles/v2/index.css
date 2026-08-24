@@ -3,6 +3,7 @@
 @import "./components.css";
 @import "./controls.css";
 @import "./audio.css";
+@import "./recording.css";
 @import "./runtime.css";
 @import "./workspace.css";
 @import "./home.css";
@@ -10,6 +11,7 @@
 @import "./transcribe.css";
 @import "./voices.css";
 @import "./convert.css";
+@import "./files.css";
 @import "./models.css";
 @import "./runners.css";
 @import "./history-v2.css";
