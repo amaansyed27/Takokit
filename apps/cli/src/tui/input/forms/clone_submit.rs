@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
+pub(in crate::tui::input) fn submit_clone(app: &mut App) -> Option<TuiAction> {
     let Some(model) = app.selected_clone_model().cloned() else {
         app.set_status(
             "No voice-cloning model is installed. Install one through the library site or CLI.",
