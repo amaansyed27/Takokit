@@ -27,6 +27,7 @@ use takokit_package::{
 use crate::AppState;
 
 mod error;
+mod files;
 mod inference;
 mod media;
 mod packages;
@@ -35,6 +36,7 @@ mod sessions;
 mod system;
 
 pub use error::ApiError;
+pub use files::*;
 pub use inference::*;
 pub use media::*;
 pub use packages::*;
