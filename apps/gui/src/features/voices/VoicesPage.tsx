@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
@@ -177,6 +178,8 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
                 ) : null}
               </div>
             </div>
+
+            {samplePath ? <LocalAudioPlayer path={samplePath} compact label="Reference audio" /> : null}
 
             <details className="tk-voice-manual-path">
               <summary>Enter a local path instead</summary>
