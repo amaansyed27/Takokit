@@ -2,7 +2,6 @@ import {
   Clock3,
   FileAudio,
   FileText,
-  Play,
   Plus,
   RotateCcw,
   Search,
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
@@ -275,7 +275,7 @@ function HistoryEvent({ event }: { event: SessionEvent }) {
   }, [outputUrl]);
 
   async function loadOutput() {
-    if (!event.output_path) return;
+    if (!event.output_path || audio) return;
     setLoading(true);
     try {
       const url = await loadSessionOutput(event.session_id, event.output_path);
@@ -308,21 +308,22 @@ function HistoryEvent({ event }: { event: SessionEvent }) {
       {event.message ? <p className="tk-history-card__message">{event.message}</p> : null}
 
       {event.output_path ? (
-        <div className="tk-history-file">
-          <div>
-            <strong>{outputFilename(event.output_path)}</strong>
-            <span title={event.output_path}>{event.output_path}</span>
+        <>
+          <div className="tk-history-file">
+            <div>
+              <strong>{outputFilename(event.output_path)}</strong>
+              <span title={event.output_path}>{event.output_path}</span>
+            </div>
+            {!audio && !outputUrl ? (
+              <ProductButton tone="ghost" loading={loading} onClick={() => void loadOutput()}>
+                Open
+              </ProductButton>
+            ) : !audio && outputUrl ? (
+              <a href={outputUrl} download={outputFilename(event.output_path)}>Download</a>
+            ) : null}
           </div>
-          {!outputUrl ? (
-            <ProductButton tone="ghost" loading={loading} onClick={() => void loadOutput()}>
-              <Play size={13} /> {audio ? "Play" : "Open"}
-            </ProductButton>
-          ) : audio ? (
-            <audio controls src={outputUrl} preload="metadata" />
-          ) : (
-            <a href={outputUrl} download={outputFilename(event.output_path)}>Download</a>
-          )}
-        </div>
+          {audio ? <LocalAudioPlayer path={event.output_path} compact defer label="Saved audio" /> : null}
+        </>
       ) : null}
     </article>
   );
