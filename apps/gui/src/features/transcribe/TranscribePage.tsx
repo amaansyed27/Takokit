@@ -1,6 +1,7 @@
 import { Check, Copy, FileAudio, FileText, FolderOpen, Gauge, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
@@ -106,6 +107,8 @@ export function TranscribePage({ runtime, onNavigate }: RouteComponentProps) {
               {filePath ? "Choose another" : "Browse audio"}
             </ProductButton>
           </div>
+
+          {filePath ? <LocalAudioPlayer path={filePath} compact label="Selected audio" /> : null}
 
           <label className="tk-transcribe-path-field">
             <span>Or enter a local path</span>
