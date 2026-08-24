@@ -28,6 +28,7 @@ use crate::AppState;
 
 mod error;
 mod inference;
+mod media;
 mod packages;
 mod progress;
 mod sessions;
@@ -35,6 +36,7 @@ mod system;
 
 pub use error::ApiError;
 pub use inference::*;
+pub use media::*;
 pub use packages::*;
 pub use progress::*;
 pub use sessions::*;
