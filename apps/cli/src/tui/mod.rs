@@ -125,9 +125,8 @@ pub async fn run_launcher(
                 }
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
-                        Ok(()) => {
-                            state.set_status("Local model, runner, voice, and session state refreshed.")
-                        }
+                        Ok(()) => state
+                            .set_status("Local model, runner, voice, and session state refreshed."),
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
                     }
                 }

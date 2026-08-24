@@ -2206,6 +2206,7 @@ dependencies = [
  "serde",
  "serde_json",
  "takokit-core",
+ "tempfile",
  "uuid",
 ]
 

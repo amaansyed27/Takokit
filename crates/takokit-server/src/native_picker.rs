@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 pub fn pick_audio_file(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
     pick_path(initial_dir, false)
@@ -49,9 +52,7 @@ fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String
 fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String> {
     let initial = initial_dir.display().to_string().replace('"', "\\\"");
     let kind = if folder { "folder" } else { "file" };
-    let script = format!(
-        "POSIX path of (choose {kind} default location POSIX file \"{initial}\")"
-    );
+    let script = format!("POSIX path of (choose {kind} default location POSIX file \"{initial}\")");
     let output = Command::new("osascript")
         .args(["-e", &script])
         .output()
@@ -71,9 +72,7 @@ fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String
     }
     command.arg(format!("--filename={}/", initial_dir.display()));
     let output = command.output().map_err(|error| {
-        format!(
-            "no graphical path picker is available ({error}); enter a path instead"
-        )
+        format!("no graphical path picker is available ({error}); enter a path instead")
     })?;
     if !output.status.success() {
         return Ok(None);

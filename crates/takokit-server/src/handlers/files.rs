@@ -69,8 +69,8 @@ pub async fn upload_workspace_file(
     }
     let root = workspace_files_root(store.workspace_root());
     let bytes = body.to_vec();
-    let summary = tokio::task::spawn_blocking(
-        move || -> Result<WorkspaceFileSummary, TakokitError> {
+    let summary =
+        tokio::task::spawn_blocking(move || -> Result<WorkspaceFileSummary, TakokitError> {
             std::fs::create_dir_all(&root).map_err(|error| {
                 TakokitError::Storage(format!(
                     "could not create workspace files directory {}: {error}",
@@ -85,15 +85,14 @@ pub async fn upload_workspace_file(
                 ))
             })?;
             workspace_file_summary(&destination)
-        },
-    )
-    .await
-    .map_err(|error| {
-        ApiError(TakokitError::Execution(format!(
-            "workspace upload task failed: {error}"
-        )))
-    })?
-    .map_err(ApiError)?;
+        })
+        .await
+        .map_err(|error| {
+            ApiError(TakokitError::Execution(format!(
+                "workspace upload task failed: {error}"
+            )))
+        })?
+        .map_err(ApiError)?;
 
     Ok(Json(summary))
 }
@@ -238,12 +237,7 @@ fn resolve_workspace_file(workspace_root: &FsPath, id: &str) -> Result<PathBuf, 
 }
 
 fn sanitize_file_name(raw: &str) -> Result<String, ApiError> {
-    let leaf = raw
-        .trim()
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or("")
-        .trim();
+    let leaf = raw.trim().rsplit(['/', '\\']).next().unwrap_or("").trim();
     if leaf.is_empty() || leaf == "." || leaf == ".." {
         return Err(ApiError(TakokitError::InvalidRequest(
             "workspace file name is required".to_string(),
@@ -340,8 +334,7 @@ mod tests {
 
     #[test]
     fn listing_missing_library_does_not_create_workspace_state() {
-        let root =
-            std::env::temp_dir().join(format!("takokit-files-{}", uuid::Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("takokit-files-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let files_root = workspace_files_root(&root);
         assert!(list_workspace_files(&files_root).unwrap().is_empty());

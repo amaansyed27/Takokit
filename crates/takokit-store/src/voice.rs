@@ -198,7 +198,13 @@ mod tests {
         std::fs::write(&sample, b"RIFF").unwrap();
         let store = VoiceProfileStore::new(root.join("voices"));
         let profile = store
-            .create("Disposable Voice", "openvoice", &sample, true, Some("owner".into()))
+            .create(
+                "Disposable Voice",
+                "openvoice",
+                &sample,
+                true,
+                Some("owner".into()),
+            )
             .unwrap();
         let removed = store.remove(&profile.id).unwrap();
         assert_eq!(removed.id, profile.id);

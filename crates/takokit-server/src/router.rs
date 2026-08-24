@@ -22,9 +22,18 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/system/audio", get(handlers::local_audio))
         .route("/v1/system/storage", get(handlers::storage_overview))
         .route("/v1/system/open", post(handlers::open_location))
-        .route("/v1/files", get(handlers::workspace_files).post(handlers::upload_workspace_file))
-        .route("/v1/files/:id/content", get(handlers::workspace_file_content))
-        .route("/v1/files/:id", axum::routing::delete(handlers::delete_workspace_file))
+        .route(
+            "/v1/files",
+            get(handlers::workspace_files).post(handlers::upload_workspace_file),
+        )
+        .route(
+            "/v1/files/:id/content",
+            get(handlers::workspace_file_content),
+        )
+        .route(
+            "/v1/files/:id",
+            axum::routing::delete(handlers::delete_workspace_file),
+        )
         .route("/v1/test/launch", get(handlers::launch_test))
         .route("/v1/capabilities", get(handlers::capabilities))
         .route("/v1/models", get(handlers::models))
@@ -59,7 +68,10 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/audio/conversions", post(handlers::convert_voice))
         .route("/v1/voices/clone", post(handlers::clone_voice))
         .route("/v1/voices/train", post(handlers::train_voice))
-        .route("/v1/voices/:id", axum::routing::delete(handlers::remove_voice))
+        .route(
+            "/v1/voices/:id",
+            axum::routing::delete(handlers::remove_voice),
+        )
         .route("/v1/sessions/open", post(handlers::open_session))
         .route("/v1/sessions", get(handlers::sessions))
         .route(

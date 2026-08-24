@@ -204,9 +204,9 @@ pub(super) fn handle_activity(app: &mut App, key: KeyEvent) -> Option<TuiAction>
 }
 
 fn active_output_dir(app: &App) -> Result<PathBuf, String> {
-    let session = app
-        .active_session()
-        .ok_or_else(|| "No active session exists yet, so there is no output folder to open.".to_string())?;
+    let session = app.active_session().ok_or_else(|| {
+        "No active session exists yet, so there is no output folder to open.".to_string()
+    })?;
     Ok(PathBuf::from(&app.workspace_root)
         .join(".tako")
         .join("sessions")
@@ -217,8 +217,12 @@ fn active_output_dir(app: &App) -> Result<PathBuf, String> {
 fn play_latest_audio(app: &App) -> Result<(), String> {
     let dir = active_output_dir(app)?;
     let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
-    let entries = fs::read_dir(&dir)
-        .map_err(|error| format!("Could not read session outputs at {}: {error}", dir.display()))?;
+    let entries = fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "Could not read session outputs at {}: {error}",
+            dir.display()
+        )
+    })?;
     for entry in entries.flatten() {
         let path = entry.path();
         let is_audio = path
@@ -247,18 +251,29 @@ fn play_latest_audio(app: &App) -> Result<(), String> {
     let path = newest
         .map(|(_, path)| path)
         .ok_or_else(|| format!("No audio output exists yet in {}.", dir.display()))?;
-    open::that(&path)
-        .map_err(|error| format!("Could not open {} in the system audio player: {error}", path.display()))?;
+    open::that(&path).map_err(|error| {
+        format!(
+            "Could not open {} in the system audio player: {error}",
+            path.display()
+        )
+    })?;
     Ok(())
 }
 
 fn open_output_folder(app: &App) -> Result<(), String> {
     let dir = active_output_dir(app)?;
     if !dir.is_dir() {
-        return Err(format!("The session output folder does not exist yet: {}", dir.display()));
+        return Err(format!(
+            "The session output folder does not exist yet: {}",
+            dir.display()
+        ));
     }
-    open::that(&dir)
-        .map_err(|error| format!("Could not open the session output folder {}: {error}", dir.display()))?;
+    open::that(&dir).map_err(|error| {
+        format!(
+            "Could not open the session output folder {}: {error}",
+            dir.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -279,7 +294,9 @@ pub(super) fn open_or_repair_selected_model(app: &mut App) -> Option<TuiAction> 
         app.set_status("Model selected. Press F2 to browse, drag/paste a file, or enter a workspace-relative path.");
     } else if model.voice_cloning {
         app.screen = TuiScreen::Clone;
-        app.set_status("Model selected. Enter a profile name and use F2 to browse for reference audio.");
+        app.set_status(
+            "Model selected. Enter a profile name and use F2 to browse for reference audio.",
+        );
     } else if model.voice_conversion {
         app.set_convert_model(&model.id);
         app.screen = TuiScreen::Convert;

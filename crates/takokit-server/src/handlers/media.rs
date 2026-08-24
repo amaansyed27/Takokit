@@ -90,9 +90,18 @@ mod tests {
 
     #[test]
     fn audio_preview_accepts_only_audio_extensions() {
-        assert_eq!(audio_content_type(FsPath::new("voice.wav")), Some("audio/wav"));
-        assert_eq!(audio_content_type(FsPath::new("voice.MP3")), Some("audio/mpeg"));
-        assert_eq!(audio_content_type(FsPath::new("voice.flac")), Some("audio/flac"));
+        assert_eq!(
+            audio_content_type(FsPath::new("voice.wav")),
+            Some("audio/wav")
+        );
+        assert_eq!(
+            audio_content_type(FsPath::new("voice.MP3")),
+            Some("audio/mpeg")
+        );
+        assert_eq!(
+            audio_content_type(FsPath::new("voice.flac")),
+            Some("audio/flac")
+        );
         assert_eq!(audio_content_type(FsPath::new("voice.txt")), None);
         assert_eq!(audio_content_type(FsPath::new("voice")), None);
     }

@@ -7,6 +7,9 @@ use ratatui::{
 };
 
 use super::widgets::{centered_rect, field, primary_button, render_text_input, set_input_cursor};
+mod helpers;
+use helpers::{render_convert_value, render_intro};
+
 use crate::tui::{
     app::{App, SpeakField, TranscribeField},
     clone::CloneField,
@@ -477,29 +480,5 @@ fn render_reference_convert(
         )
         .style(Style::default().add_modifier(Modifier::DIM)),
         rows[6],
-    );
-}
-
-fn render_convert_value(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    app: &App,
-    target: ConvertField,
-    label: &str,
-    value: &str,
-) {
-    frame.render_widget(field(label, value, app.convert_state.field == target), area);
-}
-
-fn render_intro(frame: &mut Frame<'_>, area: Rect, title: &str, detail: &str) {
-    frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(Span::styled(
-                title,
-                Style::default().add_modifier(Modifier::BOLD),
-            )),
-            Line::from(detail),
-        ]),
-        area,
     );
 }

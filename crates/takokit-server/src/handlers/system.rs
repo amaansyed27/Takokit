@@ -47,12 +47,15 @@ pub async fn ps(State(state): State<AppState>) -> Json<RunnersResponse<ProcessIn
 pub async fn pick_audio_file(headers: HeaderMap) -> Result<Json<serde_json::Value>, ApiError> {
     let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
     let initial_dir = store.workspace_root().to_path_buf();
-    let selected = tokio::task::spawn_blocking(move || {
-        crate::native_picker::pick_audio_file(&initial_dir)
-    })
-    .await
-    .map_err(|error| ApiError(TakokitError::Execution(format!("audio picker task failed: {error}"))))?
-    .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+    let selected =
+        tokio::task::spawn_blocking(move || crate::native_picker::pick_audio_file(&initial_dir))
+            .await
+            .map_err(|error| {
+                ApiError(TakokitError::Execution(format!(
+                    "audio picker task failed: {error}"
+                )))
+            })?
+            .map_err(|error| ApiError(TakokitError::Execution(error)))?;
 
     Ok(Json(serde_json::json!({
         "path": selected.map(|path| path.display().to_string())
@@ -62,10 +65,15 @@ pub async fn pick_audio_file(headers: HeaderMap) -> Result<Json<serde_json::Valu
 pub async fn pick_folder(headers: HeaderMap) -> Result<Json<serde_json::Value>, ApiError> {
     let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
     let initial_dir = store.workspace_root().to_path_buf();
-    let selected = tokio::task::spawn_blocking(move || crate::native_picker::pick_folder(&initial_dir))
-        .await
-        .map_err(|error| ApiError(TakokitError::Execution(format!("folder picker task failed: {error}"))))?
-        .map_err(|error| ApiError(TakokitError::Execution(error)))?;
+    let selected =
+        tokio::task::spawn_blocking(move || crate::native_picker::pick_folder(&initial_dir))
+            .await
+            .map_err(|error| {
+                ApiError(TakokitError::Execution(format!(
+                    "folder picker task failed: {error}"
+                )))
+            })?
+            .map_err(|error| ApiError(TakokitError::Execution(error)))?;
 
     Ok(Json(serde_json::json!({
         "path": selected.map(|path| path.display().to_string())
@@ -144,7 +152,11 @@ pub async fn open_location(
     let path_for_task = path.clone();
     tokio::task::spawn_blocking(move || open_path(&path_for_task))
         .await
-        .map_err(|error| ApiError(TakokitError::Execution(format!("open location task failed: {error}"))))?
+        .map_err(|error| {
+            ApiError(TakokitError::Execution(format!(
+                "open location task failed: {error}"
+            )))
+        })?
         .map_err(|error| ApiError(TakokitError::Execution(error)))?;
 
     Ok(StatusCode::NO_CONTENT)
@@ -302,7 +314,9 @@ pub async fn capabilities() -> Json<CapabilitiesResponse> {
 
 fn directory_size(path: &Path) -> u64 {
     if path.is_file() {
-        return std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+        return std::fs::metadata(path)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
     }
     let Ok(entries) = std::fs::read_dir(path) else {
         return 0;

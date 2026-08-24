@@ -19,12 +19,16 @@ impl App {
 
         match self.screen {
             TuiScreen::Speak => match self.speak_field {
-                SpeakField::Voice => {
-                    insert_text(&mut self.speak_voice, &mut self.speak_voice_cursor, &single_line)
-                }
-                SpeakField::Text => {
-                    insert_text(&mut self.speak_text, &mut self.speak_text_cursor, &multiline)
-                }
+                SpeakField::Voice => insert_text(
+                    &mut self.speak_voice,
+                    &mut self.speak_voice_cursor,
+                    &single_line,
+                ),
+                SpeakField::Text => insert_text(
+                    &mut self.speak_text,
+                    &mut self.speak_text_cursor,
+                    &multiline,
+                ),
                 _ => {}
             },
             TuiScreen::Transcribe if self.transcribe_field == TranscribeField::Audio => {

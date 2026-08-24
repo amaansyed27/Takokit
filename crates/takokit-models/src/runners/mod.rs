@@ -162,11 +162,9 @@ mod tests {
         let mut command = Command::new("python");
         configure_runner_command(&mut command);
 
-        let python_utf8 = command.get_envs().find_map(|(key, value)| {
-            (key == OsStr::new("PYTHONUTF8"))
-                .then_some(value)
-                .flatten()
-        });
+        let python_utf8 = command
+            .get_envs()
+            .find_map(|(key, value)| (key == OsStr::new("PYTHONUTF8")).then_some(value).flatten());
         let python_io_encoding = command.get_envs().find_map(|(key, value)| {
             (key == OsStr::new("PYTHONIOENCODING"))
                 .then_some(value)
