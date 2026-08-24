@@ -19,7 +19,7 @@ export function SpeakPage({ runtime, onNavigate }: RouteComponentProps) {
   ) ?? ttsModels.find((item) => item.id === "kokoro" && item.executable)
     ?? ttsModels.find((item) => item.executable)
     ?? ttsModels[0];
-  const [text, setText] = useState("");
+  const [text, setText] = useState(speakIntent?.text ?? "");
   const [model, setModel] = useState(initialModel?.id ?? "");
   const [voice, setVoice] = useState(speakIntent?.voiceId ?? "default");
   const [advancedOpen, setAdvancedOpen] = useState(false);
