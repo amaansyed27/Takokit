@@ -17,10 +17,10 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
+import { useVoiceProfileCreation } from "../../hooks/useVoiceProfileCreation";
 import { pickAudioFile } from "../../lib/nativePicker";
 import type { VoiceSummary } from "../../lib/types";
-import type { VoiceProfile } from "../../lib/voiceTypes";
-import { createVoiceProfile, removeVoiceProfile } from "../../lib/voices";
+import { removeVoiceProfile } from "../../lib/voices";
 import { setSpeakIntent } from "../../lib/workflowIntent";
 
 export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentProps) {
@@ -37,12 +37,17 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
   const [model, setModel] = useState(initialModel?.id ?? "");
   const [consent, setConsent] = useState(false);
   const [consentNote, setConsentNote] = useState("");
-  const [busy, setBusy] = useState(false);
   const [pickerBusy, setPickerBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [createdProfile, setCreatedProfile] = useState<VoiceProfile | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<VoiceSummary | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
+  const {
+    clearResult: clearCreatedProfile,
+    create,
+    error: createError,
+    isCreating,
+    result: createdProfile
+  } = useVoiceProfileCreation();
 
   const selectedModel = cloningModels.find((item) => item.id === model) ?? cloningModels[0];
   const localVoices = runtime.voices.filter((voice) => voice.source === "local-profile");
@@ -54,7 +59,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
       && name.trim()
       && samplePath.trim()
       && consent
-      && !busy
+      && !isCreating
       && !pickerBusy
   );
   const blocker = !serverOnline
@@ -65,12 +70,12 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
 
   async function browseReference() {
     setPickerBusy(true);
-    setError(null);
+    setPageError(null);
     try {
       const selected = await pickAudioFile();
       if (selected) setSamplePath(selected);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The audio picker could not be opened.");
+      setPageError(caught instanceof Error ? caught.message : "The audio picker could not be opened.");
     } finally {
       setPickerBusy(false);
     }
@@ -78,28 +83,20 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
 
   async function createProfile() {
     if (!canCreate || !selectedModel) return;
-    setBusy(true);
-    setError(null);
-    setCreatedProfile(null);
-    try {
-      const profile = await createVoiceProfile({
-        sample_path: samplePath.trim(),
-        name: name.trim(),
-        model: selectedModel.id,
-        consent_affirmed: consent,
-        consent_note: consentNote.trim() || undefined
-      });
-      await onRefresh();
-      setCreatedProfile(profile);
-      setName("");
-      setSamplePath("");
-      setConsent(false);
-      setConsentNote("");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Voice creation failed.");
-    } finally {
-      setBusy(false);
-    }
+    setPageError(null);
+    const profile = await create({
+      sample_path: samplePath.trim(),
+      name: name.trim(),
+      model: selectedModel.id,
+      consent_affirmed: consent,
+      consent_note: consentNote.trim() || undefined
+    });
+    if (!profile) return;
+    await onRefresh();
+    setName("");
+    setSamplePath("");
+    setConsent(false);
+    setConsentNote("");
   }
 
   function useInSpeak(voiceId: string, modelId: string) {
@@ -110,14 +107,14 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
   async function confirmRemove() {
     if (!removeTarget) return;
     setRemoveBusy(true);
-    setError(null);
+    setPageError(null);
     try {
       await removeVoiceProfile(removeTarget.id);
-      if (createdProfile?.id === removeTarget.id) setCreatedProfile(null);
+      if (createdProfile?.id === removeTarget.id) clearCreatedProfile();
       setRemoveTarget(null);
       await onRefresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Voice removal failed.");
+      setPageError(caught instanceof Error ? caught.message : "Voice removal failed.");
     } finally {
       setRemoveBusy(false);
     }
@@ -211,7 +208,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
               />
             </details>
 
-            {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
+            {pageError || createError ? <div className="tk-inline-error" role="alert">{pageError ?? createError}</div> : null}
           </div>
 
           <footer className="tk-voice-builder__footer">
@@ -219,9 +216,9 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
               <span>Clone with</span>
               <strong>{selectedModel?.name ?? "No compatible model installed"}</strong>
             </div>
-            <ProductButton tone="primary" type="button" loading={busy} disabled={!canCreate} onClick={() => void createProfile()}>
+            <ProductButton tone="primary" type="button" loading={isCreating} disabled={!canCreate} onClick={() => void createProfile()}>
               <UserRoundPlus size={16} strokeWidth={1.9} />
-              {busy ? "Creating voice" : "Create voice"}
+              {isCreating ? "Creating voice" : "Create voice"}
             </ProductButton>
           </footer>
         </section>
@@ -277,16 +274,27 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
         </aside>
       </div>
 
-      {createdProfile ? (
+      {isCreating ? (
+        <section className="tk-created-voice" aria-live="polite">
+          <span className="tk-created-voice__icon"><UserRoundPlus size={18} strokeWidth={1.8} /></span>
+          <div>
+            <strong>Creating voice…</strong>
+            <span>You can switch pages. Takokit will keep this cloning process active.</span>
+          </div>
+        </section>
+      ) : createdProfile ? (
         <section className="tk-created-voice" aria-live="polite">
           <span className="tk-created-voice__icon"><Check size={18} strokeWidth={2} /></span>
           <div>
             <strong>{createdProfile.name} is ready</strong>
-            <span>Saved locally and ready to use in Speak.</span>
+            <span>This result stays visible until you clear it. The saved voice itself remains in your library.</span>
           </div>
           <div className="tk-created-voice__actions">
             <button type="button" onClick={() => void navigator.clipboard.writeText(createdProfile.id)}>
               <Copy size={14} strokeWidth={1.8} /> Copy ID
+            </button>
+            <button type="button" onClick={clearCreatedProfile}>
+              <X size={14} strokeWidth={1.8} /> Clear
             </button>
             <ProductButton tone="primary" type="button" onClick={() => useInSpeak(createdProfile.id, createdProfile.model_id)}>
               Use in Speak <ArrowRight size={14} strokeWidth={1.9} />
