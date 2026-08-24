@@ -15,6 +15,11 @@
   padding: 8px 10px;
 }
 
+.tk-convert-path > .tk-audio-player {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
 .tk-audio-player__icon {
   display: grid;
   width: 32px;
