@@ -10,6 +10,7 @@
 @import "./speak.css";
 @import "./transcribe.css";
 @import "./voices.css";
+@import "./voices-library.css";
 @import "./convert.css";
 @import "./files.css";
 @import "./models.css";
