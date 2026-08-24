@@ -1,4 +1,5 @@
 import { ConvertPage } from "../features/convert/ConvertPage";
+import { FilesPage } from "../features/files/FilesPage";
 import { HistoryPage } from "../features/history/HistoryPage";
 import { HomePage } from "../features/home/HomePage";
 import { ModelsPage } from "../features/models/ModelsPage";
@@ -28,6 +29,7 @@ export const routes: AppRoute[] = [
   { id: "models", component: ModelsPage },
   { id: "runners", component: RunnersPage },
   { id: "voices", component: VoicesPage },
+  { id: "files", component: FilesPage },
   { id: "speak", component: SpeakPage },
   { id: "transcribe", component: TranscribePage },
   { id: "convert", component: ConvertPage },
