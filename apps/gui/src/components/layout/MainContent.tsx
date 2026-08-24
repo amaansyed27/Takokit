@@ -7,8 +7,10 @@ type MainContentProps = {
 
 export function MainContent({ children, pageId }: MainContentProps) {
   return (
-    <main className="main-content">
-      <div className="page-transition" key={pageId}>{children}</div>
+    <main className="tk-content">
+      <div className="tk-content__inner">
+        <div className="tk-page-transition" key={pageId}>{children}</div>
+      </div>
     </main>
   );
 }

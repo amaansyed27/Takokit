@@ -5,29 +5,44 @@ const API_BASE = window.location.origin;
 
 export async function initializeWorkspaceSession(): Promise<SessionRecord | null> {
   const context = getWorkspaceContext();
-  if (!context.workspace) return null;
-  const record = await openSession(context.workspace, context.session);
-  setWorkspaceContext({ workspace: record.summary.workspace_root, session: record.summary.id });
+  if (!context.workspace || !context.session) return null;
+  const record = await getSession(context.session);
+  setWorkspaceContext(
+    {
+      workspace: record.summary.workspace_root,
+      session: record.summary.id,
+      source: context.source
+    },
+    false
+  );
   return record;
 }
 
 export async function createSession(title?: string): Promise<SessionRecord> {
   const context = getWorkspaceContext();
   if (!context.workspace) {
-    throw new Error("The GUI was not launched with a Takokit project workspace.");
+    throw new Error("Choose a Takokit workspace before creating a session.");
   }
   const record = await openSession(context.workspace, undefined, title);
-  setWorkspaceContext({ workspace: record.summary.workspace_root, session: record.summary.id });
+  setWorkspaceContext({
+    workspace: record.summary.workspace_root,
+    session: record.summary.id,
+    source: context.source
+  });
   return record;
 }
 
 export async function resumeSession(id: string): Promise<SessionRecord> {
   const context = getWorkspaceContext();
   if (!context.workspace) {
-    throw new Error("The GUI was not launched with a Takokit project workspace.");
+    throw new Error("Choose a Takokit workspace before opening a session.");
   }
   const record = await openSession(context.workspace, id);
-  setWorkspaceContext({ workspace: record.summary.workspace_root, session: record.summary.id });
+  setWorkspaceContext({
+    workspace: record.summary.workspace_root,
+    session: record.summary.id,
+    source: context.source
+  });
   return record;
 }
 
@@ -94,8 +109,10 @@ async function expectJson<T>(response: Response): Promise<T> {
 
 async function responseError(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as { error?: { message?: string } };
-    if (body.error?.message) return body.error.message;
+    const body = (await response.json()) as { error?: { code?: string; message?: string } };
+    if (body.error?.message) {
+      return body.error.code ? `${body.error.code}: ${body.error.message}` : body.error.message;
+    }
   } catch {
     // Use the status fallback below.
   }

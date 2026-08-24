@@ -1,0 +1,254 @@
+.tk-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 580;
+  transition: background var(--tk-transition), border-color var(--tk-transition), color var(--tk-transition), transform var(--tk-transition);
+}
+
+.tk-button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.tk-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.tk-button--primary {
+  border-color: transparent;
+  background: var(--tk-primary-button);
+  color: var(--tk-primary-button-text);
+}
+
+.tk-button--primary:not(:disabled):hover {
+  background: var(--tk-primary-button-hover);
+}
+
+.tk-button--secondary {
+  background: var(--tk-control);
+  color: var(--tk-text);
+}
+
+.tk-button--secondary:not(:disabled):hover,
+.tk-button--ghost:not(:disabled):hover {
+  border-color: var(--tk-line-strong);
+  background: var(--tk-control-hover);
+}
+
+.tk-button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--tk-text-secondary);
+}
+
+.tk-button--danger {
+  border-color: rgba(225, 134, 124, 0.22);
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+}
+
+.tk-button--danger:not(:disabled):hover {
+  border-color: rgba(225, 134, 124, 0.38);
+  background: rgba(225, 134, 124, 0.16);
+}
+
+.tk-button__content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tk-button__spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: tk-spin 650ms linear infinite;
+}
+
+@keyframes tk-spin {
+  to { transform: rotate(360deg); }
+}
+
+.tk-field {
+  display: grid;
+  gap: 7px;
+}
+
+.tk-field__label {
+  color: var(--tk-text-secondary);
+  font-size: 10.5px;
+  font-weight: 560;
+}
+
+.tk-field__hint {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.tk-select-wrap {
+  position: relative;
+  display: grid;
+  align-items: center;
+}
+
+.tk-select-wrap > svg {
+  position: absolute;
+  right: 11px;
+  color: var(--tk-text-tertiary);
+  pointer-events: none;
+}
+
+.tk-select,
+.tk-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--tk-control);
+  color: var(--tk-text);
+  padding: 0 35px 0 11px;
+  font-family: var(--tk-font-sans);
+  font-size: 11.5px;
+  transition: background var(--tk-transition), border-color var(--tk-transition), box-shadow var(--tk-transition);
+}
+
+.tk-select {
+  appearance: none;
+}
+
+.tk-select:hover,
+.tk-input:hover {
+  background: var(--tk-control-hover);
+}
+
+.tk-select:focus,
+.tk-input:focus {
+  border-color: var(--tk-line-strong);
+  box-shadow: 0 0 0 3px var(--tk-accent-soft);
+}
+
+.tk-select:disabled,
+.tk-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tk-select option {
+  background: var(--tk-surface-strong);
+  color: var(--tk-text);
+}
+
+.tk-input {
+  padding-right: 11px;
+}
+
+.tk-input--textarea {
+  min-height: 74px;
+  resize: none;
+  padding: 10px 11px;
+  line-height: 1.45;
+}
+
+.tk-dialog-backdrop {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.46);
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.tk-dialog {
+  width: min(440px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--tk-line-strong);
+  border-radius: 16px;
+  background: var(--tk-surface-strong);
+  box-shadow: var(--tk-shadow-lg);
+  animation: tk-dialog-in 140ms ease-out;
+}
+
+@keyframes tk-dialog-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tk-dialog__header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 30px;
+  align-items: start;
+  gap: 12px;
+  padding: 18px;
+}
+
+.tk-dialog__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tk-warning-soft);
+  color: var(--tk-warning);
+}
+
+.tk-dialog__icon.is-danger {
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+}
+
+.tk-dialog__header > div {
+  display: grid;
+  gap: 6px;
+}
+
+.tk-dialog__header strong {
+  color: var(--tk-text);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.tk-dialog__description {
+  color: var(--tk-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.tk-dialog__close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-dialog__close:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--tk-line);
+  padding: 12px 14px;
+  background: var(--tk-surface);
+}

@@ -7,5 +7,5 @@ supported_model_families = ["Whisper"]
 supported_tasks = ["speech_to_text", "live_transcription"]
 dependency_strategy = "bundled-native"
 install_state = "runtime-missing"
-notes = "Shared whisper.cpp runner contract for local STT. Takokit does not execute whisper.cpp yet."
+notes = "Shared managed whisper.cpp runtime for local STT. Pulling a Whisper model installs and verifies the native whisper-cli runtime for execution."
 description = "Shared whisper.cpp runner contract for Whisper tiny/base/small/medium/large transcription models."

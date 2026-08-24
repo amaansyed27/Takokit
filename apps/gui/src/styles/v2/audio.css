@@ -1,0 +1,107 @@
+.tk-audio-player {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  border: 1px solid var(--tk-line);
+  border-radius: 11px;
+  background: var(--tk-surface-soft);
+  padding: 10px 11px;
+}
+
+.tk-audio-player.is-compact {
+  margin-top: 10px;
+  padding: 8px 10px;
+}
+
+.tk-convert-path > .tk-audio-player {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.tk-audio-player__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-audio-player__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tk-audio-player__copy strong {
+  color: var(--tk-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tk-audio-player__copy span,
+.tk-audio-player__error {
+  overflow: hidden;
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-audio-player > button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--tk-line-strong);
+  border-radius: 8px;
+  background: var(--tk-control);
+  color: var(--tk-text);
+  padding: 0 11px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 590;
+}
+
+.tk-audio-player > button:hover:not(:disabled) {
+  background: var(--tk-control-hover);
+}
+
+.tk-audio-player > button:disabled {
+  opacity: .6;
+}
+
+.tk-audio-player.is-loaded {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.tk-audio-player audio {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .tk-audio-player audio {
+  color-scheme: light;
+}
+
+.tk-audio-player__error {
+  grid-column: 2;
+  color: var(--tk-danger);
+}
+
+@media (max-width: 620px) {
+  .tk-audio-player {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .tk-audio-player > button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: center;
+  }
+}

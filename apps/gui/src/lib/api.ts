@@ -1,10 +1,11 @@
-import { mockRuntime } from "./mockData";
+import { getWorkspaceContext, workspaceHeaders } from "./workspace";
 import type {
   CapabilitySummary,
   DoctorResponse,
   ModelCapability,
   ModelInstallResponse,
   ModelPlan,
+  ModelRemovalReport,
   ModelSummary,
   RunnerSummary,
   RuntimeSnapshot,
@@ -21,8 +22,23 @@ const viteApiOverride = (import.meta as ImportMeta & { env?: Record<string, stri
 const LOCAL_API_BASE_URL = viteApiOverride || window.location.origin;
 
 type ApiStatus = {
+  service: string;
+  version: string;
   server: string;
   storage_root: string;
+};
+
+type ApiDaemonIdentity = {
+  instance_id?: string;
+  mode: "managed" | "direct";
+  pid: number;
+  executable: string;
+  storage_root: string;
+  host: string;
+  port: number;
+  started_at: number;
+  log_path?: string;
+  build_id?: string;
 };
 
 type ApiModel = {
@@ -81,111 +97,139 @@ type ApiVoice = {
   consent_required: boolean;
 };
 
+type InstalledModelEntry = {
+  id?: string;
+  name: string;
+  canonical_reference?: string;
+};
+
+type InstalledModelsResponse = {
+  kind: "installed-models";
+  data: InstalledModelEntry[];
+};
+
+export class TakokitApiError extends Error {
+  constructor(
+    public readonly operation: string,
+    public readonly code: string,
+    message: string,
+    public readonly details?: Record<string, unknown>
+  ) {
+    super(`${code}: ${message}`);
+    this.name = "TakokitApiError";
+  }
+}
+
 export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechApiResponse> {
-  return requestJson<SpeechApiResponse>("/v1/audio/speech", {
+  if (!request.input.trim()) throw new Error("Speech text cannot be empty.");
+  return requestJson<SpeechApiResponse>("generate speech", "/v1/audio/speech", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
   });
 }
 
 export async function transcribeAudio(request: TranscriptionApiRequest): Promise<TranscriptionApiResponse> {
-  return requestJson<TranscriptionApiResponse>("/v1/audio/transcriptions", {
+  if (!request.file_path.trim()) throw new Error("Choose an existing audio path.");
+  return requestJson<TranscriptionApiResponse>("transcribe audio", "/v1/audio/transcriptions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
   });
 }
 
 export async function convertVoice(request: VoiceConversionApiRequest): Promise<VoiceConversionApiResponse> {
-  return requestJson<VoiceConversionApiResponse>("/v1/audio/conversions", {
+  if (!request.source_path.trim()) throw new Error("Choose an existing source audio path.");
+  if (!request.target_voice.trim()) throw new Error("Choose the conversion target required by this model.");
+  return requestJson<VoiceConversionApiResponse>("convert voice", "/v1/audio/conversions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
   });
 }
 
 export async function getDoctor(): Promise<DoctorResponse> {
-  const response = await getJson<{ data: DoctorResponse }>("/v1/doctor");
+  const response = await getJson<{ data: DoctorResponse }>("load diagnostics", "/v1/doctor");
   return response.data;
 }
 
 export async function getRunnerDoctor(id: string): Promise<Record<string, unknown>> {
-  const response = await getJson<{ data: Record<string, unknown> }>(`/v1/runners/${encodeURIComponent(id)}/doctor`);
+  const response = await getJson<{ data: Record<string, unknown> }>(
+    "inspect runner",
+    `/v1/runners/${encodeURIComponent(id)}/doctor`
+  );
   return response.data;
 }
 
 export async function getLibraryModels(): Promise<LibraryEntry[]> {
-  const response = await getJson<{ data: LibraryEntry[] }>("/v1/library/models");
+  const response = await getJson<{ data: LibraryEntry[] }>("load model library", "/v1/library/models");
   return response.data;
 }
 
 export async function getLibraryRunners(): Promise<LibraryEntry[]> {
-  const response = await getJson<{ data: LibraryEntry[] }>("/v1/library/runners");
+  const response = await getJson<{ data: LibraryEntry[] }>("load runner library", "/v1/library/runners");
   return response.data;
 }
 
 export async function getModel(id: string): Promise<ModelSummary> {
-  const response = await getJson<{ data: ApiModel }>(`/v1/models/${encodeURIComponent(id)}`);
-  return toModelSummary(response.data);
+  const response = await getJson<{ data: ApiModel }>("inspect model", `/v1/models/${encodeURIComponent(id)}`);
+  return toModelSummary(response.data, response.data.installed);
 }
 
 export async function getModelPlan(id: string): Promise<ModelPlan> {
-  const response = await getJson<{ data: ModelPlan }>(`/v1/models/${encodeURIComponent(id)}/plan`);
+  const response = await getJson<{ data: ModelPlan }>("plan model", `/v1/models/${encodeURIComponent(id)}/plan`);
   return response.data;
 }
 
 export async function pullModel(id: string): Promise<ModelInstallResponse> {
-  return requestJson<ModelInstallResponse>("/v1/models/pull", {
+  return requestJson<ModelInstallResponse>("pull model", "/v1/models/pull", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: id })
   });
 }
 
-export async function removeModel(id: string): Promise<void> {
-  await requestNoContent(`/v1/models/${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function previewModelRemoval(id: string): Promise<ModelRemovalReport> {
+  return requestJson<ModelRemovalReport>(
+    "preview model removal",
+    `/v1/models/${encodeURIComponent(id)}?dry_run=true`,
+    { method: "DELETE" }
+  );
+}
+
+export async function removeModel(id: string): Promise<ModelRemovalReport | void> {
+  return requestJson<ModelRemovalReport>("remove model", `/v1/models/${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
 }
 
 export async function getRunner(id: string): Promise<RunnerSummary> {
-  const response = await getJson<{ data: ApiRunner }>(`/v1/runners/${encodeURIComponent(id)}`);
+  const response = await getJson<{ data: ApiRunner }>("inspect runner", `/v1/runners/${encodeURIComponent(id)}`);
   return response.data;
 }
 
 export async function pullRunner(id: string): Promise<PullResponse> {
-  return requestJson<PullResponse>("/v1/runners/pull", {
+  return requestJson<PullResponse>("pull runner", "/v1/runners/pull", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ runner: id })
   });
 }
 
 export async function installRunner(id: string): Promise<PullResponse> {
-  return requestJson<PullResponse>("/v1/runners/install", {
+  return requestJson<PullResponse>("install runner", "/v1/runners/install", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ runner: id })
   });
 }
 
 export async function removeRunner(id: string): Promise<void> {
-  await requestNoContent(`/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await requestJson<unknown>("remove runner", `/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function installAdapter(id: string): Promise<void> {
-  await requestJson<{ data: unknown }>("/v1/adapters/install", {
+  await requestJson<{ data: unknown }>("install adapter", "/v1/adapters/install", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ adapter: id })
@@ -198,116 +242,97 @@ export const apiConfig = {
 };
 
 export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
+  const [status, identity, capabilities, models, installed, runners, voices] = await Promise.all([
+    getJson<ApiStatus>("load daemon status", "/v1/status"),
+    getJson<ApiDaemonIdentity>("load daemon identity", "/v1/daemon/identity"),
+    getJson<{ data: ApiCapability[] }>("load capabilities", "/v1/capabilities"),
+    getJson<{ data: ApiModel[] }>("load models", "/v1/models"),
+    getJson<InstalledModelsResponse>("load installed inventory", "/v1/models/installed"),
+    getJson<{ data: ApiRunner[] }>("load runners", "/v1/runners"),
+    getJson<{ data: ApiVoice[] }>("load voices", "/v1/voices")
+  ]);
+
+  const installedReferences = new Set<string>();
+  installed.data.forEach((entry) => {
+    installedReferences.add(entry.name);
+    if (entry.id) installedReferences.add(entry.id);
+    if (entry.canonical_reference) installedReferences.add(entry.canonical_reference);
+  });
+  const catalogModels = models.data.map((model) =>
+    toModelSummary(model, model.installed || installedReferences.has(model.id) || installedReferences.has(model.name))
+  );
+  const installedModels = catalogModels.filter((model) => model.status === "installed");
+  const context = getWorkspaceContext();
+
+  return {
+    storagePath: status.storage_root,
+    workspacePath: context.workspace ?? "Not selected",
+    buildId: identity.build_id ?? "legacy or unknown",
+    server: {
+      status: "online",
+      url: LOCAL_API_BASE_URL,
+      uptime: `${identity.mode} daemon · pid ${identity.pid}`
+    },
+    models: installedModels,
+    catalogModels,
+    runners: runners.data,
+    voices: voices.data.map(toVoiceSummary),
+    capabilities: capabilities.data.map(toCapabilitySummary),
+    modeNote: "Installed state is verified from the canonical local inventory; catalog availability is shown separately."
+  };
+}
+
+async function getJson<T>(operation: string, path: string): Promise<T> {
+  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, {
+    headers: workspaceHeaders()
+  });
+  return expectJson<T>(operation, response);
+}
+
+async function requestJson<T>(operation: string, path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, {
+    ...init,
+    headers: workspaceHeaders(init.headers)
+  });
+  return expectJson<T>(operation, response);
+}
+
+async function expectJson<T>(operation: string, response: Response): Promise<T> {
+  if (response.ok) {
+    if (response.status === 204) return undefined as T;
+    return response.json() as Promise<T>;
+  }
+
   try {
-    const [status, capabilities, models, runners, voices] = await Promise.all([
-      getJson<ApiStatus>("/v1/status"),
-      getJson<{ data: ApiCapability[] }>("/v1/capabilities"),
-      getJson<{ data: ApiModel[] }>("/v1/models"),
-      getJson<{ data: ApiRunner[] }>("/v1/runners"),
-      getJson<{ data: ApiVoice[] }>("/v1/voices")
-    ]);
-
-    return {
-      storagePath: status.storage_root,
-      server: {
-        status: "online",
-        url: LOCAL_API_BASE_URL,
-        uptime: "daemon online"
-      },
-      models: [mockSpeechModel, ...models.data.map(toModelSummary)],
-      runners: runners.data,
-      voices: voices.data.map(toVoiceSummary),
-      capabilities: capabilities.data.map(toCapabilitySummary),
-      modeNote: "Local runtime mode: each model shows its real execution state."
+    const body = (await response.json()) as {
+      error?: {
+        code?: string;
+        message?: string;
+        path?: string;
+        model?: string;
+        log_path?: string;
+        next_action?: string;
+        [key: string]: unknown;
+      };
     };
-  } catch {
-    return {
-      ...mockRuntime,
-      models: mockRuntime.models.map((model) => ({
-        ...model,
-        executable: false,
-        lifecycleState: "metadata-only",
-        runnerRuntimeState: "runtime-missing",
-        missing: ["Local Takokit API is unavailable; live state cannot be verified."],
-        executionStatus: "unverified while the local API is offline"
-      })),
-      runners: mockRuntime.runners.map((runner) => ({
-        ...runner,
-        installed: false,
-        install_state: "runtime-missing"
-      })),
-      modeNote: "Local API offline: no model is presented as executable."
-    };
-  }
-}
-
-const mockSpeechModel: ModelSummary = {
-  id: "mock-tts",
-  name: "Mock TTS",
-  family: "internal-test",
-  purpose: "Deterministic test WAV generator for API and CLI scaffolding.",
-  version: "0.1.0",
-  language: "Local",
-  backend: "native_rust",
-  runtime: "Rust",
-  status: "installed",
-  license: "internal-test",
-  lifecycleState: "executable",
-  runnerRuntimeState: "ready",
-  executable: true,
-  missing: [],
-  nextCommand: "takokit speak \"hello\" --model mock-tts",
-  runner: "takokit-mock",
-  runnerInstalled: true,
-  hardwareNotes: "CPU, no model weights",
-  executionStatus: "ready",
-  artifactCount: 0,
-  capabilities: ["tts", "live_audio"]
-};
-
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`);
-  if (!response.ok) {
-    throw new Error(await errorMessage(response));
-  }
-  return response.json() as Promise<T>;
-}
-
-async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, init);
-  if (!response.ok) {
-    throw new Error(await errorMessage(response));
-  }
-  return response.json() as Promise<T>;
-}
-
-async function requestNoContent(path: string, init: RequestInit): Promise<void> {
-  const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, init);
-  if (!response.ok) {
-    throw new Error(await errorMessage(response));
-  }
-}
-
-async function errorMessage(response: Response): Promise<string> {
-  try {
-    const body = await response.json() as { error?: { code?: string; message?: string } };
-    if (body.error?.message) {
-      return body.error.code ? `${body.error.code}: ${body.error.message}` : body.error.message;
+    if (body.error) {
+      const { code = `http_${response.status}`, message = response.statusText || "Takokit API request failed", ...details } = body.error;
+      throw new TakokitApiError(operation, code, message, details);
     }
-  } catch {
-    // Fall through to status text.
+  } catch (error) {
+    if (error instanceof TakokitApiError) throw error;
   }
-  return `Takokit API request failed with ${response.status}`;
+  throw new TakokitApiError(operation, `http_${response.status}`, response.statusText || "Takokit API request failed");
 }
 
-function toModelSummary(model: ApiModel): ModelSummary {
+function toModelSummary(model: ApiModel, installed: boolean): ModelSummary {
   return {
     id: model.id,
     name: model.name,
     family: model.family,
     purpose: model.summary,
     version: model.version,
-    language: model.capabilities.includes("speech_to_text") ? "Multilingual" : "Local",
+    language: model.capabilities.includes("speech_to_text") ? "Multilingual" : "Model-defined",
     backend: model.backend,
     runner: model.runner,
     runnerInstalled: model.runner_installed,
@@ -315,7 +340,7 @@ function toModelSummary(model: ApiModel): ModelSummary {
     executionStatus: model.execution_status,
     artifactCount: model.artifact_count,
     runtime: toRuntimeLabel(model.runtime),
-    status: model.installed ? "installed" : "available",
+    status: installed ? "installed" : "available",
     license: model.license,
     licenseWarning: model.license_warning,
     lifecycleState: model.lifecycle_state,
@@ -347,7 +372,7 @@ function toVoiceSummary(voice: ApiVoice): VoiceSummary {
   };
 }
 
-function toCapability(capability: ApiModel["capabilities"][number]): ModelCapability | null {
+function toCapability(capability: ApiCapabilityId): ModelCapability | null {
   switch (capability) {
     case "text_to_speech":
       return "tts";

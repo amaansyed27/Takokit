@@ -2,7 +2,10 @@ use axum::http::HeaderMap;
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use takokit_core::{SessionRecord, TakokitError};
-use takokit_store::WorkspaceStore;
+use takokit_store::{
+    resolve_workspace, safe_default_workspace, validate_workspace_root, WorkspaceStore,
+    WorkspaceSurface,
+};
 use uuid::Uuid;
 
 pub const WORKSPACE_HEADER: &str = "x-takokit-workspace";
@@ -17,17 +20,15 @@ pub struct RequestWorkspace {
 impl RequestWorkspace {
     pub fn from_headers(headers: &HeaderMap, title: &str) -> Result<Self, TakokitError> {
         let store = store_from_headers(headers)?;
-        let session_id = session_id_from_headers(headers);
-        match store.open_session(session_id, Some(title)) {
-            Ok(session) => Ok(Self { store, session }),
-            Err(error) => {
-                #[cfg(test)]
-                if headers.get(WORKSPACE_HEADER).is_none() {
-                    return isolated_test_workspace(session_id, title);
-                }
-                Err(error)
-            }
-        }
+        let requested = session_id_from_headers(headers);
+        let selected = match requested {
+            Some(id) => Some(id),
+            None => store
+                .active_session()?
+                .filter(|id| store.session_dir(*id).join("session.json").is_file()),
+        };
+        let session = store.open_session(selected, Some(title))?;
+        Ok(Self { store, session })
     }
 
     pub fn session_id(&self) -> Uuid {
@@ -40,9 +41,7 @@ impl RequestWorkspace {
 }
 
 pub fn store_from_headers(headers: &HeaderMap) -> Result<WorkspaceStore, TakokitError> {
-    let store = WorkspaceStore::new(workspace_root(headers)?);
-    store.ensure_layout()?;
-    Ok(store)
+    Ok(WorkspaceStore::new(workspace_root(headers)?))
 }
 
 pub fn session_id_from_headers(headers: &HeaderMap) -> Option<Uuid> {
@@ -64,35 +63,18 @@ fn workspace_root(headers: &HeaderMap) -> Result<PathBuf, TakokitError> {
         let decoded = percent_decode_str(encoded)
             .decode_utf8()
             .map_err(|error| TakokitError::Storage(format!("invalid workspace path: {error}")))?;
-        return absolute_workspace(PathBuf::from(decoded.as_ref()));
+        let resolved = resolve_workspace(
+            Some(PathBuf::from(decoded.as_ref())),
+            None,
+            None,
+            WorkspaceSurface::Api,
+        )?;
+        return Ok(resolved.root);
     }
-    std::env::current_dir().map_err(|error| {
-        TakokitError::Storage(format!("cannot resolve working directory: {error}"))
-    })
-}
 
-fn absolute_workspace(path: PathBuf) -> Result<PathBuf, TakokitError> {
-    if path.is_absolute() {
-        return Ok(path);
-    }
-    std::env::current_dir()
-        .map(|current| current.join(path))
-        .map_err(|error| TakokitError::Storage(format!("cannot resolve workspace path: {error}")))
-}
-
-#[cfg(test)]
-fn isolated_test_workspace(
-    session_id: Option<Uuid>,
-    title: &str,
-) -> Result<RequestWorkspace, TakokitError> {
-    let root = std::env::temp_dir().join(format!(
-        "takokit-server-request-workspace-{}",
-        Uuid::new_v4()
-    ));
-    let store = WorkspaceStore::new(root);
-    store.ensure_layout()?;
-    let session = store.open_session(session_id, Some(title))?;
-    Ok(RequestWorkspace { store, session })
+    let default = safe_default_workspace()?;
+    validate_workspace_root(&default, false)?;
+    Ok(default)
 }
 
 #[cfg(test)]
@@ -123,10 +105,41 @@ mod tests {
     }
 
     #[test]
-    fn implicit_test_workspace_recovers_from_conflicting_local_state() {
+    fn missing_session_header_reuses_active_session() {
+        let root = std::env::temp_dir().join(format!("takokit-server-active-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = WorkspaceStore::new(&root);
+        let session = store.create_session(Some("active")).unwrap();
         let mut headers = HeaderMap::new();
-        headers.remove(WORKSPACE_HEADER);
-        let context = RequestWorkspace::from_headers(&headers, "isolated test").unwrap();
-        assert!(context.store.workspace_root().exists());
+        headers.insert(
+            WORKSPACE_HEADER,
+            HeaderValue::from_str(&encoded_workspace_header(&root.to_string_lossy())).unwrap(),
+        );
+        let context = RequestWorkspace::from_headers(&headers, "fallback").unwrap();
+        assert_eq!(context.session_id(), session.summary.id);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn missing_header_uses_safe_default_not_daemon_current_directory() {
+        let headers = HeaderMap::new();
+        let store = store_from_headers(&headers).unwrap();
+        assert_eq!(store.workspace_root(), safe_default_workspace().unwrap());
+        assert_ne!(store.workspace_root(), std::env::current_dir().unwrap());
+    }
+
+    #[test]
+    fn reading_workspace_context_does_not_create_tako() {
+        let root = std::env::temp_dir().join(format!("takokit-server-readonly-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            WORKSPACE_HEADER,
+            HeaderValue::from_str(&encoded_workspace_header(&root.to_string_lossy())).unwrap(),
+        );
+        let store = store_from_headers(&headers).unwrap();
+        assert!(store.list_sessions(None).unwrap().is_empty());
+        assert!(!root.join(".tako").exists());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

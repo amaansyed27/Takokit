@@ -1,4 +1,5 @@
 use super::*;
+
 #[test]
 fn atomic_runtime_record_round_trips() {
     let temp = tempfile::tempdir().unwrap();
@@ -14,6 +15,7 @@ fn atomic_runtime_record_round_trips() {
         started_at: 1,
         mode: DaemonMode::Managed,
         log_path: temp.path().join("daemon.log"),
+        build_id: current_build_id().to_string(),
     };
     write_atomic(&store.daemon_info_path(), &info).unwrap();
     assert_eq!(
@@ -21,6 +23,48 @@ fn atomic_runtime_record_round_trips() {
         info.instance_id
     );
     assert!(!store.runtime_dir().join("daemon.json.tmp").exists());
+}
+
+#[test]
+fn legacy_runtime_record_without_build_id_still_loads() {
+    let temp = tempfile::tempdir().unwrap();
+    let store = LocalStore::new(temp.path().to_path_buf());
+    store.ensure_layout().unwrap();
+    let info = test_info(temp.path());
+    let mut value = serde_json::to_value(info).unwrap();
+    value.as_object_mut().unwrap().remove("build_id");
+    fs::write(
+        store.daemon_info_path(),
+        serde_json::to_vec_pretty(&value).unwrap(),
+    )
+    .unwrap();
+
+    let loaded = read_info(&store).unwrap().unwrap();
+    assert!(loaded.build_id.is_empty());
+}
+
+#[test]
+fn matching_build_is_current() {
+    let response = build_response(
+        test_info(std::env::temp_dir().as_path()).identity(),
+        current_build_id(),
+    );
+    assert_eq!(build_freshness(&response), BuildFreshness::Current);
+}
+
+#[test]
+fn missing_build_requires_replacement() {
+    let response = build_response(test_info(std::env::temp_dir().as_path()).identity(), "");
+    assert_eq!(build_freshness(&response), BuildFreshness::Missing);
+}
+
+#[test]
+fn mismatched_build_requires_replacement() {
+    let response = build_response(
+        test_info(std::env::temp_dir().as_path()).identity(),
+        "older-build",
+    );
+    assert_eq!(build_freshness(&response), BuildFreshness::Mismatched);
 }
 
 #[test]
@@ -260,8 +304,28 @@ fn identity_validation_reports_ownership_field_mismatches() {
         .contains("host"));
 }
 
+#[test]
+fn build_freshness_does_not_change_ownership_validation() {
+    let temp = tempfile::tempdir().unwrap();
+    let info = test_info(temp.path());
+    let identity = info.identity();
+    let response = build_response(identity.clone(), "stale");
+    assert!(verify_identity(&info, &identity).is_ok());
+    assert_eq!(build_freshness(&response), BuildFreshness::Mismatched);
+}
+
+fn build_response(identity: DaemonIdentity, build_id: &str) -> DaemonBuildIdentity {
+    DaemonBuildIdentity {
+        identity,
+        build_id: build_id.to_string(),
+    }
+}
+
 fn test_info(root: &std::path::Path) -> DaemonInfo {
     let executable = root.join("takokit.exe");
+    if let Some(parent) = executable.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     fs::write(&executable, b"").unwrap();
     DaemonInfo {
         instance_id: Uuid::new_v4(),
@@ -273,6 +337,7 @@ fn test_info(root: &std::path::Path) -> DaemonInfo {
         started_at: 1,
         mode: DaemonMode::Managed,
         log_path: root.join("daemon.log"),
+        build_id: current_build_id().to_string(),
     }
 }
 fn unused_port() -> u16 {

@@ -1,0 +1,121 @@
+.tk-home-page {
+  gap: 30px;
+}
+
+.tk-home-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.tk-home-hero__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 190px;
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+  background: var(--tk-surface-soft);
+  padding: 11px 13px;
+}
+
+.tk-home-hero__status > div {
+  display: grid;
+  gap: 1px;
+}
+
+.tk-home-hero__status strong {
+  color: var(--tk-text);
+  font-size: 11.5px;
+  font-weight: 580;
+}
+
+.tk-home-hero__status small {
+  color: var(--tk-text-tertiary);
+  font-size: 10.5px;
+}
+
+.tk-home-actions {
+  margin-top: 2px;
+}
+
+.tk-home-manage-grid {
+  display: grid;
+  border-top: 1px solid var(--tk-line);
+}
+
+.tk-home-manage-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-text);
+  padding: 14px 2px;
+  text-align: left;
+  transition: background var(--tk-transition), padding var(--tk-transition);
+}
+
+.tk-home-manage-card:hover {
+  background: var(--tk-surface-soft);
+  padding-inline: 10px;
+}
+
+.tk-home-manage-card__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tk-surface);
+  color: var(--tk-text-secondary);
+}
+
+.tk-home-manage-card__body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tk-home-manage-card__body strong {
+  font-size: 13px;
+  font-weight: 590;
+}
+
+.tk-home-manage-card__body small {
+  color: var(--tk-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.tk-home-manage-card__meta {
+  color: var(--tk-text-tertiary);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+@media (max-width: 840px) {
+  .tk-home-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tk-home-hero__status {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .tk-home-manage-card {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .tk-home-manage-card__meta {
+    display: none;
+  }
+}

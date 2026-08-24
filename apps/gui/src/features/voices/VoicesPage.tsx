@@ -1,186 +1,396 @@
-import { Copy, ShieldCheck, UserRoundPlus } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  FolderOpen,
+  Gauge,
+  Mic2,
+  ShieldCheck,
+  Trash2,
+  UserRoundPlus,
+  X
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { Section } from "../../components/ui/Section";
-import { Select } from "../../components/ui/Select";
-import { Table, TableRow } from "../../components/ui/Table";
-import { createVoiceProfile } from "../../lib/voices";
+import { AudioRecorder } from "../../components/audio/AudioRecorder";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { ProductButton } from "../../components/ui/ProductButton";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
+import { ProductSelect } from "../../components/ui/ProductSelect";
+import { useVoiceProfileCreation } from "../../hooks/useVoiceProfileCreation";
+import { pickAudioFile } from "../../lib/nativePicker";
+import type { VoiceSummary } from "../../lib/types";
+import { removeVoiceProfile } from "../../lib/voices";
+import { consumeVoiceIntent, setSpeakIntent } from "../../lib/workflowIntent";
 
-export function VoicesPage({ runtime, onRefresh }: RouteComponentProps) {
+export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentProps) {
   const cloningModels = useMemo(
-    () => runtime.models.filter((model) => model.capabilities.includes("voice_cloning")),
+    () => runtime.models.filter((item) => item.capabilities.includes("voice_cloning")),
     [runtime.models]
   );
+  const voiceIntent = useMemo(() => consumeVoiceIntent(), []);
+  const initialModel = cloningModels.find((item) => item.id === "openvoice" && item.executable)
+    ?? cloningModels.find((item) => item.executable)
+    ?? cloningModels[0];
+
   const [name, setName] = useState("");
-  const [samplePath, setSamplePath] = useState("");
-  const [model, setModel] = useState(
-    cloningModels.find((item) => item.id === "chatterbox")?.id ?? cloningModels[0]?.id ?? ""
-  );
+  const [samplePath, setSamplePath] = useState(voiceIntent?.samplePath ?? "");
+  const [model, setModel] = useState(initialModel?.id ?? "");
   const [consent, setConsent] = useState(false);
   const [consentNote, setConsentNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const selectedModel = cloningModels.find((item) => item.id === model);
-  const ready = Boolean(
-    selectedModel?.executable &&
-      name.trim() &&
-      samplePath.trim() &&
-      consent &&
-      runtime.server.status === "online"
+  const [pickerBusy, setPickerBusy] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<VoiceSummary | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const {
+    clearResult: clearCreatedProfile,
+    create,
+    error: createError,
+    isCreating,
+    result: createdProfile
+  } = useVoiceProfileCreation();
+
+  const selectedModel = cloningModels.find((item) => item.id === model) ?? cloningModels[0];
+  const localVoices = runtime.voices.filter((voice) => voice.source === "local-profile");
+  const builtInVoices = runtime.voices.filter((voice) => voice.source !== "local-profile");
+  const serverOnline = runtime.server.status === "online";
+  const canCreate = Boolean(
+    serverOnline
+      && selectedModel?.executable
+      && name.trim()
+      && samplePath.trim()
+      && consent
+      && !isCreating
+      && !pickerBusy
   );
+  const blocker = !serverOnline
+    ? "Local runtime is offline."
+    : selectedModel?.executable
+      ? null
+      : selectedModel?.missing.join("; ") || "This cloning model needs attention before it can run.";
+
+  async function browseReference() {
+    setPickerBusy(true);
+    setPageError(null);
+    try {
+      const selected = await pickAudioFile();
+      if (selected) setSamplePath(selected);
+    } catch (caught) {
+      setPageError(caught instanceof Error ? caught.message : "The audio picker could not be opened.");
+    } finally {
+      setPickerBusy(false);
+    }
+  }
 
   async function createProfile() {
-    if (!ready) return;
-    setBusy(true);
-    setNotice(null);
+    if (!canCreate || !selectedModel) return;
+    setPageError(null);
+    const profile = await create({
+      sample_path: samplePath.trim(),
+      name: name.trim(),
+      model: selectedModel.id,
+      consent_affirmed: consent,
+      consent_note: consentNote.trim() || undefined
+    });
+    if (!profile) return;
+    await onRefresh();
+    setName("");
+    setSamplePath("");
+    setConsent(false);
+    setConsentNote("");
+  }
+
+  function useInSpeak(voiceId: string, modelId: string) {
+    setSpeakIntent({ voiceId, modelId });
+    onNavigate("speak");
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    setRemoveBusy(true);
+    setPageError(null);
     try {
-      const profile = await createVoiceProfile({
-        sample_path: samplePath.trim(),
-        name: name.trim(),
-        model,
-        consent_affirmed: consent,
-        consent_note: consentNote.trim() || undefined
-      });
+      await removeVoiceProfile(removeTarget.id);
+      if (createdProfile?.id === removeTarget.id) clearCreatedProfile();
+      setRemoveTarget(null);
       await onRefresh();
-      setName("");
-      setSamplePath("");
-      setConsent(false);
-      setConsentNote("");
-      setNotice(
-        `Created ${profile.name}. Use voice ID “${profile.id}” on the Speak page with ${profile.model_id}.`
-      );
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Voice profile creation failed.");
+    } catch (caught) {
+      setPageError(caught instanceof Error ? caught.message : "Voice removal failed.");
     } finally {
-      setBusy(false);
+      setRemoveBusy(false);
     }
   }
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Voices</h1>
-        <p>Create reusable local voice profiles and use them across CLI, TUI, and GUI sessions.</p>
-      </header>
+    <section className="tk-page tk-voices-page">
+      <ProductPageHeader
+        eyebrow="Voice cloning"
+        title="Voices"
+        description="Create a reusable local voice from a clean reference recording. Browse an existing clip, reuse Files, or record one right here."
+      />
 
-      <Section
-        title="Create a voice profile"
-        description="Takokit stores the reference audio globally, while this action and its profile artifact are recorded in the active project session."
-      >
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor="voice-name">Profile name</label>
-            <input
-              id="voice-name"
-              className="search-input"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="My narration voice"
-            />
-          </div>
-          <Select
-            label="Cloning model"
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            hint={
-              selectedModel?.executable
-                ? "Ready for local zero-shot profile creation."
-                : selectedModel?.missing.join("; ") || "Install a supported cloning model first."
-            }
-            options={cloningModels.map((item) => ({ value: item.id, label: item.name }))}
-          />
-          <div className="field">
-            <label htmlFor="voice-sample">Reference audio path</label>
-            <input
-              id="voice-sample"
-              className="search-input"
-              value={samplePath}
-              onChange={(event) => setSamplePath(event.target.value)}
-              placeholder="C:\\path\\to\\clean-reference.wav"
-            />
-            <small>Use a clean, single-speaker recording that the local daemon can read.</small>
-          </div>
-          <div className="field">
-            <label htmlFor="consent-note">Consent note</label>
-            <input
-              id="consent-note"
-              className="search-input"
-              value={consentNote}
-              onChange={(event) => setConsentNote(event.target.value)}
-              placeholder="I recorded and own this voice."
-            />
-          </div>
-        </div>
+      <div className="tk-voice-studio">
+        <section className="tk-voice-builder" aria-label="Create a voice">
+          <header className="tk-voice-builder__header">
+            <div>
+              <span className="tk-voice-builder__eyebrow">Instant clone</span>
+              <h2>Create a voice</h2>
+              <p>A short, clean recording is enough for supported cloning models.</p>
+            </div>
+            <span className="tk-voice-builder__icon"><UserRoundPlus size={20} strokeWidth={1.7} /></span>
+          </header>
 
-        <label className="consent-check">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-          />
-          <span>
-            <ShieldCheck size={17} aria-hidden="true" />
-            I own this voice or have explicit permission to create and use this profile.
-          </span>
-        </label>
+          <div className="tk-voice-builder__body">
+            <label className="tk-field tk-voice-name-field">
+              <span className="tk-field__label">Voice name</span>
+              <input
+                className="tk-input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="For example, Studio narrator"
+              />
+              <span className="tk-field__hint">This is the name you will see later in Speak.</span>
+            </label>
 
-        <div className="generation-actions">
-          <div className="generation-actions__meta">
-            <strong>{selectedModel?.name ?? "No cloning model available"}</strong>
-            <span>
-              {selectedModel?.executable
-                ? "The profile will be usable by ID from every Takokit interface."
-                : "Prepare the selected model and adapter before creating a profile."}
-            </span>
-          </div>
-          <span className="badge-list">
-            <Badge tone={selectedModel?.executable ? "success" : "warning"}>
-              {selectedModel?.executable ? "ready" : "blocked"}
-            </Badge>
-            <Badge tone={consent ? "success" : "warning"}>
-              {consent ? "consent affirmed" : "consent required"}
-            </Badge>
-          </span>
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!ready}
-            loading={busy}
-            onClick={() => void createProfile()}
-          >
-            <UserRoundPlus size={16} /> Create profile
-          </Button>
-        </div>
-        {notice ? <p className="notice-line">{notice}</p> : null}
-      </Section>
-
-      <Section title="Voice library" description="Preset and locally created profiles returned by the shared daemon.">
-        <Table columns={["Voice", "ID", "Model", "Source", "Consent"]} ariaLabel="Takokit voices">
-          {runtime.voices.map((voice) => (
-            <TableRow key={`${voice.source}-${voice.id}`}>
-              <strong>{voice.label}</strong>
-              <span className="voice-id">
-                {voice.id}
-                <button
+            <div className={samplePath ? "tk-voice-reference is-selected" : "tk-voice-reference"}>
+              <span className="tk-voice-reference__icon"><Mic2 size={23} strokeWidth={1.7} /></span>
+              <div className="tk-voice-reference__copy">
+                <span>Reference audio</span>
+                <strong>{samplePath ? displayFileName(samplePath) : "Choose a clean voice recording"}</strong>
+                <p>{samplePath ? "Ready to create a reusable voice profile." : "Best results come from one speaker, clear speech, and little background noise."}</p>
+              </div>
+              <div className="tk-voice-reference__actions">
+                <ProductButton
                   type="button"
-                  className="icon-button"
-                  aria-label={`Copy ${voice.id}`}
-                  onClick={() => void navigator.clipboard.writeText(voice.id)}
+                  tone={samplePath ? "secondary" : "primary"}
+                  loading={pickerBusy}
+                  onClick={() => void browseReference()}
                 >
-                  <Copy size={14} />
-                </button>
+                  <FolderOpen size={15} strokeWidth={1.8} />
+                  {samplePath ? "Choose another" : "Browse audio"}
+                </ProductButton>
+                {samplePath ? (
+                  <button className="tk-subtle-icon-button" type="button" title="Clear reference" onClick={() => setSamplePath("")}>
+                    <X size={15} strokeWidth={1.9} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <AudioRecorder
+              compact
+              label="Record a reference now"
+              onSaved={(file) => setSamplePath(file.path)}
+            />
+
+            {samplePath ? <LocalAudioPlayer path={samplePath} compact label="Reference audio" /> : null}
+
+            <details className="tk-voice-manual-path">
+              <summary>Enter a local path instead</summary>
+              <input
+                value={samplePath}
+                onChange={(event) => setSamplePath(event.target.value)}
+                placeholder="C:\\path\\to\\reference.wav"
+                spellCheck={false}
+              />
+            </details>
+
+            <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>
+              Choose from workspace Files →
+            </button>
+
+            <label className={consent ? "tk-voice-consent is-checked" : "tk-voice-consent"}>
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span className="tk-voice-consent__check">{consent ? <Check size={14} strokeWidth={2.4} /> : null}</span>
+              <span className="tk-voice-consent__icon"><ShieldCheck size={18} strokeWidth={1.8} /></span>
+              <span className="tk-voice-consent__copy">
+                <strong>I own this voice or have explicit permission to use it.</strong>
+                <small>Takokit requires this confirmation before creating a reusable voice profile.</small>
               </span>
-              <span>{voice.model}</span>
-              <span>{voice.source}</span>
-              <Badge tone={voice.consent === "affirmed" || voice.consent === "not required" ? "success" : "warning"}>
-                {voice.consent}
-              </Badge>
-            </TableRow>
-          ))}
-        </Table>
-      </Section>
+            </label>
+
+            <details className="tk-voice-consent-note">
+              <summary>Add a consent note <span>Optional</span></summary>
+              <input
+                className="tk-input"
+                value={consentNote}
+                onChange={(event) => setConsentNote(event.target.value)}
+                placeholder="For example: I recorded and own this voice."
+              />
+            </details>
+
+            {pageError || createError ? <div className="tk-inline-error" role="alert">{pageError ?? createError}</div> : null}
+          </div>
+
+          <footer className="tk-voice-builder__footer">
+            <div>
+              <span>Clone with</span>
+              <strong>{selectedModel?.name ?? "No compatible model installed"}</strong>
+            </div>
+            <ProductButton tone="primary" type="button" loading={isCreating} disabled={!canCreate} onClick={() => void createProfile()}>
+              <UserRoundPlus size={16} strokeWidth={1.9} />
+              {isCreating ? "Creating voice" : "Create voice"}
+            </ProductButton>
+          </footer>
+        </section>
+
+        <aside className="tk-voice-setup" aria-label="Voice cloning setup">
+          <div className="tk-voice-setup__header">
+            <span>Cloning setup</span>
+            <small>Local</small>
+          </div>
+
+          <div className="tk-voice-setup__body">
+            <ProductSelect
+              label="Model"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              options={cloningModels.map((item) => ({ value: item.id, label: item.name }))}
+              hint={selectedModel ? `${selectedModel.runtime} · ${selectedModel.runner}` : "Install a cloning model first."}
+            />
+
+            <div className="tk-voice-flow" aria-label="Instant cloning flow">
+              <div><span>1</span><p><strong>Reference</strong><small>Choose or record a clean voice sample.</small></p></div>
+              <div><span>2</span><p><strong>Create</strong><small>Takokit stores a reusable local profile.</small></p></div>
+              <div><span>3</span><p><strong>Speak</strong><small>Select the saved voice from Text to Speech.</small></p></div>
+            </div>
+
+            {selectedModel ? (
+              <div className="tk-voice-model-summary">
+                <div className="tk-voice-model-summary__title">
+                  <span><Gauge size={16} strokeWidth={1.8} /></span>
+                  <div><strong>{selectedModel.name}</strong><small>{selectedModel.family}</small></div>
+                </div>
+                <dl>
+                  <div><dt>Backend</dt><dd>{selectedModel.backend}</dd></div>
+                  <div><dt>Runtime</dt><dd>{selectedModel.runtime}</dd></div>
+                  <div><dt>License</dt><dd>{selectedModel.license}</dd></div>
+                </dl>
+                {blocker ? (
+                  <div className="tk-model-blocker">
+                    <span>{blocker}</span>
+                    <button type="button" onClick={() => onNavigate("models")}>Manage model →</button>
+                  </div>
+                ) : (
+                  <div className="tk-model-ready"><Check size={14} strokeWidth={2} /> Ready for instant cloning</div>
+                )}
+              </div>
+            ) : (
+              <div className="tk-model-blocker">
+                <span>No installed voice-cloning model is available.</span>
+                <button type="button" onClick={() => onNavigate("models")}>Open model library →</button>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {isCreating ? (
+        <section className="tk-created-voice" aria-live="polite">
+          <span className="tk-created-voice__icon"><UserRoundPlus size={18} strokeWidth={1.8} /></span>
+          <div>
+            <strong>Creating voice…</strong>
+            <span>You can switch pages. Takokit will keep this cloning process active.</span>
+          </div>
+        </section>
+      ) : createdProfile ? (
+        <section className="tk-created-voice" aria-live="polite">
+          <span className="tk-created-voice__icon"><Check size={18} strokeWidth={2} /></span>
+          <div>
+            <strong>{createdProfile.name} is ready</strong>
+            <span>This result stays visible until you clear it. The saved voice itself remains in your library.</span>
+          </div>
+          <div className="tk-created-voice__actions">
+            <button type="button" onClick={() => void navigator.clipboard.writeText(createdProfile.id)}>
+              <Copy size={14} strokeWidth={1.8} /> Copy ID
+            </button>
+            <button type="button" onClick={clearCreatedProfile}>
+              <X size={14} strokeWidth={1.8} /> Clear
+            </button>
+            <ProductButton tone="primary" type="button" onClick={() => useInSpeak(createdProfile.id, createdProfile.model_id)}>
+              Use in Speak <ArrowRight size={14} strokeWidth={1.9} />
+            </ProductButton>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="tk-voice-library">
+        <div className="tk-section-heading tk-voice-library__heading">
+          <div>
+            <h2>Your voices</h2>
+            <p>{localVoices.length > 0 ? `${localVoices.length} reusable ${localVoices.length === 1 ? "voice" : "voices"} saved on this device` : "Create your first reusable voice above"}</p>
+          </div>
+        </div>
+
+        {localVoices.length > 0 ? (
+          <div className="tk-voice-list">
+            {localVoices.map((voice) => (
+              <article className="tk-voice-row" key={`${voice.source}-${voice.id}`}>
+                <span className="tk-voice-row__avatar"><Mic2 size={19} strokeWidth={1.7} /></span>
+                <div className="tk-voice-row__identity">
+                  <strong>{voice.name}</strong>
+                  <span>Saved voice · {voice.model === "none" ? "model-defined" : voice.model}</span>
+                </div>
+                <div className="tk-voice-row__badges">
+                  <span className="is-local">Local</span>
+                  <span><ShieldCheck size={12} strokeWidth={1.8} /> Consent-backed</span>
+                </div>
+                <div className="tk-voice-row__actions">
+                  {voice.model !== "none" ? (
+                    <button className="tk-voice-use" type="button" onClick={() => useInSpeak(voice.id, voice.model)}>
+                      Use in Speak <ArrowRight size={13} strokeWidth={1.9} />
+                    </button>
+                  ) : null}
+                  <button className="tk-voice-icon-action" type="button" title="Copy voice ID" onClick={() => void navigator.clipboard.writeText(voice.id)}>
+                    <Copy size={14} strokeWidth={1.8} />
+                  </button>
+                  <button className="tk-voice-icon-action is-danger" type="button" title={`Remove ${voice.name}`} onClick={() => setRemoveTarget(voice)}>
+                    <Trash2 size={14} strokeWidth={1.8} />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="tk-result-empty">
+            <Mic2 size={19} strokeWidth={1.7} />
+            <div><strong>No saved voices yet</strong><span>Create an instant clone above, then use it from Speak.</span></div>
+          </div>
+        )}
+
+        {builtInVoices.length > 0 ? (
+          <div className="tk-built-in-voices">
+            <div className="tk-built-in-voices__heading"><span>Built-in voices</span><small>Provided by installed models</small></div>
+            {builtInVoices.map((voice) => (
+              <div className="tk-built-in-voice" key={`${voice.source}-${voice.id}`}>
+                <span><Mic2 size={16} strokeWidth={1.7} /></span>
+                <div><strong>{voice.name}</strong><small>{voice.model === "none" ? "Model-defined voice" : voice.model}</small></div>
+                <em>Built-in</em>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        title="Remove saved voice?"
+        description={removeTarget ? (
+          <>This permanently removes <strong>{removeTarget.name}</strong> and its Takokit-managed reference audio. Existing generated outputs are not deleted.</>
+        ) : null}
+        confirmLabel="Remove voice"
+        destructive
+        busy={removeBusy}
+        onCancel={() => !removeBusy && setRemoveTarget(null)}
+        onConfirm={() => void confirmRemove()}
+      />
     </section>
   );
+}
+
+function displayFileName(path: string): string {
+  const normalized = path.trim().replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : "Selected audio";
 }

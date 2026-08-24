@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - slice/interactive-stabilization
 
 permissions:
   contents: read

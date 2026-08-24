@@ -21,6 +21,16 @@ pub async fn voices(State(state): State<AppState>) -> Json<VoicesResponse> {
     Json(VoicesResponse { data })
 }
 
+pub async fn remove_voice(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    VoiceProfileStore::new(state.store.voices_dir())
+        .remove(&id)
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub async fn speech(
     State(state): State<AppState>,
     headers: HeaderMap,

@@ -17,8 +17,7 @@ use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, RuntimeConfig, TakokitError};
 use takokit_models::{
-    execute_speech, execute_transcription, MockTextToSpeechEngine, ModelRegistry,
-    TextToSpeechEngine,
+    execute_speech, execute_transcription, MockTextToSpeechEngine, TextToSpeechEngine,
 };
 use takokit_package::{
     acquire_maintenance_lock, bootstrap_uv, custom_model_record, custom_model_records, find_uv,
@@ -122,7 +121,12 @@ pub async fn run() -> anyhow::Result<()> {
                 )
                 .await?;
             } else {
-                run_server(AppState::new(config, store)).await?;
+                run_server(AppState::new_with_build_id(
+                    config,
+                    store,
+                    daemon::current_build_id(),
+                ))
+                .await?;
             }
         }
         Some(Command::Daemon { command }) => match command {
@@ -172,11 +176,15 @@ pub async fn run() -> anyhow::Result<()> {
         }) => create_samples(&store, &package_registry, &installed_registry).await?,
         Some(Command::Version) => {
             println!("takokit {}", env!("CARGO_PKG_VERSION"));
+            println!("build: {}", daemon::current_build_id());
             println!("storage: {}", store.root().display());
         }
         Some(Command::Status) => {
-            let state = AppState::new(config, store);
-            print_serializable(&state.status())?;
+            let state = AppState::new_with_build_id(config, store, daemon::current_build_id());
+            print_serializable(&serde_json::json!({
+                "status": state.status(),
+                "build_id": state.build_id,
+            }))?;
         }
         Some(Command::Storage(args)) => {
             run_storage_command(store.root(), args, json_output_requested())?;
@@ -306,18 +314,15 @@ pub async fn run() -> anyhow::Result<()> {
             .map_err(cli_error)?;
             print_serializable(&report)?;
         }
-        Some(Command::List { target }) => {
-            let registry = ModelRegistry::default();
-            match target {
-                None | Some(ListTarget::Models) => {
-                    print_models(&package_registry, &installed_registry)?
-                }
-                Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
-                Some(ListTarget::Voices) => {
-                    print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?
-                }
+        Some(Command::List { target }) => match target {
+            None | Some(ListTarget::Models) => {
+                print_models(&package_registry, &installed_registry)?
             }
-        }
+            Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
+            Some(ListTarget::Voices) => {
+                print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?
+            }
+        },
         Some(Command::Run(args)) => {
             run_model(
                 args,

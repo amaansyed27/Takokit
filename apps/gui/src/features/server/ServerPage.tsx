@@ -1,152 +1,134 @@
-import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, CircleAlert, Copy, FileText, RefreshCw, Server, Wrench } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { Section } from "../../components/ui/Section";
-import { Table, TableRow } from "../../components/ui/Table";
-import { useServerStatus } from "../../hooks/useServerStatus";
+import { ProductButton } from "../../components/ui/ProductButton";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { getDoctor } from "../../lib/api";
-import type { DoctorResponse } from "../../lib/types";
+import { openStorageLocation } from "../../lib/storage";
+import type { DoctorCheck, DoctorResponse } from "../../lib/types";
 
-const endpoints = [
-  "GET /health",
-  "GET /v1/status",
-  "GET /v1/capabilities",
-  "GET /v1/models",
-  "GET /v1/models/:id",
-  "GET /v1/models/:id/plan",
-  "POST /v1/models/pull",
-  "DELETE /v1/models/:id",
-  "GET /v1/runners",
-  "GET /v1/runners/:id",
-  "GET /v1/runners/:id/doctor",
-  "POST /v1/runners/pull",
-  "POST /v1/runners/install",
-  "DELETE /v1/runners/:id",
-  "GET /v1/library/models",
-  "GET /v1/library/runners",
-  "GET /v1/doctor",
-  "GET /v1/test/launch",
-  "POST /v1/audio/speech",
-  "POST /v1/audio/transcriptions"
-];
-
-export function ServerPage({ runtime }: RouteComponentProps) {
-  const [copied, setCopied] = useState<string | null>(null);
+export function ServerPage({ runtime, onRefresh, onNavigate }: RouteComponentProps) {
   const [doctor, setDoctor] = useState<DoctorResponse | null>(null);
+  const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const status = useServerStatus(runtime);
+  const [copied, setCopied] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(() => { void refreshDoctor(); }, [runtime.server.status, runtime.buildId]);
+
+  const counts = useMemo(() => {
+    const checks = doctor?.checks ?? [];
+    return {
+      ok: checks.filter((check) => check.status === "ok").length,
+      warn: checks.filter((check) => check.status === "warn").length,
+      fail: checks.filter((check) => check.status === "fail").length
+    };
+  }, [doctor]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, DoctorCheck[]>();
+    for (const check of doctor?.checks ?? []) {
+      const current = map.get(check.section) ?? [];
+      current.push(check);
+      map.set(check.section, current);
+    }
+    return [...map.entries()];
+  }, [doctor]);
+
+  async function refreshDoctor() {
     if (runtime.server.status !== "online") {
       setDoctor(null);
-      setNotice("Start takokit serve or takokit gui to run doctor checks through the API.");
       return;
     }
+    setLoading(true);
+    setNotice(null);
+    try {
+      setDoctor(await getDoctor());
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Diagnostics could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    getDoctor()
-      .then((report) => {
-        if (cancelled) return;
-        setDoctor(report);
-        setNotice(null);
-      })
-      .catch((error) => {
-        if (!cancelled) setNotice(error instanceof Error ? error.message : "Doctor endpoint failed.");
-      });
+  async function retryRuntime() {
+    await onRefresh();
+    await refreshDoctor();
+  }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime.server.status]);
-
-  function copyValue(value: string) {
-    void navigator.clipboard?.writeText(value);
+  function copy(value: string) {
+    void navigator.clipboard.writeText(value);
     setCopied(value);
-    window.setTimeout(() => setCopied(null), 1400);
+    window.setTimeout(() => setCopied(null), 1200);
   }
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Diagnostics</h1>
-        <p>Storage, server health, registry parsing, runner records, GUI build output, and log paths.</p>
-      </header>
+    <section className="tk-page tk-diagnostics-page">
+      <ProductPageHeader
+        eyebrow="System health"
+        title="Diagnostics"
+        description="A readable view of daemon identity, storage, registry health, installed records, runners, and logs."
+        actions={<ProductButton tone="secondary" loading={loading} onClick={() => void retryRuntime()}><RefreshCw size={15} /> Run checks</ProductButton>}
+      />
 
-      <div className="stats-grid">
-        <div className="stat-tile"><span>Status</span><strong>{status.label}</strong><small>{status.uptime}</small></div>
-        <div className="stat-tile"><span>Local URL</span><strong>{status.url}</strong><small>localhost only</small></div>
-        <div className="stat-tile"><span>Storage</span><strong>{doctor?.storage_root ?? runtime.storagePath}</strong><small>TAKOKIT_HOME aware</small></div>
-        <div className="stat-tile"><span>Executable</span><strong className="stat-tile__value">{doctor?.executable_models.length ?? runtime.models.filter((model) => model.executable).length}</strong><small>Planner summary</small></div>
+      <div className="tk-diagnostics-summary">
+        <Metric label="Runtime" value={runtime.server.status === "online" ? "Online" : "Offline"} detail={runtime.server.uptime} />
+        <Metric label="Healthy checks" value={String(counts.ok)} detail={`${counts.warn} warnings · ${counts.fail} failures`} />
+        <Metric label="Executable models" value={String(doctor?.executable_models.length ?? runtime.models.filter((model) => model.executable).length)} detail={`${runtime.models.length} installed`} />
+        <Metric label="Build" value={runtime.buildId.slice(0, 8)} detail={runtime.buildId} />
       </div>
 
-      <Section title="Doctor checks">
-        {notice && <p className="notice-line">{notice}</p>}
-        <Table columns={["Section", "Check", "Status", "Detail", "Action"]} ariaLabel="Doctor checks">
-          {(doctor?.checks ?? []).map((check) => (
-            <TableRow key={`${check.section}-${check.label}`}>
-              <strong>{check.section}</strong>
-              <span>{check.label}</span>
-              <Badge tone={check.status === "ok" ? "success" : "warning"}>{check.status}</Badge>
-              <span>{check.detail ?? "-"}</span>
-              <Button variant="ghost" type="button" onClick={() => copyValue(check.detail ?? check.label)}>
-                {copied === (check.detail ?? check.label) ? <Check size={14} /> : <Copy size={14} />} Copy
-              </Button>
-            </TableRow>
-          ))}
-        </Table>
-        {!doctor && !notice && <p className="notice-line">Doctor report loading.</p>}
-      </Section>
-
-      <Section title="Runtime matrix" description="Daemon at a glance.">
-        <div className="status-matrix">
-          <div className="status-cell">
-            <strong>Bind</strong>
-            <span>127.0.0.1 only</span>
-          </div>
-          <div className="status-cell">
-            <strong>Speech</strong>
-            <span>{runtime.models.find((model) => model.id === "mock-tts")?.executionStatus ?? "internal test path"}</span>
-          </div>
-          <div className="status-cell">
-            <strong>Outputs</strong>
-            <span>{runtime.storagePath}/outputs</span>
-          </div>
-          <div className="status-cell">
-            <strong>Logs</strong>
-            <span>{doctor?.logs_path ?? "~/.takokit/logs"}</span>
-          </div>
+      {runtime.server.status !== "online" ? (
+        <div className="tk-diagnostics-offline">
+          <CircleAlert size={22} />
+          <div><strong>Local runtime is unavailable</strong><span>Start or restart Takokit, then run the checks again.</span></div>
+          <ProductButton tone="secondary" onClick={() => void onRefresh()}>Retry runtime</ProductButton>
         </div>
-      </Section>
+      ) : null}
+      {notice ? <div className="tk-inline-error" role="alert">{notice}</div> : null}
 
-      <Section title="Endpoints">
-        <div className="command-note">
-          <code>takokit gui</code>
-          <span>starts the daemon when needed and opens the local web GUI</span>
-        </div>
-        <div className="command-note">
-          <code>takokit doctor --json</code>
-          <span>returns storage, registry, runner, GUI, and executable-model diagnostics</span>
-        </div>
-        <Table columns={["Route", "Method", "State", "Notes", "Copy"]} ariaLabel="Server endpoints">
-          {endpoints.map((endpoint) => (
-            <TableRow key={endpoint}>
-              <code>{endpoint}</code>
-              <span>{endpoint.split(" ")[0]}</span>
-              <span>{endpoint.includes("audio") ? "execution route" : endpoint.includes("doctor") || endpoint.includes("test") ? "diagnostic route" : "package route"}</span>
-              <span>local API</span>
-              <Button variant="ghost" type="button" onClick={() => copyValue(endpoint)}>
-                {copied === endpoint ? <Check size={14} /> : <Copy size={14} />} Copy
-              </Button>
-            </TableRow>
-          ))}
-        </Table>
-      </Section>
+      {doctor ? (
+        <div className="tk-diagnostics-layout">
+          <section className="tk-diagnostics-checks">
+            {groups.map(([section, checks]) => (
+              <div className="tk-doctor-group" key={section}>
+                <div className="tk-doctor-group__header"><span>{section}</span><strong>{checks.filter((check) => check.status === "ok").length}/{checks.length} healthy</strong></div>
+                {checks.map((check) => (
+                  <div className="tk-doctor-check" key={`${section}-${check.label}`}>
+                    <span className={check.status === "ok" ? "tk-doctor-check__icon is-ok" : check.status === "fail" ? "tk-doctor-check__icon is-fail" : "tk-doctor-check__icon is-warn"}>
+                      {check.status === "ok" ? <Check size={13} /> : <CircleAlert size={13} />}
+                    </span>
+                    <div><strong>{check.label}</strong><span title={check.detail}>{check.detail ?? "No additional detail"}</span></div>
+                    <button className="tk-row-icon-action" type="button" title="Copy detail" onClick={() => copy(check.detail ?? check.label)}>{copied === (check.detail ?? check.label) ? <Check size={14} /> : <Copy size={14} />}</button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
 
-      <Section title="Logs">
-        <pre className="logs-panel">{doctor ? `Main logs: ${doctor.logs_path}\nRunner logs live under ${runtime.storagePath}/runners/<runner>/logs.` : "Doctor data unavailable."}</pre>
-      </Section>
+          <aside className="tk-diagnostics-side">
+            <div className="tk-diagnostics-card">
+              <span className="tk-diagnostics-card__icon"><Server size={18} /></span>
+              <div><strong>Local daemon</strong><span>{runtime.server.url}</span></div>
+              <dl><div><dt>Mode</dt><dd>{runtime.server.uptime}</dd></div><div><dt>Build</dt><dd title={runtime.buildId}>{runtime.buildId.slice(0, 12)}</dd></div><div><dt>Storage</dt><dd title={doctor.storage_root}>{doctor.storage_root}</dd></div></dl>
+            </div>
+            <div className="tk-diagnostics-card">
+              <span className="tk-diagnostics-card__icon"><FileText size={18} /></span>
+              <div><strong>Logs</strong><span>Runtime and runner diagnostics are written locally.</span></div>
+              <code title={doctor.logs_path}>{doctor.logs_path}</code>
+              <ProductButton tone="secondary" onClick={() => void openStorageLocation("logs")}>Open logs folder</ProductButton>
+            </div>
+            <div className="tk-diagnostics-card">
+              <span className="tk-diagnostics-card__icon"><Wrench size={18} /></span>
+              <div><strong>Something needs repair?</strong><span>Use Models for model lifecycle and Runners for shared runtime repair.</span></div>
+              <div className="tk-diagnostics-card__actions"><button type="button" onClick={() => onNavigate("models")}>Models →</button><button type="button" onClick={() => onNavigate("runners")}>Runners →</button></div>
+            </div>
+          </aside>
+        </div>
+      ) : loading ? <div className="tk-system-loading">Running local doctor checks…</div> : null}
     </section>
   );
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="tk-system-metric"><span>{label}</span><strong>{value}</strong><small title={detail}>{detail}</small></div>;
 }

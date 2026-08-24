@@ -1,11 +1,16 @@
 mod voice;
 mod workspace;
+mod workspace_resolver;
 
 use std::path::{Path, PathBuf};
 use takokit_core::{TakokitError, TakokitResult};
 
 pub use voice::VoiceProfileStore;
 pub use workspace::WorkspaceStore;
+pub use workspace_resolver::{
+    load_persisted_workspace, persist_workspace, resolve_workspace, safe_default_workspace,
+    validate_workspace_root, ResolvedWorkspace, WorkspaceSource, WorkspaceSurface,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalStore {

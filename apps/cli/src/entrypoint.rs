@@ -4,6 +4,11 @@ use std::{
 };
 
 pub async fn run() -> anyhow::Result<()> {
+    if build_id_requested() {
+        println!("{}", env!("TAKOKIT_BUILD_ID"));
+        return Ok(());
+    }
+
     let started = Instant::now();
     let show_timing = !std::env::args_os().any(|argument| argument == OsStr::new("--daemon-child"));
     let result = takokit_cli::run().await;
@@ -17,6 +22,11 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     result
+}
+
+fn build_id_requested() -> bool {
+    let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    arguments.len() == 1 && arguments[0] == OsStr::new("--build-id")
 }
 
 fn format_duration(duration: Duration) -> String {
@@ -73,5 +83,10 @@ mod tests {
     #[test]
     fn formats_hours() {
         assert_eq!(format_duration(Duration::from_secs(3_723)), "1h 02m 03s");
+    }
+
+    #[test]
+    fn embedded_build_identifier_is_present() {
+        assert!(!env!("TAKOKIT_BUILD_ID").trim().is_empty());
     }
 }

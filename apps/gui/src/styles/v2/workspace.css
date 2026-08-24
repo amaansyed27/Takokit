@@ -1,0 +1,185 @@
+.tk-workspace-backdrop {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(7px);
+  padding: 20px;
+}
+
+.tk-workspace-dialog {
+  width: min(640px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--tk-line-strong);
+  border-radius: 18px;
+  background: var(--tk-surface);
+  box-shadow: var(--tk-shadow-lg);
+}
+
+.tk-workspace-dialog__header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 32px;
+  gap: 12px;
+  align-items: start;
+  padding: 20px;
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.tk-workspace-dialog__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-workspace-dialog__header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.tk-workspace-dialog__header > div > span {
+  color: var(--tk-accent);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tk-workspace-dialog__header h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.tk-workspace-dialog__header p {
+  margin: 0;
+  color: var(--tk-text-secondary);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.tk-workspace-dialog__body {
+  display: grid;
+  gap: 17px;
+  padding: 20px;
+}
+
+.tk-workspace-path {
+  display: grid;
+  gap: 8px;
+}
+
+.tk-workspace-path > span {
+  color: var(--tk-text-secondary);
+  font-size: 10.5px;
+  font-weight: 560;
+}
+
+.tk-workspace-path > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.tk-workspace-path input {
+  min-height: 42px;
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--tk-control);
+  color: var(--tk-text);
+  padding: 0 12px;
+  font: 10px var(--tk-font-mono);
+}
+
+.tk-workspace-path input:focus {
+  border-color: var(--tk-line-strong);
+  box-shadow: 0 0 0 3px var(--tk-accent-soft);
+}
+
+.tk-workspace-recents {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+}
+
+.tk-workspace-recents__heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--tk-line);
+  padding: 11px 13px;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-workspace-recents__heading span {
+  font-size: 10px;
+}
+
+.tk-workspace-recents > button {
+  display: grid;
+  gap: 3px;
+  border: 0;
+  border-top: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-text);
+  padding: 12px 13px;
+  text-align: left;
+  font: inherit;
+}
+
+.tk-workspace-recents > button:first-of-type {
+  border-top: 0;
+}
+
+.tk-workspace-recents > button:hover,
+.tk-workspace-recents > button.is-active {
+  background: var(--tk-surface-soft);
+}
+
+.tk-workspace-recents strong {
+  font-size: 11px;
+  font-weight: 570;
+}
+
+.tk-workspace-recents span {
+  overflow: hidden;
+  color: var(--tk-text-tertiary);
+  font: 8.5px var(--tk-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-workspace-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--tk-line);
+  padding: 13px 20px;
+}
+
+.tk-inline-warning {
+  border-radius: 9px;
+  background: var(--tk-warning-soft);
+  color: var(--tk-warning);
+  padding: 10px 11px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .tk-workspace-path > div {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-workspace-dialog__header {
+    grid-template-columns: 38px minmax(0, 1fr) 30px;
+  }
+}

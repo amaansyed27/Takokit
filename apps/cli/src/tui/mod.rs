@@ -11,13 +11,31 @@ use std::{io, time::Duration};
 
 use app::{App, TuiAction, TuiScreen};
 use catalog::SystemAction;
-use crossterm::event::{self, Event, KeyEventKind};
-use job::CommandJob;
+use crossterm::{
+    event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyEventKind},
+    execute,
+};
+use job::{CommandJob, OperationState};
 use takokit_core::RuntimeConfig;
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
 
 use crate::workspace::CliWorkspace;
+
+struct BracketedPasteGuard;
+
+impl BracketedPasteGuard {
+    fn enable() -> io::Result<Self> {
+        execute!(io::stdout(), EnableBracketedPaste)?;
+        Ok(Self)
+    }
+}
+
+impl Drop for BracketedPasteGuard {
+    fn drop(&mut self) {
+        let _ = execute!(io::stdout(), DisableBracketedPaste);
+    }
+}
 
 pub async fn run_launcher(
     config: &RuntimeConfig,
@@ -34,15 +52,20 @@ pub async fn run_launcher(
         workspace,
     )?;
     let mut active_job: Option<CommandJob> = None;
+    let mut quit_after_job = false;
+    let mut last_rendered_screen: Option<TuiScreen> = None;
 
     ratatui::run(|terminal| -> io::Result<()> {
+        let _paste_guard = BracketedPasteGuard::enable()?;
+
         loop {
             state.tick = state.tick.wrapping_add(1);
             if let Some(result) = active_job.as_ref().and_then(CommandJob::poll) {
-                let success = result.success;
+                let success = result.success();
+                let cancelled = result.state == OperationState::Cancelled;
                 state.running_label = None;
                 state.last_label = Some(result.label.clone());
-                state.set_status(if success {
+                state.set_status(if success || cancelled {
                     result.output
                 } else {
                     format!("Task failed.\n\n{}", result.output)
@@ -58,14 +81,27 @@ pub async fn run_launcher(
                     state.screen = TuiScreen::Activity;
                 }
                 active_job = None;
+                if quit_after_job {
+                    return Ok(());
+                }
             }
 
+            if last_rendered_screen != Some(state.screen) {
+                terminal.clear()?;
+                last_rendered_screen = Some(state.screen);
+            }
             terminal.draw(|frame| ui::render(frame, &state))?;
             if !event::poll(Duration::from_millis(120))? {
                 continue;
             }
-            let Event::Key(key) = event::read()? else {
-                continue;
+            let input_event = event::read()?;
+            let key = match input_event {
+                Event::Paste(text) => {
+                    state.handle_paste(&text);
+                    continue;
+                }
+                Event::Key(key) => key,
+                _ => continue,
             };
             if key.kind == KeyEventKind::Release {
                 continue;
@@ -75,19 +111,22 @@ pub async fn run_launcher(
             };
             match action {
                 TuiAction::Quit => {
-                    if active_job.is_some() {
-                        state.set_status(
-                            "A task is still running. Let it finish before exiting so no installer or model pull is left detached.",
-                        );
+                    if let Some(job) = active_job.as_ref() {
+                        if !quit_after_job {
+                            job.cancel();
+                            quit_after_job = true;
+                            state.set_status(
+                                "Cancelling the active task and waiting for it to stop cleanly…",
+                            );
+                        }
                     } else {
                         return Ok(());
                     }
                 }
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
-                        Ok(()) => {
-                            state.set_status("Local model, runner, and session state refreshed.")
-                        }
+                        Ok(()) => state
+                            .set_status("Local model, runner, voice, and session state refreshed."),
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
                     }
                 }
@@ -105,6 +144,15 @@ pub async fn run_launcher(
                         state.set_status(format!("Could not create session: {error:#}"));
                     } else {
                         state.screen = TuiScreen::Sessions;
+                    }
+                }
+                TuiAction::ChangeWorkspace(path) => {
+                    if active_job.is_some() {
+                        state.set_status("Wait for the current task before changing workspaces.");
+                    } else if let Err(error) = state.switch_workspace(&path) {
+                        state.set_status(format!("Could not change workspace: {error:#}"));
+                    } else {
+                        state.screen = TuiScreen::Workspace;
                     }
                 }
                 action => {
@@ -156,7 +204,7 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
             name,
             sample,
         } => (
-            format!("Creating voice profile {name}"),
+            format!("Saving cloned voice {name}"),
             vec![
                 "clone".into(),
                 sample,
@@ -177,30 +225,34 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
             rms_mix_rate,
             protect,
             filter_radius,
-        } => (
-            format!("Converting voice with {model}"),
-            vec![
+        } => {
+            let mut command = vec![
                 "convert".into(),
                 source,
                 "--target-voice".into(),
                 target,
                 "--model".into(),
-                model,
-                "--f0-method".into(),
-                f0_method,
-                "--pitch-shift".into(),
-                pitch_shift.to_string(),
-                "--index-rate".into(),
-                index_rate.to_string(),
-                "--rms-mix-rate".into(),
-                rms_mix_rate.to_string(),
-                "--protect".into(),
-                protect.to_string(),
-                "--filter-radius".into(),
-                filter_radius.to_string(),
-                "--consent".into(),
-            ],
-        ),
+                model.clone(),
+            ];
+            if model == "rvc" {
+                command.extend([
+                    "--f0-method".into(),
+                    f0_method,
+                    "--pitch-shift".into(),
+                    pitch_shift.to_string(),
+                    "--index-rate".into(),
+                    index_rate.to_string(),
+                    "--rms-mix-rate".into(),
+                    rms_mix_rate.to_string(),
+                    "--protect".into(),
+                    protect.to_string(),
+                    "--filter-radius".into(),
+                    filter_radius.to_string(),
+                ]);
+            }
+            command.push("--consent".into());
+            (format!("Converting voice with {model}"), command)
+        }
         TuiAction::PullRunner(runner) => (
             format!("Adding {runner}"),
             vec!["runner".into(), "pull".into(), runner],
@@ -221,7 +273,8 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
         TuiAction::Quit
         | TuiAction::Refresh
         | TuiAction::OpenSession(_)
-        | TuiAction::NewSession => return None,
+        | TuiAction::NewSession
+        | TuiAction::ChangeWorkspace(_) => return None,
     };
     let mut args = app.workspace_args();
     args.extend(command);

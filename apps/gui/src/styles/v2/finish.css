@@ -1,0 +1,37 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; min-height: 0; margin: 0; }
+html { background: var(--tk-bg); color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
+body { overflow: hidden; background: var(--tk-bg); color: var(--tk-text); font-family: var(--tk-font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+::selection { background: var(--tk-accent-soft); color: var(--tk-text); }
+
+.tk-brand__mark { overflow: hidden; border-color: transparent; background: transparent; }
+.tk-brand__mark img { display: block; width: 31px; height: 31px; object-fit: contain; }
+
+.runtime-error {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 3px 12px;
+  align-items: center;
+  margin: 0 0 18px;
+  border: 1px solid rgba(225,134,124,.28);
+  border-radius: 11px;
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+  padding: 11px 12px;
+}
+.runtime-error strong { font-size: 10px; font-weight: 620; }
+.runtime-error span { grid-column: 1; font-size: 9px; line-height: 1.4; }
+.runtime-error button { grid-column: 2; grid-row: 1 / 3; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; padding: 6px 9px; font-size: 9px; }
+
+.tk-inline-error { border-radius: 9px; background: var(--tk-danger-soft); color: var(--tk-danger); padding: 10px 11px; font-size: 9.5px; line-height: 1.45; }
+
+.tk-page code { font-family: var(--tk-font-mono); }
+a { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

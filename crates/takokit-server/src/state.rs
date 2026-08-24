@@ -20,11 +20,24 @@ pub struct AppState {
     pub installed_registry: Arc<InstalledRegistry>,
     pub tts: Arc<MockTextToSpeechEngine>,
     pub daemon_identity: DaemonIdentity,
+    pub build_id: String,
     pub shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
     pub executions: Arc<Mutex<HashMap<Uuid, ProcessInfo>>>,
 }
 impl AppState {
     pub fn new(config: RuntimeConfig, store: LocalStore) -> Self {
+        Self::new_with_build_id(
+            config,
+            store,
+            format!("version-{}", env!("CARGO_PKG_VERSION")),
+        )
+    }
+
+    pub fn new_with_build_id(
+        config: RuntimeConfig,
+        store: LocalStore,
+        build_id: impl Into<String>,
+    ) -> Self {
         Self {
             package_registry: Arc::new(PackageRegistry::bundled()),
             installed_registry: Arc::new(InstalledRegistry::new(store.manifests_dir())),
@@ -39,6 +52,7 @@ impl AppState {
                 started_at: now(),
                 log_path: None,
             },
+            build_id: build_id.into(),
             config,
             store,
             registry: Arc::new(ModelRegistry::default()),

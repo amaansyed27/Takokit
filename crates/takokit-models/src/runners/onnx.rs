@@ -214,9 +214,16 @@ pub fn speak_with_kokoro(
     let reported_path = adapter_response.output_path.ok_or_else(|| {
         TakokitError::Audio("Kokoro adapter did not return an output path".to_string())
     })?;
-    if reported_path != output_path || !output_path.is_file() {
+
+    // The requested output path is authoritative. On Windows the same file can be
+    // represented differently across the Rust/Python boundary (for example normal
+    // drive paths versus verbatim/normalized paths). The trusted adapter has already
+    // stat'ed the requested path before returning ok=true, so do not reject a valid
+    // WAV merely because the returned PathBuf is textually different.
+    if !output_path.is_file() {
         return Err(TakokitError::Audio(format!(
-            "Kokoro adapter did not create the requested WAV output at {}",
+            "Kokoro adapter reported output at {} but the requested WAV was not found at {}",
+            reported_path.display(),
             output_path.display()
         )));
     }

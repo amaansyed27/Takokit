@@ -1,4 +1,5 @@
 import { ConvertPage } from "../features/convert/ConvertPage";
+import { FilesPage } from "../features/files/FilesPage";
 import { HistoryPage } from "../features/history/HistoryPage";
 import { HomePage } from "../features/home/HomePage";
 import { ModelsPage } from "../features/models/ModelsPage";
@@ -6,6 +7,7 @@ import { RunnersPage } from "../features/runners/RunnersPage";
 import { ServerPage } from "../features/server/ServerPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { SpeakPage } from "../features/speak/SpeakPage";
+import { StoragePage } from "../features/storage/StoragePage";
 import { TranscribePage } from "../features/transcribe/TranscribePage";
 import { VoicesPage } from "../features/voices/VoicesPage";
 import type { RuntimeSnapshot } from "../lib/types";
@@ -27,10 +29,12 @@ export const routes: AppRoute[] = [
   { id: "models", component: ModelsPage },
   { id: "runners", component: RunnersPage },
   { id: "voices", component: VoicesPage },
+  { id: "files", component: FilesPage },
   { id: "speak", component: SpeakPage },
   { id: "transcribe", component: TranscribePage },
   { id: "convert", component: ConvertPage },
   { id: "history", component: HistoryPage },
+  { id: "storage", component: StoragePage },
   { id: "diagnostics", component: ServerPage },
   { id: "settings", component: SettingsPage }
 ];

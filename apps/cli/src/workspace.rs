@@ -4,7 +4,10 @@ use takokit_core::{
     NewSessionEvent, SessionEventState, SessionRecord, SessionTask, SpeechRequest, SpeechResponse,
     TranscriptionRequest, TranscriptionResponse,
 };
-use takokit_store::WorkspaceStore;
+use takokit_store::{
+    load_persisted_workspace, persist_workspace, resolve_workspace, LocalStore, WorkspaceSource,
+    WorkspaceStore, WorkspaceSurface,
+};
 use uuid::Uuid;
 
 pub(crate) const WORKSPACE_ENV: &str = "TAKOKIT_WORKSPACE";
@@ -13,37 +16,71 @@ pub(crate) const SESSION_ENV: &str = "TAKOKIT_SESSION_ID";
 #[derive(Debug, Clone)]
 pub(crate) struct CliWorkspace {
     pub(crate) store: WorkspaceStore,
-    pub(crate) session: SessionRecord,
+    pub(crate) session: Option<SessionRecord>,
+    pub(crate) source: WorkspaceSource,
 }
 
 impl CliWorkspace {
     pub(crate) fn resolve(
         workspace: Option<PathBuf>,
         session_id: Option<Uuid>,
-        create_new: bool,
+        interactive_launch: bool,
         title: &str,
     ) -> anyhow::Result<Self> {
-        let store = resolve_store(workspace)?;
-        let selected = if session_id.is_some() {
-            session_id
-        } else if create_new {
+        let surface = match title {
+            "Takokit GUI" => WorkspaceSurface::Gui,
+            "Takokit TUI" => WorkspaceSurface::Tui,
+            _ => WorkspaceSurface::Cli,
+        };
+        let global_root = LocalStore::default_root();
+        let environment = std::env::var_os(WORKSPACE_ENV).map(PathBuf::from);
+        let explicit = workspace.or(environment);
+        let persisted = if matches!(surface, WorkspaceSurface::Gui | WorkspaceSurface::Tui) {
+            load_persisted_workspace(&global_root)?
+        } else {
+            None
+        };
+        let current = std::env::current_dir().ok();
+        let resolved = resolve_workspace(explicit.clone(), persisted, current, surface)?;
+        if matches!(surface, WorkspaceSurface::Gui | WorkspaceSurface::Tui)
+            && (explicit.is_some() || resolved.source == WorkspaceSource::Persisted)
+        {
+            persist_workspace(&global_root, &resolved.root)?;
+        }
+        let store = WorkspaceStore::new(resolved.root);
+
+        let session = if let Some(id) = session_id {
+            Some(store.open_session(Some(id), Some(title))?)
+        } else if interactive_launch {
             None
         } else {
-            store.active_session()?
-        };
-        let session = match (session_id, selected) {
-            (None, Some(id)) if !store.session_dir(id).join("session.json").is_file() => {
-                store.create_session(Some(title))?
+            let active = store.active_session()?;
+            match active {
+                Some(id) if store.session_dir(id).join("session.json").is_file() => {
+                    Some(store.open_session(Some(id), Some(title))?)
+                }
+                _ => Some(store.create_session(Some(title))?),
             }
-            _ => store.open_session(selected, Some(title))?,
         };
-        let workspace = Self { store, session };
+        let workspace = Self {
+            store,
+            session,
+            source: resolved.source,
+        };
         workspace.export_environment();
         Ok(workspace)
     }
 
     pub(crate) fn session_id(&self) -> Uuid {
-        self.session.summary.id
+        self.session
+            .as_ref()
+            .expect("workspace operation requires an active session")
+            .summary
+            .id
+    }
+
+    pub(crate) fn active_session_id(&self) -> Option<Uuid> {
+        self.session.as_ref().map(|session| session.summary.id)
     }
 
     pub(crate) fn outputs_dir(&self) -> PathBuf {
@@ -52,18 +89,32 @@ impl CliWorkspace {
 
     pub(crate) fn export_environment(&self) {
         std::env::set_var(WORKSPACE_ENV, self.store.workspace_root());
-        std::env::set_var(SESSION_ENV, self.session_id().to_string());
+        if let Some(id) = self.active_session_id() {
+            std::env::set_var(SESSION_ENV, id.to_string());
+        } else {
+            std::env::remove_var(SESSION_ENV);
+        }
     }
 
     pub(crate) fn gui_query(&self) -> String {
-        format!(
-            "workspace={}&session={}",
+        let mut query = format!(
+            "workspace={}&workspace_source={}",
             utf8_percent_encode(
                 &self.store.workspace_root().to_string_lossy(),
                 NON_ALPHANUMERIC
             ),
-            self.session_id()
-        )
+            match self.source {
+                WorkspaceSource::Explicit => "explicit",
+                WorkspaceSource::Persisted => "persisted",
+                WorkspaceSource::CurrentDirectory => "current_directory",
+                WorkspaceSource::SafeDefault => "safe_default",
+            }
+        );
+        if let Some(id) = self.active_session_id() {
+            query.push_str("&session=");
+            query.push_str(&id.to_string());
+        }
+        query
     }
 
     pub(crate) fn record_speech(
@@ -124,8 +175,11 @@ impl CliWorkspace {
         input: Option<String>,
         error: &dyn std::fmt::Display,
     ) {
+        let Some(session_id) = self.active_session_id() else {
+            return;
+        };
         let _ = self.store.append_event(
-            self.session_id(),
+            session_id,
             NewSessionEvent {
                 task,
                 state: SessionEventState::Failed,
@@ -141,20 +195,14 @@ impl CliWorkspace {
 }
 
 pub(crate) fn resolve_store(workspace: Option<PathBuf>) -> anyhow::Result<WorkspaceStore> {
-    let store = WorkspaceStore::new(absolute_workspace(workspace)?);
-    store.ensure_layout()?;
-    Ok(store)
-}
-
-fn absolute_workspace(workspace: Option<PathBuf>) -> anyhow::Result<PathBuf> {
-    let path = workspace
-        .or_else(|| std::env::var_os(WORKSPACE_ENV).map(PathBuf::from))
-        .unwrap_or(std::env::current_dir()?);
-    if path.is_absolute() {
-        Ok(path)
-    } else {
-        Ok(std::env::current_dir()?.join(path))
-    }
+    let explicit = workspace.or_else(|| std::env::var_os(WORKSPACE_ENV).map(PathBuf::from));
+    let resolved = resolve_workspace(
+        explicit,
+        None,
+        std::env::current_dir().ok(),
+        WorkspaceSurface::Cli,
+    )?;
+    Ok(WorkspaceStore::new(resolved.root))
 }
 
 #[cfg(test)]
@@ -162,18 +210,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn gui_query_contains_workspace_and_session() {
+    fn gui_query_contains_workspace_source_without_forcing_a_session() {
         let root = std::env::temp_dir().join(format!("takokit-cli-workspace-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
-        let context = CliWorkspace::resolve(Some(root.clone()), None, true, "test").unwrap();
+        let context = CliWorkspace::resolve(Some(root.clone()), None, true, "Takokit GUI").unwrap();
         let query = context.gui_query();
         assert!(query.contains("workspace="));
-        assert!(query.contains(&context.session_id().to_string()));
+        assert!(query.contains("workspace_source=explicit"));
+        assert!(!query.contains("session="));
+        assert!(!root.join(".tako").exists());
         let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
-    fn stale_implicit_active_session_is_replaced() {
+    fn stale_implicit_active_session_is_replaced_for_real_operations() {
         let root = std::env::temp_dir().join(format!("takokit-cli-stale-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let store = WorkspaceStore::new(&root);

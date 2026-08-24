@@ -1,94 +1,110 @@
-import { AudioWaveform, Box, FileAudio, Mic, Server, Volume2 } from "lucide-react";
+import {
+  Activity,
+  AudioWaveform,
+  Box,
+  FileAudio,
+  Settings2,
+  UserRoundPlus,
+  Volume2
+} from "lucide-react";
 import type { RouteComponentProps } from "../../app/routes";
-import { Badge } from "../../components/ui/Badge";
-import { Section } from "../../components/ui/Section";
-import { StatTile } from "../../components/ui/StatTile";
-import { Tooltip } from "../../components/ui/Tooltip";
-import { useServerStatus } from "../../hooks/useServerStatus";
+import { ProductActionCard } from "../../components/ui/ProductActionCard";
+import { ProductMetric } from "../../components/ui/ProductMetric";
+import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 
 export function HomePage({ runtime, onNavigate }: RouteComponentProps) {
-  const ready = runtime.models.filter((model) => model.executable).length;
-  const status = useServerStatus(runtime);
+  const readyModels = runtime.models.filter((model) => model.executable).length;
+  const readyRunners = runtime.runners.filter((runner) => runner.install_state === "ready").length;
+  const serverOnline = runtime.server.status === "online";
+  const ttsModels = runtime.models.filter((model) => model.capabilities.includes("tts")).length;
+  const sttModels = runtime.models.filter((model) => model.capabilities.includes("stt")).length;
+  const cloningModels = runtime.models.filter((model) => model.capabilities.includes("voice_conversion")).length;
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Local voice runtime</h1>
-        <p>Use installed models, manage local voices, and run speech, transcription, or conversion tasks.</p>
-      </header>
+    <section className="tk-page tk-home-page">
+      <ProductPageHeader
+        eyebrow="Local workspace"
+        title="What do you want to create?"
+        description="Run speech, transcription, reusable voice creation, and voice-to-voice cloning locally. Takokit only shows controls supported by the model you choose."
+      />
 
-      <div className="stats-grid" aria-label="Runtime summary">
-        <StatTile label="Installed models" value={runtime.models.length} detail="Verified locally" />
-        <StatTile label="Ready" value={ready} detail="Executable now" />
-        <StatTile label="Voices" value={runtime.voices.length} detail="Profiles available" />
-        <Tooltip content={`Local server at ${status.url}`}>
-          <div>
-            <StatTile label="Server" value={status.label} detail={status.uptime} />
-          </div>
-        </Tooltip>
+      <section className="tk-section">
+        <div className="tk-action-grid tk-home-actions">
+          <ProductActionCard
+            icon={Volume2}
+            title="Speak"
+            description="Turn text into speech with a local model or one of your saved voices."
+            meta={`${ttsModels} TTS models ready`}
+            onClick={() => onNavigate("speak")}
+          />
+          <ProductActionCard
+            icon={FileAudio}
+            title="Transcribe"
+            description="Turn an audio file into text with a local speech-to-text model."
+            meta={`${sttModels} STT models ready`}
+            onClick={() => onNavigate("transcribe")}
+          />
+          <ProductActionCard
+            icon={UserRoundPlus}
+            title="Create a voice"
+            description="Create a reusable consent-backed voice from a clean reference recording."
+            meta={`${runtime.voices.length} saved voices`}
+            onClick={() => onNavigate("voices")}
+          />
+          <ProductActionCard
+            icon={AudioWaveform}
+            title="Clone audio"
+            description="Keep the words and timing from an existing recording while cloning a reference or RVC voice onto it."
+            meta={`${cloningModels} cloning models ready`}
+            onClick={() => onNavigate("convert")}
+          />
+        </div>
+      </section>
+
+      <div className="tk-metrics" aria-label="Local runtime summary">
+        <ProductMetric label="Models" value={runtime.models.length} detail={`${readyModels} executable`} />
+        <ProductMetric label="Voices" value={runtime.voices.length} detail="Saved profiles" />
+        <ProductMetric label="Runners" value={readyRunners} detail={`${runtime.runners.length} registered`} />
+        <ProductMetric label="Runtime" value={serverOnline ? "Ready" : "Offline"} detail="Managed locally" />
       </div>
 
-      <Section title="Quick actions" description="Start from the common paths.">
-        <div className="quick-actions">
-          <button className="quick-action" type="button" onClick={() => onNavigate("speak")}>
-            <Volume2 size={18} />
-            <strong>Generate speech</strong>
-            <span>Installed TTS models</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("transcribe")}>
-            <FileAudio size={18} />
-            <strong>Transcribe audio</strong>
-            <span>Installed STT models</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("convert")}>
-            <AudioWaveform size={18} />
-            <strong>Convert voice</strong>
-            <span>Execution and quality gates</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("voices")}>
-            <Mic size={18} />
-            <strong>Add voice</strong>
-            <span>Consent required</span>
-          </button>
-          <button className="quick-action" type="button" onClick={() => onNavigate("models")}>
-            <Box size={18} />
-            <strong>Manage models</strong>
-            <span>Installed only</span>
-          </button>
-        </div>
-      </Section>
-
-      <Section title="Available tasks" description="Capabilities exposed by the local runtime.">
-        <div className="capability-strip">
-          {runtime.capabilities.map((capability) => (
-            <div className="capability-chip" key={capability.id}>
-              <strong>{capability.label}</strong>
-              <span>{capability.description}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Runtime boundary">
-        <div className="runtime-boundary">
-          <div className="boundary-grid" aria-hidden="true">
-            <span>cli</span>
-            <span>server</span>
-            <span>gui</span>
-            <span>adapters</span>
-            <span>runners</span>
+      <section className="tk-section">
+        <div className="tk-section-heading">
+          <div>
+            <h2>Manage your local runtime</h2>
+            <p>Everything required for everyday use should be manageable here without opening a terminal.</p>
           </div>
-          <p>Rust CLI, daemon, browser GUI, storage, safety, and runners stay separated.</p>
-          <Badge tone="success"><Server size={12} /> Local-first</Badge>
         </div>
-      </Section>
 
-      <Section title="Recent outputs">
-        <div className="empty-state">
-          <strong>No generated audio yet</strong>
-          <p>{runtime.modeNote}</p>
+        <div className="tk-home-manage-grid">
+          <button className="tk-home-manage-card" type="button" onClick={() => onNavigate("models")}>
+            <span className="tk-home-manage-card__icon"><Box size={18} strokeWidth={1.8} /></span>
+            <span className="tk-home-manage-card__body">
+              <strong>Models & runners</strong>
+              <small>Discover, pull, repair, inspect, and remove local model runtimes.</small>
+            </span>
+            <span className="tk-home-manage-card__meta">{runtime.models.length} installed</span>
+          </button>
+
+          <button className="tk-home-manage-card" type="button" onClick={() => onNavigate("diagnostics")}>
+            <span className="tk-home-manage-card__icon"><Activity size={18} strokeWidth={1.8} /></span>
+            <span className="tk-home-manage-card__body">
+              <strong>Runtime health</strong>
+              <small>Inspect daemon state, runner health, logs, workspace, and recovery information.</small>
+            </span>
+            <span className="tk-home-manage-card__meta">{serverOnline ? "Healthy" : "Needs attention"}</span>
+          </button>
+
+          <button className="tk-home-manage-card" type="button" onClick={() => onNavigate("settings")}>
+            <span className="tk-home-manage-card__icon"><Settings2 size={18} strokeWidth={1.8} /></span>
+            <span className="tk-home-manage-card__body">
+              <strong>Storage & settings</strong>
+              <small>See where Takokit stores models, runners, voices, outputs, and workspace data.</small>
+            </span>
+            <span className="tk-home-manage-card__meta">Local only</span>
+          </button>
         </div>
-      </Section>
+      </section>
     </section>
   );
 }

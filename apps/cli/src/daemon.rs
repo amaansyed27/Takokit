@@ -2,13 +2,13 @@ use anyhow::{anyhow, Context};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, OpenOptions},
+    fs::{self, File, OpenOptions},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use takokit_core::{DaemonIdentity, DaemonMode, RuntimeConfig};
+use takokit_core::{DaemonBuildIdentity, DaemonIdentity, DaemonMode, RuntimeConfig};
 use takokit_package::run_automatic_uv_cleanup;
 use takokit_server::{run_server_with_listener, AppState};
 use takokit_store::LocalStore;
@@ -16,9 +16,23 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+mod runtime;
+pub(crate) use runtime::build_freshness;
+pub use runtime::write_atomic;
+use runtime::{
+    canonical_exe, canonical_root, daemon_lock_is_held, log_path, managed_daemon_executable,
+    port_is_occupied, preferred_daemon_executable, startup_lock, takokit_health_responds,
+    verify_identity,
+};
+
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);
 const SHUTDOWN_ATTEMPTS: usize = 100;
+const BUILD_ID: &str = env!("TAKOKIT_BUILD_ID");
+
+pub(crate) fn current_build_id() -> &'static str {
+    BUILD_ID
+}
 
 #[cfg(windows)]
 mod windows_handle_inheritance {
@@ -94,6 +108,13 @@ mod windows_handle_inheritance {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BuildFreshness {
+    Current,
+    Missing,
+    Mismatched,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonInfo {
     pub instance_id: Uuid,
@@ -105,6 +126,8 @@ pub struct DaemonInfo {
     pub started_at: u64,
     pub mode: DaemonMode,
     pub log_path: PathBuf,
+    #[serde(default)]
+    pub build_id: String,
 }
 impl DaemonInfo {
     fn identity(&self) -> DaemonIdentity {
@@ -123,23 +146,76 @@ impl DaemonInfo {
 }
 
 pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
-    let startup_lock = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(store.daemon_start_lock_path())
-        .with_context(|| format!("open {}", store.daemon_start_lock_path().display()))?;
+    ensure_fresh_running(store, config)
+}
+
+pub fn ensure_fresh_running(
+    store: &LocalStore,
+    config: &RuntimeConfig,
+) -> anyhow::Result<DaemonInfo> {
+    let startup_lock = startup_lock(store)?;
     startup_lock
         .lock_exclusive()
         .with_context(|| format!("lock {}", store.daemon_start_lock_path().display()))?;
-    if let Some(info) = verified_status(store, config)? {
-        return Ok(info);
+
+    let result = (|| {
+        if let Some((info, response)) = verified_runtime(store, config)? {
+            match build_freshness(&response) {
+                BuildFreshness::Current => return Ok(info),
+                BuildFreshness::Missing => {
+                    stop_locked(store, config)?.then_some(()).ok_or_else(|| {
+                        anyhow!("legacy managed daemon could not be stopped for replacement")
+                    })?;
+                }
+                BuildFreshness::Mismatched => {
+                    let stale_build = response.build_id.clone();
+                    stop_locked(store, config)?.then_some(()).ok_or_else(|| {
+                        anyhow!(
+                            "managed daemon build {stale_build} could not be stopped for replacement"
+                        )
+                    })?;
+                }
+            }
+        }
+
+        let info = start_locked(store, config)?;
+        let (_, response) = verified_runtime(store, config)?.ok_or_else(|| {
+            anyhow!(
+                "replacement daemon started but did not publish a verified identity; see {}",
+                log_path(store).display()
+            )
+        })?;
+        if build_freshness(&response) != BuildFreshness::Current {
+            return Err(anyhow!(
+                "replacement daemon build verification failed: expected {}, got {}",
+                current_build_id(),
+                if response.build_id.is_empty() {
+                    "<missing>"
+                } else {
+                    response.build_id.as_str()
+                }
+            ));
+        }
+        Ok(info)
+    })();
+
+    let _ = startup_lock.unlock();
+    result
+}
+
+fn start_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
+    if let Some((info, response)) = verified_runtime(store, config)? {
+        if build_freshness(&response) == BuildFreshness::Current {
+            return Ok(info);
+        }
     }
     if daemon_lock_is_held(store)? {
-        return wait_for_verified(store, config)?.ok_or_else(|| anyhow!(
-            "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
-            IDENTITY_WAIT.as_secs(), log_path(store).display()
-        ));
+        return wait_for_verified(store, config)?
+            .map(|(info, _)| info)
+            .ok_or_else(|| anyhow!(
+                "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
+                IDENTITY_WAIT.as_secs(), log_path(store).display()
+            ));
     }
     if port_is_occupied(config) {
         return Err(anyhow!("port {} is occupied by a direct Takokit server or another process; managed daemon will not take ownership", config.port));
@@ -173,7 +249,7 @@ pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Daemo
     };
     spawn_result
         .with_context(|| format!("spawn managed Takokit daemon with {}", executable.display()))?;
-    if let Some(info) = wait_for_verified(store, config)? {
+    if let Some((info, _)) = wait_for_verified(store, config)? {
         return Ok(info);
     }
     if daemon_lock_is_held(store)? {
@@ -220,6 +296,7 @@ pub async fn child(
         started_at: now(),
         mode: DaemonMode::Managed,
         log_path: log_path(&store),
+        build_id: current_build_id().to_string(),
     };
     write_atomic(&store.daemon_info_path(), &info)?;
     let cleanup_root = store.root().to_path_buf();
@@ -227,7 +304,8 @@ pub async fn child(
         let _ = run_automatic_uv_cleanup(&cleanup_root);
     });
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let state = AppState::new(config, store.clone()).managed(info.identity(), shutdown_tx);
+    let state = AppState::new_with_build_id(config, store.clone(), current_build_id())
+        .managed(info.identity(), shutdown_tx);
     let result = run_server_with_listener(state, listener, Some(shutdown_rx)).await;
     if read_info(&store)?.is_some_and(|current| current.instance_id == instance_id) {
         let _ = fs::remove_file(store.daemon_info_path());
@@ -237,10 +315,21 @@ pub async fn child(
 }
 
 pub fn status(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Option<DaemonInfo>> {
-    verified_status(store, config)
+    verified_runtime(store, config).map(|runtime| runtime.map(|(info, _)| info))
 }
+
 pub fn stop(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> {
-    let Some(info) = verified_status(store, config)? else {
+    let startup_lock = startup_lock(store)?;
+    startup_lock
+        .lock_exclusive()
+        .with_context(|| format!("lock {}", store.daemon_start_lock_path().display()))?;
+    let result = stop_locked(store, config);
+    let _ = startup_lock.unlock();
+    result
+}
+
+fn stop_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> {
+    let Some((info, _)) = verified_runtime(store, config)? else {
         cleanup_proven_stale(store, config)?;
         return Ok(false);
     };
@@ -271,45 +360,52 @@ pub fn stop(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<bool> 
         info.executable.display()
     ))
 }
+
 pub fn logs(store: &LocalStore) -> PathBuf {
     log_path(store)
 }
+
 pub fn ensure_running(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
-    start(store, config)
+    ensure_fresh_running(store, config)
 }
 
-fn verified_status(
+fn verified_runtime(
     store: &LocalStore,
     config: &RuntimeConfig,
-) -> anyhow::Result<Option<DaemonInfo>> {
+) -> anyhow::Result<Option<(DaemonInfo, DaemonBuildIdentity)>> {
     let Some(info) = read_info(store)? else {
         return Ok(None);
     };
-    let response = match ureq::get(&format!("{}/v1/daemon/identity", config.local_base_url()))
-        .timeout(Duration::from_millis(300))
-        .call()
-    {
-        Ok(r) => r,
+    let response = match remote_identity(config) {
+        Ok(identity) => identity,
         Err(_) => return Ok(None),
     };
-    let identity: DaemonIdentity = response.into_json()?;
-    verify_identity(&info, &identity).with_context(|| {
+    verify_identity(&info, &response.identity).with_context(|| {
         format!(
             "server at {} does not match the managed daemon runtime record",
             config.local_base_url()
         )
     })?;
-    Ok(Some(info))
+    Ok(Some((info, response)))
+}
+
+fn remote_identity(config: &RuntimeConfig) -> anyhow::Result<DaemonBuildIdentity> {
+    ureq::get(&format!("{}/v1/daemon/identity", config.local_base_url()))
+        .timeout(Duration::from_millis(300))
+        .call()
+        .map_err(|error| anyhow!("read daemon identity: {error}"))?
+        .into_json()
+        .map_err(Into::into)
 }
 
 fn wait_for_verified(
     store: &LocalStore,
     config: &RuntimeConfig,
-) -> anyhow::Result<Option<DaemonInfo>> {
+) -> anyhow::Result<Option<(DaemonInfo, DaemonBuildIdentity)>> {
     let deadline = std::time::Instant::now() + IDENTITY_WAIT;
     loop {
-        if let Some(info) = verified_status(store, config)? {
-            return Ok(Some(info));
+        if let Some(runtime) = verified_runtime(store, config)? {
+            return Ok(Some(runtime));
         }
         if std::time::Instant::now() >= deadline {
             return Ok(None);
@@ -317,6 +413,7 @@ fn wait_for_verified(
         thread::sleep(IDENTITY_POLL);
     }
 }
+
 fn cleanup_proven_stale(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
     if port_is_occupied(config) {
         return Ok(());
@@ -335,6 +432,7 @@ fn cleanup_proven_stale(store: &LocalStore, config: &RuntimeConfig) -> anyhow::R
     let _ = lock.unlock();
     Ok(())
 }
+
 fn read_info(store: &LocalStore) -> anyhow::Result<Option<DaemonInfo>> {
     if !store.daemon_info_path().is_file() {
         return Ok(None);
@@ -345,101 +443,6 @@ fn read_info(store: &LocalStore) -> anyhow::Result<Option<DaemonInfo>> {
     }
 }
 
-fn verify_identity(info: &DaemonInfo, identity: &DaemonIdentity) -> anyhow::Result<()> {
-    let expected_executable = canonical_root(&info.executable)?;
-    let expected_root = canonical_root(&info.storage_root)?;
-    let actual_executable = canonical_root(&identity.executable)?;
-    let actual_root = canonical_root(&identity.storage_root)?;
-    if identity.mode != DaemonMode::Managed {
-        return Err(anyhow!(
-            "identity mode mismatch: expected managed, got {:?}",
-            identity.mode
-        ));
-    }
-    if identity.instance_id != Some(info.instance_id) {
-        return Err(anyhow!("identity instance_id mismatch"));
-    }
-    if identity.pid != info.pid {
-        return Err(anyhow!("identity pid mismatch"));
-    }
-    if actual_executable != expected_executable {
-        return Err(anyhow!("identity executable mismatch"));
-    }
-    if actual_root != expected_root {
-        return Err(anyhow!("identity storage_root mismatch"));
-    }
-    if identity.host != info.host {
-        return Err(anyhow!("identity host mismatch"));
-    }
-    if identity.port != info.port {
-        return Err(anyhow!("identity port mismatch"));
-    }
-    Ok(())
-}
-
-fn daemon_lock_is_held(store: &LocalStore) -> anyhow::Result<bool> {
-    let lock = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(store.daemon_lock_path())?;
-    match lock.try_lock_exclusive() {
-        Ok(()) => {
-            let _ = lock.unlock();
-            Ok(false)
-        }
-        Err(_) => Ok(true),
-    }
-}
-pub fn write_atomic(path: &Path, value: &DaemonInfo) -> anyhow::Result<()> {
-    let temp = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
-    fs::write(&temp, serde_json::to_vec_pretty(value)?)?;
-    fs::rename(temp, path)?;
-    Ok(())
-}
-fn port_is_occupied(config: &RuntimeConfig) -> bool {
-    let Ok(address) = config.bind_addr().parse::<std::net::SocketAddr>() else {
-        return false;
-    };
-    std::net::TcpStream::connect_timeout(&address, Duration::from_millis(250)).is_ok()
-}
-
-#[allow(dead_code)]
-fn takokit_health_responds(config: &RuntimeConfig) -> bool {
-    ureq::get(&format!("{}/health", config.local_base_url()))
-        .timeout(Duration::from_millis(200))
-        .call()
-        .map(|response| response.status() == 200)
-        .unwrap_or(false)
-}
-fn log_path(store: &LocalStore) -> PathBuf {
-    store.logs_dir().join("daemon.log")
-}
-fn managed_daemon_executable() -> anyhow::Result<PathBuf> {
-    let current = std::env::current_exe()?;
-    Ok(preferred_daemon_executable(&current))
-}
-fn preferred_daemon_executable(current: &Path) -> PathBuf {
-    if current.file_stem().and_then(|name| name.to_str()) != Some("tako") {
-        return current.to_path_buf();
-    }
-    let mut canonical = current.to_path_buf();
-    canonical.set_file_name("takokit");
-    if let Some(extension) = current.extension() {
-        canonical.set_extension(extension);
-    }
-    if canonical.is_file() {
-        canonical
-    } else {
-        current.to_path_buf()
-    }
-}
-fn canonical_exe() -> anyhow::Result<PathBuf> {
-    Ok(fs::canonicalize(std::env::current_exe()?)?)
-}
-fn canonical_root(path: &Path) -> anyhow::Result<PathBuf> {
-    Ok(fs::canonicalize(path)?)
-}
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -1,0 +1,450 @@
+.tk-speak-page {
+  gap: 28px;
+}
+
+.tk-speak-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.tk-speak-editor,
+.tk-speak-controls {
+  border: 1px solid var(--tk-line);
+  border-radius: 14px;
+  background: var(--tk-surface);
+}
+
+.tk-speak-editor {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr) auto auto;
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.tk-speak-editor__header,
+.tk-speak-editor__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px;
+}
+
+.tk-speak-editor__header {
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.tk-speak-editor__footer {
+  border-top: 1px solid var(--tk-line);
+  background: var(--tk-surface-soft);
+}
+
+.tk-speak-editor__header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.tk-editor-label {
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tk-speak-editor__header small,
+.tk-speak-editor__footer > span {
+  color: var(--tk-text-tertiary);
+  font-size: 10.5px;
+}
+
+.tk-script-input {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--tk-text);
+  padding: 24px;
+  font-family: var(--tk-font-sans);
+  font-size: 16px;
+  font-weight: 410;
+  line-height: 1.7;
+  caret-color: var(--tk-accent-strong);
+}
+
+.tk-script-input::placeholder {
+  color: var(--tk-text-tertiary);
+}
+
+.tk-script-input:focus {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tk-surface) 98%, var(--tk-accent) 2%), var(--tk-surface));
+}
+
+.tk-model-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  color: var(--tk-warning);
+  font-size: 9.5px;
+  font-weight: 560;
+}
+
+.tk-model-state.is-ready {
+  color: var(--tk-success);
+}
+
+.tk-inline-error {
+  margin: 0 16px 12px;
+  border-radius: 9px;
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.tk-speak-controls {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  overflow: hidden;
+}
+
+.tk-control-section,
+.tk-selected-model,
+.tk-advanced-wrap {
+  display: grid;
+  gap: 14px;
+  padding: 17px;
+}
+
+.tk-selected-model,
+.tk-advanced-wrap {
+  border-top: 1px solid var(--tk-line);
+}
+
+.tk-control-section__heading,
+.tk-advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tk-control-section__heading > span {
+  color: var(--tk-text);
+  font-size: 12px;
+  font-weight: 610;
+}
+
+.tk-control-section__heading > small {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-selected-model {
+  gap: 13px;
+  background: var(--tk-surface-soft);
+}
+
+.tk-selected-model__title {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.tk-selected-model__icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tk-control);
+  color: var(--tk-text-secondary);
+}
+
+.tk-selected-model__title > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tk-selected-model__title strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 610;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-selected-model__title span:not(.tk-selected-model__icon) {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-selected-model dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.tk-selected-model dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tk-selected-model dt,
+.tk-selected-model dd {
+  font-size: 9.5px;
+}
+
+.tk-selected-model dt {
+  color: var(--tk-text-tertiary);
+}
+
+.tk-selected-model dd {
+  margin: 0;
+  color: var(--tk-text-secondary);
+  text-align: right;
+}
+
+.tk-model-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tk-success);
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.tk-model-blocker {
+  display: grid;
+  gap: 7px;
+  border-radius: 9px;
+  background: var(--tk-warning-soft);
+  padding: 10px;
+  color: var(--tk-warning);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.tk-model-blocker button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+}
+
+.tk-advanced-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--tk-text-secondary);
+  padding: 0;
+  font: inherit;
+  font-size: 10px;
+}
+
+.tk-advanced-toggle > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tk-text);
+  font-weight: 570;
+}
+
+.tk-advanced-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.tk-speak-result {
+  display: grid;
+  gap: 12px;
+}
+
+.tk-result-card,
+.tk-result-empty {
+  border: 1px solid var(--tk-line);
+  border-radius: 14px;
+  background: var(--tk-surface);
+}
+
+.tk-result-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 13px;
+  padding: 16px;
+}
+
+.tk-result-card__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tk-accent-soft);
+  color: var(--tk-success);
+}
+
+.tk-result-card__body {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+}
+
+.tk-result-card__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.tk-result-card__heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tk-result-card__heading strong {
+  font-size: 12px;
+  font-weight: 610;
+}
+
+.tk-result-card__heading span,
+.tk-result-meta {
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+
+.tk-result-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  color: var(--tk-success) !important;
+}
+
+.tk-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tk-output-path {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 9px;
+  background: var(--tk-surface-soft);
+  padding: 6px 6px 6px 10px;
+}
+
+.tk-output-path code {
+  overflow: hidden;
+  color: var(--tk-text-secondary);
+  font-family: var(--tk-font-mono);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-output-path button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+}
+
+.tk-output-path button:hover {
+  background: var(--tk-control-hover);
+  color: var(--tk-text);
+}
+
+.tk-result-empty {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 78px;
+  color: var(--tk-text-tertiary);
+  padding: 16px;
+}
+
+.tk-result-empty > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tk-result-empty strong {
+  color: var(--tk-text-secondary);
+  font-size: 11.5px;
+  font-weight: 570;
+}
+
+.tk-result-empty span {
+  font-size: 10px;
+}
+
+@media (max-width: 920px) {
+  .tk-speak-studio {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-speak-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tk-selected-model {
+    border-top: 0;
+    border-left: 1px solid var(--tk-line);
+  }
+
+  .tk-advanced-wrap {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .tk-speak-editor {
+    min-height: 430px;
+  }
+
+  .tk-script-input {
+    min-height: 320px;
+    padding: 18px;
+    font-size: 15px;
+  }
+
+  .tk-speak-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-selected-model {
+    border-top: 1px solid var(--tk-line);
+    border-left: 0;
+  }
+
+  .tk-speak-editor__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tk-result-card {
+    grid-template-columns: 1fr;
+  }
+}

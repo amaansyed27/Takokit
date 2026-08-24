@@ -1,14 +1,39 @@
+use std::path::Path;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::{
-    app::{App, SpeakField, TranscribeField, TuiAction},
+    app::{App, SpeakField, TranscribeField, TuiAction, TuiScreen},
     clone::CloneField,
     convert::{ConvertField, F0_METHODS},
-    editor::{edit_text, shifted_index},
+    editor::{edit_text, insert_text, shifted_index},
 };
 
+use super::{normalize_path_field, picker};
+
+mod clone_submit;
+mod convert_submit;
+pub(super) use self::clone_submit::submit_clone;
+pub(super) use self::convert_submit::submit_convert;
+
 pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
-    if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+    if app.speak_field == SpeakField::Text {
+        match key.code {
+            KeyCode::Tab => {
+                app.speak_field = SpeakField::Submit;
+                return None;
+            }
+            KeyCode::BackTab => {
+                app.speak_field = SpeakField::Voice;
+                return None;
+            }
+            KeyCode::Enter => {
+                insert_text(&mut app.speak_text, &mut app.speak_text_cursor, "\n");
+                return None;
+            }
+            _ => {}
+        }
+    } else if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         app.speak_field = if key.code == KeyCode::BackTab {
             app.speak_field.previous()
         } else {
@@ -20,16 +45,29 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
         SpeakField::Model => match key.code {
             KeyCode::Left | KeyCode::Up => {
                 app.speak_model_index =
-                    shifted_index(app.speak_model_index, app.tts_models.len(), -1)
+                    shifted_index(app.speak_model_index, app.tts_models.len(), -1);
+                app.normalize_speak_voice_for_model();
             }
             KeyCode::Right | KeyCode::Down => {
                 app.speak_model_index =
-                    shifted_index(app.speak_model_index, app.tts_models.len(), 1)
+                    shifted_index(app.speak_model_index, app.tts_models.len(), 1);
+                app.normalize_speak_voice_for_model();
             }
             KeyCode::Enter => app.speak_field = SpeakField::Voice,
             _ => {}
         },
         SpeakField::Voice => {
+            match key.code {
+                KeyCode::Up => {
+                    app.cycle_speak_voice(-1);
+                    return None;
+                }
+                KeyCode::Down => {
+                    app.cycle_speak_voice(1);
+                    return None;
+                }
+                _ => {}
+            }
             if edit_text(&mut app.speak_voice, &mut app.speak_voice_cursor, key) {
                 return None;
             }
@@ -41,15 +79,8 @@ pub(super) fn handle_speak(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
             if edit_text(&mut app.speak_text, &mut app.speak_text_cursor, key) {
                 return None;
             }
-            if key.code == KeyCode::Enter {
-                app.speak_field = SpeakField::Submit;
-            }
         }
-        SpeakField::Submit => {
-            if key.code == KeyCode::Enter {
-                return submit_speak(app);
-            }
-        }
+        SpeakField::Submit => {}
     }
     None
 }
@@ -77,6 +108,13 @@ pub(super) fn handle_transcribe(app: &mut App, key: KeyEvent) -> Option<TuiActio
             _ => {}
         },
         TranscribeField::Audio => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.transcribe_audio = path;
+                    app.transcribe_audio_cursor = app.transcribe_audio.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.transcribe_audio,
                 &mut app.transcribe_audio_cursor,
@@ -138,6 +176,13 @@ pub(super) fn handle_clone(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
             }
         }
         CloneField::Sample => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.clone_state.sample = path;
+                    app.clone_state.sample_cursor = app.clone_state.sample.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.clone_state.sample,
                 &mut app.clone_state.sample_cursor,
@@ -164,11 +209,12 @@ pub(super) fn handle_clone(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 }
 
 pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
+    let is_rvc = selected_conversion_model_is_rvc(app);
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         app.convert_state.field = if key.code == KeyCode::BackTab {
-            app.convert_state.field.previous()
+            previous_convert_field(app.convert_state.field, is_rvc)
         } else {
-            app.convert_state.field.next()
+            next_convert_field(app.convert_state.field, is_rvc)
         };
         return None;
     }
@@ -192,6 +238,13 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
             _ => {}
         },
         ConvertField::Source => {
+            if key.code == KeyCode::F(2) {
+                if let Some(path) = browse_audio(app) {
+                    app.convert_state.source = path;
+                    app.convert_state.source_cursor = app.convert_state.source.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.convert_state.source,
                 &mut app.convert_state.source_cursor,
@@ -204,6 +257,18 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
             }
         }
         ConvertField::Target => {
+            if key.code == KeyCode::F(2) {
+                let selected = if is_rvc {
+                    browse_folder(app)
+                } else {
+                    browse_audio(app)
+                };
+                if let Some(path) = selected {
+                    app.convert_state.target = path;
+                    app.convert_state.target_cursor = app.convert_state.target.chars().count();
+                }
+                return None;
+            }
             if edit_text(
                 &mut app.convert_state.target,
                 &mut app.convert_state.target_cursor,
@@ -212,7 +277,11 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
                 return None;
             }
             if key.code == KeyCode::Enter {
-                app.convert_state.field = ConvertField::F0Method;
+                app.convert_state.field = if is_rvc {
+                    ConvertField::F0Method
+                } else {
+                    ConvertField::Consent
+                };
             }
         }
         ConvertField::F0Method => match key.code {
@@ -281,6 +350,62 @@ pub(super) fn handle_convert(app: &mut App, key: KeyEvent) -> Option<TuiAction> 
     None
 }
 
+fn next_convert_field(field: ConvertField, is_rvc: bool) -> ConvertField {
+    if is_rvc {
+        return field.next();
+    }
+    match field {
+        ConvertField::Model => ConvertField::Source,
+        ConvertField::Source => ConvertField::Target,
+        ConvertField::Target => ConvertField::Consent,
+        ConvertField::Consent => ConvertField::Submit,
+        ConvertField::Submit => ConvertField::Model,
+        _ => ConvertField::Consent,
+    }
+}
+
+fn previous_convert_field(field: ConvertField, is_rvc: bool) -> ConvertField {
+    if is_rvc {
+        return field.previous();
+    }
+    match field {
+        ConvertField::Model => ConvertField::Submit,
+        ConvertField::Source => ConvertField::Model,
+        ConvertField::Target => ConvertField::Source,
+        ConvertField::Consent => ConvertField::Target,
+        ConvertField::Submit => ConvertField::Consent,
+        _ => ConvertField::Target,
+    }
+}
+
+fn selected_conversion_model_is_rvc(app: &App) -> bool {
+    app.selected_convert_model()
+        .map(|model| model.id == "rvc")
+        .unwrap_or(false)
+}
+
+fn browse_audio(app: &mut App) -> Option<String> {
+    match picker::pick_audio_file(Path::new(&app.workspace_root)) {
+        Ok(Some(path)) => Some(path.display().to_string()),
+        Ok(None) => None,
+        Err(error) => {
+            app.set_status(error);
+            None
+        }
+    }
+}
+
+fn browse_folder(app: &mut App) -> Option<String> {
+    match picker::pick_folder(Path::new(&app.workspace_root)) {
+        Ok(Some(path)) => Some(path.display().to_string()),
+        Ok(None) => None,
+        Err(error) => {
+            app.set_status(error);
+            None
+        }
+    }
+}
+
 fn edit_numeric(value: &mut String, cursor: &mut usize, key: KeyEvent, field: &mut ConvertField) {
     if edit_text(value, cursor, key) {
         return;
@@ -304,11 +429,14 @@ pub(super) fn submit_speak(app: &mut App) -> Option<TuiAction> {
         app.speak_field = SpeakField::Text;
         return None;
     }
-    Some(TuiAction::Speak {
+    let action = TuiAction::Speak {
         model: model.id,
         voice: app.speak_voice.trim().to_string(),
         text,
-    })
+    };
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
 pub(super) fn submit_transcribe(app: &mut App) -> Option<TuiAction> {
@@ -319,144 +447,20 @@ pub(super) fn submit_transcribe(app: &mut App) -> Option<TuiAction> {
     if !model.executable {
         return Some(TuiAction::PullModel(model.id));
     }
-    let audio = app.transcribe_audio.trim().to_string();
+    let audio = normalize_path_field(&app.transcribe_audio);
     if audio.is_empty() {
-        app.set_status("Enter the path to a local audio file first.");
+        app.set_status("Enter, browse, paste, or drag a local audio file first.");
         app.transcribe_field = TranscribeField::Audio;
         return None;
     }
-    Some(TuiAction::Transcribe {
+    let action = TuiAction::Transcribe {
         model: model.id,
         audio,
-    })
-}
-
-pub(super) fn submit_clone(app: &mut App) -> Option<TuiAction> {
-    let Some(model) = app.selected_clone_model().cloned() else {
-        app.set_status(
-            "No voice-cloning model is installed. Install one through the library site or CLI.",
-        );
-        return None;
     };
-    if !model.executable {
-        return Some(TuiAction::PullModel(model.id));
-    }
-    let name = app.clone_state.name.trim().to_string();
-    let sample = app.clone_state.sample.trim().to_string();
-    if name.is_empty() {
-        app.set_status("Enter a profile name before creating the voice.");
-        app.clone_state.field = CloneField::Name;
-        return None;
-    }
-    if sample.is_empty() {
-        app.set_status("Enter a local reference-audio path.");
-        app.clone_state.field = CloneField::Sample;
-        return None;
-    }
-    if !app.clone_state.consent {
-        app.set_status("Explicit voice-owner consent is required.");
-        app.clone_state.field = CloneField::Consent;
-        return None;
-    }
-    Some(TuiAction::CloneVoice {
-        model: model.id,
-        name,
-        sample,
-    })
+    app.screen = TuiScreen::Activity;
+    app.output_scroll = 0;
+    Some(action)
 }
 
-pub(super) fn submit_convert(app: &mut App) -> Option<TuiAction> {
-    let Some(model) = app.selected_convert_model().cloned() else {
-        app.set_status(
-            "No voice-conversion model is installed. Install RVC through the library first.",
-        );
-        return None;
-    };
-    if !model.executable {
-        return Some(TuiAction::PullModel(model.id));
-    }
-    let source = app.convert_state.source.trim().to_string();
-    let target = app.convert_state.target.trim().to_string();
-    if source.is_empty() {
-        app.set_status("Enter the source-audio path.");
-        app.convert_state.field = ConvertField::Source;
-        return None;
-    }
-    if target.is_empty() {
-        app.set_status("Enter the target RVC package or checkpoint path.");
-        app.convert_state.field = ConvertField::Target;
-        return None;
-    }
-    if !app.convert_state.consent {
-        app.set_status("Explicit source and target voice consent is required.");
-        app.convert_state.field = ConvertField::Consent;
-        return None;
-    }
-
-    let pitch_shift = parse_number::<i32>(app, ConvertField::PitchShift, "pitch shift", -24, 24)?;
-    let index_rate = parse_float(app, ConvertField::IndexRate, "index rate", 0.0, 1.0)?;
-    let rms_mix_rate = parse_float(app, ConvertField::RmsMixRate, "RMS mix rate", 0.0, 1.0)?;
-    let protect = parse_float(app, ConvertField::Protect, "protect", 0.0, 0.5)?;
-    let filter_radius =
-        parse_number::<u32>(app, ConvertField::FilterRadius, "filter radius", 0, 7)?;
-
-    Some(TuiAction::ConvertVoice {
-        model: model.id,
-        source,
-        target,
-        f0_method: app.convert_state.f0_method().to_string(),
-        pitch_shift,
-        index_rate,
-        rms_mix_rate,
-        protect,
-        filter_radius,
-    })
-}
-
-fn parse_float(
-    app: &mut App,
-    field: ConvertField,
-    label: &str,
-    minimum: f32,
-    maximum: f32,
-) -> Option<f32> {
-    let source = match field {
-        ConvertField::IndexRate => app.convert_state.index_rate.clone(),
-        ConvertField::RmsMixRate => app.convert_state.rms_mix_rate.clone(),
-        ConvertField::Protect => app.convert_state.protect.clone(),
-        _ => return None,
-    };
-    match source.trim().parse::<f32>() {
-        Ok(value) if value.is_finite() && (minimum..=maximum).contains(&value) => Some(value),
-        _ => {
-            app.set_status(format!("{label} must be between {minimum} and {maximum}."));
-            app.convert_state.field = field;
-            None
-        }
-    }
-}
-
-fn parse_number<T>(
-    app: &mut App,
-    field: ConvertField,
-    label: &str,
-    minimum: T,
-    maximum: T,
-) -> Option<T>
-where
-    T: std::str::FromStr + PartialOrd + Copy + std::fmt::Display,
-{
-    let source = match field {
-        ConvertField::PitchShift => app.convert_state.pitch_shift.clone(),
-        ConvertField::FilterRadius => app.convert_state.filter_radius.clone(),
-        _ => return None,
-    };
-    match source.trim().parse::<T>() {
-        Ok(value) if value >= minimum && value <= maximum => Some(value),
-        _ => {
-            app.set_status(format!("{label} must be between {minimum} and {maximum}."));
-            app.convert_state.field = field;
-            None
-        }
-    }
-}
+#[cfg(test)]
+mod tests;

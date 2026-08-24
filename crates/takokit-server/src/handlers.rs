@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use takokit_core::{
-    CapabilitiesResponse, CapabilityInfo, CapabilityKind, DaemonIdentity, DaemonMode,
+    CapabilitiesResponse, CapabilityInfo, CapabilityKind, DaemonBuildIdentity, DaemonMode,
     DaemonShutdownRequest, ErrorCode, HealthResponse, ModelDetailResponse, ModelInstallReport,
     ModelsResponse, ProcessInfo, PullModelRequest, PullModelResponse, PullRunnerRequest,
     RunnerDetailResponse, RunnersResponse, SpeechRequest, TakokitError, TrainVoiceRequest,
@@ -27,14 +27,18 @@ use takokit_package::{
 use crate::AppState;
 
 mod error;
+mod files;
 mod inference;
+mod media;
 mod packages;
 mod progress;
 mod sessions;
 mod system;
 
 pub use error::ApiError;
+pub use files::*;
 pub use inference::*;
+pub use media::*;
 pub use packages::*;
 pub use progress::*;
 pub use sessions::*;
