@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
+import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
 import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
@@ -420,6 +421,8 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               <div><span>Review</span><strong>{result.quality_review_required ? "Listening required" : "Not required"}</strong></div>
             </div>
 
+            <LocalAudioPlayer path={result.output_path} label="Converted audio" />
+
             <div className="tk-output-path">
               <code title={result.output_path}>{result.output_path}</code>
               <button type="button" onClick={() => void navigator.clipboard.writeText(result.output_path)} title="Copy output path">
@@ -503,6 +506,7 @@ function ConversionPathCard({ label, description, path, busy, actionLabel, onBro
           <X size={14} strokeWidth={1.9} />
         </button>
       ) : null}
+      {path && !folder ? <LocalAudioPlayer path={path} compact label={`${label} preview`} /> : null}
     </div>
   );
 }
