@@ -16,6 +16,7 @@ use super::{
         load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
     },
     convert::ConvertState,
+    library::{load_library_rows, LibraryModelRow},
 };
 
 mod state_access;
@@ -43,8 +44,9 @@ pub const HOME_ACTIONS: [(&str, &str); 8] = [
     ),
 ];
 
-pub const MANAGE_ACTIONS: [(&str, &str); 3] = [
+pub const MANAGE_ACTIONS: [(&str, &str); 4] = [
     ("Installed models", "Use, repair, or remove local models"),
+    ("Model library", "Browse and pull models from the Takokit registry"),
     ("Runners", "Inspect and repair shared execution runtimes"),
     ("System", "Daemon status, diagnostics, logs, and GUI"),
 ];
@@ -99,6 +101,7 @@ pub enum TuiScreen {
     Convert,
     Manage,
     Models,
+    ModelLibrary,
     Runners,
     System,
     Sessions,
@@ -116,6 +119,7 @@ impl TuiScreen {
             Self::Convert => "Convert voice",
             Self::Manage => "Manage",
             Self::Models => "Installed models",
+            Self::ModelLibrary => "Model library",
             Self::Runners => "Runners",
             Self::System => "System",
             Self::Sessions => "Sessions",
@@ -126,7 +130,7 @@ impl TuiScreen {
 
     pub fn parent(self) -> Self {
         match self {
-            Self::Models | Self::Runners | Self::System => Self::Manage,
+            Self::Models | Self::ModelLibrary | Self::Runners | Self::System => Self::Manage,
             Self::Home => Self::Home,
             _ => Self::Home,
         }
@@ -217,11 +221,14 @@ pub struct App {
     pub home_index: usize,
     pub manage_index: usize,
     pub models: Vec<ModelRow>,
+    pub library_models: Vec<LibraryModelRow>,
+    pub library_error: Option<String>,
     pub runners: Vec<RunnerRow>,
     pub system: Vec<SystemRow>,
     pub sessions: Vec<SessionSummary>,
     pub voice_profiles: Vec<VoiceProfile>,
     pub model_index: usize,
+    pub library_model_index: usize,
     pub runner_index: usize,
     pub system_index: usize,
     pub session_index: usize,
@@ -266,6 +273,7 @@ impl App {
         workspace: &CliWorkspace,
     ) -> anyhow::Result<Self> {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
+        let (library_models, library_error) = load_library_state(package_registry, installed_registry);
         let (tts_models, stt_models) = capability_indexes(&models);
         let clone_state = super::clone::CloneState::new(&models);
         let convert_state = ConvertState::new(&models);
@@ -298,11 +306,14 @@ impl App {
                 "whisper-tiny",
             ),
             models,
+            library_models,
+            library_error,
             runners,
             system: system_rows(),
             sessions,
             voice_profiles,
             model_index: 0,
+            library_model_index: 0,
             runner_index: 0,
             system_index: 0,
             session_index,
@@ -345,19 +356,34 @@ impl App {
         installed_registry: &InstalledRegistry,
     ) -> anyhow::Result<()> {
         let selected_model = self.selected_model().map(|model| model.id.clone());
+        let selected_library_model = self
+            .library_models
+            .get(self.library_model_index)
+            .map(|model| model.reference.clone());
         let selected_runner = self.selected_runner().map(|runner| runner.id.clone());
         let speak_model = self.selected_speak_model().map(|model| model.id.clone());
         let transcribe_model = self
             .selected_transcribe_model()
             .map(|model| model.id.clone());
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
+        let (library_models, library_error) = load_library_state(package_registry, installed_registry);
         let (tts_models, stt_models) = capability_indexes(&models);
 
         self.models = models;
+        self.library_models = library_models;
+        self.library_error = library_error;
         self.runners = runners;
         self.tts_models = tts_models;
         self.stt_models = stt_models;
         self.model_index = find_model_index(&self.models, selected_model.as_deref());
+        self.library_model_index = selected_library_model
+            .as_deref()
+            .and_then(|reference| {
+                self.library_models
+                    .iter()
+                    .position(|model| model.reference == reference)
+            })
+            .unwrap_or(0);
         self.runner_index = find_runner_index(&self.runners, selected_runner.as_deref());
         self.speak_model_index = find_capability_index(
             &self.models,
@@ -455,6 +481,16 @@ impl App {
     }
 }
 
+fn load_library_state(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+) -> (Vec<LibraryModelRow>, Option<String>) {
+    match load_library_rows(package_registry, installed_registry) {
+        Ok(models) => (models, None),
+        Err(error) => (Vec::new(), Some(format!("{error:#}"))),
+    }
+}
+
 fn session_position(sessions: &[SessionSummary], active: Option<Uuid>) -> usize {
     active
         .and_then(|id| sessions.iter().position(|session| session.id == id))
@@ -468,9 +504,18 @@ mod tests {
     #[test]
     fn nested_screens_have_obvious_parents() {
         assert_eq!(TuiScreen::Models.parent(), TuiScreen::Manage);
+        assert_eq!(TuiScreen::ModelLibrary.parent(), TuiScreen::Manage);
         assert_eq!(TuiScreen::Convert.parent(), TuiScreen::Home);
         assert_eq!(TuiScreen::Workspace.parent(), TuiScreen::Home);
         assert_eq!(TuiScreen::Home.parent(), TuiScreen::Home);
+    }
+
+    #[test]
+    fn manage_keeps_installed_and_library_as_separate_screens() {
+        assert_eq!(MANAGE_ACTIONS[0].0, "Installed models");
+        assert_eq!(MANAGE_ACTIONS[1].0, "Model library");
+        assert_eq!(MANAGE_ACTIONS[2].0, "Runners");
+        assert_eq!(MANAGE_ACTIONS[3].0, "System");
     }
 
     #[test]
