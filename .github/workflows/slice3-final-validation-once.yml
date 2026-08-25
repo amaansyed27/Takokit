@@ -84,6 +84,9 @@ jobs:
           npm install
           npm test
           npm run build
+      - name: Discard validation-only lockfile normalization
+        shell: bash
+        run: git checkout -- site/package-lock.json
       - name: Verify exact final commit stayed clean
         shell: bash
         run: |
