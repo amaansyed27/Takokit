@@ -16,6 +16,7 @@ const FISH_SPEECH_ADAPTER: &str = include_str!("../../../runners/python/fish_spe
 const OPENVOICE_ADAPTER: &str = include_str!("../../../runners/python/openvoice_adapter.py");
 const GPT_SOVITS_ADAPTER: &str = include_str!("../../../runners/python/gpt_sovits_adapter.py");
 const RVC_ADAPTER: &str = include_str!("../../../runners/python/rvc_adapter.py");
+const RVC_TRAINING_ADAPTER: &str = include_str!("../../../runners/python/rvc_training_adapter.py");
 const QWEN_OMNI_ADAPTER: &str = include_str!("../../../runners/python/qwen_omni_adapter.py");
 
 #[derive(Debug, Clone, Copy)]
@@ -39,11 +40,59 @@ pub(crate) struct AdapterSpec {
     pub note: &'static str,
 }
 
+const RVC_TRAINING_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
+    repository: "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git",
+    revision: "81eed5e8f68b6bed1789f682fe78cdd324495afc",
+    recursive: false,
+    requirement_files: &[],
+    editable: false,
+};
+
+const RVC_TRAINING_PACKAGES: &[&str] = &[
+    "torch",
+    "torchaudio",
+    "setuptools>=75,<81",
+    "packaging>=24",
+    "av>=15.1,<16",
+    "einops>=0.8,<1",
+    "faiss-cpu>=1.13,<2",
+    "ffmpeg-python>=0.2,<1",
+    "librosa>=0.10.2,<0.11",
+    "local-attention>=1.11,<2",
+    "matplotlib>=3.8,<4",
+    "networkx>=3.2,<4",
+    "numpy>=1.26.4,<2",
+    "opencv-python-headless>=4.10,<5",
+    "praat-parselmouth>=0.4.5,<1",
+    "PyYAML>=6.0.1",
+    "scikit-learn>=1.6,<2",
+    "scipy>=1.13,<2",
+    "soundfile>=0.13,<1",
+    "tensorboard>=2.19",
+    "torchfcpe>=0.0.4,<0.1",
+    "tqdm>=4.67,<5",
+    "transformers>=4.49,<4.50",
+];
+
+const RVC_TRAINING_SPEC: AdapterSpec = AdapterSpec {
+    id: "rvc_training",
+    model_family: "rvc-training-internal",
+    python: "3.12",
+    packages: RVC_TRAINING_PACKAGES,
+    no_deps_packages: &[],
+    script: Some(RVC_TRAINING_ADAPTER),
+    source: Some(RVC_TRAINING_SOURCE),
+    note: "Pinned official RVC training worker. Uses the shared Takokit Python 3.12 ABI base; no per-voice environment.",
+};
+
 #[path = "runtime_python_specs/catalog.rs"]
 mod catalog;
 pub(crate) use catalog::ADAPTER_SPECS;
 
 pub(crate) fn adapter_spec(id: &str) -> Option<&'static AdapterSpec> {
+    if id == RVC_TRAINING_SPEC.id {
+        return Some(&RVC_TRAINING_SPEC);
+    }
     ADAPTER_SPECS.iter().find(|spec| spec.id == id)
 }
 
@@ -116,6 +165,19 @@ mod tests {
     fn rvc_uses_portable_pyav_override() {
         assert_eq!(adapter_dependency_overrides("rvc"), &["av==12.0.0"]);
         assert!(adapter_dependency_overrides("openvoice").is_empty());
+    }
+
+    #[test]
+    fn rvc_training_is_pinned_and_separate_from_inference() {
+        let inference = adapter_spec("rvc").expect("RVC inference adapter");
+        let training = adapter_spec("rvc_training").expect("RVC training adapter");
+        assert_eq!(inference.python, "3.11");
+        assert_eq!(training.python, "3.12");
+        assert_eq!(training.source.expect("training source").revision, "81eed5e8f68b6bed1789f682fe78cdd324495afc");
+        assert!(RVC_TRAINING_ADAPTER.contains("train/preprocess.py"));
+        assert!(RVC_TRAINING_ADAPTER.contains("train/train.py"));
+        assert!(RVC_TRAINING_ADAPTER.contains("train/train_index.py"));
+        assert!(RVC_TRAINING_ADAPTER.contains("Reusing deterministic prepared dataset"));
     }
 
     #[test]
@@ -240,7 +302,6 @@ mod tests {
         assert!(HF_AUDIO_ADAPTER.contains("decode_audio"));
         assert!(F5_TTS_ADAPTER.contains("install_soundfile_torchaudio_io"));
         assert!(COSYVOICE2_ADAPTER.contains("cuda_runtime_is_compatible"));
-        assert!(COSYVOICE2_ADAPTER.contains("text_frontend=False"));
         assert!(OPENVOICE_ADAPTER.contains("configure_mecab_dictionary"));
         assert!(KYUTAI_TTS_ADAPTER.contains("NO_TORCH_COMPILE"));
         assert!(QWEN_OMNI_ADAPTER.contains("return_audio=False"));

@@ -1,19 +1,19 @@
 id = "rvc"
 name = "RVC"
 family = "rvc"
-version = "0.1.0"
+version = "0.2.0"
 kind = "voice-convert"
 backend = "python-managed"
 runner = "takokit-python-managed"
 required_adapter = "rvc"
 license = "mit"
-description = "Retrieval-based Voice Conversion with pinned HuBERT and RMVPE base assets. Conversion requires a user-supplied or trained target .pth checkpoint and optional .index file."
+description = "Retrieval-based Voice Conversion with pinned inference and training assets. Conversion accepts manual, imported, or Takokit-trained .pth checkpoints with an optional matching .index. Advanced training uses Takokit's separate managed RVC training adapter."
 
 [capabilities]
 tts = false
 stt = false
 voice_cloning = false
-voice_training = false
+voice_training = true
 voice_conversion = true
 live_transcription = false
 live_audio = false
@@ -27,8 +27,16 @@ min_vram = "4gb"
 [source]
 provider = "hugging-face"
 repository = "lj1995/VoiceConversionWebUI"
-revision = "d53cd75f4e954ffc87f251200a682c9e63b6b821"
-allow_patterns = ["hubert_base.pt", "rmvpe.pt"]
+revision = "1be9d36ece685661920e1a7cb36eb0437c1e5581"
+allow_patterns = [
+  "hubert_base.pt",
+  "rmvpe.pt",
+  "hubert_base/config.json",
+  "hubert_base/preprocessor_config.json",
+  "hubert_base/pytorch_model.bin",
+  "pretrained_v2/f0G40k.pth",
+  "pretrained_v2/f0D40k.pth",
+]
 
 [artifacts]
 metadata_only = false
