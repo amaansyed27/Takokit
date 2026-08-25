@@ -22,15 +22,20 @@ jobs:
           python .github/scripts/rvc-test-wire.py
           cargo fmt --all
       - name: Advanced RVC service and package tests
-        run: cargo test -p takokit-models rvc_voice_service --lib
+        run: |
+          cargo test -p takokit-models rvc_voice_service --lib
       - name: Advanced RVC API tests
-        run: cargo test -p takokit-server rvc --lib
+        run: |
+          cargo test -p takokit-server rvc --lib
       - name: Advanced RVC CLI tests
-        run: cargo test -p takokit-cli tests::rvc --lib
+        run: |
+          cargo test -p takokit-cli tests::rvc --lib
       - name: Advanced RVC TUI tests
-        run: cargo test -p takokit-cli tui:: --lib
+        run: |
+          cargo test -p takokit-cli tui:: --lib
       - name: Repository quality
-        run: python scripts/audit_file_sizes.py
+        run: |
+          python scripts/audit_file_sizes.py
       - name: Commit regression coverage
         run: |
           git rm .github/workflows/rvc-regression-wire-once.yml .github/scripts/rvc-test-wire.py
