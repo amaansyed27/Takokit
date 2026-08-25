@@ -154,6 +154,7 @@ impl App {
             TuiScreen::Convert => forms::handle_convert(self, key),
             TuiScreen::Manage => navigation::handle_manage(self, key),
             TuiScreen::Models => navigation::handle_models(self, key),
+            TuiScreen::ModelLibrary => navigation::handle_model_library(self, key),
             TuiScreen::Runners => navigation::handle_runners(self, key),
             TuiScreen::System => navigation::handle_system(self, key),
             TuiScreen::Sessions => navigation::handle_sessions(self, key),
@@ -178,6 +179,7 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
             None
         }
         TuiScreen::Models => navigation::open_or_repair_selected_model(app),
+        TuiScreen::ModelLibrary => navigation::library_primary_action(app),
         TuiScreen::Runners => navigation::runner_primary_action(app),
         TuiScreen::System => app
             .selected_system()
@@ -230,6 +232,11 @@ mod tests {
     #[test]
     fn workspace_screen_accepts_text() {
         assert!(TuiScreen::Workspace.accepts_text());
+    }
+
+    #[test]
+    fn model_library_is_non_text_navigation() {
+        assert!(!TuiScreen::ModelLibrary.accepts_text());
     }
 
     #[test]
