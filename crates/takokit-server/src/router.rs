@@ -63,6 +63,80 @@ pub fn server_router(state: AppState) -> Router {
             get(handlers::runner).delete(handlers::remove_runner),
         )
         .route("/v1/voices", get(handlers::voices))
+        .route(
+            "/v1/voices/rvc",
+            get(handlers::rvc_voice_list).post(handlers::rvc_voice_create),
+        )
+        .route("/v1/voices/rvc/presets", get(handlers::rvc_voice_presets))
+        .route("/v1/voices/rvc/import", post(handlers::rvc_import))
+        .route(
+            "/v1/voices/rvc/package/verify",
+            post(handlers::rvc_package_verify),
+        )
+        .route(
+            "/v1/voices/rvc/package/import",
+            post(handlers::rvc_package_import),
+        )
+        .route(
+            "/v1/voices/rvc/:voice",
+            get(handlers::rvc_voice_show).delete(handlers::rvc_voice_remove),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/samples",
+            get(handlers::rvc_sample_list).post(handlers::rvc_sample_add),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/samples/:sample",
+            axum::routing::patch(handlers::rvc_sample_update)
+                .delete(handlers::rvc_sample_remove),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/dataset/inspect",
+            post(handlers::rvc_dataset_inspect),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/dataset/prepared",
+            axum::routing::delete(handlers::rvc_dataset_clear),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/preflight",
+            post(handlers::rvc_preflight),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/prepare",
+            post(handlers::rvc_prepare),
+        )
+        .route("/v1/voices/rvc/:voice/train", post(handlers::rvc_train))
+        .route(
+            "/v1/voices/rvc/:voice/train/recover",
+            post(handlers::rvc_train_recover),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/train/status",
+            get(handlers::rvc_train_status),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/train/logs",
+            get(handlers::rvc_train_logs),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/train/cancel",
+            post(handlers::rvc_train_cancel),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/checkpoints",
+            get(handlers::rvc_checkpoints),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/checkpoint",
+            post(handlers::rvc_select_checkpoint),
+        )
+        .route(
+            "/v1/voices/rvc/:voice/indexes",
+            get(handlers::rvc_indexes),
+        )
+        .route("/v1/voices/rvc/:voice/test", post(handlers::rvc_test_voice))
+        .route("/v1/voices/rvc/:voice/export", post(handlers::rvc_export))
         .route("/v1/audio/speech", post(handlers::speech))
         .route("/v1/audio/transcriptions", post(handlers::transcriptions))
         .route("/v1/audio/conversions", post(handlers::convert_voice))
