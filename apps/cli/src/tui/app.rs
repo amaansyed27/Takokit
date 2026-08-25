@@ -16,7 +16,7 @@ use super::{
         load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
     },
     convert::ConvertState,
-    library::{load_library_rows, LibraryModelRow},
+    library::{load_library_state, LibraryModelRow},
 };
 
 mod state_access;
@@ -46,7 +46,10 @@ pub const HOME_ACTIONS: [(&str, &str); 8] = [
 
 pub const MANAGE_ACTIONS: [(&str, &str); 4] = [
     ("Installed models", "Use, repair, or remove local models"),
-    ("Model library", "Browse and pull models from the Takokit registry"),
+    (
+        "Model library",
+        "Browse and pull models from the Takokit registry",
+    ),
     ("Runners", "Inspect and repair shared execution runtimes"),
     ("System", "Daemon status, diagnostics, logs, and GUI"),
 ];
@@ -273,7 +276,8 @@ impl App {
         workspace: &CliWorkspace,
     ) -> anyhow::Result<Self> {
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
-        let (library_models, library_error) = load_library_state(package_registry, installed_registry);
+        let (library_models, library_error) =
+            load_library_state(package_registry, installed_registry);
         let (tts_models, stt_models) = capability_indexes(&models);
         let clone_state = super::clone::CloneState::new(&models);
         let convert_state = ConvertState::new(&models);
@@ -366,7 +370,8 @@ impl App {
             .selected_transcribe_model()
             .map(|model| model.id.clone());
         let (models, runners) = load_runtime_rows(package_registry, installed_registry)?;
-        let (library_models, library_error) = load_library_state(package_registry, installed_registry);
+        let (library_models, library_error) =
+            load_library_state(package_registry, installed_registry);
         let (tts_models, stt_models) = capability_indexes(&models);
 
         self.models = models;
@@ -478,16 +483,6 @@ impl App {
     pub fn set_status(&mut self, value: impl Into<String>) {
         self.status = value.into();
         self.output_scroll = 0;
-    }
-}
-
-fn load_library_state(
-    package_registry: &PackageRegistry,
-    installed_registry: &InstalledRegistry,
-) -> (Vec<LibraryModelRow>, Option<String>) {
-    match load_library_rows(package_registry, installed_registry) {
-        Ok(models) => (models, None),
-        Err(error) => (Vec::new(), Some(format!("{error:#}"))),
     }
 }
 
