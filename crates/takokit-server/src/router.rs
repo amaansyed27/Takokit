@@ -1,5 +1,6 @@
 use anyhow::Context;
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
@@ -8,6 +9,8 @@ use tokio::sync::oneshot;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::{handlers, AppState};
+
+const WORKSPACE_UPLOAD_BODY_LIMIT_BYTES: usize = 100 * 1024 * 1024;
 
 pub fn server_router(state: AppState) -> Router {
     Router::new()
@@ -25,7 +28,9 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/system/open", post(handlers::open_location))
         .route(
             "/v1/files",
-            get(handlers::workspace_files).post(handlers::upload_workspace_file),
+            get(handlers::workspace_files)
+                .post(handlers::upload_workspace_file)
+                .layer(DefaultBodyLimit::max(WORKSPACE_UPLOAD_BODY_LIMIT_BYTES)),
         )
         .route(
             "/v1/files/:id/content",
