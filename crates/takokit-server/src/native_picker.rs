@@ -4,17 +4,56 @@ use std::{
 };
 
 pub fn pick_audio_file(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
-    pick_path(initial_dir, false)
+    pick_path(initial_dir, PickerKind::Audio)
 }
 
 pub fn pick_folder(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
-    pick_path(initial_dir, true)
+    pick_path(initial_dir, PickerKind::Folder)
+}
+
+pub fn pick_rvc_checkpoint(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
+    pick_path(initial_dir, PickerKind::RvcCheckpoint)
+}
+
+pub fn pick_rvc_index(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
+    pick_path(initial_dir, PickerKind::RvcIndex)
+}
+
+pub fn pick_rvc_package(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
+    pick_path(initial_dir, PickerKind::RvcPackage)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PickerKind {
+    Audio,
+    Folder,
+    RvcCheckpoint,
+    RvcIndex,
+    RvcPackage,
+}
+
+impl PickerKind {
+    fn windows_filter(self) -> &'static str {
+        match self {
+            Self::Audio => {
+                "Audio files|*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.wma|All files|*.*"
+            }
+            Self::RvcCheckpoint => "RVC checkpoints|*.pth|All files|*.*",
+            Self::RvcIndex => "RVC indexes|*.index|All files|*.*",
+            Self::RvcPackage => "Takokit voice packages|*.takovoice|All files|*.*",
+            Self::Folder => "All files|*.*",
+        }
+    }
+
+    fn is_folder(self) -> bool {
+        self == Self::Folder
+    }
 }
 
 #[cfg(windows)]
-fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String> {
+fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
     let initial = escape_powershell_single_quoted(&initial_dir.display().to_string());
-    let script = if folder {
+    let script = if kind.is_folder() {
         format!(
             "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Windows.Forms; \
              [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); \
@@ -23,12 +62,13 @@ fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String
              if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ [Console]::Write($d.SelectedPath) }}"
         )
     } else {
+        let filter = escape_powershell_single_quoted(kind.windows_filter());
         format!(
             "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Windows.Forms; \
              [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); \
              $d=New-Object System.Windows.Forms.OpenFileDialog; \
              $d.InitialDirectory='{initial}'; \
-             $d.Filter='Audio files|*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.wma|All files|*.*'; \
+             $d.Filter='{filter}'; \
              if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ [Console]::Write($d.FileName) }}"
         )
     };
@@ -49,10 +89,12 @@ fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String
 }
 
 #[cfg(target_os = "macos")]
-fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String> {
+fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
     let initial = initial_dir.display().to_string().replace('"', "\\\"");
-    let kind = if folder { "folder" } else { "file" };
-    let script = format!("POSIX path of (choose {kind} default location POSIX file \"{initial}\")");
+    let target = if kind.is_folder() { "folder" } else { "file" };
+    let script = format!(
+        "POSIX path of (choose {target} default location POSIX file \"{initial}\")"
+    );
     let output = Command::new("osascript")
         .args(["-e", &script])
         .output()
@@ -64,10 +106,10 @@ fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String> {
+fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
     let mut command = Command::new("zenity");
     command.arg("--file-selection");
-    if folder {
+    if kind.is_folder() {
         command.arg("--directory");
     }
     command.arg(format!("--filename={}/", initial_dir.display()));
@@ -111,5 +153,12 @@ mod tests {
             selected_path_from_stdout("C:\\Voice Project ü\\sample.wav\r\n".as_bytes()).unwrap(),
             Some(PathBuf::from("C:\\Voice Project ü\\sample.wav"))
         );
+    }
+
+    #[test]
+    fn rvc_artifact_filters_are_specific() {
+        assert!(PickerKind::RvcCheckpoint.windows_filter().contains("*.pth"));
+        assert!(PickerKind::RvcIndex.windows_filter().contains("*.index"));
+        assert!(PickerKind::RvcPackage.windows_filter().contains("*.takovoice"));
     }
 }
