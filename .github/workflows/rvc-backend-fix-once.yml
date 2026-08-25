@@ -1,0 +1,33 @@
+name: RVC backend fix once
+
+on:
+  push:
+    branches:
+      - slice/advanced-rvc-cloning
+    paths:
+      - .github/workflows/rvc-backend-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: python scripts/rvc_backend_fix_once.py
+      - shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git rm .github/workflows/rvc-backend-fix-once.yml scripts/rvc_backend_fix_once.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(rvc): complete backend conversion contract"
+          git push origin HEAD:slice/advanced-rvc-cloning
