@@ -1,13 +1,13 @@
 use super::*;
 use serde_json::{json, Value};
+#[cfg(not(windows))]
+use std::fs;
 use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-#[cfg(not(windows))]
-use std::fs;
 use takokit_package::{install_python_adapter, python_managed_runner_layout, InstalledRegistry};
 
 impl RvcVoiceService {
