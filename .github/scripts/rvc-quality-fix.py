@@ -79,4 +79,4 @@ const emptyReview: ReviewState = {
   artifacts: false
 };
 
-''', "")
+''', "type ReviewState = typeof emptyReview;\n\n")
