@@ -1,0 +1,168 @@
+.tk-rvc-presets,
+.tk-rvc-training-sequence,
+.tk-rvc-job-card,
+.tk-rvc-test-intro,
+.tk-rvc-test-source,
+.tk-rvc-test-result,
+.tk-rvc-checkpoint-card,
+.tk-rvc-package-card,
+.tk-rvc-custom-config,
+.tk-rvc-preflight {
+  border: 1px solid var(--tk-line);
+  border-radius: 14px;
+  background: var(--tk-surface);
+  box-shadow: var(--tk-shadow-sm);
+}
+
+.tk-rvc-presets { padding: 16px; }
+.tk-rvc-presets h3 { margin: 0; color: var(--tk-text); font-size: 14px; font-weight: 610; }
+.tk-rvc-presets p { color: var(--tk-text-secondary); margin: 4px 0 0; font-size: 11px; line-height: 1.5; }
+.tk-rvc-preset-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.tk-rvc-preset-grid button {
+  border: 1px solid var(--tk-line);
+  border-radius: 11px;
+  background: var(--tk-surface-soft);
+  color: var(--tk-text);
+  padding: 11px;
+  text-align: left;
+  display: grid;
+  gap: 5px;
+  cursor: pointer;
+  transition: border-color var(--tk-transition), background var(--tk-transition);
+}
+.tk-rvc-preset-grid button:hover { border-color: var(--tk-line-strong); background: var(--tk-surface-hover); }
+.tk-rvc-preset-grid button.is-active { border-color: rgba(156, 177, 159, .36); background: var(--tk-accent-soft); }
+.tk-rvc-preset-grid span { color: var(--tk-text-tertiary); font-size: 9.5px; line-height: 1.4; }
+
+.tk-rvc-custom-config {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 13px;
+  background: var(--tk-surface-soft);
+  box-shadow: none;
+}
+.tk-rvc-custom-config label { display: grid; gap: 5px; }
+.tk-rvc-custom-config input,
+.tk-rvc-custom-config select {
+  min-height: 38px;
+  border: 1px solid var(--tk-line);
+  border-radius: 9px;
+  outline: none;
+  background: var(--tk-control);
+  color: var(--tk-text);
+  padding: 0 10px;
+}
+.tk-rvc-custom-config input:focus,
+.tk-rvc-custom-config select:focus { border-color: var(--tk-line-strong); box-shadow: 0 0 0 3px var(--tk-accent-soft); }
+.tk-rvc-checkbox { align-content: center; grid-template-columns: auto 1fr !important; }
+
+.tk-rvc-training-sequence { display: grid; overflow: hidden; }
+.tk-rvc-training-sequence article {
+  padding: 13px 14px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+}
+.tk-rvc-training-sequence article + article { border-top: 1px solid var(--tk-line); }
+.tk-rvc-training-sequence article > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--tk-surface-soft);
+  display: grid;
+  place-items: center;
+  color: var(--tk-text-secondary);
+}
+.tk-rvc-training-sequence p { margin: 3px 0 0; color: var(--tk-text-tertiary); font-size: 10.5px; }
+
+.tk-rvc-preflight { border-left: 3px solid var(--tk-accent); padding: 13px; box-shadow: none; }
+.tk-rvc-preflight header { display: flex; justify-content: space-between; gap: 12px; }
+.tk-rvc-preflight > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+.tk-rvc-preflight > div span {
+  border: 1px solid var(--tk-line);
+  border-radius: 9px;
+  background: var(--tk-surface-soft);
+  padding: 8px;
+  display: grid;
+  gap: 3px;
+  color: var(--tk-text-tertiary);
+  font-size: 9.5px;
+}
+.tk-rvc-preflight p { margin: 7px 0 0; color: var(--tk-text-secondary); font-size: 10.5px; }
+
+.tk-rvc-job-card { overflow: hidden; }
+.tk-rvc-job-card header {
+  padding: 11px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-job-card header > div { display: flex; gap: 7px; align-items: center; }
+.tk-rvc-job-card button {
+  border: 1px solid var(--tk-line);
+  border-radius: 9px;
+  background: var(--tk-control);
+  color: var(--tk-text-secondary);
+  cursor: pointer;
+  transition: border-color var(--tk-transition), background var(--tk-transition), color var(--tk-transition);
+}
+.tk-rvc-job-card button:hover { border-color: var(--tk-line-strong); background: var(--tk-control-hover); color: var(--tk-text); }
+.tk-rvc-job-card pre {
+  margin: 0;
+  min-height: 150px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 13px;
+  white-space: pre-wrap;
+  background: var(--tk-sidebar-bg);
+  color: var(--tk-text-secondary);
+  font-family: var(--tk-font-mono);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.tk-rvc-job-failure {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--tk-line);
+  background: var(--tk-danger-soft);
+  color: var(--tk-danger);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 10.5px;
+}
+
+.tk-rvc-checkpoints-list { display: grid; gap: 8px; }
+.tk-rvc-checkpoint-card { padding: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.tk-rvc-checkpoint-card dl { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0 0; color: var(--tk-text-tertiary); font-size: 9.5px; }
+.tk-rvc-checkpoint-card dl div { display: flex; gap: 4px; }
+.tk-rvc-package-card { padding: 14px; display: grid; gap: 10px; }
+.tk-rvc-package-card__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.tk-rvc-test-intro { padding: 14px; display: flex; gap: 10px; }
+.tk-rvc-test-intro p { margin: 4px 0 0; color: var(--tk-text-secondary); font-size: 10.5px; line-height: 1.5; }
+.tk-rvc-test-source { padding: 13px 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.tk-rvc-test-source > div { display: grid; gap: 3px; min-width: 0; }
+.tk-rvc-test-source span,
+.tk-rvc-test-source small { color: var(--tk-text-tertiary); overflow: hidden; text-overflow: ellipsis; }
+.tk-rvc-test-actions { display: flex; gap: 8px; }
+.tk-rvc-test-result { padding: 14px; display: grid; gap: 10px; }
+.tk-rvc-test-result header { display: flex; justify-content: space-between; gap: 12px; }
+.tk-rvc-test-result p { margin: 0; color: var(--tk-text-secondary); font-size: 10.5px; }
+
+@media (max-width: 900px) {
+  .tk-rvc-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tk-rvc-custom-config { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 620px) {
+  .tk-rvc-preset-grid,
+  .tk-rvc-custom-config { grid-template-columns: 1fr; }
+  .tk-rvc-training-sequence article { grid-template-columns: 30px minmax(0, 1fr); }
+  .tk-rvc-training-sequence article > :last-child { grid-column: 2; justify-self: start; }
+  .tk-rvc-preflight > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tk-rvc-test-source { align-items: flex-start; flex-direction: column; }
+}
