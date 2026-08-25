@@ -19,30 +19,11 @@ import { useVoiceConversion } from "../../hooks/useVoiceConversion";
 import { pickAudioFile, pickFolder } from "../../lib/nativePicker";
 import type { RvcF0Method } from "../../lib/types";
 import { consumeCloneIntent } from "../../lib/workflowIntent";
-import { ConversionPathCard, NumberField, ReviewItem, displayFileName, formatBytes } from "./ConvertComponents";
+import { ConversionPathCard, NumberField, ReviewItem, displayFileName, emptyReview, f0Options, formatBytes } from "./ConvertComponents";
 
 type ConversionMode = "reference" | "rvc";
 
-type ReviewState = {
-  words: boolean;
-  timbre: boolean;
-  similarity: boolean;
-  artifacts: boolean;
-};
-
-const f0Options = [
-  { value: "rmvpe", label: "RMVPE" },
-  { value: "harvest", label: "Harvest" },
-  { value: "crepe", label: "CREPE" },
-  { value: "pm", label: "Parselmouth" }
-];
-
-const emptyReview: ReviewState = {
-  words: false,
-  timbre: false,
-  similarity: false,
-  artifacts: false
-};
+type ReviewState = typeof emptyReview;
 
 export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentProps) {
   const conversionModels = useMemo(
