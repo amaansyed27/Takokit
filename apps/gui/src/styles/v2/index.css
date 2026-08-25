@@ -11,6 +11,7 @@
 @import "./transcribe.css";
 @import "./voices.css";
 @import "./voices-library.css";
+@import "./rvc-studio.css";
 @import "./convert.css";
 @import "./convert-result.css";
 @import "./files.css";

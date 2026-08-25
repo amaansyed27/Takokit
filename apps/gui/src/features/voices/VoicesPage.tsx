@@ -19,10 +19,11 @@ import { ProductButton } from "../../components/ui/ProductButton";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { ProductSelect } from "../../components/ui/ProductSelect";
 import { useVoiceProfileCreation } from "../../hooks/useVoiceProfileCreation";
+import { AdvancedVoiceStudio } from "./AdvancedVoiceStudio";
 import { pickAudioFile } from "../../lib/nativePicker";
 import type { VoiceSummary } from "../../lib/types";
 import { removeVoiceProfile } from "../../lib/voices";
-import { consumeVoiceIntent, setSpeakIntent } from "../../lib/workflowIntent";
+import { consumeVoiceIntent, setCloneIntent, setSpeakIntent } from "../../lib/workflowIntent";
 
 export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentProps) {
   const cloningModels = useMemo(
@@ -30,6 +31,7 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
     [runtime.models]
   );
   const voiceIntent = useMemo(() => consumeVoiceIntent(), []);
+  const [createMode, setCreateMode] = useState<"instant" | "advanced">(voiceIntent?.mode ?? "instant");
   const initialModel = cloningModels.find((item) => item.id === "openvoice" && item.executable)
     ?? cloningModels.find((item) => item.executable)
     ?? cloningModels[0];
@@ -52,8 +54,8 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
   } = useVoiceProfileCreation();
 
   const selectedModel = cloningModels.find((item) => item.id === model) ?? cloningModels[0];
-  const localVoices = runtime.voices.filter((voice) => voice.source === "local-profile");
-  const builtInVoices = runtime.voices.filter((voice) => voice.source !== "local-profile");
+  const localVoices = runtime.voices.filter((voice) => voice.source === "local-profile" || voice.source === "managed-rvc");
+  const builtInVoices = runtime.voices.filter((voice) => voice.source !== "local-profile" && voice.source !== "managed-rvc");
   const serverOnline = runtime.server.status === "online";
   const canCreate = Boolean(
     serverOnline
@@ -106,6 +108,11 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
     onNavigate("speak");
   }
 
+  function useInConvert(voiceId: string) {
+    setCloneIntent({ targetPath: voiceId, mode: "rvc" });
+    onNavigate("convert");
+  }
+
   async function confirmRemove() {
     if (!removeTarget) return;
     setRemoveBusy(true);
@@ -127,9 +134,19 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
       <ProductPageHeader
         eyebrow="Voice cloning"
         title="Voices"
-        description="Create a reusable local voice from a clean reference recording. Browse an existing clip, reuse Files, or record one right here."
+        description="Create an instant reference clone or build and train a persistent managed RVC voice in Voice Studio."
       />
 
+      <div className="tk-voice-create-modes" role="tablist" aria-label="Voice creation type">
+        <button type="button" className={createMode === "instant" ? "is-active" : ""} onClick={() => setCreateMode("instant")}>
+          <strong>Instant Clone</strong><span>One clean reference recording → reusable voice profile</span>
+        </button>
+        <button type="button" className={createMode === "advanced" ? "is-active" : ""} onClick={() => setCreateMode("advanced")}>
+          <strong>Advanced Clone</strong><span>Multi-sample RVC dataset → prepare, train, checkpoint, test</span>
+        </button>
+      </div>
+
+      {createMode === "instant" ? (<>
       <div className="tk-voice-studio">
         <section className="tk-voice-builder" aria-label="Create a voice">
           <header className="tk-voice-builder__header">
@@ -315,6 +332,10 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
         </section>
       ) : null}
 
+      </>) : (
+        <AdvancedVoiceStudio initialSamplePath={voiceIntent?.samplePath} onNavigate={onNavigate} onRefresh={onRefresh} />
+      )}
+
       <section className="tk-voice-library">
         <div className="tk-section-heading tk-voice-library__heading">
           <div>
@@ -330,14 +351,18 @@ export function VoicesPage({ runtime, onNavigate, onRefresh }: RouteComponentPro
                 <span className="tk-voice-row__avatar"><Mic2 size={19} strokeWidth={1.7} /></span>
                 <div className="tk-voice-row__identity">
                   <strong>{voice.name}</strong>
-                  <span>Saved voice · {voice.model === "none" ? "model-defined" : voice.model}</span>
+                  <span>{voice.source === "managed-rvc" ? "Managed RVC voice · ready for Convert" : `Saved voice · ${voice.model === "none" ? "model-defined" : voice.model}`}</span>
                 </div>
                 <div className="tk-voice-row__badges">
                   <span className="is-local">Local</span>
                   <span><ShieldCheck size={12} strokeWidth={1.8} /> Consent-backed</span>
                 </div>
                 <div className="tk-voice-row__actions">
-                  {voice.model !== "none" ? (
+                  {voice.source === "managed-rvc" ? (
+                    <button className="tk-voice-use" type="button" onClick={() => useInConvert(voice.id)}>
+                      Use in Convert <ArrowRight size={13} strokeWidth={1.9} />
+                    </button>
+                  ) : voice.model !== "none" ? (
                     <button className="tk-voice-use" type="button" onClick={() => useInSpeak(voice.id, voice.model)}>
                       Use in Speak <ArrowRight size={13} strokeWidth={1.9} />
                     </button>

@@ -15,6 +15,7 @@ export type TranscribeIntent = {
 
 export type VoiceIntent = {
   samplePath?: string;
+  mode?: "instant" | "advanced";
 };
 
 export type CloneIntent = {

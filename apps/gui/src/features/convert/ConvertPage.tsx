@@ -58,6 +58,10 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
     [conversionModels]
   );
   const cloneIntent = useMemo(() => consumeCloneIntent(), []);
+  const managedRvcVoices = useMemo(
+    () => runtime.voices.filter((voice) => voice.source === "managed-rvc" && voice.model === "rvc"),
+    [runtime.voices]
+  );
 
   const [mode, setMode] = useState<ConversionMode>(cloneIntent?.mode ?? "reference");
   const modeModels = mode === "rvc" ? rvcModels : referenceModels;
@@ -79,6 +83,7 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
   const { clearResult, convert, error, isConverting, result } = useVoiceConversion();
 
   const selectedModel = modeModels.find((item) => item.id === model) ?? modeModels[0];
+  const selectedManagedRvcVoice = mode === "rvc" ? managedRvcVoices.find((voice) => voice.id === targetPath) : undefined;
   const serverOnline = runtime.server.status === "online";
   const blocker = !serverOnline
     ? "The local runtime is not connected."
@@ -239,16 +244,28 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
               <span />
             </div>
 
+            {mode === "rvc" && managedRvcVoices.length > 0 ? (
+              <ProductSelect
+                label="Managed RVC voice"
+                value={selectedManagedRvcVoice?.id ?? ""}
+                onChange={(event) => setTargetPath(event.target.value)}
+                options={[{ value: "", label: "Choose a managed voice" }, ...managedRvcVoices.map((voice) => ({ value: voice.id, label: voice.name }))]}
+                hint="Voice Studio checkpoints selected as Ready appear here automatically."
+              />
+            ) : null}
+
             <ConversionPathCard
-              label={mode === "rvc" ? "Target RVC package" : "Target reference"}
+              label={mode === "rvc" ? (selectedManagedRvcVoice ? "Target managed voice" : "Target RVC package") : "Target reference"}
               description={
                 mode === "rvc"
-                  ? "Choose the folder containing the target checkpoint and optional index."
+                  ? selectedManagedRvcVoice
+                    ? "This managed Voice Studio checkpoint will be resolved by the shared RVC service."
+                    : "Choose a managed voice above or browse a legacy folder containing a checkpoint and optional index."
                   : "Choose a clean recording of the voice you want the output to resemble."
               }
               path={targetPath}
               busy={targetPickerBusy}
-              actionLabel={targetPath ? "Choose another" : mode === "rvc" ? "Browse package" : "Browse reference"}
+              actionLabel={mode === "rvc" ? "Browse legacy package" : targetPath ? "Choose another" : "Browse reference"}
               onBrowse={() => void browseTarget()}
               onClear={() => setTargetPath("")}
               folder={mode === "rvc"}
