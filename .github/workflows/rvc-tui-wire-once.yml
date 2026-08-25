@@ -1,0 +1,34 @@
+name: RVC TUI wire once
+on:
+  push:
+    branches: [slice/advanced-rvc-cloning]
+    paths:
+      - .github/workflows/rvc-tui-wire-once.yml
+      - .github/scripts/rvc-tui-wire.py
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply TUI wiring
+        run: python .github/scripts/rvc-tui-wire.py
+      - name: Format and check CLI
+        run: |
+          cargo fmt --all
+          cargo check -p takokit-cli
+          cargo test -p takokit-cli tui:: --lib
+      - name: Commit TUI
+        run: |
+          git rm .github/workflows/rvc-tui-wire-once.yml .github/scripts/rvc-tui-wire.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(tui): finish guided Advanced RVC lifecycle"
+          git push origin HEAD:slice/advanced-rvc-cloning
