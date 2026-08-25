@@ -5,6 +5,8 @@ use uuid::Uuid;
 
 pub const RVC_VOICE_SCHEMA_VERSION: u32 = 1;
 pub const TAKOVOICE_SCHEMA_VERSION: u32 = 1;
+pub const RVC_VERIFIED_SAMPLE_RATE_HZ: u32 = 40_000;
+pub const RVC_VERIFIED_MODEL_VERSION: &str = "v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -58,7 +60,7 @@ pub enum RvcSampleState {
     Invalid,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RvcSampleWarning {
     pub code: String,
     pub message: String,
@@ -117,7 +119,6 @@ pub enum RvcTrainingPreset {
 
 impl RvcTrainingPreset {
     pub const ALL: [Self; 4] = [Self::Quick, Self::Balanced, Self::HighQuality, Self::Custom];
-
     pub fn id(self) -> &'static str {
         match self {
             Self::Quick => "quick",
@@ -172,8 +173,8 @@ impl RvcTrainingConfig {
             epochs,
             batch_size,
             save_every_epochs,
-            sample_rate_hz: 40_000,
-            model_version: "v2".to_string(),
+            sample_rate_hz: RVC_VERIFIED_SAMPLE_RATE_HZ,
+            model_version: RVC_VERIFIED_MODEL_VERSION.to_string(),
             f0_enabled: true,
             f0_method: RvcF0Method::Rmvpe,
             device: RvcTrainingDevice::Auto,
@@ -186,17 +187,23 @@ impl RvcTrainingConfig {
         if self.epochs == 0 || self.epochs > 1200 {
             return Err("epochs must be between 1 and 1200".to_string());
         }
-        if self.batch_size == 0 {
-            return Err("batch size must be at least 1".to_string());
+        if self.batch_size == 0 || self.batch_size > 64 {
+            return Err("batch size must be between 1 and 64".to_string());
         }
-        if self.save_every_epochs == 0 {
-            return Err("checkpoint interval must be at least 1 epoch".to_string());
+        if self.save_every_epochs == 0 || self.save_every_epochs > self.epochs {
+            return Err("checkpoint interval must be between 1 and total epochs".to_string());
         }
-        if !matches!(self.sample_rate_hz, 32_000 | 40_000 | 48_000) {
-            return Err("RVC sample rate must be 32000, 40000, or 48000 Hz".to_string());
+        if self.sample_rate_hz != RVC_VERIFIED_SAMPLE_RATE_HZ {
+            return Err("Slice 3 training is verified only for RVC v2 at 40 kHz".to_string());
         }
-        if !matches!(self.model_version.as_str(), "v1" | "v2") {
-            return Err("RVC model version must be v1 or v2".to_string());
+        if self.model_version != RVC_VERIFIED_MODEL_VERSION {
+            return Err("Slice 3 training is verified only for RVC v2 at 40 kHz".to_string());
+        }
+        if !self.f0_enabled || self.f0_method != RvcF0Method::Rmvpe {
+            return Err("Slice 3 training requires the verified RMVPE F0 pipeline".to_string());
+        }
+        if self.device == RvcTrainingDevice::Cpu && self.precision == RvcTrainingPrecision::Fp16 {
+            return Err("FP16 is not supported for the verified CPU training path; use auto or fp32".to_string());
         }
         Ok(())
     }
@@ -212,20 +219,36 @@ pub struct RvcTrainingPresetInfo {
 
 pub fn rvc_training_presets() -> Vec<RvcTrainingPresetInfo> {
     vec![
-        RvcTrainingPresetInfo { id: RvcTrainingPreset::Quick, label: "Quick test".into(), description: "A short 20-epoch run for validating the dataset, runtime, and training path. Not a production-quality claim.".into(), config: RvcTrainingConfig::preset(RvcTrainingPreset::Quick) },
-        RvcTrainingPresetInfo { id: RvcTrainingPreset::Balanced, label: "Balanced".into(), description: "A 200-epoch general starting point using the documented RVC v2/40k training path.".into(), config: RvcTrainingConfig::preset(RvcTrainingPreset::Balanced) },
-        RvcTrainingPresetInfo { id: RvcTrainingPreset::HighQuality, label: "High quality".into(), description: "An extended 400-epoch run for clean, sufficiently long datasets. More training does not guarantee better perceptual quality.".into(), config: RvcTrainingConfig::preset(RvcTrainingPreset::HighQuality) },
-        RvcTrainingPresetInfo { id: RvcTrainingPreset::Custom, label: "Custom".into(), description: "Advanced RVC parameters supplied explicitly by the user.".into(), config: None },
+        RvcTrainingPresetInfo {
+            id: RvcTrainingPreset::Quick,
+            label: "Quick test".into(),
+            description: "20 epochs for validating samples, preparation, GPU/runtime compatibility, checkpoint creation, and conversion. Not a final-quality guarantee.".into(),
+            config: RvcTrainingConfig::preset(RvcTrainingPreset::Quick),
+        },
+        RvcTrainingPresetInfo {
+            id: RvcTrainingPreset::Balanced,
+            label: "Balanced".into(),
+            description: "200 epochs. Recommended normal starting point for the verified RVC v2/40 kHz/RMVPE path.".into(),
+            config: RvcTrainingConfig::preset(RvcTrainingPreset::Balanced),
+        },
+        RvcTrainingPresetInfo {
+            id: RvcTrainingPreset::HighQuality,
+            label: "High quality".into(),
+            description: "400 epochs. An extended run with higher resource/time cost; extra training does not guarantee perceptual improvement.".into(),
+            config: RvcTrainingConfig::preset(RvcTrainingPreset::HighQuality),
+        },
+        RvcTrainingPresetInfo {
+            id: RvcTrainingPreset::Custom,
+            label: "Custom".into(),
+            description: "Advanced epochs, batch size, checkpoint cadence, device, precision, and GPU-cache controls inside Takokit's verified v2/40 kHz/RMVPE envelope.".into(),
+            config: None,
+        },
     ]
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RvcPreflightClass {
-    Recommended,
-    Possible,
-    Unsupported,
-}
+pub enum RvcPreflightClass { Recommended, Possible, Unsupported }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RvcHardwarePreflight {
@@ -246,14 +269,7 @@ pub struct RvcHardwarePreflight {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RvcTrainingJobStatus {
-    Queued,
-    Running,
-    Succeeded,
-    Failed,
-    Cancelled,
-    Stale,
-}
+pub enum RvcTrainingJobStatus { Queued, Running, Succeeded, Failed, Cancelled, Stale }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -262,6 +278,7 @@ pub enum RvcTrainingStage {
     Preprocess,
     ExtractF0,
     ExtractFeatures,
+    ReadyToTrain,
     Train,
     BuildIndex,
     ValidateArtifacts,
@@ -323,24 +340,32 @@ pub struct ManagedRvcVoice {
     pub ready_at: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RvcVoiceDetail {
+    pub project: RvcVoiceProject,
+    pub samples: Vec<RvcVoiceSample>,
+    pub dataset: RvcDatasetInspection,
+    pub managed: Option<ManagedRvcVoice>,
+    pub checkpoints: Vec<RvcCheckpoint>,
+    pub indexes: Vec<RvcIndexArtifact>,
+    pub active_job: Option<RvcTrainingJob>,
+    pub conversion_target: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRvcVoiceRequest {
     pub name: String,
     pub consent_affirmed: bool,
     pub consent_note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct AddRvcSamplesRequest {
-    pub paths: Vec<PathBuf>,
-}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddRvcSamplesRequest { pub paths: Vec<PathBuf> }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct SetRvcSampleIncludedRequest {
-    pub included: bool,
-}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetRvcSampleIncludedRequest { pub included: bool }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartRvcTrainingRequest {
     pub preset: RvcTrainingPreset,
     pub custom: Option<RvcTrainingConfig>,
@@ -357,7 +382,7 @@ impl StartRvcTrainingRequest {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportRvcVoiceRequest {
     pub checkpoint: PathBuf,
     pub index: Option<PathBuf>,
@@ -366,13 +391,13 @@ pub struct ImportRvcVoiceRequest {
     pub consent_note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectRvcCheckpointRequest {
     pub checkpoint_id: Uuid,
     pub index_id: Option<Uuid>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportRvcVoiceRequest {
     pub output: PathBuf,
     #[serde(default)]
@@ -381,15 +406,62 @@ pub struct ExportRvcVoiceRequest {
     pub include_reference: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct VerifyRvcPackageRequest {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifyRvcPackageRequest { pub package: PathBuf }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportRvcPackageRequest {
     pub package: PathBuf,
+    pub name: Option<String>,
+    pub consent_affirmed: bool,
+    pub consent_note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestRvcVoiceRequest {
     pub input: PathBuf,
     pub workspace_root: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveRvcVoiceRequest { #[serde(default)] pub dry_run: bool }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RvcVoiceRemovalPreview {
+    pub voice_id: Uuid,
+    pub name: String,
+    pub bytes: u64,
+    pub files: usize,
+    pub dry_run: bool,
+    pub removed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RvcPackageArtifact {
+    pub path: String,
+    pub sha256: String,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RvcPackageManifest {
+    pub schema_version: u32,
+    pub engine: String,
+    pub voice_name: String,
+    pub exported_at: u64,
+    pub checkpoint: RvcPackageArtifact,
+    pub index: Option<RvcPackageArtifact>,
+    pub reference: Option<RvcPackageArtifact>,
+    pub consent_acknowledged: bool,
+    pub provenance_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RvcPackageSignature {
+    pub algorithm: String,
+    pub public_key_hex: String,
+    pub signature_hex: String,
+    pub signer_fingerprint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -409,19 +481,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn presets_are_real_rvc_parameters() {
-        let quick = RvcTrainingConfig::preset(RvcTrainingPreset::Quick).unwrap();
-        let balanced = RvcTrainingConfig::preset(RvcTrainingPreset::Balanced).unwrap();
-        let high = RvcTrainingConfig::preset(RvcTrainingPreset::HighQuality).unwrap();
-        assert_eq!(quick.epochs, 20);
-        assert_eq!(balanced.epochs, 200);
-        assert!(high.epochs > balanced.epochs);
-        for config in [quick, balanced, high] {
+    fn presets_share_verified_contract() {
+        for preset in [RvcTrainingPreset::Quick, RvcTrainingPreset::Balanced, RvcTrainingPreset::HighQuality] {
+            let config = RvcTrainingConfig::preset(preset).unwrap();
             assert_eq!(config.sample_rate_hz, 40_000);
             assert_eq!(config.model_version, "v2");
             assert_eq!(config.f0_method, RvcF0Method::Rmvpe);
             config.validate().unwrap();
         }
+    }
+
+    #[test]
+    fn unsupported_training_modes_are_rejected_at_domain_boundary() {
+        let mut config = RvcTrainingConfig::preset(RvcTrainingPreset::Quick).unwrap();
+        config.sample_rate_hz = 48_000;
+        assert!(config.validate().is_err());
+        config.sample_rate_hz = 40_000;
+        config.model_version = "v1".into();
+        assert!(config.validate().is_err());
+        config.model_version = "v2".into();
+        config.f0_method = RvcF0Method::Harvest;
+        assert!(config.validate().is_err());
+        config.f0_method = RvcF0Method::Rmvpe;
+        config.device = RvcTrainingDevice::Cpu;
+        config.precision = RvcTrainingPrecision::Fp16;
+        assert!(config.validate().is_err());
     }
 
     #[test]
