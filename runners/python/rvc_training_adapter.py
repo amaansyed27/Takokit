@@ -1,9 +1,4 @@
-"""Takokit managed worker for official RVC dataset preparation and training.
-
-Inference intentionally remains in rvc_adapter.py. This worker owns only objective
-sample inspection, hardware preflight, deterministic preparation, training, index
-building and artifact discovery for Takokit's verified Slice 3 training envelope.
-"""
+"""Takokit managed worker for the verified RVC v2/40 kHz/RMVPE training envelope."""
 from __future__ import annotations
 
 import hashlib
@@ -58,14 +53,8 @@ def append_log(log_path: Path, message: str) -> None:
 def run_stage(command: list[str], cwd: Path, log_path: Path, env: dict[str, str]) -> None:
     append_log(log_path, "$ " + subprocess.list2cmdline(command))
     with log_path.open("a", encoding="utf-8", errors="replace") as stream:
-        process = subprocess.Popen(
-            command,
-            cwd=str(cwd),
-            env=env,
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
+        process = subprocess.Popen(command, cwd=str(cwd), env=env, stdout=stream,
+                                   stderr=subprocess.STDOUT, text=True)
         return_code = process.wait()
     if return_code != 0:
         raise RuntimeError(f"RVC stage exited with code {return_code}; see {log_path}")
@@ -101,16 +90,11 @@ def link_directory(source: Path, destination: Path) -> None:
         else:
             destination.unlink()
     if os.name == "nt":
-        result = subprocess.run(
-            ["cmd", "/d", "/c", "mklink", "/J", str(destination), str(source)],
-            capture_output=True,
-            text=True,
-        )
+        result = subprocess.run(["cmd", "/d", "/c", "mklink", "/J", str(destination), str(source)],
+                                capture_output=True, text=True)
         if result.returncode != 0:
-            raise RuntimeError(
-                "Could not create the managed RVC experiment junction: "
-                + (result.stderr or result.stdout).strip()
-            )
+            raise RuntimeError("Could not create the managed RVC experiment junction: "
+                               + (result.stderr or result.stdout).strip())
     else:
         destination.symlink_to(source, target_is_directory=True)
 
@@ -131,11 +115,9 @@ def inspect_audio(path: Path) -> dict[str, Any]:
     if audio.size == 0 or sample_rate <= 0:
         raise ValueError(f"audio sample is empty: {path}")
     if audio.ndim > 1:
-        mono = audio.mean(axis=0)
-        channels = int(audio.shape[0])
+        mono, channels = audio.mean(axis=0), int(audio.shape[0])
     else:
-        mono = audio
-        channels = int(getattr(info, "channels", 1) or 1)
+        mono, channels = audio, int(getattr(info, "channels", 1) or 1)
     duration_ms = int(round((mono.shape[-1] / float(sample_rate)) * 1000.0))
     absolute = np.abs(mono)
     peak = float(absolute.max(initial=0.0))
@@ -154,17 +136,13 @@ def inspect_audio(path: Path) -> dict[str, Any]:
     if channels > 2:
         warnings.append({"code": "many_channels", "message": "More than two channels were detected; RVC preprocessing will downmix the recording."})
     return {
-        "duration_ms": duration_ms,
-        "sample_rate": int(sample_rate),
-        "channels": channels,
+        "duration_ms": duration_ms, "sample_rate": int(sample_rate), "channels": channels,
         "codec": str(getattr(info, "subtype", "") or "") or None,
         "container": str(getattr(info, "format", "") or path.suffix.lstrip(".")) or None,
         "peak_dbfs": 20.0 * math.log10(max(peak, 1e-12)),
         "rms_dbfs": 20.0 * math.log10(max(rms, 1e-12)),
-        "silence_ratio": silence_ratio,
-        "clipped_ratio": clipped_ratio,
-        "warnings": warnings,
-        "valid": duration_ms > 0,
+        "silence_ratio": silence_ratio, "clipped_ratio": clipped_ratio,
+        "warnings": warnings, "valid": duration_ms > 0,
     }
 
 
@@ -172,19 +150,12 @@ def system_ram_bytes() -> int | None:
     if os.name == "nt":
         try:
             import ctypes
-
             class MemoryStatus(ctypes.Structure):
-                _fields_ = [
-                    ("length", ctypes.c_ulong),
-                    ("memory_load", ctypes.c_ulong),
-                    ("total_phys", ctypes.c_ulonglong),
-                    ("avail_phys", ctypes.c_ulonglong),
-                    ("total_page", ctypes.c_ulonglong),
-                    ("avail_page", ctypes.c_ulonglong),
-                    ("total_virtual", ctypes.c_ulonglong),
-                    ("avail_virtual", ctypes.c_ulonglong),
-                    ("avail_extended_virtual", ctypes.c_ulonglong),
-                ]
+                _fields_ = [("length", ctypes.c_ulong), ("memory_load", ctypes.c_ulong),
+                            ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
+                            ("total_page", ctypes.c_ulonglong), ("avail_page", ctypes.c_ulonglong),
+                            ("total_virtual", ctypes.c_ulonglong), ("avail_virtual", ctypes.c_ulonglong),
+                            ("avail_extended_virtual", ctypes.c_ulonglong)]
             status = MemoryStatus()
             status.length = ctypes.sizeof(MemoryStatus)
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
@@ -202,17 +173,15 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError("Slice 3 training is verified only for RVC v2 at 40 kHz")
     if not bool(config.get("f0_enabled", True)) or str(config.get("f0_method") or "rmvpe").lower() != "rmvpe":
         raise ValueError("Slice 3 training requires the verified RMVPE F0 pipeline")
-    epochs = int(config.get("epochs") or 0)
-    batch = int(config.get("batch_size") or 0)
+    epochs, batch = int(config.get("epochs") or 0), int(config.get("batch_size") or 0)
     save_every = int(config.get("save_every_epochs") or 0)
-    if epochs < 1 or epochs > 1200:
+    if not 1 <= epochs <= 1200:
         raise ValueError("epochs must be between 1 and 1200")
-    if batch < 1 or batch > 64:
+    if not 1 <= batch <= 64:
         raise ValueError("batch size must be between 1 and 64")
-    if save_every < 1 or save_every > epochs:
+    if not 1 <= save_every <= epochs:
         raise ValueError("checkpoint interval must be between 1 and total epochs")
-    device = str(config.get("device") or "auto").lower()
-    precision = str(config.get("precision") or "auto").lower()
+    device, precision = str(config.get("device") or "auto").lower(), str(config.get("precision") or "auto").lower()
     if device not in {"auto", "cuda", "cpu"}:
         raise ValueError(f"unsupported RVC training device: {device}")
     if precision not in {"auto", "fp16", "fp32"}:
@@ -223,15 +192,13 @@ def validate_config(config: dict[str, Any]) -> None:
 
 def preflight(request: dict[str, Any]) -> dict[str, Any]:
     import torch
-
     voice_root = Path(request["voice_root"]).resolve()
     requested_device = str(request.get("device") or "auto").lower()
     requested_precision = str(request.get("precision") or "auto").lower()
-    ram = system_ram_bytes()
-    disk = shutil.disk_usage(voice_root).free
-    gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
-    vram = int(torch.cuda.get_device_properties(0).total_memory) if torch.cuda.is_available() else None
+    ram, disk = system_ram_bytes(), shutil.disk_usage(voice_root).free
     cuda = bool(torch.cuda.is_available())
+    gpu = torch.cuda.get_device_name(0) if cuda else None
+    vram = int(torch.cuda.get_device_properties(0).total_memory) if cuda else None
     reasons: list[str] = []
     if requested_device == "cuda" and not cuda:
         classification, resolved_device = "unsupported", "cuda"
@@ -252,41 +219,27 @@ def preflight(request: dict[str, Any]) -> dict[str, Any]:
     if ram is not None and ram < MIN_RVC_RAM:
         classification = "unsupported"
         reasons.append("System RAM is below Takokit's 8 GiB RVC model requirement.")
-    if requested_precision == "auto":
-        resolved_precision = "fp16" if resolved_device == "cuda" else "fp32"
-    else:
-        resolved_precision = requested_precision
+    resolved_precision = ("fp16" if resolved_device == "cuda" else "fp32") if requested_precision == "auto" else requested_precision
     if resolved_device == "cpu" and resolved_precision == "fp16":
         classification = "unsupported"
         reasons.append("FP16 is not supported for the verified CPU training path.")
     return {
-        "class": classification,
-        "cpu": platform.processor() or platform.machine() or "unknown",
-        "gpu": gpu,
-        "backend": "cuda" if cuda else "cpu",
-        "vram_bytes": vram,
-        "system_ram_bytes": ram,
-        "available_disk_bytes": int(disk),
+        "class": classification, "cpu": platform.processor() or platform.machine() or "unknown",
+        "gpu": gpu, "backend": "cuda" if cuda else "cpu", "vram_bytes": vram,
+        "system_ram_bytes": ram, "available_disk_bytes": int(disk),
         "dataset_duration_ms": int(request.get("dataset_duration_ms") or 0),
-        "resolved_device": resolved_device,
-        "resolved_precision": resolved_precision,
+        "resolved_device": resolved_device, "resolved_precision": resolved_precision,
         "resource_category": "gpu_training" if resolved_device == "cuda" else "cpu_training",
         "reasons": reasons,
     }
 
 
 def ensure_assets(trainer_root: Path, asset_root: Path) -> tuple[Path, Path]:
-    hubert_source = asset_root / "hubert_base"
-    rmvpe_source = asset_root / "rmvpe.pt"
+    hubert_source, rmvpe_source = asset_root / "hubert_base", asset_root / "rmvpe.pt"
     pretrain_root = asset_root / "pretrained_v2"
-    required = [
-        hubert_source / "config.json",
-        hubert_source / "preprocessor_config.json",
-        hubert_source / "pytorch_model.bin",
-        rmvpe_source,
-        pretrain_root / "f0G40k.pth",
-        pretrain_root / "f0D40k.pth",
-    ]
+    required = [hubert_source / "config.json", hubert_source / "preprocessor_config.json",
+                hubert_source / "pytorch_model.bin", rmvpe_source,
+                pretrain_root / "f0G40k.pth", pretrain_root / "f0D40k.pth"]
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise FileNotFoundError("RVC training assets are incomplete; run `tako pull rvc`. Missing: " + ", ".join(missing))
@@ -321,23 +274,18 @@ def stage_inputs(samples: list[dict[str, Any]], input_root: Path) -> None:
         source = Path(sample["path"]).resolve()
         if not source.is_file():
             raise FileNotFoundError(f"included sample is missing: {source}")
-        suffix = source.suffix.lower() or ".wav"
-        link_file(source, input_root / f"sample_{index:04d}{suffix}")
+        link_file(source, input_root / f"sample_{index:04d}{source.suffix.lower() or '.wav'}")
 
 
 def build_filelist(exp_dir: Path) -> int:
-    gt = exp_dir / "0_gt_wavs"
-    features = exp_dir / "3_feature768"
-    f0 = exp_dir / "2a_f0"
-    f0nsf = exp_dir / "2b-f0nsf"
-    lines: list[str] = []
+    gt, features, f0, f0nsf = (exp_dir / "0_gt_wavs", exp_dir / "3_feature768",
+                               exp_dir / "2a_f0", exp_dir / "2b-f0nsf")
     if not gt.is_dir() or not features.is_dir():
         raise RuntimeError("RVC preprocessing/features are incomplete")
+    lines: list[str] = []
     for wav in sorted(gt.glob("*.wav")):
-        stem = wav.stem
-        feature = features / f"{stem}.npy"
-        coarse = f0 / f"{stem}.wav.npy"
-        continuous = f0nsf / f"{stem}.wav.npy"
+        stem, feature = wav.stem, features / f"{wav.stem}.npy"
+        coarse, continuous = f0 / f"{stem}.wav.npy", f0nsf / f"{stem}.wav.npy"
         if not coarse.is_file() or not continuous.is_file():
             coarse, continuous = f0 / f"{stem}.npy", f0nsf / f"{stem}.npy"
         if feature.is_file() and coarse.is_file() and continuous.is_file():
@@ -349,14 +297,11 @@ def build_filelist(exp_dir: Path) -> int:
 
 
 def discover_artifacts(voice_root: Path, trainer_root: Path, experiment: str) -> dict[str, Any]:
-    checkpoint_root = voice_root / "checkpoints"
-    index_root = voice_root / "indexes"
+    checkpoint_root, index_root = voice_root / "checkpoints", voice_root / "indexes"
     checkpoint_root.mkdir(parents=True, exist_ok=True)
     index_root.mkdir(parents=True, exist_ok=True)
-    exported = sorted(
-        (trainer_root / "assets" / "weights").glob(f"{experiment}*.pth"),
-        key=lambda path: path.stat().st_mtime,
-    )
+    exported = sorted((trainer_root / "assets" / "weights").glob(f"{experiment}*.pth"),
+                      key=lambda path: path.stat().st_mtime)
     if not exported:
         raise RuntimeError("RVC training completed without producing an inference .pth checkpoint")
     checkpoint_paths: list[Path] = []
@@ -369,12 +314,9 @@ def discover_artifacts(voice_root: Path, trainer_root: Path, experiment: str) ->
         raise RuntimeError("RVC index generation completed without producing an .index artifact")
     active_checkpoint, active_index = checkpoint_paths[-1], indexes[-1]
     artifacts = {
-        "checkpoint": str(active_checkpoint),
-        "checkpoint_sha256": sha256(active_checkpoint),
-        "checkpoint_bytes": active_checkpoint.stat().st_size,
-        "index": str(active_index),
-        "index_sha256": sha256(active_index),
-        "index_bytes": active_index.stat().st_size,
+        "checkpoint": str(active_checkpoint), "checkpoint_sha256": sha256(active_checkpoint),
+        "checkpoint_bytes": active_checkpoint.stat().st_size, "index": str(active_index),
+        "index_sha256": sha256(active_index), "index_bytes": active_index.stat().st_size,
         "all_checkpoints": [str(path) for path in checkpoint_paths],
     }
     atomic_json(voice_root / "jobs" / "latest-artifacts.json", artifacts)
@@ -382,12 +324,9 @@ def discover_artifacts(voice_root: Path, trainer_root: Path, experiment: str) ->
 
 
 def run_training(request: dict[str, Any]) -> None:
-    voice_root = Path(request["voice_root"]).resolve()
-    trainer_root = Path(request["trainer_root"]).resolve()
-    asset_root = Path(request["asset_root"]).resolve()
-    job_path = Path(request["job_path"]).resolve()
-    log_path = Path(request["log_path"]).resolve()
-    config = dict(request["config"])
+    voice_root, trainer_root = Path(request["voice_root"]).resolve(), Path(request["trainer_root"]).resolve()
+    asset_root, job_path = Path(request["asset_root"]).resolve(), Path(request["job_path"]).resolve()
+    log_path, config = Path(request["log_path"]).resolve(), dict(request["config"])
     samples = list(request.get("samples") or [])
     prepare_only = bool(request.get("prepare_only")) or request.get("operation") == "prepare"
     validate_config(config)
@@ -395,10 +334,8 @@ def run_training(request: dict[str, Any]) -> None:
         raise FileNotFoundError(f"managed RVC trainer is missing: {trainer_root}")
     generator, discriminator = ensure_assets(trainer_root, asset_root)
     experiment = "takokit_" + str(request["voice_id"]).replace("-", "")
-    exp_dir = voice_root / "dataset" / "experiment"
-    staged_root = voice_root / "dataset" / "inputs"
-    logs_link = trainer_root / "logs" / experiment
-    config_source = trainer_root / "configs" / "v2" / "40k.json"
+    exp_dir, staged_root = voice_root / "dataset" / "experiment", voice_root / "dataset" / "inputs"
+    logs_link, config_source = trainer_root / "logs" / experiment, trainer_root / "configs" / "v2" / "40k.json"
     if not config_source.is_file():
         raise FileNotFoundError(f"RVC v2 40k config is missing: {config_source}")
     env = os.environ.copy()
@@ -408,13 +345,8 @@ def run_training(request: dict[str, Any]) -> None:
         env["CUDA_VISIBLE_DEVICES"] = ""
     if resolved_device == "cpu" and resolved_precision == "fp16":
         raise ValueError("verified CPU training does not support FP16")
-    prepare_hash = prepare_key(samples, config)
-    marker = voice_root / "dataset" / ".prepare-key"
-    can_reuse = (
-        marker.is_file()
-        and marker.read_text(encoding="utf-8").strip() == prepare_hash
-        and (exp_dir / "filelist.txt").is_file()
-    )
+    prepare_hash, marker = prepare_key(samples, config), voice_root / "dataset" / ".prepare-key"
+    can_reuse = marker.is_file() and marker.read_text(encoding="utf-8").strip() == prepare_hash and (exp_dir / "filelist.txt").is_file()
     if not can_reuse:
         if exp_dir.exists():
             shutil.rmtree(exp_dir)
@@ -422,20 +354,21 @@ def run_training(request: dict[str, Any]) -> None:
         stage_inputs(samples, staged_root)
         link_directory(exp_dir, logs_link)
         update_job(job_path, status="running", stage="preprocess", started_at=int(time.time()), child_pid=os.getpid())
-        run_stage(
-            [sys.executable, "train/preprocess.py", str(staged_root), "40000", str(max(1, min(os.cpu_count() or 1, 8))), str(exp_dir), "False", "3.7"],
-            trainer_root, log_path, env,
-        )
+        run_stage([sys.executable, "train/preprocess.py", str(staged_root), "40000",
+                   str(max(1, min(os.cpu_count() or 1, 8))), str(exp_dir), "False", "3.7"],
+                  trainer_root, log_path, env)
         update_job(job_path, stage="extract_f0")
         if resolved_device == "cuda":
-            run_stage([sys.executable, "train/dataset/extract_f0.py", "cuda", "1", "0", "0", str(exp_dir), resolved_precision != "fp32" and "true" or "false"], trainer_root, log_path, env)
+            run_stage([sys.executable, "train/dataset/extract_f0.py", "cuda", "1", "0", "0", str(exp_dir),
+                       "true" if resolved_precision != "fp32" else "false"], trainer_root, log_path, env)
         else:
-            run_stage([sys.executable, "train/dataset/extract_f0.py", "cpu", str(exp_dir), str(max(1, min(os.cpu_count() or 1, 8))), "rmvpe"], trainer_root, log_path, env)
+            run_stage([sys.executable, "train/dataset/extract_f0.py", "cpu", str(exp_dir),
+                       str(max(1, min(os.cpu_count() or 1, 8))), "rmvpe"], trainer_root, log_path, env)
         update_job(job_path, stage="extract_features")
-        run_stage(
-            [sys.executable, "train/dataset/extract_hubert_feature.py", "cuda" if resolved_device == "cuda" else "cpu", "1", "0", str(exp_dir), "v2", "true" if resolved_device == "cuda" and resolved_precision != "fp32" else "false"],
-            trainer_root, log_path, env,
-        )
+        run_stage([sys.executable, "train/dataset/extract_hubert_feature.py",
+                   "cuda" if resolved_device == "cuda" else "cpu", "1", "0", str(exp_dir), "v2",
+                   "true" if resolved_device == "cuda" and resolved_precision != "fp32" else "false"],
+                  trainer_root, log_path, env)
         segment_count = build_filelist(exp_dir)
         shutil.copy2(config_source, exp_dir / "config.json")
         marker.write_text(prepare_hash, encoding="utf-8")
@@ -443,36 +376,21 @@ def run_training(request: dict[str, Any]) -> None:
     else:
         link_directory(exp_dir, logs_link)
         append_log(log_path, "Reusing deterministic prepared dataset; input/config fingerprint is unchanged.")
-
     if prepare_only:
         update_job(job_path, stage="ready_to_train", status="succeeded", finished_at=int(time.time()), failure=None)
         atomic_json(voice_root / "jobs" / "latest-preparation.json", {"fingerprint": prepare_hash, "experiment": str(exp_dir)})
         append_log(log_path, "RVC dataset preparation completed. No training process was started.")
         return
-
     update_job(job_path, stage="train", status="running")
-    train_command = [
-        sys.executable, "train/train.py",
-        "-e", experiment,
-        "-sr", "40k",
-        "-f0", "1",
-        "-bs", str(config["batch_size"]),
-        "-te", str(config["epochs"]),
-        "-se", str(config["save_every_epochs"]),
-        "-pg", str(generator),
-        "-pd", str(discriminator),
-        "-l", "0",
-        "-c", "1" if config.get("cache_dataset_on_gpu") else "0",
-        "-sw", "1",
-        "-v", "v2",
-        "-g", "0",
-    ]
+    train_command = [sys.executable, "train/train.py", "-e", experiment, "-sr", "40k", "-f0", "1",
+                     "-bs", str(config["batch_size"]), "-te", str(config["epochs"]),
+                     "-se", str(config["save_every_epochs"]), "-pg", str(generator), "-pd", str(discriminator),
+                     "-l", "0", "-c", "1" if config.get("cache_dataset_on_gpu") else "0",
+                     "-sw", "1", "-v", "v2", "-g", "0"]
     run_stage(train_command, trainer_root, log_path, env)
     update_job(job_path, stage="build_index")
-    run_stage(
-        [sys.executable, "train/train_index.py", experiment, "v2", str(voice_root / "indexes"), str(max(1, min(os.cpu_count() or 1, 8))), "single"],
-        trainer_root, log_path, env,
-    )
+    run_stage([sys.executable, "train/train_index.py", experiment, "v2", str(voice_root / "indexes"),
+               str(max(1, min(os.cpu_count() or 1, 8))), "single"], trainer_root, log_path, env)
     update_job(job_path, stage="validate_artifacts")
     artifacts = discover_artifacts(voice_root, trainer_root, experiment)
     update_job(job_path, stage="complete", status="succeeded", finished_at=int(time.time()), failure=None)
@@ -496,21 +414,19 @@ def main() -> None:
     if len(sys.argv) == 3 and sys.argv[1] == "--job":
         request_path = Path(sys.argv[2]).resolve()
         request = json.loads(request_path.read_text(encoding="utf-8"))
-        job_path = Path(request["job_path"]).resolve()
-        log_path = Path(request["log_path"]).resolve()
+        job_path, log_path = Path(request["job_path"]).resolve(), Path(request["log_path"]).resolve()
         try:
             run_training(request)
         except BaseException as error:
             append_log(log_path, f"{type(error).__name__}: {error}")
             try:
-                update_job(job_path, status="failed", finished_at=int(time.time()), failure=f"{type(error).__name__}: {error}")
+                update_job(job_path, status="failed", finished_at=int(time.time()),
+                           failure=f"{type(error).__name__}: {error}")
             except Exception:
                 pass
             raise
         return
-    request = json.load(sys.stdin)
-    result = handle_request(request)
-    respond(**result)
+    respond(**handle_request(json.load(sys.stdin)))
 
 
 if __name__ == "__main__":
