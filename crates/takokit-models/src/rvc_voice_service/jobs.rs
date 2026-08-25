@@ -340,7 +340,10 @@ impl RvcVoiceService {
 
         match install_python_adapter(&self.root, "rvc_training") {
             Ok(_) => return Ok(()),
-            Err(error) if error.to_string().contains("another Takokit process is already installing this adapter") => {}
+            Err(error)
+                if error
+                    .to_string()
+                    .contains("another Takokit process is already installing this adapter") => {}
             Err(error) => return Err(TakokitError::Storage(error.to_string())),
         }
 
