@@ -49,7 +49,7 @@ pub(super) fn handle_manage(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
             app.manage_index = shifted_index(app.manage_index, MANAGE_ACTIONS.len(), 1)
         }
         KeyCode::Enter | KeyCode::Char(' ') => open_manage_item(app, app.manage_index),
-        KeyCode::Char(character @ '1'..='3') => {
+        KeyCode::Char(character @ '1'..='4') => {
             let index = character as usize - '1' as usize;
             app.manage_index = index;
             open_manage_item(app, index);
@@ -63,7 +63,8 @@ pub(super) fn handle_manage(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
 pub(super) fn open_manage_item(app: &mut App, index: usize) {
     app.screen = match index {
         0 => TuiScreen::Models,
-        1 => TuiScreen::Runners,
+        1 => TuiScreen::ModelLibrary,
+        2 => TuiScreen::Runners,
         _ => TuiScreen::System,
     };
 }
@@ -96,6 +97,44 @@ pub(super) fn handle_models(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
         KeyCode::Char('r') => return Some(TuiAction::Refresh),
         _ => {}
     }
+    None
+}
+
+pub(super) fn handle_model_library(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
+    match key.code {
+        KeyCode::Up | KeyCode::BackTab => {
+            app.library_model_index =
+                shifted_index(app.library_model_index, app.library_models.len(), -1)
+        }
+        KeyCode::Down | KeyCode::Tab => {
+            app.library_model_index =
+                shifted_index(app.library_model_index, app.library_models.len(), 1)
+        }
+        KeyCode::Enter | KeyCode::Char(' ') | KeyCode::Char('p') => {
+            return library_primary_action(app)
+        }
+        KeyCode::Char('r') => return Some(TuiAction::Refresh),
+        _ => {}
+    }
+    None
+}
+
+pub(super) fn library_primary_action(app: &mut App) -> Option<TuiAction> {
+    let model = app.library_models.get(app.library_model_index)?.clone();
+    if let Some(reference) = model.pull_reference() {
+        return Some(TuiAction::PullModel(reference.to_string()));
+    }
+
+    app.model_index = app
+        .models
+        .iter()
+        .position(|installed| installed.id == model.model_id)
+        .unwrap_or(0);
+    app.screen = TuiScreen::Models;
+    app.set_status(format!(
+        "{} is already installed and ready. It is selected in Installed models.",
+        model.title
+    ));
     None
 }
 
@@ -326,5 +365,11 @@ mod tests {
     #[test]
     fn home_workspace_item_maps_to_workspace_screen() {
         assert_eq!(HOME_ACTIONS[6].0, "Workspace");
+    }
+
+    #[test]
+    fn manage_library_item_is_separate_from_installed_models() {
+        assert_eq!(MANAGE_ACTIONS[0].0, "Installed models");
+        assert_eq!(MANAGE_ACTIONS[1].0, "Model library");
     }
 }
