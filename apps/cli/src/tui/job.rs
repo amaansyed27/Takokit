@@ -267,7 +267,10 @@ fn normalize_terminal_argument(arg: &str) -> String {
     let normalized = arg.trim();
     if normalized.len() >= 2 {
         let bytes = normalized.as_bytes();
-        let quoted = matches!((bytes.first(), bytes.last()), (Some(b'"'), Some(b'"')) | (Some(b'\''), Some(b'\'')));
+        let quoted = matches!(
+            (bytes.first(), bytes.last()),
+            (Some(b'"'), Some(b'"')) | (Some(b'\''), Some(b'\''))
+        );
         if quoted {
             return normalized[1..normalized.len() - 1].to_string();
         }
@@ -302,7 +305,10 @@ mod tests {
 
     #[test]
     fn normalizes_quoted_terminal_arguments() {
-        assert_eq!(normalize_terminal_argument(r#""C:\Voice Project ü\sample.wav""#), r#"C:\Voice Project ü\sample.wav"#);
+        assert_eq!(
+            normalize_terminal_argument(r#""C:\Voice Project ü\sample.wav""#),
+            r#"C:\Voice Project ü\sample.wav"#
+        );
         assert_eq!(normalize_terminal_argument("'hello world'"), "hello world");
     }
 
