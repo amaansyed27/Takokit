@@ -360,18 +360,18 @@ def run_training(request: dict[str, Any]) -> None:
         stage_inputs(samples, staged_root)
         link_directory(exp_dir, logs_link)
         update_job(job_path, status="running", stage="preprocess", started_at=int(time.time()), child_pid=os.getpid())
-        run_stage([sys.executable, "train/preprocess.py", str(staged_root), "40000",
+        run_stage([sys.executable, "-m", "train.preprocess", str(staged_root), "40000",
                    str(max(1, min(os.cpu_count() or 1, 8))), str(exp_dir), "False", "3.7"],
                   trainer_root, log_path, env)
         update_job(job_path, stage="extract_f0")
         if resolved_device == "cuda":
-            run_stage([sys.executable, "train/dataset/extract_f0.py", "cuda", "1", "0", "0", str(exp_dir),
+            run_stage([sys.executable, "-m", "train.dataset.extract_f0", "cuda", "1", "0", "0", str(exp_dir),
                        "true" if resolved_precision != "fp32" else "false"], trainer_root, log_path, env)
         else:
-            run_stage([sys.executable, "train/dataset/extract_f0.py", "cpu", str(exp_dir),
+            run_stage([sys.executable, "-m", "train.dataset.extract_f0", "cpu", str(exp_dir),
                        str(max(1, min(os.cpu_count() or 1, 8))), "rmvpe"], trainer_root, log_path, env)
         update_job(job_path, stage="extract_features")
-        run_stage([sys.executable, "train/dataset/extract_hubert_feature.py",
+        run_stage([sys.executable, "-m", "train.dataset.extract_hubert_feature",
                    "cuda" if resolved_device == "cuda" else "cpu", "1", "0", str(exp_dir), "v2",
                    "true" if resolved_device == "cuda" and resolved_precision != "fp32" else "false"],
                   trainer_root, log_path, env)
@@ -388,14 +388,14 @@ def run_training(request: dict[str, Any]) -> None:
         append_log(log_path, "RVC dataset preparation completed. No training process was started.")
         return
     update_job(job_path, stage="train", status="running")
-    train_command = [sys.executable, "train/train.py", "-e", experiment, "-sr", "40k", "-f0", "1",
+    train_command = [sys.executable, "-m", "train.train", "-e", experiment, "-sr", "40k", "-f0", "1",
                      "-bs", str(config["batch_size"]), "-te", str(config["epochs"]),
                      "-se", str(config["save_every_epochs"]), "-pg", str(generator), "-pd", str(discriminator),
                      "-l", "0", "-c", "1" if config.get("cache_dataset_on_gpu") else "0",
                      "-sw", "1", "-v", "v2", "-g", "0"]
     run_stage(train_command, trainer_root, log_path, env)
     update_job(job_path, stage="build_index")
-    run_stage([sys.executable, "train/train_index.py", experiment, "v2", str(voice_root / "indexes"),
+    run_stage([sys.executable, "-m", "train.train_index", experiment, "v2", str(voice_root / "indexes"),
                str(max(1, min(os.cpu_count() or 1, 8))), "single"], trainer_root, log_path, env)
     update_job(job_path, stage="validate_artifacts")
     artifacts = discover_artifacts(voice_root, trainer_root, experiment)
