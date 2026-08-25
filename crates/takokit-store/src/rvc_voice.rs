@@ -14,69 +14,8 @@ use takokit_core::{
 };
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
-pub struct RvcVoiceLayout {
-    pub root: PathBuf,
-    pub project: PathBuf,
-    pub voice: PathBuf,
-    pub consent: PathBuf,
-    pub samples_originals: PathBuf,
-    pub samples_managed: PathBuf,
-    pub sample_metadata: PathBuf,
-    pub dataset_segments: PathBuf,
-    pub dataset_f0: PathBuf,
-    pub dataset_features: PathBuf,
-    pub checkpoints: PathBuf,
-    pub indexes: PathBuf,
-    pub references: PathBuf,
-    pub logs: PathBuf,
-    pub jobs: PathBuf,
-    pub packages: PathBuf,
-}
-
-impl RvcVoiceLayout {
-    pub fn new(root: PathBuf) -> Self {
-        Self {
-            project: root.join("project.json"),
-            voice: root.join("voice.json"),
-            consent: root.join("consent.json"),
-            samples_originals: root.join("samples").join("originals"),
-            samples_managed: root.join("samples").join("managed"),
-            sample_metadata: root.join("samples").join("metadata"),
-            dataset_segments: root.join("dataset").join("segments"),
-            dataset_f0: root.join("dataset").join("f0"),
-            dataset_features: root.join("dataset").join("features"),
-            checkpoints: root.join("checkpoints"),
-            indexes: root.join("indexes"),
-            references: root.join("references"),
-            logs: root.join("logs"),
-            jobs: root.join("jobs"),
-            packages: root.join("packages"),
-            root,
-        }
-    }
-
-    fn ensure(&self) -> TakokitResult<()> {
-        for path in [
-            &self.root,
-            &self.samples_originals,
-            &self.samples_managed,
-            &self.sample_metadata,
-            &self.dataset_segments,
-            &self.dataset_f0,
-            &self.dataset_features,
-            &self.checkpoints,
-            &self.indexes,
-            &self.references,
-            &self.logs,
-            &self.jobs,
-            &self.packages,
-        ] {
-            fs::create_dir_all(path).map_err(storage_error)?;
-        }
-        Ok(())
-    }
-}
+mod layout;
+pub use layout::RvcVoiceLayout;
 
 #[derive(Debug, Clone)]
 pub struct RvcVoiceStore {
@@ -105,7 +44,7 @@ impl RvcVoiceStore {
         let name = validate_name(name)?;
         if !consent_affirmed {
             return Err(TakokitError::InvalidRequest(
-                "advanced voice creation requires permission acknowledgement".to_string(),
+                "advanced voice creation requires permission acknowledgement".into(),
             ));
         }
         fs::create_dir_all(&self.root).map_err(storage_error)?;
@@ -117,7 +56,7 @@ impl RvcVoiceStore {
             schema_version: RVC_VOICE_SCHEMA_VERSION,
             id,
             name,
-            engine: "rvc".to_string(),
+            engine: "rvc".into(),
             state: RvcVoiceProjectState::Created,
             imported: false,
             created_at: now,
@@ -132,7 +71,7 @@ impl RvcVoiceStore {
             affirmed: true,
             note: consent_note,
             recorded_at: now,
-            statement: "I own this voice or have explicit permission to use these recordings. This acknowledgement is metadata, not legal verification.".to_string(),
+            statement: "I own this voice or have explicit permission to use these recordings. This acknowledgement is metadata, not legal verification.".into(),
         };
         atomic_json(&layout.project, &project)?;
         atomic_json(&layout.consent, &consent)?;
@@ -140,8 +79,7 @@ impl RvcVoiceStore {
     }
 
     pub fn load(&self, voice: &str) -> TakokitResult<RvcVoiceProject> {
-        let id = self.resolve_id(voice)?;
-        read_json(&self.layout(id).project)
+        read_json(&self.layout(self.resolve_id(voice)?).project)
     }
 
     pub fn load_id(&self, id: Uuid) -> TakokitResult<RvcVoiceProject> {
@@ -154,15 +92,18 @@ impl RvcVoiceStore {
         }
         let mut projects = Vec::new();
         for entry in fs::read_dir(&self.root).map_err(storage_error)? {
-            let entry = entry.map_err(storage_error)?;
-            let path = entry.path().join("project.json");
+            let path = entry.map_err(storage_error)?.path().join("project.json");
             if path.is_file() {
                 if let Ok(project) = read_json::<RvcVoiceProject>(&path) {
                     projects.push(project);
                 }
             }
         }
-        projects.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.name.cmp(&b.name)));
+        projects.sort_by(|a, b| {
+            b.updated_at
+                .cmp(&a.updated_at)
+                .then_with(|| a.name.cmp(&b.name))
+        });
         Ok(projects)
     }
 
@@ -207,9 +148,15 @@ impl RvcVoiceStore {
         Ok(project)
     }
 
-    pub fn add_samples(&self, voice: &str, paths: &[PathBuf]) -> TakokitResult<Vec<RvcVoiceSample>> {
+    pub fn add_samples(
+        &self,
+        voice: &str,
+        paths: &[PathBuf],
+    ) -> TakokitResult<Vec<RvcVoiceSample>> {
         if paths.is_empty() {
-            return Err(TakokitError::InvalidRequest("at least one audio file is required".to_string()));
+            return Err(TakokitError::InvalidRequest(
+                "at least one audio file is required".into(),
+            ));
         }
         let id = self.resolve_id(voice)?;
         let layout = self.layout(id);
@@ -218,35 +165,56 @@ impl RvcVoiceStore {
         let mut added = Vec::new();
         for input in paths {
             let source = input.canonicalize().map_err(|error| {
-                TakokitError::InvalidRequest(format!("audio file {} cannot be read: {error}", input.display()))
+                TakokitError::InvalidRequest(format!(
+                    "audio file {} cannot be read: {error}",
+                    input.display()
+                ))
             })?;
             if !source.is_file() {
-                return Err(TakokitError::InvalidRequest(format!("audio sample is not a file: {}", source.display())));
+                return Err(TakokitError::InvalidRequest(format!(
+                    "audio sample is not a file: {}",
+                    source.display()
+                )));
             }
             let hash = sha256_file(&source)?;
-            if existing.iter().chain(added.iter()).any(|sample: &RvcVoiceSample| sample.sha256 == hash) {
+            if existing
+                .iter()
+                .chain(added.iter())
+                .any(|sample: &RvcVoiceSample| sample.sha256 == hash)
+            {
                 continue;
             }
             let sample_id = Uuid::new_v4();
-            let extension = source.extension().and_then(|value| value.to_str()).unwrap_or("audio");
-            let managed = layout.samples_originals.join(format!("{sample_id}.{extension}"));
+            let extension = source
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("audio");
+            let managed = layout
+                .samples_originals
+                .join(format!("{sample_id}.{extension}"));
             fs::copy(&source, &managed).map_err(storage_error)?;
-            let bytes = fs::metadata(&managed).map_err(storage_error)?.len();
             let sample = RvcVoiceSample {
                 id: sample_id,
                 voice_id: id,
-                display_name: source.file_name().and_then(|value| value.to_str()).unwrap_or("sample").to_string(),
+                display_name: source
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("sample")
+                    .to_string(),
                 source_path: source,
-                managed_path: managed,
+                managed_path: managed.clone(),
                 sha256: hash,
-                bytes,
+                bytes: fs::metadata(&managed).map_err(storage_error)?.len(),
                 imported_at: now_secs(),
                 included: true,
                 state: RvcSampleState::Imported,
                 inspection: None,
                 warnings: Vec::new(),
             };
-            atomic_json(&layout.sample_metadata.join(format!("{sample_id}.json")), &sample)?;
+            atomic_json(
+                &layout.sample_metadata.join(format!("{sample_id}.json")),
+                &sample,
+            )?;
             added.push(sample);
         }
         if !added.is_empty() {
@@ -256,8 +224,7 @@ impl RvcVoiceStore {
     }
 
     pub fn samples(&self, voice: &str) -> TakokitResult<Vec<RvcVoiceSample>> {
-        let id = self.resolve_id(voice)?;
-        self.samples_id(id)
+        self.samples_id(self.resolve_id(voice)?)
     }
 
     pub fn samples_id(&self, id: Uuid) -> TakokitResult<Vec<RvcVoiceSample>> {
@@ -272,7 +239,7 @@ impl RvcVoiceStore {
                 samples.push(read_json(&path)?);
             }
         }
-        samples.sort_by(|a: &RvcVoiceSample, b| a.imported_at.cmp(&b.imported_at));
+        samples.sort_by_key(|sample: &RvcVoiceSample| sample.imported_at);
         Ok(samples)
     }
 
@@ -285,15 +252,32 @@ impl RvcVoiceStore {
     ) -> TakokitResult<RvcVoiceSample> {
         sample.inspection = Some(inspection);
         sample.warnings = warnings;
-        sample.state = if valid { RvcSampleState::Inspected } else { RvcSampleState::Invalid };
-        let path = self.layout(sample.voice_id).sample_metadata.join(format!("{}.json", sample.id));
-        atomic_json(&path, &sample)?;
+        sample.state = if valid {
+            RvcSampleState::Inspected
+        } else {
+            RvcSampleState::Invalid
+        };
+        atomic_json(
+            &self
+                .layout(sample.voice_id)
+                .sample_metadata
+                .join(format!("{}.json", sample.id)),
+            &sample,
+        )?;
         Ok(sample)
     }
 
-    pub fn set_sample_included(&self, voice: &str, sample_id: Uuid, included: bool) -> TakokitResult<RvcVoiceSample> {
+    pub fn set_sample_included(
+        &self,
+        voice: &str,
+        sample_id: Uuid,
+        included: bool,
+    ) -> TakokitResult<RvcVoiceSample> {
         let voice_id = self.resolve_id(voice)?;
-        let path = self.layout(voice_id).sample_metadata.join(format!("{sample_id}.json"));
+        let path = self
+            .layout(voice_id)
+            .sample_metadata
+            .join(format!("{sample_id}.json"));
         let mut sample: RvcVoiceSample = read_json(&path)?;
         sample.included = included;
         atomic_json(&path, &sample)?;
@@ -308,25 +292,48 @@ impl RvcVoiceStore {
         if sample.managed_path.starts_with(&layout.root) && sample.managed_path.is_file() {
             fs::remove_file(&sample.managed_path).map_err(storage_error)?;
         }
-        fs::remove_file(metadata).map_err(storage_error)?;
-        Ok(())
+        fs::remove_file(metadata).map_err(storage_error)
     }
 
     pub fn dataset_summary(&self, voice: &str) -> TakokitResult<RvcDatasetInspection> {
         let voice_id = self.resolve_id(voice)?;
         let samples = self.samples_id(voice_id)?;
-        let included = samples.iter().filter(|sample| sample.included).collect::<Vec<_>>();
-        let usable_duration_ms = included.iter().filter_map(|sample| sample.inspection.as_ref()?.duration_ms).sum();
-        let mut warnings = included.iter().flat_map(|sample| sample.warnings.clone()).collect::<Vec<_>>();
+        let included = samples
+            .iter()
+            .filter(|sample| sample.included)
+            .collect::<Vec<_>>();
+        let usable_duration_ms = included
+            .iter()
+            .filter_map(|sample| sample.inspection.as_ref()?.duration_ms)
+            .sum();
+        let mut warnings = included
+            .iter()
+            .flat_map(|sample| sample.warnings.clone())
+            .collect::<Vec<_>>();
         if included.is_empty() {
-            warnings.push(RvcSampleWarning { code: "empty_dataset".into(), message: "Add at least one usable recording before preparing the dataset.".into() });
+            warnings.push(RvcSampleWarning {
+                code: "empty_dataset".into(),
+                message: "Add at least one usable recording before preparing the dataset.".into(),
+            });
         }
         if usable_duration_ms > 0 && usable_duration_ms < 60_000 {
-            warnings.push(RvcSampleWarning { code: "very_short_dataset".into(), message: "Usable speech is under one minute. RVC upstream guidance does not recommend datasets below one minute.".into() });
+            warnings.push(RvcSampleWarning {
+                code: "very_short_dataset".into(),
+                message: "Usable speech is under one minute. RVC upstream guidance does not recommend datasets below one minute.".into(),
+            });
         }
         let ready = !included.is_empty()
-            && included.iter().all(|sample| sample.state == RvcSampleState::Inspected)
-            && included.iter().all(|sample| sample.inspection.as_ref().and_then(|value| value.duration_ms).unwrap_or(0) > 0);
+            && included
+                .iter()
+                .all(|sample| sample.state == RvcSampleState::Inspected)
+            && included.iter().all(|sample| {
+                sample
+                    .inspection
+                    .as_ref()
+                    .and_then(|value| value.duration_ms)
+                    .unwrap_or(0)
+                    > 0
+            });
         Ok(RvcDatasetInspection {
             voice_id,
             sample_count: samples.len(),
@@ -343,7 +350,12 @@ impl RvcVoiceStore {
     pub fn clear_prepared_dataset(&self, voice: &str) -> TakokitResult<()> {
         let id = self.resolve_id(voice)?;
         let layout = self.layout(id);
-        for path in [&layout.samples_managed, &layout.dataset_segments, &layout.dataset_f0, &layout.dataset_features] {
+        for path in [
+            &layout.samples_managed,
+            &layout.dataset_segments,
+            &layout.dataset_f0,
+            &layout.dataset_features,
+        ] {
             if path.exists() {
                 fs::remove_dir_all(path).map_err(storage_error)?;
             }
@@ -375,7 +387,10 @@ impl RvcVoiceStore {
                 continue;
             }
             let job: RvcTrainingJob = read_json(&path)?;
-            if matches!(job.status, RvcTrainingJobStatus::Queued | RvcTrainingJobStatus::Running) {
+            if matches!(
+                job.status,
+                RvcTrainingJobStatus::Queued | RvcTrainingJobStatus::Running
+            ) {
                 jobs.push(job);
             }
         }
@@ -384,8 +399,13 @@ impl RvcVoiceStore {
     }
 
     pub fn save_checkpoint(&self, checkpoint: &RvcCheckpoint) -> TakokitResult<()> {
-        let path = self.layout(checkpoint.voice_id).checkpoints.join(format!("{}.json", checkpoint.id));
-        atomic_json(&path, checkpoint)
+        atomic_json(
+            &self
+                .layout(checkpoint.voice_id)
+                .checkpoints
+                .join(format!("{}.json", checkpoint.id)),
+            checkpoint,
+        )
     }
 
     pub fn checkpoints(&self, voice: &str) -> TakokitResult<Vec<RvcCheckpoint>> {
@@ -394,8 +414,13 @@ impl RvcVoiceStore {
     }
 
     pub fn save_index(&self, index: &RvcIndexArtifact) -> TakokitResult<()> {
-        let path = self.layout(index.voice_id).indexes.join(format!("{}.json", index.id));
-        atomic_json(&path, index)
+        atomic_json(
+            &self
+                .layout(index.voice_id)
+                .indexes
+                .join(format!("{}.json", index.id)),
+            index,
+        )
     }
 
     pub fn indexes(&self, voice: &str) -> TakokitResult<Vec<RvcIndexArtifact>> {
@@ -408,19 +433,26 @@ impl RvcVoiceStore {
     }
 
     pub fn managed_voice(&self, voice: &str) -> TakokitResult<ManagedRvcVoice> {
-        let id = self.resolve_id(voice)?;
-        read_json(&self.layout(id).voice)
+        read_json(&self.layout(self.resolve_id(voice)?).voice)
     }
 
     pub fn remove(&self, voice: &str, dry_run: bool) -> TakokitResult<Vec<PathBuf>> {
         let id = self.resolve_id(voice)?;
         if self.active_job(id)?.is_some() {
-            return Err(TakokitError::InvalidRequest("cannot remove a voice while a training job is active; cancel it first".into()));
+            return Err(TakokitError::InvalidRequest(
+                "cannot remove a voice while a training job is active; cancel it first".into(),
+            ));
         }
         let root = self.layout(id).root;
         let files = if root.is_dir() {
-            fs::read_dir(&root).map_err(storage_error)?.filter_map(Result::ok).map(|entry| entry.path()).collect()
-        } else { Vec::new() };
+            fs::read_dir(&root)
+                .map_err(storage_error)?
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .collect()
+        } else {
+            Vec::new()
+        };
         if !dry_run && root.exists() {
             fs::remove_dir_all(root).map_err(storage_error)?;
         }
@@ -434,7 +466,9 @@ pub fn sha256_file(path: &Path) -> TakokitResult<String> {
     let mut buffer = [0u8; 64 * 1024];
     loop {
         let read = file.read(&mut buffer).map_err(storage_error)?;
-        if read == 0 { break; }
+        if read == 0 {
+            break;
+        }
         hasher.update(&buffer[..read]);
     }
     Ok(format!("{:x}", hasher.finalize()))
@@ -443,28 +477,38 @@ pub fn sha256_file(path: &Path) -> TakokitResult<String> {
 fn validate_name(name: &str) -> TakokitResult<String> {
     let value = name.trim();
     if value.is_empty() {
-        return Err(TakokitError::InvalidRequest("voice name cannot be empty".to_string()));
+        return Err(TakokitError::InvalidRequest("voice name cannot be empty".into()));
     }
     if value.chars().count() > 120 {
-        return Err(TakokitError::InvalidRequest("voice name cannot exceed 120 characters".to_string()));
+        return Err(TakokitError::InvalidRequest(
+            "voice name cannot exceed 120 characters".into(),
+        ));
     }
     Ok(value.to_string())
 }
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
     let bytes = fs::read(path).map_err(storage_error)?;
-    serde_json::from_slice(&bytes).map_err(|error| TakokitError::Storage(format!("invalid metadata {}: {error}", path.display())))
+    serde_json::from_slice(&bytes).map_err(|error| {
+        TakokitError::Storage(format!("invalid metadata {}: {error}", path.display()))
+    })
 }
 
 fn atomic_json<T: Serialize>(path: &Path, value: &T) -> TakokitResult<()> {
-    let parent = path.parent().ok_or_else(|| TakokitError::Storage(format!("metadata path has no parent: {}", path.display())))?;
+    let parent = path.parent().ok_or_else(|| {
+        TakokitError::Storage(format!("metadata path has no parent: {}", path.display()))
+    })?;
     fs::create_dir_all(parent).map_err(storage_error)?;
     let temporary = path.with_extension("json.tmp");
-    let bytes = serde_json::to_vec_pretty(value).map_err(|error| TakokitError::Storage(error.to_string()))?;
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| TakokitError::Storage(error.to_string()))?;
     let mut file = File::create(&temporary).map_err(storage_error)?;
     file.write_all(&bytes).map_err(storage_error)?;
     file.sync_all().map_err(storage_error)?;
@@ -475,7 +519,9 @@ fn atomic_json<T: Serialize>(path: &Path, value: &T) -> TakokitResult<()> {
 }
 
 fn read_metadata_dir<T: DeserializeOwned>(dir: &Path) -> TakokitResult<Vec<T>> {
-    if !dir.is_dir() { return Ok(Vec::new()); }
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
     let mut values = Vec::new();
     for entry in fs::read_dir(dir).map_err(storage_error)? {
         let path = entry.map_err(storage_error)?.path();
@@ -499,70 +545,4 @@ fn storage_error(error: std::io::Error) -> TakokitError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn creates_unicode_voice_and_persists_layout() {
-        let temp = TempDir::new().unwrap();
-        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
-        let project = store.create("Voice ü 日本語", true, None).unwrap();
-        let loaded = store.load(&project.id.to_string()).unwrap();
-        assert_eq!(loaded.name, "Voice ü 日本語");
-        assert!(store.layout(project.id).samples_originals.is_dir());
-        assert!(store.layout(project.id).jobs.is_dir());
-    }
-
-    #[test]
-    fn duplicate_names_are_allowed_but_ambiguous_by_name() {
-        let temp = TempDir::new().unwrap();
-        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
-        store.create("Same", true, None).unwrap();
-        store.create("Same", true, None).unwrap();
-        assert!(store.load("Same").is_err());
-        assert_eq!(store.list().unwrap().len(), 2);
-    }
-
-    #[test]
-    fn sample_import_deduplicates_by_hash_and_preserves_source() {
-        let temp = TempDir::new().unwrap();
-        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
-        let project = store.create("Voice", true, None).unwrap();
-        let source = temp.path().join("sample ü.wav");
-        fs::write(&source, b"not-real-audio-yet").unwrap();
-        let added = store.add_samples(&project.id.to_string(), &[source.clone(), source.clone()]).unwrap();
-        assert_eq!(added.len(), 1);
-        assert!(source.is_file());
-        assert!(added[0].managed_path.is_file());
-        store.remove_sample(&project.id.to_string(), added[0].id).unwrap();
-        assert!(source.is_file());
-    }
-
-    #[test]
-    fn removing_voice_is_blocked_by_active_job() {
-        let temp = TempDir::new().unwrap();
-        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
-        let project = store.create("Voice", true, None).unwrap();
-        let config = takokit_core::RvcTrainingConfig::preset(takokit_core::RvcTrainingPreset::Quick).unwrap();
-        let job = RvcTrainingJob {
-            id: Uuid::new_v4(), voice_id: project.id, config, status: RvcTrainingJobStatus::Running,
-            stage: takokit_core::RvcTrainingStage::Train, created_at: now_secs(), started_at: Some(now_secs()),
-            finished_at: None, owner_pid: None, child_pid: None, log_path: PathBuf::new(), checkpoint_ids: vec![],
-            failure: None, cancellation_requested: false,
-        };
-        store.save_job(&job).unwrap();
-        assert!(store.remove(&project.id.to_string(), false).is_err());
-    }
-
-    #[test]
-    fn auxiliary_job_json_does_not_break_active_job_recovery() {
-        let temp = TempDir::new().unwrap();
-        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
-        let project = store.create("Voice", true, None).unwrap();
-        let layout = store.layout(project.id);
-        fs::write(layout.jobs.join("latest-result.json"), br#"{"checkpoint":"model.pth"}"#).unwrap();
-        fs::write(layout.jobs.join("abc.request.json"), br#"{"operation":"train"}"#).unwrap();
-        assert!(store.active_job(project.id).unwrap().is_none());
-    }
-}
+mod tests;
