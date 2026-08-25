@@ -70,6 +70,7 @@ const COSYVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc",
     recursive: true,
     requirement_files: &["requirements.txt"],
+    required_files: &[],
     editable: false,
 };
 const FISH_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -77,6 +78,7 @@ const FISH_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "e5e292632cb11e7a27b2b7487f58f612bc101e13",
     recursive: false,
     requirement_files: &[],
+    required_files: &[],
     editable: true,
 };
 const OPENVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -84,6 +86,7 @@ const OPENVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "74a1d147b17a8c3092dd5430504bd83ef6c7eb23",
     recursive: false,
     requirement_files: &[],
+    required_files: &[],
     editable: false,
 };
 const GPT_SOVITS_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -91,6 +94,7 @@ const GPT_SOVITS_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "be6a4f1e9d8a22d41b7d42c22df9d7ef36f225d2",
     recursive: true,
     requirement_files: &["requirements.txt"],
+    required_files: &[],
     editable: false,
 };
 const RVC_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -98,6 +102,7 @@ const RVC_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "7b284a634667c34103eaaeed972b48ccdb4b893e",
     recursive: false,
     requirement_files: &[],
+    required_files: &[],
     editable: false,
 };
 

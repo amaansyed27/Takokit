@@ -335,7 +335,9 @@ def run_training(request: dict[str, Any]) -> None:
     generator, discriminator = ensure_assets(trainer_root, asset_root)
     experiment = "takokit_" + str(request["voice_id"]).replace("-", "")
     exp_dir, staged_root = voice_root / "dataset" / "experiment", voice_root / "dataset" / "inputs"
-    logs_link, config_source = trainer_root / "logs" / experiment, trainer_root / "configs" / "v2" / "40k.json"
+    # Upstream intentionally uses the v1 40 kHz topology config for both model
+    # versions at 40 kHz; the model version remains v2 in the training command.
+    logs_link, config_source = trainer_root / "logs" / experiment, trainer_root / "configs" / "v1" / "40k.json"
     if not config_source.is_file():
         raise FileNotFoundError(f"RVC v2 40k config is missing: {config_source}")
     env = os.environ.copy()
@@ -401,7 +403,11 @@ def run_training(request: dict[str, Any]) -> None:
 def handle_request(request: dict[str, Any]) -> dict[str, Any]:
     operation = request.get("operation")
     if operation == "inspect":
-        return {"ok": True, "inspection": inspect_audio(Path(request["path"]).expanduser().resolve())}
+        try:
+            return {"ok": True, "inspection": inspect_audio(Path(request["path"]).expanduser().resolve())}
+        except Exception as error:
+            return {"ok": False, "error_kind": "audio_inspection",
+                    "error": f"{type(error).__name__}: {error}"}
     if operation == "preflight":
         return {"ok": True, "preflight": preflight(request)}
     if operation in {"prepare", "train"}:
@@ -434,5 +440,5 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         if not (len(sys.argv) == 3 and sys.argv[1] == "--job"):
-            respond(ok=False, error=f"{type(error).__name__}: {error}")
+            respond(ok=False, error_kind="runtime_setup", error=f"{type(error).__name__}: {error}")
         raise

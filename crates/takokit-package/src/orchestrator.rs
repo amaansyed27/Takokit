@@ -5,6 +5,7 @@ use crate::{
     planning::has_verified_executor,
     runtime_model_source::{estimate_model_source_bytes, model_source_staging_path},
     runtime_python::{prefetch_python_adapter_model, python_adapter_is_current},
+    runtime_python_specs::companion_adapters_for_model,
     transaction::ModelInstallSnapshot,
     *,
 };
@@ -161,7 +162,7 @@ fn install_model_complete_inner(
             .to_string(),
     };
 
-    let (adapter, adapter_ready) = if let Some(adapter_id) = model.required_adapter.as_deref() {
+    let (mut adapter, adapter_ready) = if let Some(adapter_id) = model.required_adapter.as_deref() {
         let ready_before = python_adapter_is_current(takokit_root, adapter_id);
         if !ready_before {
             let adapter_path = python_managed_runner_layout(takokit_root)
@@ -220,6 +221,46 @@ fn install_model_complete_inner(
     } else {
         (None, false)
     };
+
+    for companion_id in companion_adapters_for_model(&model.id) {
+        let ready_before = python_adapter_is_current(takokit_root, companion_id);
+        if !ready_before {
+            let adapter_path = python_managed_runner_layout(takokit_root)
+                .adapters
+                .join(companion_id);
+            let monitor = InstallProgressMonitor::start(
+                progress.clone(),
+                vec![adapter_path],
+                "adapter",
+                format!("Installing {companion_id} dependencies for {}", model.id),
+                None,
+            );
+            let result = install_python_adapter(takokit_root, companion_id)
+                .map_err(|error| PackageError::at_stage(InstallFailureStage::Adapter, error));
+            drop(monitor);
+            result?;
+        }
+        if !python_adapter_is_current(takokit_root, companion_id) {
+            return Err(PackageError::at_stage(
+                InstallFailureStage::Adapter,
+                PackageError::ArtifactInstallFailed {
+                    artifact: (*companion_id).to_string(),
+                    reason: "companion adapter installation completed without passing the complete readiness check"
+                        .into(),
+                },
+            ));
+        }
+        if let Some(step) = adapter.as_mut() {
+            step.detail.push_str(&format!(
+                "; companion {companion_id}: {}",
+                if ready_before {
+                    "already ready"
+                } else {
+                    "installed"
+                }
+            ));
+        }
+    }
 
     if !has_verified_executor(&model, &runner, adapter_ready) {
         return Err(PackageError::at_stage(

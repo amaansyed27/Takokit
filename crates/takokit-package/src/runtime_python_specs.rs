@@ -25,6 +25,7 @@ pub(crate) struct AdapterSourceSpec {
     pub revision: &'static str,
     pub recursive: bool,
     pub requirement_files: &'static [&'static str],
+    pub required_files: &'static [&'static str],
     pub editable: bool,
 }
 
@@ -45,6 +46,7 @@ const RVC_TRAINING_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "81eed5e8f68b6bed1789f682fe78cdd324495afc",
     recursive: false,
     requirement_files: &[],
+    required_files: &["configs/v1/40k.json", "train/train.py"],
     editable: false,
 };
 
@@ -101,6 +103,13 @@ pub fn adapter_for_model(model_id: &str) -> Option<&'static str> {
         .iter()
         .find(|spec| spec.model_family == model_id)
         .map(|spec| spec.id)
+}
+
+pub(crate) fn companion_adapters_for_model(model_id: &str) -> &'static [&'static str] {
+    match model_id {
+        "rvc" => &["rvc_training"],
+        _ => &[],
+    }
 }
 
 pub fn runtime_model_id(model: &crate::ModelManifest) -> &str {
@@ -171,12 +180,18 @@ mod tests {
     fn rvc_training_is_pinned_and_separate_from_inference() {
         let inference = adapter_spec("rvc").expect("RVC inference adapter");
         let training = adapter_spec("rvc_training").expect("RVC training adapter");
+        assert_eq!(companion_adapters_for_model("rvc"), &["rvc_training"]);
         assert_eq!(inference.python, "3.11");
         assert_eq!(training.python, "3.12");
         assert_eq!(
             training.source.expect("training source").revision,
             "81eed5e8f68b6bed1789f682fe78cdd324495afc"
         );
+        assert_eq!(
+            training.source.expect("training source").required_files,
+            &["configs/v1/40k.json", "train/train.py"]
+        );
+        assert!(RVC_TRAINING_ADAPTER.contains("configs\" / \"v1\" / \"40k.json"));
         assert!(RVC_TRAINING_ADAPTER.contains("train/preprocess.py"));
         assert!(RVC_TRAINING_ADAPTER.contains("train/train.py"));
         assert!(RVC_TRAINING_ADAPTER.contains("train/train_index.py"));

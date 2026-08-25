@@ -124,6 +124,27 @@ fn bundled_qwen_manifest_pins_complete_local_runtime_artifacts() {
 }
 
 #[test]
+fn bundled_rvc_manifest_pins_training_assets_and_revision() {
+    let manifest = PackageRegistry::bundled()
+        .model("rvc")
+        .expect("rvc manifest");
+
+    assert_eq!(manifest.version, "0.2.0");
+    assert!(manifest.capabilities.voice_training);
+    assert!(manifest.capabilities.voice_conversion);
+    let source = manifest.source.as_ref().expect("rvc model source");
+    assert_eq!(source.revision, "1be9d36ece685661920e1a7cb36eb0437c1e5581");
+    assert!(source
+        .allow_patterns
+        .iter()
+        .any(|pattern| pattern == "pretrained_v2/f0G40k.pth"));
+    assert!(source
+        .allow_patterns
+        .iter()
+        .any(|pattern| pattern == "pretrained_v2/f0D40k.pth"));
+}
+
+#[test]
 
 fn metadata_only_model_install_still_works_with_artifact_placeholders() {
     let temp = tempfile::tempdir().expect("tempdir");

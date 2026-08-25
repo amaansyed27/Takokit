@@ -128,44 +128,14 @@ impl RvcVoiceService {
         }
         for sample in samples {
             let request = json!({"operation": "inspect", "path": sample.managed_path});
-            match self.run_worker(&request) {
-                Ok(value) => {
-                    let raw: WorkerInspection =
-                        serde_json::from_value(value.get("inspection").cloned().ok_or_else(
-                            || invalid("RVC inspection returned no inspection payload"),
-                        )?)
-                        .map_err(|error| {
-                            invalid(format!("invalid RVC inspection response: {error}"))
-                        })?;
-                    self.store.save_sample_inspection(
-                        sample,
-                        RvcAudioInspection {
-                            duration_ms: raw.duration_ms,
-                            sample_rate: raw.sample_rate,
-                            channels: raw.channels,
-                            codec: raw.codec,
-                            container: raw.container,
-                            peak_dbfs: raw.peak_dbfs,
-                            rms_dbfs: raw.rms_dbfs,
-                            silence_ratio: raw.silence_ratio,
-                            clipped_ratio: raw.clipped_ratio,
-                        },
-                        raw.warnings,
-                        raw.valid,
-                    )?;
-                }
-                Err(error) => {
-                    self.store.save_sample_inspection(
-                        sample,
-                        RvcAudioInspection::default(),
-                        vec![RvcSampleWarning {
-                            code: "unreadable_audio".into(),
-                            message: error.to_string(),
-                        }],
-                        false,
-                    )?;
-                }
-            }
+            let result =
+                self.run_worker(&request).and_then(|value| {
+                    serde_json::from_value(value.get("inspection").cloned().ok_or_else(|| {
+                        execution("RVC inspection returned no inspection payload")
+                    })?)
+                    .map_err(|error| execution(format!("invalid RVC inspection response: {error}")))
+                });
+            self.persist_inspection_result(sample, result)?;
         }
         let summary = self.store.dataset_summary(voice)?;
         self.store.set_state(
@@ -178,6 +148,47 @@ impl RvcVoiceService {
             None,
         )?;
         Ok(summary)
+    }
+
+    fn persist_inspection_result(
+        &self,
+        sample: RvcVoiceSample,
+        result: TakokitResult<WorkerInspection>,
+    ) -> TakokitResult<()> {
+        match result {
+            Ok(raw) => self
+                .store
+                .save_sample_inspection(
+                    sample,
+                    RvcAudioInspection {
+                        duration_ms: raw.duration_ms,
+                        sample_rate: raw.sample_rate,
+                        channels: raw.channels,
+                        codec: raw.codec,
+                        container: raw.container,
+                        peak_dbfs: raw.peak_dbfs,
+                        rms_dbfs: raw.rms_dbfs,
+                        silence_ratio: raw.silence_ratio,
+                        clipped_ratio: raw.clipped_ratio,
+                    },
+                    raw.warnings,
+                    raw.valid,
+                )
+                .map(|_| ()),
+            Err(TakokitError::Audio(message)) => self
+                .store
+                .save_sample_inspection(
+                    sample,
+                    RvcAudioInspection::default(),
+                    vec![RvcSampleWarning {
+                        code: "unreadable_audio".into(),
+                        message,
+                    }],
+                    false,
+                )
+                .map(|_| ()),
+            Err(error) => Err(error),
+        }
     }
 
     pub fn preflight(
@@ -329,6 +340,10 @@ pub(super) fn now() -> u64 {
 
 pub(super) fn invalid(message: impl Into<String>) -> TakokitError {
     TakokitError::InvalidRequest(message.into())
+}
+
+pub(super) fn execution(message: impl Into<String>) -> TakokitError {
+    TakokitError::Execution(message.into())
 }
 
 pub(super) fn storage(error: std::io::Error) -> TakokitError {

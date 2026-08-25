@@ -13,6 +13,55 @@ fn creates_unicode_voice_and_persists_layout() {
 }
 
 #[test]
+fn interrupted_project_write_restores_previous_record() {
+    let temp = TempDir::new().unwrap();
+    let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
+    let project = store.create("Voice ü", true, None).unwrap();
+    let path = store.layout(project.id).project;
+    fs::rename(&path, previous_json_path(&path)).unwrap();
+
+    let loaded = store.load_id(project.id).unwrap();
+
+    assert_eq!(loaded.id, project.id);
+    assert!(path.is_file());
+    assert!(!previous_json_path(&path).exists());
+}
+
+#[test]
+fn orphaned_project_directory_recovers_from_owned_sample_and_job_metadata() {
+    let temp = TempDir::new().unwrap();
+    let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
+    let project = store.create("Original name", true, None).unwrap();
+    let source = temp.path().join("Speaker ü.wav");
+    fs::write(&source, b"sample").unwrap();
+    let sample = store
+        .add_samples(&project.id.to_string(), &[source])
+        .unwrap()
+        .pop()
+        .unwrap();
+    store
+        .save_sample_inspection(
+            sample,
+            takokit_core::RvcAudioInspection {
+                duration_ms: Some(10_000),
+                ..Default::default()
+            },
+            vec![],
+            true,
+        )
+        .unwrap();
+    fs::remove_file(store.layout(project.id).project).unwrap();
+
+    let recovered = store.list().unwrap().pop().unwrap();
+
+    assert_eq!(recovered.id, project.id);
+    assert_eq!(recovered.name, "Speaker ü");
+    assert_eq!(recovered.state, RvcVoiceProjectState::ReadyForPreparation);
+    assert!(store.layout(project.id).project.is_file());
+    assert_eq!(store.samples_id(project.id).unwrap().len(), 1);
+}
+
+#[test]
 fn duplicate_names_are_allowed_but_ambiguous_by_name() {
     let temp = TempDir::new().unwrap();
     let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));

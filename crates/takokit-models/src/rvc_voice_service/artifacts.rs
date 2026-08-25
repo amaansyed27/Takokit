@@ -139,6 +139,11 @@ impl RvcVoiceService {
             .get("index")
             .and_then(Value::as_str)
             .map(PathBuf::from);
+        let layout = self.store.layout(project.id);
+        ensure_managed_artifact(&checkpoint_path, &layout.checkpoints, "checkpoint")?;
+        if let Some(index_path) = index_path.as_ref() {
+            ensure_managed_artifact(index_path, &layout.indexes, "index")?;
+        }
         if !checkpoint_path.is_file() {
             return Err(invalid("RVC worker checkpoint is missing"));
         }
@@ -339,6 +344,18 @@ fn copy_or_link(source: &Path, destination: &Path) -> TakokitResult<()> {
     }
     if fs::hard_link(source, destination).is_err() {
         fs::copy(source, destination).map_err(storage)?;
+    }
+    Ok(())
+}
+
+fn ensure_managed_artifact(path: &Path, expected_root: &Path, kind: &str) -> TakokitResult<()> {
+    let canonical = path.canonicalize().map_err(storage)?;
+    let canonical_root = expected_root.canonicalize().map_err(storage)?;
+    if !canonical.starts_with(&canonical_root) {
+        return Err(invalid(format!(
+            "RVC worker {kind} does not belong to the selected voice project: {}",
+            path.display()
+        )));
     }
     Ok(())
 }

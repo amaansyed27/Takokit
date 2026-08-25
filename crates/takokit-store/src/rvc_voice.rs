@@ -92,7 +92,20 @@ impl RvcVoiceStore {
         }
         let mut projects = Vec::new();
         for entry in fs::read_dir(&self.root).map_err(storage_error)? {
-            let path = entry.map_err(storage_error)?.path().join("project.json");
+            let directory = entry.map_err(storage_error)?.path();
+            let path = directory.join("project.json");
+            if !path.is_file() {
+                if let Some(id) = directory
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                {
+                    if let Some(project) = self.recover_project(id)? {
+                        projects.push(project);
+                    }
+                }
+                continue;
+            }
             if path.is_file() {
                 if let Ok(project) = read_json::<RvcVoiceProject>(&path) {
                     projects.push(project);
@@ -110,6 +123,9 @@ impl RvcVoiceStore {
     pub fn resolve_id(&self, voice: &str) -> TakokitResult<Uuid> {
         if let Ok(id) = Uuid::parse_str(voice) {
             if self.layout(id).project.is_file() {
+                return Ok(id);
+            }
+            if self.recover_project(id)?.is_some() {
                 return Ok(id);
             }
         }
@@ -134,6 +150,81 @@ impl RvcVoiceStore {
         let mut project = project.clone();
         project.updated_at = now_secs();
         atomic_json(&self.layout(project.id).project, &project)
+    }
+
+    fn recover_project(&self, id: Uuid) -> TakokitResult<Option<RvcVoiceProject>> {
+        let layout = self.layout(id);
+        if !layout.root.is_dir() || !layout.consent.is_file() {
+            return Ok(None);
+        }
+        let consent: RvcVoiceConsent = read_json(&layout.consent)?;
+        if consent.voice_id != id || !consent.affirmed {
+            return Ok(None);
+        }
+        let samples = self.samples_id(id)?;
+        let name = samples
+            .first()
+            .and_then(|sample| Path::new(&sample.display_name).file_stem())
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.trim().is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("Recovered RVC voice {}", &id.to_string()[..8]));
+        let mut jobs = Vec::new();
+        if layout.jobs.is_dir() {
+            for entry in fs::read_dir(&layout.jobs).map_err(storage_error)? {
+                let path = entry.map_err(storage_error)?.path();
+                if is_uuid_json_record(&path) {
+                    if let Ok(job) = read_json::<RvcTrainingJob>(&path) {
+                        if job.voice_id == id {
+                            jobs.push(job);
+                        }
+                    }
+                }
+            }
+        }
+        jobs.sort_by_key(|job| job.created_at);
+        let managed = read_json::<ManagedRvcVoice>(&layout.voice).ok();
+        let ready_for_preparation = !samples.is_empty()
+            && samples
+                .iter()
+                .filter(|sample| sample.included)
+                .all(|sample| {
+                    sample.state == takokit_core::RvcSampleState::Inspected
+                        && sample
+                            .inspection
+                            .as_ref()
+                            .and_then(|inspection| inspection.duration_ms)
+                            .unwrap_or_default()
+                            > 0
+                });
+        let created_at = samples
+            .iter()
+            .map(|sample| sample.imported_at)
+            .chain(std::iter::once(consent.recorded_at))
+            .min()
+            .unwrap_or(consent.recorded_at);
+        let project = RvcVoiceProject {
+            schema_version: RVC_VOICE_SCHEMA_VERSION,
+            id,
+            name,
+            engine: "rvc".into(),
+            state: if managed.is_some() {
+                RvcVoiceProjectState::Ready
+            } else if ready_for_preparation {
+                RvcVoiceProjectState::ReadyForPreparation
+            } else {
+                RvcVoiceProjectState::CollectingSamples
+            },
+            imported: false,
+            created_at,
+            updated_at: now_secs(),
+            latest_job_id: jobs.last().map(|job| job.id),
+            active_checkpoint_id: managed.as_ref().map(|voice| voice.checkpoint_id),
+            active_index_id: managed.as_ref().and_then(|voice| voice.index_id),
+            last_error: None,
+        };
+        atomic_json(&layout.project, &project)?;
+        Ok(Some(project))
     }
 
     pub fn set_state(
@@ -282,6 +373,21 @@ fn now_secs() -> u64 {
 }
 
 fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
+    match read_json_file(path) {
+        Ok(value) => Ok(value),
+        Err(primary) => {
+            let previous = previous_json_path(path);
+            let value = read_json_file(&previous).map_err(|_| primary)?;
+            if path.exists() {
+                fs::remove_file(path).map_err(storage_error)?;
+            }
+            fs::rename(previous, path).map_err(storage_error)?;
+            Ok(value)
+        }
+    }
+}
+
+fn read_json_file<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
     let bytes = fs::read(path).map_err(storage_error)?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TakokitError::Storage(format!("invalid metadata {}: {error}", path.display()))
@@ -294,15 +400,34 @@ fn atomic_json<T: Serialize>(path: &Path, value: &T) -> TakokitResult<()> {
     })?;
     fs::create_dir_all(parent).map_err(storage_error)?;
     let temporary = path.with_extension("json.tmp");
+    let previous = previous_json_path(path);
     let bytes = serde_json::to_vec_pretty(value)
         .map_err(|error| TakokitError::Storage(error.to_string()))?;
     let mut file = File::create(&temporary).map_err(storage_error)?;
     file.write_all(&bytes).map_err(storage_error)?;
     file.sync_all().map_err(storage_error)?;
-    if path.exists() {
-        fs::remove_file(path).map_err(storage_error)?;
+    if previous.exists() {
+        fs::remove_file(&previous).map_err(storage_error)?;
     }
-    fs::rename(temporary, path).map_err(storage_error)
+    let replaced_existing = path.exists();
+    if replaced_existing {
+        fs::rename(path, &previous).map_err(storage_error)?;
+    }
+    if let Err(error) = fs::rename(&temporary, path) {
+        let _ = fs::remove_file(&temporary);
+        if replaced_existing {
+            let _ = fs::rename(&previous, path);
+        }
+        return Err(storage_error(error));
+    }
+    if replaced_existing {
+        fs::remove_file(previous).map_err(storage_error)?;
+    }
+    Ok(())
+}
+
+fn previous_json_path(path: &Path) -> PathBuf {
+    path.with_extension("json.previous")
 }
 
 fn read_metadata_dir<T: DeserializeOwned>(dir: &Path) -> TakokitResult<Vec<T>> {

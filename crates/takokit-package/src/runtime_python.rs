@@ -62,7 +62,7 @@ pub fn python_adapter_records(takokit_root: &Path) -> PackageResult<Vec<AdapterR
     Ok(records)
 }
 
-pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> bool {
+pub fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> bool {
     let Some(spec) = adapter_spec(adapter) else {
         return false;
     };
@@ -81,6 +81,10 @@ pub(crate) fn python_adapter_is_current(takokit_root: &Path, adapter: &str) -> b
         && std::fs::read_to_string(shared_marker)
             .is_ok_and(|version| version.trim() == shared_runtime_identity(spec.python))
         && venv_inherits_shared_packages(&venv)
+        && spec
+            .source
+            .as_ref()
+            .is_none_or(|source| adapter_source_is_current(&adapter_dir.join("source"), source))
 }
 
 pub fn python_adapter_record(takokit_root: &Path, adapter: &str) -> PackageResult<AdapterRecord> {
@@ -103,6 +107,9 @@ pub fn install_python_adapter(takokit_root: &Path, adapter: &str) -> PackageResu
     let layout = python_managed_runner_layout(takokit_root);
     let adapter_dir = layout.adapters.join(adapter);
     let _install_lock = lock_adapter_install(&adapter_dir, adapter)?;
+    if python_adapter_is_current(takokit_root, adapter) {
+        return python_adapter_record(takokit_root, adapter);
+    }
     let manifest_path = adapter_dir.join("adapter.toml");
     ensure_adapter_manifest(&manifest_path, spec)?;
     let mut record = read_adapter_record(&manifest_path, spec)?;
@@ -310,12 +317,7 @@ fn install_adapter_source(
     source: &AdapterSourceSpec,
 ) -> PackageResult<PathBuf> {
     let destination = adapter_dir.join("source");
-    let marker = destination.join(".takokit-revision");
-    if destination.is_dir()
-        && std::fs::read_to_string(&marker)
-            .ok()
-            .is_some_and(|revision| revision.trim() == source.revision)
-    {
+    if adapter_source_is_current(&destination, source) {
         return Ok(destination);
     }
     if destination.exists() {
@@ -372,6 +374,17 @@ fn install_adapter_source(
     Ok(destination)
 }
 
+fn adapter_source_is_current(destination: &Path, source: &AdapterSourceSpec) -> bool {
+    destination.is_dir()
+        && std::fs::read_to_string(destination.join(".takokit-revision"))
+            .ok()
+            .is_some_and(|revision| revision.trim() == source.revision)
+        && source
+            .required_files
+            .iter()
+            .all(|relative| destination.join(relative).is_file())
+}
+
 fn prepare_adapter_requirements(
     adapter: &str,
     target_os: &str,
@@ -408,4 +421,31 @@ fn uv_pip_install(
     ];
     arguments.extend(dependencies);
     run_logged_uv_command(takokit_root, log, uv, &arguments)
+}
+
+#[cfg(test)]
+mod source_readiness_tests {
+    use super::*;
+
+    #[test]
+    fn adapter_source_requires_revision_and_declared_runtime_files() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = AdapterSourceSpec {
+            repository: "https://example.invalid/source.git",
+            revision: "pinned-revision",
+            recursive: false,
+            requirement_files: &[],
+            required_files: &["configs/v1/40k.json", "train/train.py"],
+            editable: false,
+        };
+        std::fs::write(temp.path().join(".takokit-revision"), source.revision)
+            .expect("revision marker");
+        std::fs::create_dir_all(temp.path().join("configs/v1")).expect("config directory");
+        std::fs::create_dir_all(temp.path().join("train")).expect("train directory");
+        std::fs::write(temp.path().join("configs/v1/40k.json"), "{}").expect("config");
+
+        assert!(!adapter_source_is_current(temp.path(), &source));
+        std::fs::write(temp.path().join("train/train.py"), "# train").expect("trainer");
+        assert!(adapter_source_is_current(temp.path(), &source));
+    }
 }
