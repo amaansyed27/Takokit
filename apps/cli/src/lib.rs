@@ -35,7 +35,9 @@ mod args;
 mod daemon_commands;
 mod local_setup;
 mod output;
+mod rvc_voice_command;
 mod test_commands;
+mod voice_command;
 
 use args::*;
 use daemon_commands::*;
@@ -227,29 +229,16 @@ pub async fn run() -> anyhow::Result<()> {
                 print_value(&serde_json::json!({"id": id, "removed": removed}))?;
             }
         },
-        Some(Command::Voice { command }) => match command {
-            VoiceCommand::List => {
-                print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?;
-            }
-            VoiceCommand::Show { model } => {
-                let manifest = package_registry.model(&model).map_err(cli_error)?;
-                print_serializable(&voice_contract_for_model(&manifest))?;
-            }
-            VoiceCommand::Add {
-                sample,
-                name,
-                model,
-                consent,
-            } => run_clone(
-                CloneArgs {
-                    sample,
-                    name,
-                    model,
-                    consent,
-                },
-                workspace.as_ref().expect("voice add workspace"),
-            )?,
-        },
+        Some(Command::Voice { command }) => {
+            voice_command::run_voice_command(
+                command,
+                &store,
+                &package_registry,
+                &installed_registry,
+                workspace.as_ref(),
+            )
+            .await?;
+        }
         Some(Command::Library { target }) => match target {
             LibraryTarget::Models => print_library_models(&package_registry)?,
             LibraryTarget::Runners => print_library_runners(&package_registry)?,
@@ -464,6 +453,11 @@ fn command_uses_workspace(command: &Option<Command>) -> bool {
             | Some(Command::Voice {
                 command: VoiceCommand::Add { .. }
             })
+            | Some(Command::Voice {
+                command: VoiceCommand::Rvc {
+                    command: RvcVoiceCommand::Test { .. },
+                },
+            })
             | Some(Command::Convert(_))
             | Some(Command::Train(_))
     )
@@ -483,6 +477,12 @@ fn surface_title(command: &Option<Command>) -> &'static str {
         Some(Command::Voice {
             command: VoiceCommand::Add { .. },
         }) => "CLI voice profile",
+        Some(Command::Voice {
+            command:
+                VoiceCommand::Rvc {
+                    command: RvcVoiceCommand::Test { .. },
+                },
+        }) => "CLI RVC voice test",
         Some(Command::Convert(_)) => "CLI voice conversion",
         Some(Command::Train(_)) => "CLI voice training",
         _ => "Takokit CLI",

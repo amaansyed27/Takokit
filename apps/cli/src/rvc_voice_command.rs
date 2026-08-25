@@ -61,9 +61,10 @@ pub(crate) async fn run_direct(
             "rvc_hardware_preflight",
             service.preflight(&voice, training.config()?)?,
         ),
-        RvcVoiceCommand::Prepare { voice, training } => {
-            public_job("rvc_training_job", service.prepare(&voice, training.request()?)?)?
-        }
+        RvcVoiceCommand::Prepare { voice, training } => public_job(
+            "rvc_training_job",
+            service.prepare(&voice, training.request()?)?,
+        )?,
         RvcVoiceCommand::Train { voice, training } => public_job(
             "rvc_training_job",
             service.start_training(&voice, training.request()?)?,
@@ -167,10 +168,7 @@ pub(crate) async fn run_direct(
     print_value(&value)
 }
 
-pub(crate) fn run_daemon(
-    client: &Client,
-    command: &RvcVoiceCommand,
-) -> anyhow::Result<Value> {
+pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::Result<Value> {
     match command {
         RvcVoiceCommand::Create {
             name,
@@ -196,7 +194,9 @@ pub(crate) fn run_daemon(
             RvcSampleCommand::List => client.get(&rvc_path(voice, "/samples")),
             RvcSampleCommand::Remove { sample } => {
                 client.delete(&rvc_path(voice, &format!("/samples/{sample}")))?;
-                Ok(json!({"kind":"rvc_sample_removal","data":{"voice":voice,"sample":sample,"removed":true}}))
+                Ok(
+                    json!({"kind":"rvc_sample_removal","data":{"voice":voice,"sample":sample,"removed":true}}),
+                )
             }
         },
         RvcVoiceCommand::Inspect { voice } => {
@@ -215,7 +215,10 @@ pub(crate) fn run_daemon(
         RvcVoiceCommand::Status { voice } => client.get(&rvc_path(voice, "/train/status")),
         RvcVoiceCommand::Logs { voice, max_bytes } => client.get(&rvc_path(
             voice,
-            &format!("/train/logs?max_bytes={}", max_bytes.min(&(2 * 1024 * 1024))),
+            &format!(
+                "/train/logs?max_bytes={}",
+                max_bytes.min(&(2 * 1024 * 1024))
+            ),
         )),
         RvcVoiceCommand::Cancel { voice } => {
             client.post(&rvc_path(voice, "/train/cancel"), &json!({}))
@@ -292,10 +295,9 @@ pub(crate) fn run_daemon(
                 consent_note: consent_note.clone(),
             },
         ),
-        RvcVoiceCommand::Remove { voice, dry_run } => client.delete_json(&format!(
-            "{}?dry_run={dry_run}",
-            rvc_path(voice, "")
-        )),
+        RvcVoiceCommand::Remove { voice, dry_run } => {
+            client.delete_json(&format!("{}?dry_run={dry_run}", rvc_path(voice, "")))
+        }
     }
 }
 
@@ -339,7 +341,12 @@ fn scrub_job(value: &mut Value) {
     let Some(map) = value.as_object_mut() else {
         return;
     };
-    for key in ["owner_pid", "child_pid", "log_path", "cancellation_requested"] {
+    for key in [
+        "owner_pid",
+        "child_pid",
+        "log_path",
+        "cancellation_requested",
+    ] {
         map.remove(key);
     }
 }

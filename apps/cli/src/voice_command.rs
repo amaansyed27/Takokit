@@ -17,8 +17,10 @@ pub(crate) async fn run_voice_command(
 ) -> anyhow::Result<()> {
     match command {
         VoiceCommand::List => {
-            let mut value = serde_json::to_value(VoiceProfileStore::new(store.voices_dir()).list()?)?;
-            let mut managed = serde_json::to_value(takokit_models::RvcVoiceService::new(store.root()).list()?)?;
+            let mut value =
+                serde_json::to_value(VoiceProfileStore::new(store.voices_dir()).list()?)?;
+            let mut managed =
+                serde_json::to_value(takokit_models::RvcVoiceService::new(store.root()).list()?)?;
             if let (Some(items), Some(extra)) = (value.as_array_mut(), managed.as_array_mut()) {
                 items.append(extra);
             }
