@@ -1,128 +1,112 @@
 name: Slice 3 final validation once
-
 on:
   push:
     branches: [slice/advanced-rvc-cloning]
     paths:
       - .github/workflows/slice3-final-validation-once.yml
-
 permissions:
   contents: write
-
 jobs:
   validate:
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            apps/gui/package-lock.json
-            site/package-lock.json
-
       - name: Rust formatting
-        run: cargo fmt --all -- --check
-
+        run: |
+          cargo fmt --all -- --check
       - name: Rust workspace check
-        run: cargo check --workspace
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo check --workspace
       - name: Rust workspace tests
-        run: cargo test --workspace
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test --workspace
       - name: Release binaries
-        run: cargo build --release --bin tako --bin takokit
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo build --release --bin tako --bin takokit
       - name: GUI production build
         working-directory: apps/gui
         run: |
           npm ci
           npm run build
-
       - name: Repository quality checks
-        run: python scripts/audit_file_sizes.py
-
+        run: |
+          python scripts/audit_file_sizes.py
       - name: Companion and library checks
         working-directory: site
         run: |
           npm install
           npm test
           npm run build
-
       - name: Focused Advanced RVC service tests
-        run: cargo test -p takokit-models rvc_voice_service --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-models rvc_voice_service --lib
       - name: Focused takovoice package security tests
-        run: cargo test -p takokit-models rvc_voice_service::package_security_tests --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-models rvc_voice_service::package_security_tests --lib
       - name: Focused Advanced RVC API tests
-        run: cargo test -p takokit-server rvc --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-server rvc --lib
       - name: Focused Advanced RVC CLI tests
-        run: cargo test -p takokit-cli tests::rvc --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-cli tests::rvc --lib
       - name: Focused Advanced RVC TUI tests
-        run: cargo test -p takokit-cli tui:: --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-cli tui:: --lib
       - name: Create exact final cleanup commit
         run: |
           git rm .github/workflows/slice3-final-validation-once.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore(slice3): remove final validation workflow"
-
       - name: Final HEAD Rust formatting
-        run: cargo fmt --all -- --check
-
+        run: |
+          cargo fmt --all -- --check
       - name: Final HEAD Rust workspace check
-        run: cargo check --workspace
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo check --workspace
       - name: Final HEAD Rust workspace tests
-        run: cargo test --workspace
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test --workspace
       - name: Final HEAD release binaries
-        run: cargo build --release --bin tako --bin takokit
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo build --release --bin tako --bin takokit
       - name: Final HEAD GUI production build
         working-directory: apps/gui
         run: |
           npm ci
           npm run build
-
       - name: Final HEAD repository quality checks
-        run: python scripts/audit_file_sizes.py
-
+        run: |
+          python scripts/audit_file_sizes.py
       - name: Final HEAD companion and library checks
         working-directory: site
         run: |
           npm install
           npm test
           npm run build
-
       - name: Final HEAD focused Advanced RVC service tests
-        run: cargo test -p takokit-models rvc_voice_service --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-models rvc_voice_service --lib
       - name: Final HEAD focused takovoice package security tests
-        run: cargo test -p takokit-models rvc_voice_service::package_security_tests --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-models rvc_voice_service::package_security_tests --lib
       - name: Final HEAD focused Advanced RVC API tests
-        run: cargo test -p takokit-server rvc --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-server rvc --lib
       - name: Final HEAD focused Advanced RVC CLI tests
-        run: cargo test -p takokit-cli tests::rvc --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-cli tests::rvc --lib
       - name: Final HEAD focused Advanced RVC TUI tests
-        run: cargo test -p takokit-cli tui:: --lib
-
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-cli tui:: --lib
       - name: Push validated final HEAD
-        run: git push origin HEAD:slice/advanced-rvc-cloning
+        run: |
+          git push origin HEAD:slice/advanced-rvc-cloning
