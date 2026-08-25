@@ -1,0 +1,29 @@
+name: RVC format once
+on:
+  push:
+    branches:
+      - slice/advanced-rvc-cloning
+    paths:
+      - .github/workflows/rvc-format-once.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format Rust
+        run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/takokit-package/src/runtime_python_specs/catalog.rs crates/takokit-package/src/tests.rs crates/takokit-package/src/tests/rvc_runtime.rs
+          git commit -m "style(rvc): format Windows pull regression coverage"
+          git push origin HEAD:slice/advanced-rvc-cloning
