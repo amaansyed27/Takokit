@@ -371,11 +371,12 @@ impl RvcVoiceStore {
         let mut jobs = Vec::new();
         for entry in fs::read_dir(dir).map_err(storage_error)? {
             let path = entry.map_err(storage_error)?.path();
-            if path.extension().and_then(|v| v.to_str()) == Some("json") {
-                let job: RvcTrainingJob = read_json(&path)?;
-                if matches!(job.status, RvcTrainingJobStatus::Queued | RvcTrainingJobStatus::Running) {
-                    jobs.push(job);
-                }
+            if !is_uuid_json_record(&path) {
+                continue;
+            }
+            let job: RvcTrainingJob = read_json(&path)?;
+            if matches!(job.status, RvcTrainingJobStatus::Queued | RvcTrainingJobStatus::Running) {
+                jobs.push(job);
             }
         }
         jobs.sort_by_key(|job| job.created_at);
@@ -478,11 +479,19 @@ fn read_metadata_dir<T: DeserializeOwned>(dir: &Path) -> TakokitResult<Vec<T>> {
     let mut values = Vec::new();
     for entry in fs::read_dir(dir).map_err(storage_error)? {
         let path = entry.map_err(storage_error)?.path();
-        if path.extension().and_then(|v| v.to_str()) == Some("json") {
+        if is_uuid_json_record(&path) {
             values.push(read_json(&path)?);
         }
     }
     Ok(values)
+}
+
+fn is_uuid_json_record(path: &Path) -> bool {
+    path.extension().and_then(|value| value.to_str()) == Some("json")
+        && path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| Uuid::parse_str(value).is_ok())
 }
 
 fn storage_error(error: std::io::Error) -> TakokitError {
@@ -544,5 +553,16 @@ mod tests {
         };
         store.save_job(&job).unwrap();
         assert!(store.remove(&project.id.to_string(), false).is_err());
+    }
+
+    #[test]
+    fn auxiliary_job_json_does_not_break_active_job_recovery() {
+        let temp = TempDir::new().unwrap();
+        let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
+        let project = store.create("Voice", true, None).unwrap();
+        let layout = store.layout(project.id);
+        fs::write(layout.jobs.join("latest-result.json"), br#"{"checkpoint":"model.pth"}"#).unwrap();
+        fs::write(layout.jobs.join("abc.request.json"), br#"{"operation":"train"}"#).unwrap();
+        assert!(store.active_job(project.id).unwrap().is_none());
     }
 }
