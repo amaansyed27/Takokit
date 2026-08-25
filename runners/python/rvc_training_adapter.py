@@ -339,8 +339,12 @@ def run_training(request: dict[str, Any]) -> None:
     # versions at 40 kHz; the model version remains v2 in the training command.
     logs_link, config_source = trainer_root / "logs" / experiment, trainer_root / "configs" / "v1" / "40k.json"
     if not config_source.is_file():
-        raise FileNotFoundError(f"RVC v2 40k config is missing: {config_source}")
+        raise FileNotFoundError(f"RVC 40 kHz topology config is missing: {config_source}")
     env = os.environ.copy()
+    inherited_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(trainer_root) + (
+        os.pathsep + inherited_pythonpath if inherited_pythonpath else ""
+    )
     resolved_device = str(request.get("resolved_device") or "auto").lower()
     resolved_precision = str(request.get("resolved_precision") or "auto").lower()
     if resolved_device == "cpu":
