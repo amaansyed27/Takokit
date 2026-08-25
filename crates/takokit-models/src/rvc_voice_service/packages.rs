@@ -406,13 +406,13 @@ fn verify_signature(manifest: &[u8], signature: &RvcPackageSignature) -> Result<
         .try_into()
         .map_err(|_| "invalid public key length".to_string())?;
     let verifying = VerifyingKey::from_bytes(&public).map_err(|error| error.to_string())?;
-    let signature = Signature::from_slice(
+    let signer_fingerprint = signature.signer_fingerprint.clone();
+    let parsed_signature = Signature::from_slice(
         &hex::decode(&signature.signature_hex).map_err(|error| error.to_string())?,
     )
     .map_err(|error| error.to_string())?;
     let fingerprint = hex::encode(Sha256::digest(verifying.as_bytes()));
-    Ok(fingerprint == signature.signer_fingerprint
-        && verifying.verify(manifest, &signature).is_ok())
+    Ok(fingerprint == signer_fingerprint && verifying.verify(manifest, &parsed_signature).is_ok())
 }
 
 fn first_reference(root: &Path) -> Option<PathBuf> {

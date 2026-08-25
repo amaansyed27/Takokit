@@ -1,5 +1,8 @@
 use super::*;
-use axum::extract::{Path as AxumPath, Query};
+use axum::{
+    extract::{Path as AxumPath, Query},
+    http::HeaderMap,
+};
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -380,13 +383,16 @@ pub async fn rvc_package_import(
 pub async fn rvc_test_voice(
     State(state): State<AppState>,
     AxumPath(voice): AxumPath<String>,
+    headers: HeaderMap,
     Json(request): Json<TestRvcVoiceRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let output_dir = request
-        .workspace_root
-        .as_ref()
-        .map(|root| root.join("outputs"))
-        .unwrap_or_else(|| state.store.root().join("outputs"));
+    let output_dir = if request.workspace_root.is_some() {
+        request.workspace_root.as_ref().unwrap().join("outputs")
+    } else {
+        crate::RequestWorkspace::from_headers(&headers, "RVC voice test")
+            .map_err(ApiError)?
+            .outputs_dir()
+    };
     let response = state
         .rvc_voices
         .test_voice(
