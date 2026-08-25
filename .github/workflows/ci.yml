@@ -140,6 +140,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
           $Tako = Join-Path $PWD "target\release\tako.exe"
           $Sample = Join-Path $env:RUNNER_TEMP "rvc-prepare-smoke.wav"
           @'
