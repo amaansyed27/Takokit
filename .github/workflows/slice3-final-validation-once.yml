@@ -23,7 +23,6 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          git checkout 147e85e28296f5e172ae518f2c12ba8b50cf3486f14 -- apps/cli/src/daemon.rs || git checkout 147e85e28296f5e172ae5184dc390d5a3030b739 -- apps/cli/src/daemon.rs
           git checkout 147e85e28296f5e172ae5184dc390d5a3030b739 -- apps/cli/src/daemon.rs
           python -c 'from pathlib import Path; p=Path("apps/cli/src/daemon.rs"); s=p.read_text(encoding="utf-8"); old="    port_is_occupied, preferred_daemon_executable, startup_lock, takokit_health_responds,\n    verify_identity,\n};"; new="    port_is_occupied, startup_lock, verify_identity,\n};\n#[cfg(test)]\nuse runtime::{preferred_daemon_executable, takokit_health_responds};"; assert old in s; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           python -c 'from pathlib import Path; p=Path("apps/cli/src/tui/job.rs"); s=p.read_text(encoding="utf-8"); old="    path::{Path, PathBuf},\n"; new="    path::PathBuf,\n"; assert old in s; p.write_text(s.replace(old,new,1),encoding="utf-8")'
@@ -64,7 +63,8 @@ jobs:
         run: RUSTFLAGS='-D warnings' cargo test -p takokit-cli tests::rvc --lib
       - name: Advanced RVC TUI tests
         shell: bash
-        run: RUSTFLAGS='-D warnings' cargo test -p takokit-cli tui:: --lib
+        run: |
+          RUSTFLAGS='-D warnings' cargo test -p takokit-cli tui:: --lib
       - name: Complete workspace tests
         shell: bash
         run: RUSTFLAGS='-D warnings' cargo test --workspace
