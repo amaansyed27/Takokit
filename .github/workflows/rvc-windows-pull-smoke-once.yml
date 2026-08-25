@@ -1,0 +1,67 @@
+name: RVC Windows pull smoke once
+on:
+  push:
+    branches: [slice/advanced-rvc-cloning]
+    paths:
+      - .github/workflows/rvc-windows-pull-smoke-once.yml
+permissions:
+  contents: read
+jobs:
+  pull-rvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Tako
+        shell: pwsh
+        run: |
+          cargo build --release --bin tako
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Pull RVC into a clean Takokit home
+        shell: pwsh
+        run: |
+          $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
+          $Tako = Join-Path $PWD "target\release\tako.exe"
+          & $Tako pull rvc
+          if ($LASTEXITCODE -ne 0) {
+            $Log = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc\install.log"
+            if (Test-Path $Log) { Get-Content $Log -Tail 300 }
+            exit $LASTEXITCODE
+          }
+      - name: Verify managed RVC adapter imports without fairseq build
+        shell: pwsh
+        run: |
+          $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
+          $Adapter = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc"
+          $Python = Join-Path $Adapter "venv\Scripts\python.exe"
+          $Script = Join-Path $Adapter "rvc.py"
+          $Source = Join-Path $Adapter "source"
+          if (!(Test-Path $Python) -or !(Test-Path $Script) -or !(Test-Path $Source)) {
+            throw "managed RVC adapter is incomplete"
+          }
+          $Code = @'
+import importlib.util
+import pathlib
+import sys
+adapter = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("takokit_rvc_adapter", adapter / "rvc.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.install_fairseq_import_stub()
+sys.path.insert(0, str(adapter / "source"))
+from rvc.modules.vc.modules import VC
+assert VC is not None
+print("managed RVC converter import: ok")
+'@
+          & $Python -c $Code $Adapter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Assert install log did not build fairseq
+        shell: pwsh
+        run: |
+          $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
+          $Log = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc\install.log"
+          $Text = Get-Content $Log -Raw
+          if ($Text -match "Building.*fairseq|fairseq.*cpp_extension|fairseq/clib") {
+            throw "RVC pull attempted to compile fairseq"
+          }
+          Get-Content $Log -Tail 80
