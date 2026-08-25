@@ -1,4 +1,4 @@
-import { ArrowRight, FileArchive, Plus, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, AudioLines, FileArchive, Plus, RotateCcw, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { ProductButton } from "../../components/ui/ProductButton";
@@ -106,7 +106,7 @@ export function AdvancedVoiceStudio({ onNavigate, onRefresh, initialSamplePath }
           <h2>Custom RVC Voice Studio</h2>
           <p>Build a persistent local RVC voice from recordings, or bring an existing checkpoint/package into the same managed workflow.</p>
         </div>
-        <span className="tk-rvc-intro__mark"><Sparkles size={20} strokeWidth={1.6} /></span>
+        <span className="tk-rvc-intro__mark"><AudioLines size={20} strokeWidth={1.6} /></span>
       </div>
 
       <div className="tk-rvc-mode-grid" role="tablist" aria-label="Advanced voice source">
