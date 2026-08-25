@@ -1,6 +1,5 @@
 use crate::{
-    args::{rvc::RvcTrainingPresetArg, RvcSampleCommand, RvcVoiceCommand},
-    Cli, Command, VoiceCommand,
+    RvcSampleCommand, RvcTrainingPresetArg, RvcVoiceCommand, Cli, Command, VoiceCommand,
 };
 use clap::Parser;
 use std::path::PathBuf;
