@@ -99,6 +99,21 @@ def link_directory(source: Path, destination: Path) -> None:
         destination.symlink_to(source, target_is_directory=True)
 
 
+def configure_managed_ffmpeg(env: dict[str, str]) -> Path:
+    """Expose Takokit's bundled Python FFmpeg binary to pinned upstream RVC stages."""
+    import imageio_ffmpeg
+
+    source = Path(imageio_ffmpeg.get_ffmpeg_exe()).resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"managed FFmpeg executable is missing: {source}")
+    tools = Path(__file__).resolve().parent / "tools"
+    executable = tools / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    link_file(source, executable)
+    inherited_path = env.get("PATH")
+    env["PATH"] = str(tools) + (os.pathsep + inherited_path if inherited_path else "")
+    return executable
+
+
 def inspect_audio(path: Path) -> dict[str, Any]:
     import librosa
     import numpy as np
@@ -345,6 +360,8 @@ def run_training(request: dict[str, Any]) -> None:
     env["PYTHONPATH"] = str(trainer_root) + (
         os.pathsep + inherited_pythonpath if inherited_pythonpath else ""
     )
+    managed_ffmpeg = configure_managed_ffmpeg(env)
+    append_log(log_path, f"Using managed FFmpeg: {managed_ffmpeg}")
     resolved_device = str(request.get("resolved_device") or "auto").lower()
     resolved_precision = str(request.get("resolved_precision") or "auto").lower()
     if resolved_device == "cpu":
