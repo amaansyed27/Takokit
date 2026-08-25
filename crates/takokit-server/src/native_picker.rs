@@ -35,9 +35,7 @@ enum PickerKind {
 impl PickerKind {
     fn windows_filter(self) -> &'static str {
         match self {
-            Self::Audio => {
-                "Audio files|*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.wma|All files|*.*"
-            }
+            Self::Audio => "Audio files|*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.wma|All files|*.*",
             Self::RvcCheckpoint => "RVC checkpoints|*.pth|All files|*.*",
             Self::RvcIndex => "RVC indexes|*.index|All files|*.*",
             Self::RvcPackage => "Takokit voice packages|*.takovoice|All files|*.*",
@@ -92,9 +90,8 @@ fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, St
 fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
     let initial = initial_dir.display().to_string().replace('"', "\\\"");
     let target = if kind.is_folder() { "folder" } else { "file" };
-    let script = format!(
-        "POSIX path of (choose {target} default location POSIX file \"{initial}\")"
-    );
+    let script =
+        format!("POSIX path of (choose {target} default location POSIX file \"{initial}\")");
     let output = Command::new("osascript")
         .args(["-e", &script])
         .output()
@@ -159,6 +156,8 @@ mod tests {
     fn rvc_artifact_filters_are_specific() {
         assert!(PickerKind::RvcCheckpoint.windows_filter().contains("*.pth"));
         assert!(PickerKind::RvcIndex.windows_filter().contains("*.index"));
-        assert!(PickerKind::RvcPackage.windows_filter().contains("*.takovoice"));
+        assert!(PickerKind::RvcPackage
+            .windows_filter()
+            .contains("*.takovoice"));
     }
 }

@@ -171,7 +171,7 @@ export function RvcSamplesPanel({ detail, initialSamplePath, onChanged }: Props)
           <article key={sample.id} className={sample.included ? "tk-rvc-sample" : "tk-rvc-sample is-excluded"}>
             <div className="tk-rvc-sample__identity">
               <span><FileAudio size={17} /></span>
-              <div><strong>{sample.display_name}</strong><small>{formatBytes(sample.bytes)} · {formatDuration(sample.inspection?.duration_ms ?? 0)} · {sample.state.replaceAll("_", " ")}</small></div>
+              <div><strong>{sample.display_name}</strong><small>{formatBytes(sample.bytes)} · {formatDuration(sample.inspection?.duration_ms ?? 0)} · {sample.state.replace(/_/g, " ")}</small></div>
             </div>
             <div className="tk-rvc-sample__preview"><LocalAudioPlayer path={sample.managed_path} compact defer label="Play sample" /></div>
             <div className="tk-rvc-sample__warnings">
@@ -199,5 +199,5 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 function labelWarning(code: string): string {
-  return code.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return code.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

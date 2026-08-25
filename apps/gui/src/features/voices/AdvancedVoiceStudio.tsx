@@ -176,5 +176,5 @@ function ArtifactField({ label, value, required, onBrowse, onChange }: {
 }
 
 function stateLabel(state: string): string {
-  return state.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return state.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

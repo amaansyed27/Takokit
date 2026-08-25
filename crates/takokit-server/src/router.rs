@@ -19,10 +19,7 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/doctor", get(handlers::doctor))
         .route("/v1/system/picker/audio", get(handlers::pick_audio_file))
         .route("/v1/system/picker/folder", get(handlers::pick_folder))
-        .route(
-            "/v1/system/picker/rvc",
-            get(handlers::pick_rvc_artifact),
-        )
+        .route("/v1/system/picker/rvc", get(handlers::pick_rvc_artifact))
         .route("/v1/system/audio", get(handlers::local_audio))
         .route("/v1/system/storage", get(handlers::storage_overview))
         .route("/v1/system/open", post(handlers::open_location))

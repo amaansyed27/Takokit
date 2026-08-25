@@ -86,7 +86,7 @@ export function RvcStudioWorkspace({ voice, initialSamplePath, onBack, onNavigat
 }
 
 function stateLabel(state: string): string {
-  return state.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return state.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDuration(milliseconds: number): string {
