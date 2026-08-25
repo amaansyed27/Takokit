@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
 
 #[derive(Debug, Clone)]
@@ -16,6 +14,16 @@ pub struct LibraryModelRow {
 impl LibraryModelRow {
     pub fn pull_reference(&self) -> Option<&str> {
         (!self.ready).then_some(self.reference.as_str())
+    }
+}
+
+pub fn load_library_state(
+    package_registry: &PackageRegistry,
+    installed_registry: &InstalledRegistry,
+) -> (Vec<LibraryModelRow>, Option<String>) {
+    match load_library_rows(package_registry, installed_registry) {
+        Ok(models) => (models, None),
+        Err(error) => (Vec::new(), Some(format!("{error:#}"))),
     }
 }
 
@@ -87,12 +95,7 @@ pub fn load_library_rows(
     Ok(rows)
 }
 
-fn format_hardware(
-    cpu: bool,
-    gpu: bool,
-    min_ram: Option<&str>,
-    min_vram: Option<&str>,
-) -> String {
+fn format_hardware(cpu: bool, gpu: bool, min_ram: Option<&str>, min_vram: Option<&str>) -> String {
     let mut parts = Vec::new();
     if cpu {
         parts.push("CPU".to_string());
@@ -129,6 +132,8 @@ fn format_size(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
 
     fn bundled_registry() -> PackageRegistry {
