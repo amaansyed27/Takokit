@@ -336,4 +336,6 @@ pub(super) fn storage(error: std::io::Error) -> TakokitError {
 }
 
 #[cfg(test)]
+mod package_security_tests;
+#[cfg(test)]
 mod tests;
