@@ -1,5 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},

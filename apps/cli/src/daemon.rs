@@ -82,7 +82,7 @@ mod windows_handle_inheritance {
             if handle.is_null() || handle == INVALID_HANDLE_VALUE {
                 continue;
             }
-            let mut flags = 0_u32;
+            let mut flags = 0;
             if unsafe { GetHandleInformation(handle, &mut flags) } == 0 {
                 continue;
             }
@@ -90,7 +90,7 @@ mod windows_handle_inheritance {
                 continue;
             }
             if unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) } != 0 {
-                restored.push((handle, flags));
+                restored.push((handle, flags & HANDLE_FLAG_INHERIT));
             }
         }
         StandardHandleInheritanceGuard { restored }
@@ -101,12 +101,19 @@ mod windows_handle_inheritance {
         if handle.is_null() {
             return unsafe { GetLastError() } == ERROR_INVALID_PARAMETER;
         }
-        let result = unsafe { WaitForSingleObject(handle, 0) };
+        let status = unsafe { WaitForSingleObject(handle, 0) };
         unsafe {
-            CloseHandle(handle);
+            let _ = CloseHandle(handle);
         }
-        result == WAIT_OBJECT_0
+        status == WAIT_OBJECT_0
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BuildFreshness {
+    Current,
+    Missing,
+    Mismatched,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,15 +125,13 @@ pub struct DaemonInfo {
     pub host: String,
     pub port: u16,
     pub started_at: u64,
-    #[serde(default = "default_daemon_mode")]
     pub mode: DaemonMode,
     pub log_path: PathBuf,
     #[serde(default)]
     pub build_id: String,
 }
-
 impl DaemonInfo {
-    pub fn identity(&self) -> DaemonIdentity {
+    fn identity(&self) -> DaemonIdentity {
         DaemonIdentity {
             instance_id: Some(self.instance_id),
             mode: self.mode,
@@ -141,124 +146,152 @@ impl DaemonInfo {
     }
 }
 
-fn default_daemon_mode() -> DaemonMode {
-    DaemonMode::Managed
+pub fn start(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
+    ensure_fresh_running(store, config)
 }
 
-pub(crate) fn ensure_fresh_running(
+pub fn ensure_fresh_running(
     store: &LocalStore,
     config: &RuntimeConfig,
 ) -> anyhow::Result<DaemonInfo> {
-    store.ensure_layout()?;
     let startup_lock = startup_lock(store)?;
     startup_lock
         .lock_exclusive()
         .with_context(|| format!("lock {}", store.daemon_start_lock_path().display()))?;
 
-    let result = ensure_fresh_running_locked(store, config);
+    let result = (|| {
+        if let Some((info, response)) = verified_runtime(store, config)? {
+            match build_freshness(&response) {
+                BuildFreshness::Current => return Ok(info),
+                BuildFreshness::Missing => {
+                    stop_locked(store, config)?.then_some(()).ok_or_else(|| {
+                        anyhow!("legacy managed daemon could not be stopped for replacement")
+                    })?;
+                }
+                BuildFreshness::Mismatched => {
+                    let stale_build = response.build_id.clone();
+                    stop_locked(store, config)?.then_some(()).ok_or_else(|| {
+                        anyhow!(
+                            "managed daemon build {stale_build} could not be stopped for replacement"
+                        )
+                    })?;
+                }
+            }
+        }
+
+        let info = start_locked(store, config)?;
+        let (_, response) = verified_runtime(store, config)?.ok_or_else(|| {
+            anyhow!(
+                "replacement daemon started but did not publish a verified identity; see {}",
+                log_path(store).display()
+            )
+        })?;
+        if build_freshness(&response) != BuildFreshness::Current {
+            return Err(anyhow!(
+                "replacement daemon build verification failed: expected {}, got {}",
+                current_build_id(),
+                if response.build_id.is_empty() {
+                    "<missing>"
+                } else {
+                    response.build_id.as_str()
+                }
+            ));
+        }
+        Ok(info)
+    })();
+
     let _ = startup_lock.unlock();
     result
 }
 
-fn ensure_fresh_running_locked(
-    store: &LocalStore,
-    config: &RuntimeConfig,
-) -> anyhow::Result<DaemonInfo> {
-    if let Some((info, build)) = verified_runtime(store, config)? {
-        if build_freshness(&build) == runtime::BuildFreshness::Current {
+fn start_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<DaemonInfo> {
+    if let Some((info, response)) = verified_runtime(store, config)? {
+        if build_freshness(&response) == BuildFreshness::Current {
             return Ok(info);
         }
-        stop_locked(store, config).context("stop stale Takokit daemon")?;
-    } else if port_is_occupied(config) {
-        return Err(anyhow!(
-            "port {} is already occupied by a process Takokit cannot verify as its managed daemon",
-            config.port
-        ));
     }
-
+    if daemon_lock_is_held(store)? {
+        return wait_for_verified(store, config)?
+            .map(|(info, _)| info)
+            .ok_or_else(|| anyhow!(
+                "daemon process owns the runtime lock but has not published a verified API identity within {} seconds; see {}",
+                IDENTITY_WAIT.as_secs(), log_path(store).display()
+            ));
+    }
+    if port_is_occupied(config) {
+        return Err(anyhow!("port {} is occupied by a direct Takokit server or another process; managed daemon will not take ownership", config.port));
+    }
     cleanup_proven_stale(store, config)?;
-    spawn_managed(store, config)?;
-    wait_for_verified(store, config)?
-        .map(|(info, _)| info)
-        .ok_or_else(|| anyhow!("managed daemon did not become ready within 5 seconds"))
-}
-
-pub(crate) fn spawn_managed(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
-    let executable = managed_daemon_executable()
-        .with_context(|| "locate the canonical Takokit daemon executable")?;
-    let log = log_path(store);
-    if let Some(parent) = log.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let stdout = OpenOptions::new().create(true).append(true).open(&log)?;
-    let stderr = stdout.try_clone()?;
-    let root = store.root().display().to_string();
-    let port = config.port.to_string();
-    let host = config.host.clone();
-
+    let instance_id = Uuid::new_v4();
+    let executable = managed_daemon_executable()?;
+    let log_path = log_path(store);
+    let log = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
     let mut command = Command::new(&executable);
     command
-        .arg("--storage-root")
-        .arg(root)
-        .arg("--host")
-        .arg(host)
-        .arg("--port")
-        .arg(port)
-        .arg("daemon")
         .arg("serve")
+        .arg("--daemon-child")
+        .arg("--instance-id")
+        .arg(instance_id.to_string())
         .stdin(Stdio::null())
-        .stdout(stdout)
-        .stderr(stderr);
-
+        .stdout(Stdio::from(log.try_clone()?))
+        .stderr(Stdio::from(log));
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        command.creation_flags(0x0000_0008 | 0x0000_0200);
+    }
+    let spawn_result = {
+        #[cfg(windows)]
         let _guard = windows_handle_inheritance::suppress();
-        command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
-        command.spawn()?;
-        return Ok(());
+        command.spawn()
+    };
+    spawn_result
+        .with_context(|| format!("spawn managed Takokit daemon with {}", executable.display()))?;
+    if let Some((info, _)) = wait_for_verified(store, config)? {
+        return Ok(info);
     }
-
-    #[cfg(not(windows))]
-    {
-        command.spawn()?;
-        Ok(())
+    if daemon_lock_is_held(store)? {
+        return Err(anyhow!(
+            "managed child acquired the runtime lock but failed to publish a verified API identity within {} seconds; see {}",
+            IDENTITY_WAIT.as_secs(),
+            log_path.display()
+        ));
     }
+    cleanup_proven_stale(store, config)?;
+    Err(anyhow!(
+        "managed child exited before acquiring ownership or publishing a verified API identity within {} seconds; see {}",
+        IDENTITY_WAIT.as_secs(),
+        log_path.display()
+    ))
 }
 
-pub(crate) fn install_canonical_daemon_for_test(
-    source: &Path,
-    target_dir: &Path,
-) -> anyhow::Result<PathBuf> {
-    let target = target_dir.join(if cfg!(windows) {
-        "takokit.exe"
-    } else {
-        "takokit"
-    });
-    fs::copy(source, &target)?;
-    Ok(target)
-}
-
-pub async fn serve(store: LocalStore, config: RuntimeConfig) -> anyhow::Result<()> {
-    store.ensure_layout()?;
+pub async fn child(
+    store: LocalStore,
+    config: RuntimeConfig,
+    instance_id: Uuid,
+) -> anyhow::Result<()> {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .open(store.daemon_lock_path())?;
-    lock.try_lock_exclusive()
-        .map_err(|_| anyhow!("another Takokit managed daemon already owns this storage root"))?;
+    lock.try_lock_exclusive().map_err(|_| {
+        anyhow!(
+            "another managed daemon owns {}",
+            store.daemon_lock_path().display()
+        )
+    })?;
     let listener = TcpListener::bind(config.bind_addr())
         .await
-        .with_context(|| format!("bind {}", config.bind_addr()))?;
-    let instance_id = Uuid::new_v4();
+        .with_context(|| format!("managed daemon could not bind {}", config.bind_addr()))?;
     let info = DaemonInfo {
         instance_id,
         pid: std::process::id(),
-        executable: std::env::current_exe().unwrap_or_default(),
-        storage_root: store.root().to_path_buf(),
+        executable: canonical_exe()?,
+        storage_root: canonical_root(store.root())?,
         host: config.host.clone(),
         port: config.port,
         started_at: now(),
