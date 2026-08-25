@@ -7,7 +7,6 @@ pub struct LibraryModelRow {
     pub title: String,
     pub state: String,
     pub detail: String,
-    pub installed: bool,
     pub ready: bool,
 }
 
@@ -86,7 +85,6 @@ pub fn load_library_rows(
                     release.source.provider,
                     action,
                 ),
-                installed,
                 ready,
             });
         }
@@ -153,7 +151,6 @@ mod tests {
             .expect("kokoro in canonical registry");
 
         assert_eq!(kokoro.state, "available");
-        assert!(!kokoro.installed);
         assert!(!kokoro.ready);
         assert_eq!(kokoro.pull_reference(), Some(kokoro.reference.as_str()));
     }
