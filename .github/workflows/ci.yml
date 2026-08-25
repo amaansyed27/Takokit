@@ -42,6 +42,8 @@ jobs:
   rust:
     name: Rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -D warnings
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +102,9 @@ jobs:
         run: |
           cargo test --workspace 2>&1 | Tee-Object -FilePath cargo-test-windows.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build release binaries
+        run: cargo build --release --bin tako --bin takokit
 
       - name: Upload Rust test log
         if: always()
