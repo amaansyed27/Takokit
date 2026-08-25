@@ -408,3 +408,6 @@ pub async fn rvc_test_voice(
         serde_json::json!({"kind":"rvc_voice_test","data":response}),
     ))
 }
+
+#[cfg(test)]
+mod tests;

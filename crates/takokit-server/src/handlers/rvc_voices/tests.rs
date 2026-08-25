@@ -1,7 +1,7 @@
 use super::*;
 use takokit_core::{
-    RvcF0Method, RvcTrainingConfig, RvcTrainingDevice, RvcTrainingJobStatus,
-    RvcTrainingPrecision, RvcTrainingPreset, RvcTrainingStage,
+    RvcF0Method, RvcTrainingConfig, RvcTrainingDevice, RvcTrainingJobStatus, RvcTrainingPrecision,
+    RvcTrainingPreset, RvcTrainingStage,
 };
 
 fn fixture_job() -> RvcTrainingJob {

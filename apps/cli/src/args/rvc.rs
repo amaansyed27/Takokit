@@ -217,7 +217,7 @@ pub(crate) enum RvcVoiceCommand {
     },
     Export {
         voice: String,
-        output: PathBuf,
+        package: PathBuf,
         #[arg(long)]
         sign: bool,
         #[arg(long)]

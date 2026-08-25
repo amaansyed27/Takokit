@@ -1,5 +1,7 @@
 use super::*;
 
+mod rvc;
+
 #[test]
 fn cli_accepts_bare_command_for_interactive_launcher() {
     let cli = Cli::try_parse_from(["takokit"]).expect("bare cli parse");

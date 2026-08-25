@@ -33,6 +33,7 @@ enum PickerKind {
 }
 
 impl PickerKind {
+    #[cfg(any(windows, test))]
     fn windows_filter(self) -> &'static str {
         match self {
             Self::Audio => "Audio files|*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.wma|All files|*.*",

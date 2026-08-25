@@ -186,13 +186,6 @@ impl AdvancedRvcState {
     pub fn preset(&self) -> &'static str {
         RVC_PRESETS[self.preset_index.min(RVC_PRESETS.len() - 1)]
     }
-
-    pub fn clear_paths(&mut self) {
-        self.path.clear();
-        self.path_cursor = 0;
-        self.index.clear();
-        self.index_cursor = 0;
-    }
 }
 
 #[cfg(test)]

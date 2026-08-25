@@ -129,14 +129,14 @@ pub(crate) async fn run_direct(
         ),
         RvcVoiceCommand::Export {
             voice,
-            output,
+            package,
             sign,
             include_reference,
         } => {
             let path = service.export_package(
                 &voice,
                 ExportRvcVoiceRequest {
-                    output,
+                    output: package,
                     sign,
                     include_reference,
                 },
@@ -264,13 +264,13 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
         ),
         RvcVoiceCommand::Export {
             voice,
-            output,
+            package,
             sign,
             include_reference,
         } => client.post(
             &rvc_path(voice, "/export"),
             &json!({
-                "output":output,
+                "output":package,
                 "sign":sign,
                 "include_reference":include_reference,
             }),

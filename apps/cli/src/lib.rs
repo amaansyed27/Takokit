@@ -24,9 +24,8 @@ use takokit_package::{
     initialize_runner_runtime, install_model_complete, install_python_adapter,
     model_info_from_plan, plan_model, python_adapter_record, python_adapter_records,
     register_custom_model, remove_custom_model, remove_model_complete, require_custom_model_id,
-    resolve_execution_plan, runner_runtime_layout, voice_contract_for_model, InstallModelOptions,
-    InstalledRegistry, ModelPlan, PackageError, PackageRegistry, RemoveModelOptions,
-    RunnerManifest,
+    resolve_execution_plan, runner_runtime_layout, InstallModelOptions, InstalledRegistry,
+    ModelPlan, PackageError, PackageRegistry, RemoveModelOptions, RunnerManifest,
 };
 use takokit_server::{run_server, AppState};
 use takokit_store::{LocalStore, VoiceProfileStore};

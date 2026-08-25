@@ -282,8 +282,6 @@ fn use_in_convert(app: &mut App) -> Option<TuiAction> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn managed_commands_keep_voice_rvc_cli_shape() {
         let prefix = ["voice", "rvc"];

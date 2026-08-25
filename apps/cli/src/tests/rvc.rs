@@ -1,6 +1,4 @@
-use crate::{
-    RvcSampleCommand, RvcTrainingPresetArg, RvcVoiceCommand, Cli, Command, VoiceCommand,
-};
+use crate::{Cli, Command, RvcSampleCommand, RvcTrainingPresetArg, RvcVoiceCommand, VoiceCommand};
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -168,15 +166,8 @@ fn parses_package_export_verify_import_and_dry_run_remove() {
         RvcVoiceCommand::ImportPackage { consent: true, .. }
     ));
 
-    let remove = Cli::try_parse_from([
-        "tako",
-        "voice",
-        "rvc",
-        "remove",
-        "voice-id",
-        "--dry-run",
-    ])
-    .unwrap();
+    let remove =
+        Cli::try_parse_from(["tako", "voice", "rvc", "remove", "voice-id", "--dry-run"]).unwrap();
     assert!(matches!(
         rvc(remove.command.unwrap()),
         RvcVoiceCommand::Remove { voice, dry_run: true } if voice == "voice-id"
