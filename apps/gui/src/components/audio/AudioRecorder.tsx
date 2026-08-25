@@ -1,4 +1,4 @@
-import { Mic, Square, X } from "lucide-react";
+import { Check, Mic, RotateCcw, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { uploadWorkspaceFile, type WorkspaceFile } from "../../lib/files";
 
@@ -6,13 +6,22 @@ type AudioRecorderProps = {
   onSaved: (file: WorkspaceFile) => void;
   compact?: boolean;
   label?: string;
+  reviewBeforeSave?: boolean;
 };
 
-export function AudioRecorder({ onSaved, compact = false, label = "Record audio" }: AudioRecorderProps) {
+export function AudioRecorder({
+  onSaved,
+  compact = false,
+  label = "Record audio",
+  reviewBeforeSave = false
+}: AudioRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [saving, setSaving] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [reviewUrl, setReviewUrl] = useState<string | null>(null);
+  const pendingBlobRef = useRef<Blob | null>(null);
+  const pendingNameRef = useRef<string | null>(null);
   const recordingRef = useRef(false);
   const savingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -28,6 +37,7 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
 
   async function start() {
     if (recordingRef.current || savingRef.current) return;
+    clearReview();
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Microphone recording is not available in this browser.");
@@ -83,9 +93,7 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
   async function stop() {
     if (!recordingRef.current || savingRef.current) return;
     recordingRef.current = false;
-    savingRef.current = true;
     setRecording(false);
-    setSaving(true);
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
@@ -99,12 +107,40 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
       const samples = flatten(chunks);
       if (samples.length === 0) throw new Error("No microphone audio was captured.");
       const wav = encodeWav(samples, sampleRate);
-      const file = await uploadWorkspaceFile(wav, recordingName());
+      const name = recordingName();
+      if (reviewBeforeSave) {
+        pendingBlobRef.current = wav;
+        pendingNameRef.current = name;
+        setReviewUrl(URL.createObjectURL(wav));
+        return;
+      }
+      await saveBlob(wav, name);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The recording could not be saved.");
+    }
+  }
+
+  async function keepReview() {
+    const blob = pendingBlobRef.current;
+    const name = pendingNameRef.current;
+    if (!blob || !name || savingRef.current) return;
+    try {
+      await saveBlob(blob, name);
+      clearReview();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The recording could not be saved.");
+    }
+  }
+
+  async function saveBlob(blob: Blob, name: string) {
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      const file = await uploadWorkspaceFile(blob, name);
       onSaved(file);
       setSeconds(0);
       chunksRef.current = [];
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The recording could not be saved.");
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -116,7 +152,17 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
     setRecording(false);
     setSeconds(0);
     chunksRef.current = [];
+    clearReview();
     cleanup();
+  }
+
+  function clearReview() {
+    setReviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    pendingBlobRef.current = null;
+    pendingNameRef.current = null;
   }
 
   function cleanupAudioGraph() {
@@ -140,6 +186,8 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
       timerRef.current = null;
     }
     cleanupAudioGraph();
+    const current = reviewUrl;
+    if (current) URL.revokeObjectURL(current);
   }
 
   return (
@@ -148,18 +196,24 @@ export function AudioRecorder({ onSaved, compact = false, label = "Record audio"
         <Mic size={16} strokeWidth={1.8} />
       </span>
       <div className="tk-recorder__copy">
-        <strong>{recording ? "Recording…" : saving ? "Saving recording…" : label}</strong>
-        <span>{recording ? `${formatDuration(seconds)} · maximum 5 minutes` : "Uses your microphone and saves a WAV to Files."}</span>
+        <strong>{recording ? "Recording…" : reviewUrl ? "Review this recording" : saving ? "Saving recording…" : label}</strong>
+        <span>{recording ? `${formatDuration(seconds)} · maximum 5 minutes` : reviewUrl ? "Play it back, then keep it or record again." : "Uses your microphone and saves a WAV to Files."}</span>
+        {reviewUrl ? <audio className="tk-recorder__review" src={reviewUrl} controls preload="metadata" /> : null}
       </div>
       <div className="tk-recorder__actions">
         {recording ? (
           <>
             <button className="is-stop" type="button" onClick={() => void stop()}>
-              <Square size={12} fill="currentColor" /> Stop & use
+              <Square size={12} fill="currentColor" /> Stop
             </button>
             <button className="is-cancel" type="button" title="Discard recording" onClick={cancel}>
               <X size={14} />
             </button>
+          </>
+        ) : reviewUrl ? (
+          <>
+            <button type="button" disabled={saving} onClick={() => void keepReview()}><Check size={13} /> {saving ? "Saving" : "Keep & add"}</button>
+            <button className="is-cancel" type="button" disabled={saving} title="Discard and record again" onClick={() => { clearReview(); void start(); }}><RotateCcw size={14} /></button>
           </>
         ) : (
           <button type="button" disabled={saving} onClick={() => void start()}>
