@@ -51,6 +51,19 @@ const QWEN_OMNI_PACKAGES: &[&str] = &[
     "torchaudio",
     "torchvision",
 ];
+const RVC_PACKAGES: &[&str] = &[
+    "transformers>=4.49,<4.50",
+    "numpy==1.26.4",
+    "numba==0.58.1",
+    "librosa>=0.10.1,<0.11",
+    "praat-parselmouth>=0.4.3,<1",
+    "pyworld>=0.3.4,<0.4",
+    "torchcrepe>=0.0.22,<0.1",
+    "av==12.0.0",
+    "faiss-cpu>=1.7.4,<2",
+    "python-dotenv>=1,<2",
+    "pydub>=0.25,<1",
+];
 
 const COSYVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     repository: "https://github.com/FunAudioLLM/CosyVoice.git",
@@ -85,7 +98,7 @@ const RVC_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "7b284a634667c34103eaaeed972b48ccdb4b893e",
     recursive: false,
     requirement_files: &[],
-    editable: true,
+    editable: false,
 };
 
 macro_rules! adapter {
@@ -378,10 +391,10 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "rvc",
         "rvc",
         "3.11",
-        &[],
+        RVC_PACKAGES,
         RVC_ADAPTER,
         Some(RVC_SOURCE),
-        "RVC."
+        "RVC conversion using pinned source plus a pure-Python Transformers HuBERT compatibility layer; the upstream fairseq package is not compiled."
     ),
     adapter!(
         "qwen_omni",
