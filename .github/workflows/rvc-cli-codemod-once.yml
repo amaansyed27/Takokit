@@ -1,0 +1,35 @@
+name: RVC CLI codemod once
+
+on:
+  push:
+    branches:
+      - slice/advanced-rvc-cloning
+    paths:
+      - .github/workflows/rvc-cli-codemod-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  codemod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply codemod
+        run: python scripts/rvc_cli_wire_once.py
+      - name: Format and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git rm .github/workflows/rvc-cli-codemod-once.yml scripts/rvc_cli_wire_once.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(rvc): wire advanced CLI through shared service"
+          git push origin HEAD:slice/advanced-rvc-cloning
