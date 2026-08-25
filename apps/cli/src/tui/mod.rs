@@ -5,6 +5,7 @@ mod convert;
 mod editor;
 mod input;
 mod job;
+mod library;
 mod ui;
 
 use std::{io, time::Duration};
