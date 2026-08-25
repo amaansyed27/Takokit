@@ -14,3 +14,5 @@
 /site/dist/
 /site/public/v1/registry.json
 /.tako/
+site/.env.local
+site/.vercel
