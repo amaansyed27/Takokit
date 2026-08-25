@@ -136,8 +136,8 @@ fn parses_package_export_verify_import_and_dry_run_remove() {
     .unwrap();
     assert!(matches!(
         rvc(export.command.unwrap()),
-        RvcVoiceCommand::Export { voice, output, sign: true, .. }
-            if voice == "voice-id" && output == PathBuf::from(r"C:\exports\voice ü.takovoice")
+        RvcVoiceCommand::Export { voice, package, sign: true, .. }
+            if voice == "voice-id" && package == PathBuf::from(r"C:\exports\voice ü.takovoice")
     ));
 
     let verify = Cli::try_parse_from([
