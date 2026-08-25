@@ -1,3 +1,4 @@
+mod advanced_rvc;
 mod forms;
 mod home;
 mod lists;
@@ -39,7 +40,9 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         TuiScreen::Home => home::render_home(frame, page[1], app),
         TuiScreen::Speak => forms::render_speak(frame, page[1], app),
         TuiScreen::Transcribe => forms::render_transcribe(frame, page[1], app),
-        TuiScreen::Clone => forms::render_clone(frame, page[1], app),
+        TuiScreen::CreateVoice => advanced_rvc::render_create_voice(frame, page[1], app),
+        TuiScreen::InstantClone => forms::render_clone(frame, page[1], app),
+        TuiScreen::AdvancedRvc => advanced_rvc::render_advanced_rvc(frame, page[1], app),
         TuiScreen::Convert => forms::render_convert(frame, page[1], app),
         TuiScreen::Manage => home::render_manage(frame, page[1], app),
         TuiScreen::Models => lists::render_models(frame, page[1], app),
@@ -151,8 +154,12 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         TuiScreen::Transcribe => {
             "F2 browse · Ctrl+U clear · Home/End edit · Ctrl+Enter run · Esc home"
         }
-        TuiScreen::Clone => {
-            "F2 reference audio · Space consent · Ctrl+Enter save voice · Esc home"
+        TuiScreen::CreateVoice => "↑/↓ choose · Enter open · Esc home",
+        TuiScreen::InstantClone => {
+            "F2 reference audio · Space consent · Ctrl+Enter save voice · Esc back"
+        }
+        TuiScreen::AdvancedRvc => {
+            "Tab fields · ↑/↓ project/preset/action · F2 browse · Ctrl+Enter run · Ctrl+C cancel · Esc back"
         }
         TuiScreen::Convert => {
             "F2 source/target · Space consent · Ctrl+Enter convert · P plays result in Activity"
@@ -189,7 +196,7 @@ fn render_help(frame: &mut Frame<'_>, app: &App) {
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(
-            "Takokit TUI\n\nVoice workflows\n  Speak: Text → speech. Choose a TTS model, then use ↑/↓ on Voice to cycle compatible saved cloned voices. You can still type a voice ID manually.\n\n  Create Voice: Reference audio → reusable cloned voice. Takokit saves the consent-backed voice locally. After it finishes, open Speak, select the same compatible model, choose the saved voice, and enter text.\n\n  Convert Voice: Existing speech audio → target voice. The original words stay the same; the voice/timbre changes toward the target. OpenVoice uses target reference audio. RVC uses a target RVC package and exposes its tuning controls.\n\nTranscribe\n  Audio → text. F2 opens a native audio picker; paste/drag and workspace-relative paths also work.\n\nRunning tasks\n  Tab moves through fields. Ctrl+U clears the focused text field. Ctrl+Enter runs. Results open in Activity. A successful conversion proves execution only; listen before judging similarity or artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Model Library browses Takokit's canonical registry and pulls or repairs models through the same background job flow. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. F2 browses for a folder. Switching changes sessions and outputs only; installed models and saved voices remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows a human-readable result, output paths, and next actions. Press P to play the newest audio output in the system player or O to open the active session output folder.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
+            "Takokit TUI\n\nVoice workflows\n  Speak: Text → speech. Choose a TTS model, then use ↑/↓ on Voice to cycle compatible saved cloned voices. You can still type a voice ID manually.\n\n  Create Voice: Choose Instant Clone for a reference-audio profile or Advanced RVC for a persistent multi-sample dataset, preparation, hardware preflight, training, checkpoint activation, testing, and Use in Convert.\n\n  Convert Voice: Existing speech audio → target voice. The original words stay the same; the voice/timbre changes toward the target. OpenVoice uses target reference audio. RVC uses a target RVC package and exposes its tuning controls.\n\nTranscribe\n  Audio → text. F2 opens a native audio picker; paste/drag and workspace-relative paths also work.\n\nRunning tasks\n  Tab moves through fields. Ctrl+U clears the focused text field. Ctrl+Enter runs. Results open in Activity. A successful conversion proves execution only; listen before judging similarity or artefacts.\n\nManage\n  Installed Models contains verified local inventory only. Model Library browses Takokit's canonical registry and pulls or repairs models through the same background job flow. Runners and System hold runtime maintenance actions. Destructive actions require confirmation.\n\nWorkspace\n  Press W from non-text screens or open Workspace from Home. F2 browses for a folder. Switching changes sessions and outputs only; installed models and saved voices remain global.\n\nSessions\n  Enter opens a session. N creates a new one.\n\nActivity\n  Shows a human-readable result, output paths, and next actions. Press P to play the newest audio output in the system player or O to open the active session output folder.\n\nNavigation\n  Esc goes back. Esc on Home exits. F1 closes this help. Ctrl+C cancels a running child task and exits after cleanup.",
         )
         .wrap(Wrap { trim: false })
         .block(

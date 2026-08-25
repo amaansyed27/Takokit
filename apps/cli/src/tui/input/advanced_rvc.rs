@@ -120,11 +120,8 @@ pub(super) fn handle_advanced_rvc(app: &mut App, key: KeyEvent) -> Option<TuiAct
                 )
             }
             KeyCode::Right | KeyCode::Down => {
-                app.advanced_rvc.action_index = shifted_index(
-                    app.advanced_rvc.action_index,
-                    ADVANCED_RVC_ACTIONS.len(),
-                    1,
-                )
+                app.advanced_rvc.action_index =
+                    shifted_index(app.advanced_rvc.action_index, ADVANCED_RVC_ACTIONS.len(), 1)
             }
             KeyCode::Enter | KeyCode::Char(' ') => return submit_advanced_rvc(app),
             _ => {}
@@ -236,7 +233,9 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
                 }
                 AdvancedRvcAction::TestVoice => {
                     if path.is_empty() {
-                        app.set_status("Test Voice requires source audio in Path. Press F2 to browse.");
+                        app.set_status(
+                            "Test Voice requires source audio in Path. Press F2 to browse.",
+                        );
                         return None;
                     }
                     vec!["test".into(), voice, path]

@@ -91,7 +91,9 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
                     .unwrap_or_else(|| "not selected".to_string())
             )
         })
-        .unwrap_or_else(|| "No Advanced RVC project yet — choose New Voice or Import Existing".into());
+        .unwrap_or_else(|| {
+            "No Advanced RVC project yet — choose New Voice or Import Existing".into()
+        });
     frame.render_widget(
         field(
             "Project · ↑/↓ change",
@@ -195,6 +197,9 @@ mod tests {
 
     #[test]
     fn state_names_are_human_readable() {
-        assert_eq!(state_name(takokit_core::RvcVoiceProjectState::ReadyToTrain), "ready to train");
+        assert_eq!(
+            state_name(takokit_core::RvcVoiceProjectState::ReadyToTrain),
+            "ready to train"
+        );
     }
 }

@@ -104,7 +104,9 @@ impl AdvancedRvcAction {
     pub fn hint(self) -> &'static str {
         match self {
             Self::NewVoice => "Name + consent → create a persistent managed project",
-            Self::ImportExisting => "Path=.pth or .takovoice; optional Index=.index; Name + consent",
+            Self::ImportExisting => {
+                "Path=.pth or .takovoice; optional Index=.index; Name + consent"
+            }
             Self::AddSample => "Path=audio file; Takokit copies it into managed voice storage",
             Self::Inspect => "Inspect durations, format facts, duplicates, and objective warnings",
             Self::Prepare => "Run preprocessing, RMVPE F0, and feature extraction",
