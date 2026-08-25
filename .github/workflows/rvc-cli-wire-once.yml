@@ -1,18 +1,25 @@
 name: RVC CLI wire once
+
 on:
   push:
-    branches: [slice/advanced-rvc-cloning]
-    paths: [.github/workflows/rvc-cli-wire-once.yml]
+    branches:
+      - slice/advanced-rvc-cloning
+    paths:
+      - .github/workflows/rvc-cli-wire-once.yml
+
 permissions:
   contents: write
+
 jobs:
   wire:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
-        with: {components: rustfmt}
+        with:
+          components: rustfmt
       - name: Wire CLI and format
         shell: bash
         run: |
