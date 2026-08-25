@@ -7,6 +7,8 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    thread,
+    time::Duration,
 };
 use takokit_package::{install_python_adapter, python_managed_runner_layout, InstalledRegistry};
 
@@ -332,11 +334,27 @@ impl RvcVoiceService {
     fn ensure_training_adapter(&self) -> TakokitResult<()> {
         let layout = python_managed_runner_layout(&self.root);
         let adapter = layout.adapters.join("rvc_training");
-        if !adapter.join("rvc_training.py").is_file() || !adapter_python(&adapter).is_file() {
-            install_python_adapter(&self.root, "rvc_training")
-                .map_err(|error| TakokitError::Storage(error.to_string()))?;
+        if training_adapter_ready(&adapter) {
+            return Ok(());
         }
-        Ok(())
+
+        match install_python_adapter(&self.root, "rvc_training") {
+            Ok(_) => return Ok(()),
+            Err(error) if error.to_string().contains("another Takokit process is already installing this adapter") => {}
+            Err(error) => return Err(TakokitError::Storage(error.to_string())),
+        }
+
+        for _ in 0..900 {
+            if training_adapter_ready(&adapter) {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        Err(TakokitError::Storage(
+            "timed out waiting for another Takokit process to finish installing the RVC training adapter; check the rvc_training install log and retry"
+                .into(),
+        ))
     }
 
     fn training_paths(&self) -> TakokitResult<TrainingPaths> {
@@ -372,6 +390,10 @@ struct TrainingPaths {
     script: PathBuf,
     trainer_root: PathBuf,
     asset_root: PathBuf,
+}
+
+fn training_adapter_ready(adapter: &Path) -> bool {
+    adapter.join("rvc_training.py").is_file() && adapter_python(adapter).is_file()
 }
 
 fn adapter_python(adapter: &Path) -> PathBuf {
