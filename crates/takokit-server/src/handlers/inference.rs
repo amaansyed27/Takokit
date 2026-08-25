@@ -18,6 +18,29 @@ pub async fn voices(State(state): State<AppState>) -> Json<VoicesResponse> {
             consent_required: false,
         }));
     }
+    if let Ok(projects) = state.rvc_voices.list() {
+        for project in projects {
+            if project.active_checkpoint_id.is_none() {
+                continue;
+            }
+            let id = project.id.to_string();
+            if state
+                .rvc_voices
+                .show(&id)
+                .ok()
+                .and_then(|detail| detail.managed)
+                .is_some()
+            {
+                data.push(VoiceInfo {
+                    id,
+                    name: project.name,
+                    source: "managed-rvc".to_string(),
+                    model_id: Some("rvc".to_string()),
+                    consent_required: false,
+                });
+            }
+        }
+    }
     Json(VoicesResponse { data })
 }
 
@@ -25,6 +48,10 @@ pub async fn remove_voice(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    if state.rvc_voices.show(&id).is_ok() {
+        state.rvc_voices.remove(&id, false).map_err(ApiError)?;
+        return Ok(StatusCode::NO_CONTENT);
+    }
     VoiceProfileStore::new(state.store.voices_dir())
         .remove(&id)
         .map_err(ApiError)?;
@@ -180,7 +207,7 @@ pub async fn transcriptions(
 pub async fn convert_voice(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(request): Json<VoiceConversionRequest>,
+    Json(mut request): Json<VoiceConversionRequest>,
 ) -> Result<Json<VoiceConversionResponse>, ApiError> {
     let workspace =
         RequestWorkspace::from_headers(&headers, "Voice conversion").map_err(ApiError)?;
@@ -188,6 +215,12 @@ pub async fn convert_voice(
     let model = request.model.clone();
     let source_path = request.source_path.clone();
     let target_voice = request.target_voice.clone();
+    if model == "rvc" {
+        request.target_voice = state
+            .rvc_voices
+            .resolve_conversion_target(&request.target_voice)
+            .map_err(ApiError)?;
+    }
     let _execution = state
         .register_execution(model.clone(), "voice_conversion")
         .await;
