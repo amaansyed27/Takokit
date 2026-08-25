@@ -121,6 +121,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             $Log = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc\install.log"
             if (Test-Path $Log) { Get-Content $Log -Tail 300 }
+            $TrainingLog = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc_training\install.log"
+            if (Test-Path $TrainingLog) { Get-Content $TrainingLog -Tail 300 }
             exit $LASTEXITCODE
           }
           $Adapter = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc"
@@ -133,6 +135,93 @@ jobs:
           if ($Text -match "Building.*fairseq|fairseq.*cpp_extension|fairseq/clib") {
             throw "RVC pull attempted to compile fairseq"
           }
+
+      - name: Prepare real RVC dataset in clean managed home (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Tako = Join-Path $PWD "target\release\tako.exe"
+          $Sample = Join-Path $env:RUNNER_TEMP "rvc-prepare-smoke.wav"
+          @'
+          import math
+          import struct
+          import sys
+          import wave
+
+          path = sys.argv[1]
+          sample_rate = 16000
+          seconds = 8
+          with wave.open(path, "wb") as wav:
+              wav.setnchannels(1)
+              wav.setsampwidth(2)
+              wav.setframerate(sample_rate)
+              frames = bytearray()
+              for i in range(sample_rate * seconds):
+                  t = i / sample_rate
+                  value = 0.22 * math.sin(2.0 * math.pi * (180.0 + 35.0 * math.sin(2.0 * math.pi * 0.7 * t)) * t)
+                  frames.extend(struct.pack("<h", int(max(-1.0, min(1.0, value)) * 32767)))
+              wav.writeframes(frames)
+          '@ | python - $Sample
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          & $Tako --direct voice rvc create --name "CI RVC Prepare Smoke" --consent
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $VoiceRoot = Join-Path $env:TAKOKIT_HOME "voices\rvc"
+          $Voice = (Get-ChildItem $VoiceRoot -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+          if (-not $Voice) { throw "RVC prepare smoke did not create a voice project" }
+
+          & $Tako --direct voice rvc samples $Voice add $Sample
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $Tako --direct voice rvc inspect $Voice
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $Tako --direct voice rvc preflight $Voice --preset custom --epochs 1 --batch-size 1 --save-every-epochs 1 --device cpu --precision fp32
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $Tako --direct voice rvc prepare $Voice --preset custom --epochs 1 --batch-size 1 --save-every-epochs 1 --device cpu --precision fp32
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $VoiceDir = Join-Path $VoiceRoot $Voice
+          $Deadline = (Get-Date).AddMinutes(20)
+          $Succeeded = $false
+          while ((Get-Date) -lt $Deadline) {
+            $JobFile = Get-ChildItem (Join-Path $VoiceDir "jobs") -Filter "*.json" |
+              Where-Object { $_.BaseName -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+            if ($JobFile) {
+              $Job = Get-Content $JobFile.FullName -Raw | ConvertFrom-Json
+              Write-Host "RVC prepare status=$($Job.status) stage=$($Job.stage)"
+              if ($Job.status -eq "succeeded") {
+                if ($Job.stage -ne "ready_to_train") {
+                  throw "RVC preparation succeeded with unexpected terminal stage: $($Job.stage)"
+                }
+                $Succeeded = $true
+                break
+              }
+              if ($Job.status -in @("failed", "stale", "cancelled")) {
+                if ($Job.log_path -and (Test-Path $Job.log_path)) { Get-Content $Job.log_path -Tail 300 }
+                throw "RVC preparation ended as $($Job.status): $($Job.failure)"
+              }
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $Succeeded) { throw "Timed out waiting for real RVC dataset preparation" }
+
+          $Experiment = Join-Path $VoiceDir "dataset\experiment"
+          $FileList = Join-Path $Experiment "filelist.txt"
+          $ConfigPath = Join-Path $Experiment "config.json"
+          if (-not (Test-Path $FileList)) { throw "RVC preparation produced no filelist.txt" }
+          if (-not (Test-Path $ConfigPath)) { throw "RVC preparation produced no config.json" }
+          $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+          if ($Config.data.sampling_rate -ne 40000) {
+            throw "RVC preparation copied the wrong 40 kHz topology config"
+          }
+          if ((Get-Content $FileList | Where-Object { $_.Trim() }).Count -lt 1) {
+            throw "RVC preparation produced an empty training file list"
+          }
+          $LatestLog = Get-ChildItem (Join-Path $VoiceDir "logs") -Filter "*.log" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if ($LatestLog) { Get-Content $LatestLog.FullName -Tail 120 }
 
       - name: Upload Rust test log
         if: always()
