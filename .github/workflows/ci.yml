@@ -106,6 +106,29 @@ jobs:
       - name: Build release binaries
         run: cargo build --release --bin tako --bin takokit
 
+      - name: Pull RVC in clean managed home (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
+          $Tako = Join-Path $PWD "target\release\tako.exe"
+          & $Tako pull rvc
+          if ($LASTEXITCODE -ne 0) {
+            $Log = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc\install.log"
+            if (Test-Path $Log) { Get-Content $Log -Tail 300 }
+            exit $LASTEXITCODE
+          }
+          $Adapter = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc"
+          $Python = Join-Path $Adapter "venv\Scripts\python.exe"
+          $Code = 'import importlib.util,pathlib,sys; a=pathlib.Path(sys.argv[1]); s=importlib.util.spec_from_file_location("takokit_rvc",a/"rvc.py"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.install_fairseq_import_stub(); sys.path.insert(0,str(a/"source")); from rvc.modules.vc.modules import VC; assert VC is not None; print("managed RVC converter import: ok")'
+          & $Python -c $Code $Adapter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Log = Join-Path $Adapter "install.log"
+          $Text = Get-Content $Log -Raw
+          if ($Text -match "Building.*fairseq|fairseq.*cpp_extension|fairseq/clib") {
+            throw "RVC pull attempted to compile fairseq"
+          }
+
       - name: Upload Rust test log
         if: always()
         uses: actions/upload-artifact@v4
