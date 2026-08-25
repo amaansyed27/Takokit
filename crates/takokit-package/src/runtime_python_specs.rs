@@ -192,9 +192,11 @@ mod tests {
             &["configs/v1/40k.json", "train/train.py"]
         );
         assert!(RVC_TRAINING_ADAPTER.contains("configs\" / \"v1\" / \"40k.json"));
-        assert!(RVC_TRAINING_ADAPTER.contains("train/preprocess.py"));
-        assert!(RVC_TRAINING_ADAPTER.contains("train/train.py"));
-        assert!(RVC_TRAINING_ADAPTER.contains("train/train_index.py"));
+        assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.preprocess\""));
+        assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.dataset.extract_f0\""));
+        assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.dataset.extract_hubert_feature\""));
+        assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.train\""));
+        assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.train_index\""));
         assert!(RVC_TRAINING_ADAPTER.contains("Reusing deterministic prepared dataset"));
     }
 
