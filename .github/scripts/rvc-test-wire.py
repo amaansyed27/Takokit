@@ -28,6 +28,12 @@ edit(
     "apps/cli/src/rvc_voice_command.rs",
     "        RvcVoiceCommand::Export {\n            voice,\n            output,\n            sign,",
     "        RvcVoiceCommand::Export {\n            voice,\n            package,\n            sign,",
+    count=2,
+)
+edit(
+    "apps/cli/src/rvc_voice_command.rs",
+    "                    output,\n                    sign,",
+    "                    output: package,\n                    sign,",
 )
 edit(
     "apps/cli/src/rvc_voice_command.rs",
@@ -56,9 +62,6 @@ edit(
     "impl PickerKind {\n    fn windows_filter(self) -> &'static str {",
     "impl PickerKind {\n    #[cfg(any(windows, test))]\n    fn windows_filter(self) -> &'static str {",
 )
-
-# Remove two legacy dead fields/helpers that were no longer wired to any
-# product path and only generated warnings during final validation.
 edit(
     "apps/cli/src/tui/catalog.rs",
     "    pub model_type: String,\n",
@@ -70,11 +73,16 @@ edit(
     "",
 )
 
-progress = Path("apps/cli/src/progress.rs")
-text = progress.read_text(encoding="utf-8")
-text = text.replace("use crate::daemon_client::Client;\n", "")
-text = text.replace("const REDRAW_INTERVAL: Duration = Duration::from_secs(1);\n", "")
-start = text.index("    pub(crate) fn start_model_pull(")
-end = text.index("    fn spawn_timer", start)
-text = text[:start] + text[end:]
-progress.write_text(text, encoding="utf-8")
+# progress.rs is included in more than one module context. The model-pull
+# helper is live in daemon_commands, but appears dead in the duplicate test
+# context; keep the feature and scope the lint exception to those two items.
+edit(
+    "apps/cli/src/progress.rs",
+    "const REDRAW_INTERVAL: Duration = Duration::from_secs(1);",
+    "#[allow(dead_code)]\nconst REDRAW_INTERVAL: Duration = Duration::from_secs(1);",
+)
+edit(
+    "apps/cli/src/progress.rs",
+    "    pub(crate) fn start_model_pull(",
+    "    #[allow(dead_code)]\n    pub(crate) fn start_model_pull(",
+)
