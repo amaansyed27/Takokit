@@ -59,6 +59,7 @@ const RVC_TRAINING_PACKAGES: &[&str] = &[
     "einops>=0.8,<1",
     "faiss-cpu>=1.13,<2",
     "ffmpeg-python>=0.2,<1",
+    "imageio-ffmpeg>=0.6,<1",
     "librosa>=0.10.2,<0.11",
     "local-attention>=1.11,<2",
     "matplotlib>=3.8,<4",
@@ -183,6 +184,7 @@ mod tests {
         assert_eq!(companion_adapters_for_model("rvc"), &["rvc_training"]);
         assert_eq!(inference.python, "3.11");
         assert_eq!(training.python, "3.12");
+        assert!(training.packages.contains(&"imageio-ffmpeg>=0.6,<1"));
         assert_eq!(
             training.source.expect("training source").revision,
             "81eed5e8f68b6bed1789f682fe78cdd324495afc"
@@ -192,6 +194,7 @@ mod tests {
             &["configs/v1/40k.json", "train/train.py"]
         );
         assert!(RVC_TRAINING_ADAPTER.contains("configs\" / \"v1\" / \"40k.json"));
+        assert!(RVC_TRAINING_ADAPTER.contains("configure_managed_ffmpeg"));
         assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.preprocess\""));
         assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.dataset.extract_f0\""));
         assert!(RVC_TRAINING_ADAPTER.contains("\"-m\", \"train.dataset.extract_hubert_feature\""));
