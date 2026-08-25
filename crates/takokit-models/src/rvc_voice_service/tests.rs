@@ -35,8 +35,15 @@ fn runtime_manifest_never_escapes_conversion_root() {
 #[test]
 fn imported_artifact_is_managed_copy_with_same_hash() {
     let (temp, service, project) = imported_service();
-    let checkpoint = service.store.checkpoints(&project.id.to_string()).unwrap().pop().unwrap();
-    assert!(checkpoint.path.starts_with(service.store.layout(project.id).root));
+    let checkpoint = service
+        .store
+        .checkpoints(&project.id.to_string())
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(checkpoint
+        .path
+        .starts_with(service.store.layout(project.id).root));
     assert_eq!(checkpoint.sha256, sha256_file(&checkpoint.path).unwrap());
     assert_ne!(checkpoint.path, temp.path().join("model.pth"));
 }

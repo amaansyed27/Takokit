@@ -35,7 +35,12 @@ fn scrub_job_internals(value: &mut Value) {
     let Some(object) = value.as_object_mut() else {
         return;
     };
-    for field in ["owner_pid", "child_pid", "log_path", "cancellation_requested"] {
+    for field in [
+        "owner_pid",
+        "child_pid",
+        "log_path",
+        "cancellation_requested",
+    ] {
         object.remove(field);
     }
 }
@@ -62,9 +67,7 @@ pub async fn rvc_voice_list(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let items = state.rvc_voices.list().map_err(ApiError)?;
-    Ok(Json(
-        serde_json::json!({"kind":"rvc_voices","data":items}),
-    ))
+    Ok(Json(serde_json::json!({"kind":"rvc_voices","data":items})))
 }
 
 pub async fn rvc_voice_create(
@@ -143,9 +146,7 @@ pub async fn rvc_sample_update(
         .rvc_voices
         .set_sample_included(&voice, sample, request.included)
         .map_err(ApiError)?;
-    Ok(Json(
-        serde_json::json!({"kind":"rvc_sample","data":sample}),
-    ))
+    Ok(Json(serde_json::json!({"kind":"rvc_sample","data":sample})))
 }
 
 pub async fn rvc_sample_remove(
@@ -182,7 +183,10 @@ pub async fn rvc_preflight(
     AxumPath(voice): AxumPath<String>,
     Json(config): Json<RvcTrainingConfig>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let report = state.rvc_voices.preflight(&voice, config).map_err(ApiError)?;
+    let report = state
+        .rvc_voices
+        .preflight(&voice, config)
+        .map_err(ApiError)?;
     Ok(Json(
         serde_json::json!({"kind":"rvc_hardware_preflight","data":report}),
     ))
@@ -193,7 +197,10 @@ pub async fn rvc_prepare(
     AxumPath(voice): AxumPath<String>,
     Json(request): Json<StartRvcTrainingRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
-    let job = state.rvc_voices.prepare(&voice, request).map_err(ApiError)?;
+    let job = state
+        .rvc_voices
+        .prepare(&voice, request)
+        .map_err(ApiError)?;
     Ok((
         StatusCode::ACCEPTED,
         Json(serde_json::json!({
@@ -242,10 +249,7 @@ pub async fn rvc_train_status(
     State(state): State<AppState>,
     AxumPath(voice): AxumPath<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let job = state
-        .rvc_voices
-        .training_status(&voice)
-        .map_err(ApiError)?;
+    let job = state.rvc_voices.training_status(&voice).map_err(ApiError)?;
     Ok(Json(serde_json::json!({
         "kind":"rvc_training_job",
         "data":public_optional_job(job)
@@ -261,10 +265,7 @@ pub async fn rvc_train_logs(
         .rvc_voices
         .training_logs(
             &voice,
-            query
-                .max_bytes
-                .unwrap_or(256 * 1024)
-                .min(2 * 1024 * 1024),
+            query.max_bytes.unwrap_or(256 * 1024).min(2 * 1024 * 1024),
         )
         .map_err(ApiError)?;
     Ok(Json(
@@ -276,10 +277,7 @@ pub async fn rvc_train_cancel(
     State(state): State<AppState>,
     AxumPath(voice): AxumPath<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let job = state
-        .rvc_voices
-        .cancel_training(&voice)
-        .map_err(ApiError)?;
+    let job = state.rvc_voices.cancel_training(&voice).map_err(ApiError)?;
     Ok(Json(serde_json::json!({
         "kind":"rvc_training_job",
         "data":public_job(&job)
@@ -372,10 +370,7 @@ pub async fn rvc_package_import(
     State(state): State<AppState>,
     Json(request): Json<ImportRvcPackageRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
-    let project = state
-        .rvc_voices
-        .import_package(request)
-        .map_err(ApiError)?;
+    let project = state.rvc_voices.import_package(request).map_err(ApiError)?;
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({"kind":"rvc_voice","data":project})),

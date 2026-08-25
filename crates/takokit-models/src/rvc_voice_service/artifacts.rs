@@ -1,6 +1,9 @@
 use super::*;
 use serde_json::{json, Value};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use takokit_store::sha256_file;
 
 impl RvcVoiceService {
@@ -27,7 +30,9 @@ impl RvcVoiceService {
             .find(|item| item.id == request.checkpoint_id)
             .ok_or_else(|| invalid("checkpoint does not belong to this voice"))?;
         if !checkpoint.valid_for_inference || !checkpoint.path.is_file() {
-            return Err(invalid("selected checkpoint is missing or invalid for inference"));
+            return Err(invalid(
+                "selected checkpoint is missing or invalid for inference",
+            ));
         }
         let index = match request.index_id {
             Some(id) => Some(
@@ -43,8 +48,13 @@ impl RvcVoiceService {
             if !index.valid || !index.path.is_file() {
                 return Err(invalid("selected index is missing or invalid"));
             }
-            if index.checkpoint_id.is_some_and(|pair| pair != checkpoint.id) {
-                return Err(invalid("selected index is paired with a different checkpoint"));
+            if index
+                .checkpoint_id
+                .is_some_and(|pair| pair != checkpoint.id)
+            {
+                return Err(invalid(
+                    "selected index is paired with a different checkpoint",
+                ));
             }
         }
         self.materialize_runtime(&project, &checkpoint, index.as_ref())?;
@@ -117,16 +127,18 @@ impl RvcVoiceService {
         if !result_path.is_file() {
             return Ok(());
         }
-        let value: Value = serde_json::from_reader(
-            std::fs::File::open(&result_path).map_err(storage)?,
-        )
-        .map_err(|error| invalid(error.to_string()))?;
+        let value: Value =
+            serde_json::from_reader(std::fs::File::open(&result_path).map_err(storage)?)
+                .map_err(|error| invalid(error.to_string()))?;
         let checkpoint_path = value
             .get("checkpoint")
             .and_then(Value::as_str)
             .map(PathBuf::from)
             .ok_or_else(|| invalid("RVC worker result is missing checkpoint"))?;
-        let index_path = value.get("index").and_then(Value::as_str).map(PathBuf::from);
+        let index_path = value
+            .get("index")
+            .and_then(Value::as_str)
+            .map(PathBuf::from);
         if !checkpoint_path.is_file() {
             return Err(invalid("RVC worker checkpoint is missing"));
         }
@@ -296,7 +308,10 @@ impl RvcVoiceService {
 
 fn validate_artifact_path(path: &Path, extension: &str) -> TakokitResult<()> {
     if !path.is_file() {
-        return Err(invalid(format!("artifact does not exist: {}", path.display())));
+        return Err(invalid(format!(
+            "artifact does not exist: {}",
+            path.display()
+        )));
     }
     if path
         .extension()

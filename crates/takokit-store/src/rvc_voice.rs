@@ -121,7 +121,9 @@ impl RvcVoiceStore {
             .collect::<Vec<_>>();
         match matches.as_slice() {
             [id] => Ok(*id),
-            [] => Err(TakokitError::Storage(format!("RVC voice not found: {voice}"))),
+            [] => Err(TakokitError::Storage(format!(
+                "RVC voice not found: {voice}"
+            ))),
             _ => Err(TakokitError::InvalidRequest(format!(
                 "more than one RVC voice is named {voice:?}; use its voice ID"
             ))),
@@ -260,7 +262,9 @@ pub fn sha256_file(path: &Path) -> TakokitResult<String> {
 fn validate_name(name: &str) -> TakokitResult<String> {
     let value = name.trim();
     if value.is_empty() {
-        return Err(TakokitError::InvalidRequest("voice name cannot be empty".into()));
+        return Err(TakokitError::InvalidRequest(
+            "voice name cannot be empty".into(),
+        ));
     }
     if value.chars().count() > 120 {
         return Err(TakokitError::InvalidRequest(

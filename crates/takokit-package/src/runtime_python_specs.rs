@@ -173,7 +173,10 @@ mod tests {
         let training = adapter_spec("rvc_training").expect("RVC training adapter");
         assert_eq!(inference.python, "3.11");
         assert_eq!(training.python, "3.12");
-        assert_eq!(training.source.expect("training source").revision, "81eed5e8f68b6bed1789f682fe78cdd324495afc");
+        assert_eq!(
+            training.source.expect("training source").revision,
+            "81eed5e8f68b6bed1789f682fe78cdd324495afc"
+        );
         assert!(RVC_TRAINING_ADAPTER.contains("train/preprocess.py"));
         assert!(RVC_TRAINING_ADAPTER.contains("train/train.py"));
         assert!(RVC_TRAINING_ADAPTER.contains("train/train_index.py"));

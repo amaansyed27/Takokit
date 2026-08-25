@@ -57,8 +57,11 @@ impl RvcVoiceService {
     }
 
     pub fn create(&self, request: CreateRvcVoiceRequest) -> TakokitResult<RvcVoiceProject> {
-        self.store
-            .create(&request.name, request.consent_affirmed, request.consent_note)
+        self.store.create(
+            &request.name,
+            request.consent_affirmed,
+            request.consent_note,
+        )
     }
 
     pub fn list(&self) -> TakokitResult<Vec<RvcVoiceProject>> {
@@ -127,15 +130,13 @@ impl RvcVoiceService {
             let request = json!({"operation": "inspect", "path": sample.managed_path});
             match self.run_worker(&request) {
                 Ok(value) => {
-                    let raw: WorkerInspection = serde_json::from_value(
-                        value
-                            .get("inspection")
-                            .cloned()
-                            .ok_or_else(|| invalid("RVC inspection returned no inspection payload"))?,
-                    )
-                    .map_err(|error| {
-                        invalid(format!("invalid RVC inspection response: {error}"))
-                    })?;
+                    let raw: WorkerInspection =
+                        serde_json::from_value(value.get("inspection").cloned().ok_or_else(
+                            || invalid("RVC inspection returned no inspection payload"),
+                        )?)
+                        .map_err(|error| {
+                            invalid(format!("invalid RVC inspection response: {error}"))
+                        })?;
                     self.store.save_sample_inspection(
                         sample,
                         RvcAudioInspection {

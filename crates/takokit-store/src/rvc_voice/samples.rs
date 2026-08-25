@@ -1,5 +1,7 @@
 use super::*;
-use takokit_core::{RvcAudioInspection, RvcDatasetInspection, RvcSampleState, RvcSampleWarning, RvcVoiceSample};
+use takokit_core::{
+    RvcAudioInspection, RvcDatasetInspection, RvcSampleState, RvcSampleWarning, RvcVoiceSample,
+};
 
 impl RvcVoiceStore {
     pub fn add_samples(

@@ -46,8 +46,8 @@ fn removing_voice_is_blocked_by_active_job() {
     let temp = TempDir::new().unwrap();
     let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
     let project = store.create("Voice", true, None).unwrap();
-    let config = takokit_core::RvcTrainingConfig::preset(takokit_core::RvcTrainingPreset::Quick)
-        .unwrap();
+    let config =
+        takokit_core::RvcTrainingConfig::preset(takokit_core::RvcTrainingPreset::Quick).unwrap();
     let job = RvcTrainingJob {
         id: Uuid::new_v4(),
         voice_id: project.id,

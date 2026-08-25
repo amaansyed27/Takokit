@@ -113,7 +113,8 @@ impl AppState {
                         .count()
                 })
                 .unwrap_or(0),
-            voices: self.registry.voices().len() + self.rvc_voices.list().map(|items| items.len()).unwrap_or(0),
+            voices: self.registry.voices().len()
+                + self.rvc_voices.list().map(|items| items.len()).unwrap_or(0),
         }
     }
 }

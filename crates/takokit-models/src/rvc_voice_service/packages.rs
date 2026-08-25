@@ -52,12 +52,13 @@ impl RvcVoiceService {
             consent_acknowledged: true,
             provenance_note: "Takokit package provenance records local artifact integrity. It does not prove speaker identity, legal ownership, consent authenticity, or perceptual similarity.".into(),
         };
-        let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-            .map_err(|error| invalid(error.to_string()))?;
+        let manifest_bytes =
+            serde_json::to_vec_pretty(&manifest).map_err(|error| invalid(error.to_string()))?;
         let mut zip = ZipWriter::new(File::create(&request.output).map_err(storage)?);
         let options =
             SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        zip.start_file("manifest.json", options).map_err(zip_error)?;
+        zip.start_file("manifest.json", options)
+            .map_err(zip_error)?;
         zip.write_all(&manifest_bytes).map_err(storage)?;
         add_zip_file(&mut zip, "checkpoint.pth", &checkpoint, options)?;
         if index.is_file() {
@@ -68,7 +69,8 @@ impl RvcVoiceService {
         }
         if request.sign {
             let signature = self.sign_manifest(&manifest_bytes)?;
-            zip.start_file("signature.json", options).map_err(zip_error)?;
+            zip.start_file("signature.json", options)
+                .map_err(zip_error)?;
             zip.write_all(
                 &serde_json::to_vec_pretty(&signature)
                     .map_err(|error| invalid(error.to_string()))?,
@@ -158,8 +160,8 @@ impl RvcVoiceService {
         }
         let mut archive = open_package(&request.package)?;
         let manifest_bytes = read_small_entry(&mut archive, "manifest.json", MAX_MANIFEST_BYTES)?;
-        let manifest: RvcPackageManifest = serde_json::from_slice(&manifest_bytes)
-            .map_err(|error| invalid(error.to_string()))?;
+        let manifest: RvcPackageManifest =
+            serde_json::from_slice(&manifest_bytes).map_err(|error| invalid(error.to_string()))?;
         let name = request.name.unwrap_or(manifest.voice_name.clone());
         let mut project = self.store.create(&name, true, request.consent_note)?;
         project.imported = true;
@@ -248,7 +250,9 @@ fn validate_manifest(manifest: &RvcPackageManifest) -> Vec<String> {
         let path = Path::new(path);
         if path.is_absolute()
             || path.components().count() != 1
-            || path.components().any(|part| matches!(part, std::path::Component::ParentDir))
+            || path
+                .components()
+                .any(|part| matches!(part, std::path::Component::ParentDir))
         {
             errors.push(format!("unsafe manifest artifact path: {}", path.display()));
         }
@@ -393,10 +397,7 @@ fn extract_entry(
     Ok(())
 }
 
-fn verify_signature(
-    manifest: &[u8],
-    signature: &RvcPackageSignature,
-) -> Result<bool, String> {
+fn verify_signature(manifest: &[u8], signature: &RvcPackageSignature) -> Result<bool, String> {
     if signature.algorithm != "Ed25519" {
         return Ok(false);
     }

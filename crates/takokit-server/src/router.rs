@@ -87,8 +87,7 @@ pub fn server_router(state: AppState) -> Router {
         )
         .route(
             "/v1/voices/rvc/:voice/samples/:sample",
-            axum::routing::patch(handlers::rvc_sample_update)
-                .delete(handlers::rvc_sample_remove),
+            axum::routing::patch(handlers::rvc_sample_update).delete(handlers::rvc_sample_remove),
         )
         .route(
             "/v1/voices/rvc/:voice/dataset/inspect",
@@ -102,10 +101,7 @@ pub fn server_router(state: AppState) -> Router {
             "/v1/voices/rvc/:voice/preflight",
             post(handlers::rvc_preflight),
         )
-        .route(
-            "/v1/voices/rvc/:voice/prepare",
-            post(handlers::rvc_prepare),
-        )
+        .route("/v1/voices/rvc/:voice/prepare", post(handlers::rvc_prepare))
         .route("/v1/voices/rvc/:voice/train", post(handlers::rvc_train))
         .route(
             "/v1/voices/rvc/:voice/train/recover",
@@ -131,10 +127,7 @@ pub fn server_router(state: AppState) -> Router {
             "/v1/voices/rvc/:voice/checkpoint",
             post(handlers::rvc_select_checkpoint),
         )
-        .route(
-            "/v1/voices/rvc/:voice/indexes",
-            get(handlers::rvc_indexes),
-        )
+        .route("/v1/voices/rvc/:voice/indexes", get(handlers::rvc_indexes))
         .route("/v1/voices/rvc/:voice/test", post(handlers::rvc_test_voice))
         .route("/v1/voices/rvc/:voice/export", post(handlers::rvc_export))
         .route("/v1/audio/speech", post(handlers::speech))

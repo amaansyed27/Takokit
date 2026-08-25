@@ -84,7 +84,8 @@ impl RvcVoiceService {
         if !process_matches_job(pid, &request_path) {
             job.status = RvcTrainingJobStatus::Stale;
             job.failure = Some(
-                "recorded PID is not the Takokit-owned RVC worker; no process was terminated".into(),
+                "recorded PID is not the Takokit-owned RVC worker; no process was terminated"
+                    .into(),
             );
             job.finished_at = Some(now());
             self.store.save_job(&job)?;
@@ -206,8 +207,8 @@ impl RvcVoiceService {
         .map_err(|error| invalid(error.to_string()))?;
         let output = child.wait_with_output().map_err(storage)?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let value: Value = serde_json::from_str(stdout.lines().last().unwrap_or("{}"))
-            .map_err(|error| {
+        let value: Value =
+            serde_json::from_str(stdout.lines().last().unwrap_or("{}")).map_err(|error| {
                 invalid(format!(
                     "invalid RVC adapter response: {error}; stderr: {}",
                     String::from_utf8_lossy(&output.stderr)
@@ -313,9 +314,9 @@ impl RvcVoiceService {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x0800_0000 | 0x0000_0200);
         }
-        let child = command.spawn().map_err(|error| {
-            invalid(format!("failed to start managed RVC worker: {error}"))
-        })?;
+        let child = command
+            .spawn()
+            .map_err(|error| invalid(format!("failed to start managed RVC worker: {error}")))?;
         job.owner_pid = Some(child.id());
         self.store.save_job(&job)?;
         let mut project = project;
@@ -409,9 +410,8 @@ fn process_matches_job(pid: u32, request_path: &Path) -> bool {
     }
     #[cfg(windows)]
     {
-        let command = format!(
-            "(Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\").CommandLine"
-        );
+        let command =
+            format!("(Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\").CommandLine");
         return Command::new("powershell.exe")
             .args(["-NoProfile", "-Command", &command])
             .output()
