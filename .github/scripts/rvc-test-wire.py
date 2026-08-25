@@ -34,11 +34,6 @@ edit(
     '                "output":output,',
     '                "output":package,',
 )
-edit(
-    "apps/cli/src/tests/rvc.rs",
-    "        RvcVoiceCommand::Export { voice, output, sign: true, .. }\n            if voice == \"voice-id\" && output == PathBuf::from(r\"C:\\\\exports\\\\voice ü.takovoice\")",
-    "        RvcVoiceCommand::Export { voice, package, sign: true, .. }\n            if voice == \"voice-id\" && package == PathBuf::from(r\"C:\\\\exports\\\\voice ü.takovoice\")",
-)
 
 # Clear Slice 3 compiler warnings without weakening any validation.
 edit(
@@ -61,3 +56,25 @@ edit(
     "impl PickerKind {\n    fn windows_filter(self) -> &'static str {",
     "impl PickerKind {\n    #[cfg(any(windows, test))]\n    fn windows_filter(self) -> &'static str {",
 )
+
+# Remove two legacy dead fields/helpers that were no longer wired to any
+# product path and only generated warnings during final validation.
+edit(
+    "apps/cli/src/tui/catalog.rs",
+    "    pub model_type: String,\n",
+    "",
+)
+edit(
+    "apps/cli/src/tui/catalog.rs",
+    "                model_type: installed.model_type.clone(),\n",
+    "",
+)
+
+progress = Path("apps/cli/src/progress.rs")
+text = progress.read_text(encoding="utf-8")
+text = text.replace("use crate::daemon_client::Client;\n", "")
+text = text.replace("const REDRAW_INTERVAL: Duration = Duration::from_secs(1);\n", "")
+start = text.index("    pub(crate) fn start_model_pull(")
+end = text.index("    fn spawn_timer", start)
+text = text[:start] + text[end:]
+progress.write_text(text, encoding="utf-8")
