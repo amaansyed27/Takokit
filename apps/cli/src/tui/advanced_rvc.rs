@@ -60,21 +60,18 @@ pub enum AdvancedRvcAction {
     UseInConvert,
 }
 
-pub const ADVANCED_RVC_ACTIONS: [AdvancedRvcAction; 16] = [
+// Keep the normal TUI focused on the product workflow. The lower-level lifecycle
+// commands remain available through the canonical CLI/API for diagnostics and
+// advanced use, but users should not have to manage checkpoints or indexes.
+pub const ADVANCED_RVC_ACTIONS: [AdvancedRvcAction; 10] = [
     AdvancedRvcAction::NewVoice,
     AdvancedRvcAction::ImportExisting,
     AdvancedRvcAction::AddSample,
     AdvancedRvcAction::Inspect,
-    AdvancedRvcAction::Prepare,
-    AdvancedRvcAction::Preflight,
     AdvancedRvcAction::Train,
     AdvancedRvcAction::Status,
-    AdvancedRvcAction::Logs,
     AdvancedRvcAction::Cancel,
     AdvancedRvcAction::Recover,
-    AdvancedRvcAction::Checkpoints,
-    AdvancedRvcAction::Indexes,
-    AdvancedRvcAction::ActivateCheckpoint,
     AdvancedRvcAction::TestVoice,
     AdvancedRvcAction::UseInConvert,
 ];
@@ -82,50 +79,75 @@ pub const ADVANCED_RVC_ACTIONS: [AdvancedRvcAction; 16] = [
 impl AdvancedRvcAction {
     pub fn label(self) -> &'static str {
         match self {
-            Self::NewVoice => "New Voice",
-            Self::ImportExisting => "Import Existing",
-            Self::AddSample => "Add Sample",
-            Self::Inspect => "Inspect Dataset",
-            Self::Prepare => "Prepare Dataset",
-            Self::Preflight => "Hardware Preflight",
-            Self::Train => "Start Training",
-            Self::Status => "Training Status",
-            Self::Logs => "Training Logs",
-            Self::Cancel => "Cancel Training",
-            Self::Recover => "Recover Training",
-            Self::Checkpoints => "Checkpoints",
-            Self::Indexes => "Indexes",
-            Self::ActivateCheckpoint => "Activate Checkpoint",
-            Self::TestVoice => "Test Voice",
-            Self::UseInConvert => "Use in Convert",
+            Self::NewVoice => "Create trained voice",
+            Self::ImportExisting => "Import existing voice",
+            Self::AddSample => "Add recording",
+            Self::Inspect => "Check recordings",
+            Self::Prepare => "Prepare recordings (advanced)",
+            Self::Preflight => "Hardware check (advanced)",
+            Self::Train => "Train voice",
+            Self::Status => "Training progress",
+            Self::Logs => "Technical log",
+            Self::Cancel => "Cancel training",
+            Self::Recover => "Continue / recover training",
+            Self::Checkpoints => "Model files (advanced)",
+            Self::Indexes => "Index files (advanced)",
+            Self::ActivateCheckpoint => "Select model file (advanced)",
+            Self::TestVoice => "Test voice",
+            Self::UseInConvert => "Use in Clone audio",
         }
     }
 
     pub fn hint(self) -> &'static str {
         match self {
-            Self::NewVoice => "Name + consent → create a persistent managed project",
+            Self::NewVoice => "Give the voice a name and confirm you have permission to use it.",
             Self::ImportExisting => {
-                "Path=.pth or .takovoice; optional Index=.index; Name + consent"
+                "Import a Takokit .takovoice package or, for legacy RVC models, a .pth file."
             }
-            Self::AddSample => "Path=audio file; Takokit copies it into managed voice storage",
-            Self::Inspect => "Inspect durations, format facts, duplicates, and objective warnings",
-            Self::Prepare => "Run preprocessing, RMVPE F0, and feature extraction",
-            Self::Preflight => "Check selected preset against CPU/GPU/RAM/disk",
-            Self::Train => "Start the persistent managed RVC training worker",
-            Self::Status => "Read current persistent job state",
-            Self::Logs => "Open the persisted preparation/training log",
-            Self::Cancel => "Request clean cancellation of the active managed job",
-            Self::Recover => "Recover a genuinely recoverable failed/cancelled/stale job",
-            Self::Checkpoints => "List validated checkpoints and IDs",
-            Self::Indexes => "List built/imported index artifacts and IDs",
-            Self::ActivateCheckpoint => "Path=checkpoint UUID; Index=optional index UUID",
-            Self::TestVoice => "Path=source speech audio; run the normal RVC converter",
-            Self::UseInConvert => "Open Convert with this managed voice already selected",
+            Self::AddSample => "Add a clean recording of this speaker. You can add more than one.",
+            Self::Inspect => "Check duration, duplicates and recording quality before training.",
+            Self::Prepare => "Run only the preprocessing stages without starting training.",
+            Self::Preflight => "Check the selected training settings against this computer.",
+            Self::Train => {
+                "Takokit checks hardware, prepares the recordings, trains, builds the index and activates the finished voice automatically."
+            }
+            Self::Status => "Show the real training stage and epoch progress from the managed job.",
+            Self::Logs => "Open the persisted backend preparation and training log.",
+            Self::Cancel => "Stop the current managed training job cleanly.",
+            Self::Recover => "Resume a cancelled, failed or interrupted training run when possible.",
+            Self::Checkpoints => "List validated inference model files and their IDs.",
+            Self::Indexes => "List validated search-index files and their IDs.",
+            Self::ActivateCheckpoint => "Select a validated model/index pair manually.",
+            Self::TestVoice => "Choose speech from another speaker and convert it to this trained voice.",
+            Self::UseInConvert => "Open Clone audio with this trained voice already selected.",
         }
     }
 
     pub fn uses_audio_picker(self) -> bool {
         matches!(self, Self::AddSample | Self::TestVoice)
+    }
+
+    pub fn requires_name(self) -> bool {
+        matches!(self, Self::NewVoice | Self::ImportExisting)
+    }
+
+    pub fn requires_path(self) -> bool {
+        matches!(
+            self,
+            Self::ImportExisting | Self::AddSample | Self::ActivateCheckpoint | Self::TestVoice
+        )
+    }
+
+    pub fn shows_index_input(self) -> bool {
+        matches!(self, Self::ImportExisting | Self::ActivateCheckpoint)
+    }
+
+    pub fn shows_training_quality(self) -> bool {
+        matches!(self, Self::Prepare | Self::Preflight | Self::Train)
+    }
+
+    pub fn requires_consent(self) -> bool {
+        matches!(self, Self::NewVoice | Self::ImportExisting)
     }
 }
 
@@ -193,26 +215,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn advanced_workflow_exposes_required_lifecycle_actions() {
+    fn normal_tui_exposes_user_level_trained_voice_workflow() {
         let labels = ADVANCED_RVC_ACTIONS
             .iter()
             .map(|action| action.label())
             .collect::<Vec<_>>();
         for required in [
-            "New Voice",
-            "Import Existing",
-            "Add Sample",
-            "Inspect Dataset",
-            "Prepare Dataset",
-            "Hardware Preflight",
-            "Start Training",
-            "Training Logs",
-            "Cancel Training",
-            "Checkpoints",
-            "Test Voice",
-            "Use in Convert",
+            "Create trained voice",
+            "Import existing voice",
+            "Add recording",
+            "Check recordings",
+            "Train voice",
+            "Training progress",
+            "Cancel training",
+            "Continue / recover training",
+            "Test voice",
+            "Use in Clone audio",
         ] {
             assert!(labels.contains(&required));
+        }
+        for technical in [
+            "Prepare recordings (advanced)",
+            "Hardware check (advanced)",
+            "Technical log",
+            "Model files (advanced)",
+            "Index files (advanced)",
+            "Select model file (advanced)",
+        ] {
+            assert!(!labels.contains(&technical));
         }
     }
 
