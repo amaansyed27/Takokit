@@ -231,7 +231,6 @@ fn path_label(action: AdvancedRvcAction) -> &'static str {
         AdvancedRvcAction::ImportExisting => "Voice package / legacy model · F2 browse",
         AdvancedRvcAction::AddSample => "Recording · F2 browse",
         AdvancedRvcAction::TestVoice => "Test speech · F2 browse",
-        AdvancedRvcAction::ActivateCheckpoint => "Model ID",
         _ => "Audio / file",
     }
 }
@@ -241,7 +240,6 @@ fn path_placeholder(action: AdvancedRvcAction) -> &'static str {
         AdvancedRvcAction::ImportExisting => "Choose a .takovoice package or legacy .pth model",
         AdvancedRvcAction::AddSample => "Choose a clean recording of this speaker",
         AdvancedRvcAction::TestVoice => "Choose speech from another speaker",
-        AdvancedRvcAction::ActivateCheckpoint => "checkpoint UUID",
         _ => "Choose a file",
     }
 }
