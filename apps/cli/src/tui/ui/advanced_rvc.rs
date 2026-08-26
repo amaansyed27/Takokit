@@ -137,11 +137,7 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
         );
     } else {
         frame.render_widget(
-            field(
-                "Audio / file",
-                "No file is needed for this action.",
-                false,
-            ),
+            field("Audio / file", "No file is needed for this action.", false),
             rows[4],
         );
     }
@@ -171,7 +167,10 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
         frame.render_widget(
             field(
                 "Training quality · ↑/↓ change",
-                format!("{} · Balanced is the recommended default", preset_label(state.preset())),
+                format!(
+                    "{} · Balanced is the recommended default",
+                    preset_label(state.preset())
+                ),
                 state.field == AdvancedRvcField::Preset,
             ),
             rows[6],
@@ -283,7 +282,10 @@ mod tests {
 
     #[test]
     fn normal_training_copy_hides_checkpoint_management() {
-        assert_eq!(path_label(AdvancedRvcAction::AddSample), "Recording · F2 browse");
+        assert_eq!(
+            path_label(AdvancedRvcAction::AddSample),
+            "Recording · F2 browse"
+        );
         assert_eq!(preset_label("balanced"), "Balanced");
     }
 }
