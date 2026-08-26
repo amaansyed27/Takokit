@@ -1,5 +1,4 @@
 use std::{
-    path::PathBuf,
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -101,7 +100,7 @@ fn execute_cli(
     let workspace_dir = normalized_args
         .windows(2)
         .find(|pair| pair[0] == "--workspace")
-        .map(|pair| PathBuf::from(&pair[1]))
+        .map(|pair| std::path::Path::new(&pair[1]))
         .filter(|path| path.is_dir());
 
     let mut command = Command::new(executable);

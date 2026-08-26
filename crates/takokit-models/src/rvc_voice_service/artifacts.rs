@@ -175,9 +175,12 @@ impl RvcVoiceService {
         };
         let index = if let Some(path) = index_path.filter(|path| path.is_file()) {
             let hash = sha256_file(&path)?;
-            match self.store.indexes(voice)?.into_iter().find(|item| {
-                item.sha256 == hash && item.checkpoint_id == Some(checkpoint.id)
-            }) {
+            match self
+                .store
+                .indexes(voice)?
+                .into_iter()
+                .find(|item| item.sha256 == hash && item.checkpoint_id == Some(checkpoint.id))
+            {
                 Some(item) => Some(item),
                 None => {
                     let item = RvcIndexArtifact {
