@@ -199,9 +199,9 @@ function ArtifactRow({ label, value, onChange, onBrowse }: { label: string; valu
 
 function stateLabel(state: string): string {
   if (state === "ready") return "Ready";
-  if (state === "new" || state === "dataset_ready") return "Needs recordings";
-  if (state === "ready_to_train") return "Ready to train";
-  if (["preprocessing", "training", "building_index", "validating_artifacts"].includes(state)) return "Training";
+  if (["created", "collecting_samples"].includes(state)) return "Needs recordings";
+  if (["ready_for_preparation", "ready_to_train"].includes(state)) return "Ready to train";
+  if (["preprocessing", "extracting_f0", "extracting_features", "training", "building_index", "validating_artifacts"].includes(state)) return "Training";
   if (["failed", "cancelled"].includes(state)) return "Needs attention";
   return state.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
