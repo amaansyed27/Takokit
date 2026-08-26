@@ -1,6 +1,6 @@
 //! Storage inspection and safe cache cleanup for the Takokit home directory.
 
-use crate::args::{StorageArgs, StorageCommand};
+use crate::args::{StorageArgs, StorageCommand, StorageScope};
 use serde::Serialize;
 use std::{
     collections::HashSet,
@@ -8,7 +8,11 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
 };
-use takokit_package::{automatic_cleanup_state, clean_uv_cache};
+use takokit_package::{
+    acquire_maintenance_lock, automatic_cleanup_state, clean_provider_storage, clean_uv_cache,
+    migrate_legacy_provider_cache, provider_ownership_status, ProviderCleanupReport,
+    ProviderOwnershipStatus,
+};
 
 #[path = "storage_cache.rs"]
 mod storage_cache;
@@ -54,6 +58,12 @@ pub(crate) struct StorageReport {
     pub(crate) categories: Vec<StorageCategoryReport>,
 }
 
+#[derive(Debug, Serialize)]
+struct StorageEnvelope<'a> {
+    storage: &'a StorageReport,
+    provider_ownership: &'a ProviderOwnershipStatus,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum FileIdentity {
     #[cfg(windows)]
@@ -90,16 +100,31 @@ pub(crate) fn run_storage_command(
                 io::stderr().flush()?;
             }
             let report = inspect_storage(root)?;
+            let ownership = provider_ownership_status(root)?;
             if json_requested {
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&StorageEnvelope {
+                        storage: &report,
+                        provider_ownership: &ownership,
+                    })?
+                );
             } else {
                 print_storage_report(&report);
+                print_provider_ownership(&ownership);
             }
         }
         Some(StorageCommand::Status) => {
             let state = automatic_cleanup_state(root)?;
+            let ownership = provider_ownership_status(root)?;
             if args.json || json {
-                println!("{}", serde_json::to_string_pretty(&state)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "automatic_cleanup": state,
+                        "provider_ownership": ownership,
+                    }))?
+                );
             } else {
                 println!("Takokit automatic storage cleanup");
                 println!(
@@ -117,28 +142,110 @@ pub(crate) fn run_storage_command(
                 println!(
                     "  configuration TAKOKIT_AUTO_STORAGE_CLEANUP=0 disables background cleanup"
                 );
+                println!();
+                print_provider_ownership(&ownership);
             }
         }
-        Some(StorageCommand::Clean { dry_run }) => {
+        Some(StorageCommand::Clean { dry_run, scope }) => {
+            run_cleanup(root, scope, dry_run, args.json || json)?;
+        }
+    }
+    Ok(())
+}
+
+fn run_cleanup(root: &Path, scope: StorageScope, dry_run: bool, json: bool) -> anyhow::Result<()> {
+    match scope {
+        StorageScope::Uv => {
             let report = clean_uv_cache(root, dry_run)?;
-            if args.json || json {
+            if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 println!("Takokit storage cleanup");
+                println!("  scope        uv");
                 println!("  target       {}", report.target.display());
                 println!("  cache size   {}", format_bytes(report.reclaimed_bytes));
+                println!("  mode         {}", if report.dry_run { "dry-run" } else { "clean" });
+                println!("  removed      {}", if report.removed { "yes" } else { "no" });
+            }
+        }
+        StorageScope::Downloads | StorageScope::Unused | StorageScope::AllSafe => {
+            let _guard = acquire_maintenance_lock(root)?;
+            let before = provider_ownership_status(root)?;
+            let migration = if !dry_run
+                && matches!(scope, StorageScope::Unused | StorageScope::AllSafe)
+                && !before.legacy_models_pending_migration.is_empty()
+            {
+                Some(migrate_legacy_provider_cache(root)?)
+            } else {
+                None
+            };
+            let scope_name = match scope {
+                StorageScope::Downloads => "downloads",
+                StorageScope::Unused => "unused",
+                StorageScope::AllSafe => "all-safe",
+                StorageScope::Uv => unreachable!(),
+            };
+            let report = clean_provider_storage(root, scope_name, dry_run)?;
+            let after = provider_ownership_status(root)?;
+            if json {
                 println!(
-                    "  mode         {}",
-                    if report.dry_run { "dry-run" } else { "clean" }
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "migration": migration,
+                        "cleanup": report,
+                        "provider_ownership_before": before,
+                        "provider_ownership_after": after,
+                    }))?
                 );
-                println!(
-                    "  removed      {}",
-                    if report.removed { "yes" } else { "no" }
-                );
+            } else {
+                if dry_run && !before.legacy_models_pending_migration.is_empty() {
+                    println!(
+                        "Provider migration required before provider caches can become cleanable: {}",
+                        before.legacy_models_pending_migration.join(", ")
+                    );
+                    println!("A real `--scope {scope_name}` cleanup performs the non-destructive durable migration first.");
+                    println!();
+                }
+                if let Some(migration) = migration.as_ref() {
+                    println!("Takokit provider ownership migration");
+                    println!("  journal      {}", migration.journal.display());
+                    println!("  migrated     {}", migration.migrated_models.len());
+                    println!("  already owned {}", migration.already_owned_models.len());
+                    println!("  provider bytes {}", format_bytes(migration.provider_bytes));
+                    println!();
+                }
+                print_provider_cleanup(&report);
             }
         }
     }
     Ok(())
+}
+
+fn print_provider_cleanup(report: &ProviderCleanupReport) {
+    println!("Takokit storage cleanup");
+    println!("  scope        {}", report.scope);
+    println!("  mode         {}", if report.dry_run { "dry-run" } else { "clean" });
+    println!("  reclaimable  {}", format_bytes(report.reclaimed_bytes));
+    println!("  remove paths {}", report.removed.len());
+    println!("  retained     {}", report.retained.len());
+    for item in &report.removed {
+        println!("  remove       {:>10}  {}  ({})", format_bytes(item.bytes), item.path.display(), item.reason);
+    }
+    for item in &report.retained {
+        println!("  retain       {:>10}  {}  ({})", format_bytes(item.bytes), item.path.display(), item.reason);
+    }
+}
+
+fn print_provider_ownership(status: &ProviderOwnershipStatus) {
+    println!("Provider checkpoint ownership");
+    println!("  schema           {}", status.schema_version);
+    println!("  provider cache   {} across {} files", format_bytes(status.provider_cache_bytes), status.provider_cache_files);
+    println!("  durable blobs    {} across {} files", format_bytes(status.durable_blob_bytes), status.durable_blob_files);
+    println!("  model ledgers    {}", status.model_ledgers);
+    println!("  fully owned      {}", if status.provider_cache_fully_owned { "yes" } else { "no" });
+    if !status.legacy_models_pending_migration.is_empty() {
+        println!("  migration pending {}", status.legacy_models_pending_migration.join(", "));
+    }
 }
 
 pub(crate) fn inspect_storage(root: &Path) -> io::Result<StorageReport> {
@@ -268,23 +375,11 @@ fn print_storage_report(report: &StorageReport) {
     println!("  root              {}", report.root.display());
     println!("  estimated unique  {}", format_bytes(report.unique_bytes));
     println!("  logical paths     {}", format_bytes(report.logical_bytes));
-    println!(
-        "  hardlink savings  {}",
-        format_bytes(report.hardlink_savings_bytes)
-    );
+    println!("  hardlink savings  {}", format_bytes(report.hardlink_savings_bytes));
     println!("  files             {}", report.files);
-    println!(
-        "  safe cache cleanup {}",
-        format_bytes(report.uv_cache_logical_bytes)
-    );
-    println!(
-        "  protected cache   {}",
-        format_bytes(report.protected_cache_logical_bytes)
-    );
-    println!(
-        "  scan mode         fast (deduplicates files >= {})",
-        format_bytes(report.hardlink_identity_threshold_bytes)
-    );
+    println!("  UV cache           {}", format_bytes(report.uv_cache_logical_bytes));
+    println!("  provider/other cache {}", format_bytes(report.protected_cache_logical_bytes));
+    println!("  scan mode         fast (deduplicates files >= {})", format_bytes(report.hardlink_identity_threshold_bytes));
     println!();
     println!("CATEGORY       UNIQUE      LOGICAL       FILES");
     for category in &report.categories {
@@ -312,10 +407,11 @@ fn print_storage_report(report: &StorageReport) {
     }
 
     println!();
-    println!("Use `tako storage clean --dry-run` to preview UV package-cache cleanup.");
-    println!(
-        "Provider caches marked protected may contain active installed-model checkpoints; do not delete them manually."
-    );
+    println!("Cleanup examples:");
+    println!("  tako storage clean --dry-run --scope uv");
+    println!("  tako storage clean --dry-run --scope downloads");
+    println!("  tako storage clean --dry-run --scope unused");
+    println!("  tako storage clean --dry-run --scope all-safe");
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -338,10 +434,7 @@ fn file_identity(path: &Path, _metadata: &fs::Metadata) -> FileIdentity {
     use std::{ffi::c_void, fs::File, mem::MaybeUninit, os::windows::io::AsRawHandle};
 
     #[repr(C)]
-    struct FileTime {
-        low: u32,
-        high: u32,
-    }
+    struct FileTime { low: u32, high: u32 }
 
     #[repr(C)]
     struct ByHandleFileInformation {
@@ -359,16 +452,12 @@ fn file_identity(path: &Path, _metadata: &fs::Metadata) -> FileIdentity {
 
     #[link(name = "kernel32")]
     extern "system" {
-        fn GetFileInformationByHandle(
-            handle: *mut c_void,
-            information: *mut ByHandleFileInformation,
-        ) -> i32;
+        fn GetFileInformationByHandle(handle: *mut c_void, information: *mut ByHandleFileInformation) -> i32;
     }
 
     if let Ok(file) = File::open(path) {
         let mut information = MaybeUninit::<ByHandleFileInformation>::uninit();
-        let success =
-            unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
+        let success = unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
         if success != 0 {
             let information = unsafe { information.assume_init() };
             return FileIdentity::Windows {
@@ -386,11 +475,7 @@ fn file_identity(path: &Path, metadata: &fs::Metadata) -> FileIdentity {
     use std::os::unix::fs::MetadataExt;
     let device = metadata.dev();
     let inode = metadata.ino();
-    if inode == 0 {
-        FileIdentity::Fallback(path.to_path_buf())
-    } else {
-        FileIdentity::Unix { device, inode }
-    }
+    if inode == 0 { FileIdentity::Fallback(path.to_path_buf()) } else { FileIdentity::Unix { device, inode } }
 }
 
 #[cfg(not(any(windows, unix)))]
