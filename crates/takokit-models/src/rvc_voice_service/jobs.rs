@@ -193,13 +193,16 @@ impl RvcVoiceService {
 
     pub(super) fn run_worker(&self, request: &Value) -> TakokitResult<Value> {
         let paths = self.training_paths()?;
-        let mut child = Command::new(paths.python)
+        let mut command = Command::new(paths.python);
+        command
             .arg(paths.script)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .env("PYTHONUTF8", "1")
-            .env("PYTHONIOENCODING", "utf-8")
+            .env("PYTHONIOENCODING", "utf-8");
+        hide_windows_console(&mut command);
+        let mut child = command
             .spawn()
             .map_err(|error| execution(format!("failed to start RVC training adapter: {error}")))?;
         serde_json::to_writer(
@@ -355,6 +358,8 @@ impl RvcVoiceService {
         self.ensure_training_adapter()?;
         let layout = python_managed_runner_layout(&self.root);
         let adapter = layout.adapters.join("rvc_training");
+        let trainer_root = adapter.join("source");
+        std::fs::create_dir_all(trainer_root.join("assets").join("weights")).map_err(storage)?;
         let installed = InstalledRegistry::new(self.root.join("manifests"));
         let record = installed.installed_model_record("rvc").map_err(|_| {
             invalid("RVC assets are not installed; run `tako pull rvc` before training")
@@ -366,7 +371,7 @@ impl RvcVoiceService {
         Ok(TrainingPaths {
             python: adapter_python(&adapter),
             script: adapter.join("rvc_training.py"),
-            trainer_root: adapter.join("source"),
+            trainer_root,
             asset_root,
         })
     }
@@ -397,16 +402,24 @@ fn adapter_python(adapter: &Path) -> PathBuf {
     }
 }
 
+#[cfg(windows)]
+fn hide_windows_console(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    command.creation_flags(0x0800_0000);
+}
+
+#[cfg(not(windows))]
+fn hide_windows_console(_command: &mut Command) {}
+
 fn process_is_running(pid: u32) -> bool {
     #[cfg(windows)]
     {
-        Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-            .output()
-            .ok()
-            .is_some_and(|output| {
-                String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
-            })
+        let mut command = Command::new("tasklist");
+        command.args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"]);
+        hide_windows_console(&mut command);
+        command.output().ok().is_some_and(|output| {
+            String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+        })
     }
     #[cfg(not(windows))]
     {
@@ -424,17 +437,16 @@ fn process_matches_job(pid: u32, request_path: &Path) -> bool {
     }
     #[cfg(windows)]
     {
-        let command =
+        let script =
             format!("(Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\").CommandLine");
-        return Command::new("powershell.exe")
-            .args(["-NoProfile", "-Command", &command])
-            .output()
-            .ok()
-            .is_some_and(|output| {
-                let line = String::from_utf8_lossy(&output.stdout);
-                line.contains(request_path.to_string_lossy().as_ref())
-                    && line.contains("rvc_training.py")
-            });
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-Command", &script]);
+        hide_windows_console(&mut command);
+        return command.output().ok().is_some_and(|output| {
+            let line = String::from_utf8_lossy(&output.stdout);
+            line.contains(request_path.to_string_lossy().as_ref())
+                && line.contains("rvc_training.py")
+        });
     }
     #[cfg(not(windows))]
     {
@@ -451,10 +463,10 @@ fn process_matches_job(pid: u32, request_path: &Path) -> bool {
 fn terminate_owned_tree(pid: u32) -> TakokitResult<()> {
     #[cfg(windows)]
     {
-        let status = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status()
-            .map_err(storage)?;
+        let mut command = Command::new("taskkill");
+        command.args(["/PID", &pid.to_string(), "/T", "/F"]);
+        hide_windows_console(&mut command);
+        let status = command.status().map_err(storage)?;
         if !status.success() {
             return Err(invalid(format!(
                 "taskkill could not terminate Takokit RVC job PID {pid}"
