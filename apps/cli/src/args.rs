@@ -33,6 +33,29 @@ impl From<RvcF0MethodArg> for takokit_core::RvcF0Method {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum StorageScope {
+    Uv,
+    Downloads,
+    Unused,
+    AllSafe,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum UpdateChannelArg {
+    Stable,
+    Preview,
+}
+
+impl UpdateChannelArg {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Stable => "stable",
+            Self::Preview => "preview",
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
@@ -68,6 +91,11 @@ pub(crate) enum Command {
     Version,
     Status,
     Storage(StorageArgs),
+    Update {
+        #[command(subcommand)]
+        command: UpdateCommand,
+    },
+    Reset(ResetArgs),
     Licenses {
         #[command(subcommand)]
         command: LicenseCommand,
@@ -144,7 +172,8 @@ pub(crate) enum DaemonCommand {
 #[derive(Debug, Args)]
 pub(crate) struct SpeakArgs {
     pub(crate) text: String,
-    #[arg(long, default_value = "mock-tts")]
+    /// Real installed model to use. Takokit has no release-facing mock default.
+    #[arg(long)]
     pub(crate) model: String,
     #[arg(long, default_value = "default")]
     pub(crate) voice: String,
@@ -232,12 +261,59 @@ pub(crate) struct StorageArgs {
 pub(crate) enum StorageCommand {
     /// Show the last automatic cleanup result and whether background cleanup is enabled.
     Status,
-    /// Remove Takokit's isolated uv package cache. Installed hardlinked packages remain valid.
+    /// Remove only reconstructible data in the requested provider-aware scope.
     Clean {
         /// Show what would be removed without changing files.
         #[arg(long)]
         dry_run: bool,
+        /// Safe cleanup class. Provider checkpoint caches are never implicit cleanup targets.
+        #[arg(long, value_enum, default_value = "all-safe")]
+        scope: StorageScope,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum UpdateCommand {
+    /// Inspect the configured signed release manifest.
+    Check(UpdateSourceArgs),
+    /// Stage a verified update and launch the external updater helper.
+    Apply(UpdateSourceArgs),
+    /// Show local update channel, distribution mode, and update journal state.
+    Status,
+    /// Persist the release channel used for automatic/manual checks.
+    Channel { channel: UpdateChannelArg },
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct UpdateSourceArgs {
+    /// Override the release manifest URL/path. Intended for private/test channels.
+    #[arg(long)]
+    pub(crate) manifest: Option<String>,
+    /// Override the detached signature URL/path.
+    #[arg(long)]
+    pub(crate) signature: Option<String>,
+    /// Allow the repository's deterministic non-production test signing key.
+    #[arg(long, hide = true)]
+    pub(crate) allow_test: bool,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct ResetArgs {
+    /// Preview exact global-data cleanup without deleting anything.
+    #[arg(long)]
+    pub(crate) dry_run: bool,
+    /// Remove the Takokit global data root after explicit acknowledgement.
+    #[arg(long)]
+    pub(crate) all: bool,
+    /// Required acknowledgement for destructive global reset.
+    #[arg(long, value_name = "RESOLVED_TAKOKIT_HOME")]
+    pub(crate) confirm: Option<PathBuf>,
+    /// Also remove one explicitly selected project's `.tako` directory.
+    #[arg(long, value_name = "WORKSPACE")]
+    pub(crate) project_data: Option<PathBuf>,
+    /// Separate acknowledgement for project `.tako` deletion.
+    #[arg(long, value_name = "RESOLVED_TAKO_DIR")]
+    pub(crate) confirm_project_data: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
