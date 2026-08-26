@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-#[path = "takokit_updater_support.rs"]
+#[path = "../takokit_updater_support.rs"]
 mod support;
 use support::*;
 
