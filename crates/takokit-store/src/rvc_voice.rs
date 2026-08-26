@@ -381,6 +381,9 @@ fn recovery_name_path(layout: &RvcVoiceLayout) -> PathBuf {
 }
 
 fn write_recovery_name(layout: &RvcVoiceLayout, name: &str) -> TakokitResult<()> {
+    let _guard = metadata_write_lock().lock().map_err(|_| {
+        TakokitError::Storage("RVC metadata lock is poisoned".to_string())
+    })?;
     let path = recovery_name_path(layout);
     fs::write(&path, name).map_err(|error| {
         TakokitError::Storage(format!(
@@ -391,12 +394,16 @@ fn write_recovery_name(layout: &RvcVoiceLayout, name: &str) -> TakokitResult<()>
 }
 
 fn read_recovery_name(layout: &RvcVoiceLayout) -> Option<String> {
+    let _guard = metadata_write_lock().lock().ok()?;
     fs::read_to_string(recovery_name_path(layout))
         .ok()
         .and_then(|value| validate_name(&value).ok())
 }
 
 fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
+    let _guard = metadata_write_lock().lock().map_err(|_| {
+        TakokitError::Storage("RVC metadata lock is poisoned".to_string())
+    })?;
     match read_json_file(path) {
         Ok(value) => Ok(value),
         Err(primary) => {
@@ -422,7 +429,7 @@ fn read_json_file<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
 
 fn atomic_json<T: Serialize>(path: &Path, value: &T) -> TakokitResult<()> {
     let _guard = metadata_write_lock().lock().map_err(|_| {
-        TakokitError::Storage("RVC metadata write lock is poisoned".to_string())
+        TakokitError::Storage("RVC metadata lock is poisoned".to_string())
     })?;
     let parent = path.parent().ok_or_else(|| {
         TakokitError::Storage(format!("metadata path has no parent: {}", path.display()))
