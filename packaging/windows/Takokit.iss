@@ -45,7 +45,7 @@ Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{autoprograms}\Takokit"; Filename: "{app}\bin\Takokit.exe"; WorkingDir: "{localappdata}\Takokit"; Comment: "Takokit local voice AI runtime"
-Name: "{autoprograms}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; WorkingDir: "{userprofile}"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
+Name: "{autoprograms}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
 
 [Code]
 const
