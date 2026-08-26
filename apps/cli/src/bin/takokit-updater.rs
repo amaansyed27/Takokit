@@ -185,7 +185,6 @@ fn rollback_after_replacement(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn fixture_args(root: &Path) -> Args {
         Args {
