@@ -10,6 +10,10 @@ fn creates_unicode_voice_and_persists_layout() {
     assert_eq!(loaded.name, "Voice ü 日本語");
     assert!(store.layout(project.id).samples_originals.is_dir());
     assert!(store.layout(project.id).jobs.is_dir());
+    assert_eq!(
+        fs::read_to_string(store.layout(project.id).root.join(RECOVERY_NAME_FILE)).unwrap(),
+        "Voice ü 日本語"
+    );
 }
 
 #[test]
@@ -28,7 +32,7 @@ fn interrupted_project_write_restores_previous_record() {
 }
 
 #[test]
-fn orphaned_project_directory_recovers_from_owned_sample_and_job_metadata() {
+fn orphaned_project_directory_preserves_user_assigned_name() {
     let temp = TempDir::new().unwrap();
     let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
     let project = store.create("Original name", true, None).unwrap();
@@ -55,10 +59,29 @@ fn orphaned_project_directory_recovers_from_owned_sample_and_job_metadata() {
     let recovered = store.list().unwrap().pop().unwrap();
 
     assert_eq!(recovered.id, project.id);
-    assert_eq!(recovered.name, "Speaker ü");
+    assert_eq!(recovered.name, "Original name");
     assert_eq!(recovered.state, RvcVoiceProjectState::ReadyForPreparation);
     assert!(store.layout(project.id).project.is_file());
     assert_eq!(store.samples_id(project.id).unwrap().len(), 1);
+}
+
+#[test]
+fn legacy_orphan_without_recovery_name_uses_neutral_name_not_sample_name() {
+    let temp = TempDir::new().unwrap();
+    let store = RvcVoiceStore::new(temp.path().join("voices/rvc"));
+    let project = store.create("Original name", true, None).unwrap();
+    let source = temp.path().join("Speaker ü.wav");
+    fs::write(&source, b"sample").unwrap();
+    store
+        .add_samples(&project.id.to_string(), &[source])
+        .unwrap();
+    fs::remove_file(store.layout(project.id).project).unwrap();
+    fs::remove_file(store.layout(project.id).root.join(RECOVERY_NAME_FILE)).unwrap();
+
+    let recovered = store.list().unwrap().pop().unwrap();
+
+    assert!(recovered.name.starts_with("Recovered RVC voice "));
+    assert_ne!(recovered.name, "Speaker ü");
 }
 
 #[test]
