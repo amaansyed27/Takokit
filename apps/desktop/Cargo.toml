@@ -5,6 +5,10 @@ edition = "2021"
 license = "MIT"
 publish = false
 
+[[bin]]
+name = "Takokit"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
