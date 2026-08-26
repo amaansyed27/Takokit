@@ -53,6 +53,10 @@ fn render_object(map: &serde_json::Map<String, serde_json::Value>, depth: usize)
         println!("{}", removal::format_model_removal(map));
         return;
     }
+    if rvc::is_training_job(map) {
+        println!("{}", rvc::format_training_job(map));
+        return;
+    }
     if rvc::is_voice_conversion_report(map) {
         println!("{}", rvc::format_voice_conversion(map));
         return;
