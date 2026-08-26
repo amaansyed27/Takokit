@@ -1,4 +1,4 @@
-import { ArrowRight, FileArchive, FolderOpen, Plus, ShieldCheck } from "lucide-react";
+import { ArrowRight, AudioWaveform, FileArchive, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { ProductButton } from "../../components/ui/ProductButton";
@@ -122,65 +122,103 @@ export function AdvancedVoiceStudio({ onNavigate, onRefresh, initialSamplePath }
   }
 
   return (
-    <section className="tk-rvc-simple-landing">
-      <header className="tk-rvc-simple-heading">
-        <span>Trained voice</span>
-        <h2>Train a voice</h2>
-        <p>Add recordings of one speaker and Takokit handles preparation, training, model selection and indexing automatically.</p>
-      </header>
+    <section className="tk-rvc-home">
+      <div className="tk-rvc-home__grid">
+        <section className="tk-rvc-create-card" aria-label="Create trained voice">
+          <header className="tk-rvc-create-card__header">
+            <div>
+              <span className="tk-rvc-kicker">Trained voice</span>
+              <h2>New trained voice</h2>
+              <p>Start with a name. Add recordings and train on the next screen.</p>
+            </div>
+            <span className="tk-rvc-create-card__icon"><AudioWaveform size={21} strokeWidth={1.7} /></span>
+          </header>
 
-      <section className="tk-rvc-simple-create" aria-label="Create trained voice">
-        <label className="tk-field">
-          <span className="tk-field__label">Voice name</span>
-          <input className="tk-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="For example, Studio narrator" />
-        </label>
-        <label className="tk-rvc-simple-consent">
-          <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-          <span><ShieldCheck size={16} /><strong>I own this voice or have explicit permission to use it.</strong></span>
-        </label>
-        {initialSamplePath ? <p className="tk-rvc-simple-note">The audio you selected will be added after the voice is created.</p> : null}
-        {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
-        <ProductButton tone="primary" loading={busy} disabled={busy || !name.trim() || !consent} onClick={() => void createVoice()}>
-          <Plus size={15} /> Create voice
-        </ProductButton>
-      </section>
+          <div className="tk-rvc-create-card__body">
+            <label className="tk-field">
+              <span className="tk-field__label">Voice name</span>
+              <input
+                className="tk-input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="For example, Studio narrator"
+              />
+              <span className="tk-field__hint">You can add multiple recordings after creating the voice.</span>
+            </label>
 
-      <section className="tk-rvc-simple-library">
-        <header><div><h3>Your trained voices</h3><p>Open a voice to add recordings, train it, or test it.</p></div><span>{projects.length}</span></header>
-        <div className="tk-rvc-simple-voice-list">
-          {projects.map((project) => (
-            <button type="button" key={project.id} onClick={() => setActiveVoice(project.id)}>
-              <span><strong>{project.name}</strong><small>{project.imported ? "Imported voice" : stateLabel(project.state)}</small></span>
-              <ArrowRight size={15} />
-            </button>
-          ))}
-          {projects.length === 0 ? <p className="tk-rvc-empty">No trained voices yet.</p> : null}
-        </div>
-      </section>
+            <div className="tk-rvc-create-flow" aria-label="Training flow">
+              <div className="is-current"><span>1</span><p><strong>Create</strong><small>Name the voice</small></p></div>
+              <div><span>2</span><p><strong>Add audio</strong><small>Upload or record</small></p></div>
+              <div><span>3</span><p><strong>Train</strong><small>Takokit handles the rest</small></p></div>
+            </div>
 
-      <details className="tk-rvc-simple-advanced">
-        <summary>Import an existing voice</summary>
-        <div className="tk-rvc-simple-import">
-          <div>
-            <strong>Takokit voice package</strong>
-            <p>Recommended for moving a trained voice between Takokit installs.</p>
-          </div>
-          <div className="tk-rvc-simple-file-row">
-            <input className="tk-input" value={packagePath} onChange={(event) => setPackagePath(event.target.value)} placeholder="Choose a .takovoice package" />
-            <ProductButton tone="secondary" disabled={busy} onClick={() => void browse("package")}><FolderOpen size={14} /> Browse</ProductButton>
-            <ProductButton tone="primary" disabled={busy || !packagePath.trim()} onClick={() => void importPackage()}><FileArchive size={14} /> Import</ProductButton>
+            <label className={consent ? "tk-rvc-permission is-checked" : "tk-rvc-permission"}>
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span className="tk-rvc-permission__check">{consent ? "✓" : ""}</span>
+              <ShieldCheck size={18} strokeWidth={1.8} />
+              <span>
+                <strong>I own this voice or have explicit permission to use it.</strong>
+                <small>Required before Takokit creates a persistent trained voice.</small>
+              </span>
+            </label>
+
+            {initialSamplePath ? <div className="tk-rvc-seeded-note">Your selected audio will be added automatically after creation.</div> : null}
+            {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
           </div>
 
-          <details className="tk-rvc-simple-legacy">
-            <summary>Legacy RVC files (.pth / .index)</summary>
-            <p>This is only for existing RVC models from outside Takokit. Normal Takokit training never asks you to choose these files.</p>
-            <label className="tk-field"><span className="tk-field__label">Voice name</span><input className="tk-input" value={legacyName} onChange={(event) => setLegacyName(event.target.value)} /></label>
-            <ArtifactRow label="Model (.pth)" value={checkpoint} onChange={setCheckpoint} onBrowse={() => void browse("checkpoint")} />
-            <ArtifactRow label="Index (.index, optional)" value={index} onChange={setIndex} onBrowse={() => void browse("index")} />
-            <ProductButton tone="primary" disabled={busy || !legacyName.trim() || !checkpoint.trim()} onClick={() => void importLegacy()}>Import legacy voice</ProductButton>
+          <footer className="tk-rvc-create-card__footer">
+            <span>Local RVC training</span>
+            <ProductButton tone="primary" loading={busy} disabled={busy || !name.trim() || !consent} onClick={() => void createVoice()}>
+              <Plus size={15} /> Create trained voice
+            </ProductButton>
+          </footer>
+        </section>
+
+        <aside className="tk-rvc-library-card" aria-label="Trained voices">
+          <header className="tk-rvc-library-card__header">
+            <div><strong>Trained voices</strong><small>Open one to continue training or test it.</small></div>
+            <span>{projects.length}</span>
+          </header>
+
+          <div className="tk-rvc-library-card__list">
+            {projects.map((project) => (
+              <button type="button" key={project.id} onClick={() => setActiveVoice(project.id)}>
+                <span className="tk-rvc-library-card__voice-icon"><AudioWaveform size={16} strokeWidth={1.8} /></span>
+                <span className="tk-rvc-library-card__identity">
+                  <strong>{project.name}</strong>
+                  <small>{project.imported ? "Imported voice" : stateLabel(project.state)}</small>
+                </span>
+                <ArrowRight size={14} />
+              </button>
+            ))}
+            {projects.length === 0 ? <div className="tk-rvc-library-card__empty">No trained voices yet.</div> : null}
+          </div>
+
+          <details className="tk-rvc-import">
+            <summary>Import an existing voice</summary>
+            <div className="tk-rvc-import__body">
+              <div>
+                <strong>Takokit voice package</strong>
+                <p>Recommended for moving a trained voice between Takokit installs.</p>
+              </div>
+              <div className="tk-rvc-simple-file-row">
+                <input className="tk-input" value={packagePath} onChange={(event) => setPackagePath(event.target.value)} placeholder="Choose a .takovoice package" />
+                <ProductButton tone="secondary" disabled={busy} onClick={() => void browse("package")}><FolderOpen size={14} /> Browse</ProductButton>
+              </div>
+              <ProductButton tone="primary" disabled={busy || !packagePath.trim()} onClick={() => void importPackage()}><FileArchive size={14} /> Import package</ProductButton>
+
+              <details className="tk-rvc-simple-legacy">
+                <summary>Legacy RVC files (.pth / .index)</summary>
+                <p>Only use this for RVC models created outside Takokit.</p>
+                <label className="tk-field"><span className="tk-field__label">Voice name</span><input className="tk-input" value={legacyName} onChange={(event) => setLegacyName(event.target.value)} /></label>
+                <ArtifactRow label="Model (.pth)" value={checkpoint} onChange={setCheckpoint} onBrowse={() => void browse("checkpoint")} />
+                <ArtifactRow label="Index (.index, optional)" value={index} onChange={setIndex} onBrowse={() => void browse("index")} />
+                <ProductButton tone="secondary" disabled={busy || !legacyName.trim() || !checkpoint.trim()} onClick={() => void importLegacy()}>Import legacy voice</ProductButton>
+              </details>
+            </div>
           </details>
-        </div>
-      </details>
+        </aside>
+      </div>
     </section>
   );
 }
