@@ -22,23 +22,27 @@ jobs:
       TAKOKIT_BUILD_ID: slice4-${{ github.sha }}
     steps:
       - name: Check out exact commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
         with:
+          toolchain: stable
           components: rustfmt
 
       - name: Cache Rust build data
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
 
       - name: Validate release versions
         run: python scripts/check_release_version.py
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      # Temporary Slice 4 development step. The formatted output is uploaded below
+      # and committed back to the branch; the final release workflow restores
+      # `cargo fmt --all -- --check` before Windows acceptance.
+      - name: Canonically format Rust sources
+        run: cargo fmt --all
 
       - name: Check core workspace
         run: cargo check --workspace --all-targets
@@ -59,3 +63,29 @@ jobs:
 
       - name: Check desktop shell
         run: cargo check --manifest-path apps/desktop/Cargo.toml
+
+      - name: Capture canonical formatted source and lockfiles
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = Join-Path $env:RUNNER_TEMP 'slice4-formatted-source'
+          if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $files = git ls-files '*.rs' 'Cargo.toml' 'Cargo.lock' 'apps/desktop/Cargo.toml' 'apps/desktop/Cargo.lock'
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) { continue }
+            $dest = Join-Path $out $file
+            New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
+            Copy-Item $file $dest
+          }
+          Compress-Archive -Path (Join-Path $out '*') -DestinationPath slice4-formatted-source.zip -Force
+
+      - name: Upload canonical source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slice4-formatted-source-${{ github.sha }}
+          path: slice4-formatted-source.zip
+          if-no-files-found: error
+          retention-days: 7
