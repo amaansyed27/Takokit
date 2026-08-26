@@ -1,2 +1,13 @@
 @import "./voice-polish-landing.css";
 @import "./voice-polish-workspace.css";
+
+.tk-voice-create-modes > button:first-child strong,
+.tk-voice-create-modes > button:nth-child(2) strong { font-size: 0; }
+.tk-voice-create-modes > button:first-child strong::after {
+  content: "Instant voice";
+  font-size: 11.5px;
+}
+.tk-voice-create-modes > button:nth-child(2) strong::after {
+  content: "Train a voice";
+  font-size: 11.5px;
+}
