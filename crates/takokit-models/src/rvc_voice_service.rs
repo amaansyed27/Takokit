@@ -16,6 +16,7 @@ mod artifacts;
 mod cleanup;
 mod jobs;
 mod packages;
+mod progress;
 
 #[derive(Debug, Clone)]
 pub struct RvcVoiceService {
