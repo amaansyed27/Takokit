@@ -1,4 +1,4 @@
-import { ArrowRight, FolderOpen, FlaskConical } from "lucide-react";
+import { ArrowRight, FolderOpen } from "lucide-react";
 import { useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
@@ -8,9 +8,7 @@ import { testRvcVoice, type RvcVoiceDetail } from "../../lib/rvcApi";
 import type { VoiceConversionApiResponse } from "../../lib/types";
 import { setCloneIntent } from "../../lib/workflowIntent";
 
-type Props = Pick<RouteComponentProps, "onNavigate"> & {
-  detail: RvcVoiceDetail;
-};
+type Props = Pick<RouteComponentProps, "onNavigate"> & { detail: RvcVoiceDetail };
 
 export function RvcTestPanel({ detail, onNavigate }: Props) {
   const [sourcePath, setSourcePath] = useState("");
@@ -29,7 +27,7 @@ export function RvcTestPanel({ detail, onNavigate }: Props) {
         setResult(null);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The source audio picker could not be opened.");
+      setError(caught instanceof Error ? caught.message : "The audio picker could not be opened.");
     } finally {
       setBusy(false);
     }
@@ -56,48 +54,31 @@ export function RvcTestPanel({ detail, onNavigate }: Props) {
   }
 
   return (
-    <div className="tk-rvc-panel tk-rvc-test-panel">
-      <section className="tk-rvc-test-intro">
-        <span><FlaskConical size={18} /></span>
-        <div>
-          <strong>Test this voice through the normal RVC converter</strong>
-          <p>This does not use a separate preview engine. It sends the selected source audio through the same conversion service used by Clone audio.</p>
-        </div>
-      </section>
+    <div className="tk-rvc-simple-panel tk-rvc-simple-test">
+      <header className="tk-rvc-simple-section-heading">
+        <div><h3>Test your voice</h3><p>Choose any speech recording. Takokit preserves the words and timing while converting the speaker to this trained voice.</p></div>
+      </header>
 
-      {!ready ? (
-        <div className="tk-inline-note">Select a valid checkpoint in Checkpoints before testing or using this voice in Convert.</div>
-      ) : null}
+      {!ready ? <div className="tk-inline-note">Finish training or import a voice first. Takokit activates the finished model automatically.</div> : null}
 
-      <section className="tk-rvc-test-source">
-        <div>
-          <span>Source speech audio</span>
-          <strong>{sourcePath ? displayFileName(sourcePath) : "Choose an audio recording"}</strong>
-          <small>{sourcePath || "The words and timing from this recording are preserved."}</small>
-        </div>
-        <ProductButton tone="secondary" disabled={busy} onClick={() => void browseSource()}>
-          <FolderOpen size={14} /> Browse audio
-        </ProductButton>
-      </section>
+      <div className="tk-rvc-simple-test-source">
+        <div><span>Source audio</span><strong>{sourcePath ? displayFileName(sourcePath) : "Choose speech to convert"}</strong><small>{sourcePath || "Use a different speaker for the clearest test."}</small></div>
+        <ProductButton tone="secondary" disabled={busy} onClick={() => void browseSource()}><FolderOpen size={14} /> Browse audio</ProductButton>
+      </div>
 
       {sourcePath ? <LocalAudioPlayer path={sourcePath} compact defer label="Source audio" /> : null}
       {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
 
-      <div className="tk-rvc-test-actions">
-        <ProductButton tone="primary" loading={busy} disabled={!ready || !sourcePath.trim() || busy} onClick={() => void runTest()}>
-          Test voice
-        </ProductButton>
-        <ProductButton tone="secondary" disabled={!ready} onClick={useInConvert}>
-          Use in Convert <ArrowRight size={14} />
-        </ProductButton>
+      <div className="tk-rvc-simple-actions">
+        <ProductButton tone="primary" loading={busy} disabled={!ready || !sourcePath.trim() || busy} onClick={() => void runTest()}>Test voice</ProductButton>
+        <ProductButton tone="secondary" disabled={!ready} onClick={useInConvert}>Use in Clone audio <ArrowRight size={14} /></ProductButton>
       </div>
 
       {result ? (
-        <section className="tk-rvc-test-result">
-          <header><strong>Converted test output</strong><span>{result.execution_status === "passed" ? "Execution passed" : result.execution_status}</span></header>
-          <LocalAudioPlayer path={result.output_path} label="RVC test output" />
-          <p>{result.quality_notice}</p>
-          <ProductButton tone="primary" onClick={useInConvert}>Open in Convert <ArrowRight size={14} /></ProductButton>
+        <section className="tk-rvc-simple-test-result">
+          <header><strong>Converted voice</strong><span>{result.execution_status === "passed" ? "Ready" : result.execution_status}</span></header>
+          <LocalAudioPlayer path={result.output_path} label="Converted test output" />
+          <ProductButton tone="primary" onClick={useInConvert}>Continue in Clone audio <ArrowRight size={14} /></ProductButton>
         </section>
       ) : null}
     </div>
