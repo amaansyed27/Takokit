@@ -20,23 +20,14 @@ pub enum AdvancedRvcAction {
     ImportExisting,
     AddSample,
     Inspect,
-    Prepare,
-    Preflight,
     Train,
     Status,
-    Logs,
     Cancel,
     Recover,
-    Checkpoints,
-    Indexes,
-    ActivateCheckpoint,
     TestVoice,
     UseInConvert,
 }
 
-// Keep the normal TUI focused on the product workflow. The lower-level lifecycle
-// commands remain available through the canonical CLI/API for diagnostics and
-// advanced use, but users should not have to manage checkpoints or indexes.
 pub const ADVANCED_RVC_ACTIONS: [AdvancedRvcAction; 10] = [
     AdvancedRvcAction::NewVoice,
     AdvancedRvcAction::ImportExisting,
@@ -57,16 +48,10 @@ impl AdvancedRvcAction {
             Self::ImportExisting => "Import existing voice",
             Self::AddSample => "Add recording",
             Self::Inspect => "Check recordings",
-            Self::Prepare => "Prepare recordings (advanced)",
-            Self::Preflight => "Hardware check (advanced)",
             Self::Train => "Train voice",
             Self::Status => "Training progress",
-            Self::Logs => "Technical log",
             Self::Cancel => "Cancel training",
             Self::Recover => "Continue / recover training",
-            Self::Checkpoints => "Model files (advanced)",
-            Self::Indexes => "Index files (advanced)",
-            Self::ActivateCheckpoint => "Select model file (advanced)",
             Self::TestVoice => "Test voice",
             Self::UseInConvert => "Use in Clone audio",
         }
@@ -80,18 +65,12 @@ impl AdvancedRvcAction {
             }
             Self::AddSample => "Add a clean recording of this speaker. You can add more than one.",
             Self::Inspect => "Check duration, duplicates and recording quality before training.",
-            Self::Prepare => "Run only the preprocessing stages without starting training.",
-            Self::Preflight => "Check the selected training settings against this computer.",
             Self::Train => {
                 "Takokit checks hardware, prepares the recordings, trains, builds the index and activates the finished voice automatically."
             }
             Self::Status => "Show the real training stage and epoch progress from the managed job.",
-            Self::Logs => "Open the persisted backend preparation and training log.",
             Self::Cancel => "Stop the current managed training job cleanly.",
             Self::Recover => "Resume a cancelled, failed or interrupted training run when possible.",
-            Self::Checkpoints => "List validated inference model files and their IDs.",
-            Self::Indexes => "List validated search-index files and their IDs.",
-            Self::ActivateCheckpoint => "Select a validated model/index pair manually.",
             Self::TestVoice => "Choose speech from another speaker and convert it to this trained voice.",
             Self::UseInConvert => "Open Clone audio with this trained voice already selected.",
         }
@@ -106,18 +85,15 @@ impl AdvancedRvcAction {
     }
 
     pub fn requires_path(self) -> bool {
-        matches!(
-            self,
-            Self::ImportExisting | Self::AddSample | Self::ActivateCheckpoint | Self::TestVoice
-        )
+        matches!(self, Self::ImportExisting | Self::AddSample | Self::TestVoice)
     }
 
     pub fn shows_index_input(self) -> bool {
-        matches!(self, Self::ImportExisting | Self::ActivateCheckpoint)
+        matches!(self, Self::ImportExisting)
     }
 
     pub fn shows_training_quality(self) -> bool {
-        matches!(self, Self::Prepare | Self::Preflight | Self::Train)
+        matches!(self, Self::Train)
     }
 
     pub fn requires_consent(self) -> bool {
@@ -233,30 +209,21 @@ mod tests {
             .iter()
             .map(|action| action.label())
             .collect::<Vec<_>>();
-        for required in [
-            "Create trained voice",
-            "Import existing voice",
-            "Add recording",
-            "Check recordings",
-            "Train voice",
-            "Training progress",
-            "Cancel training",
-            "Continue / recover training",
-            "Test voice",
-            "Use in Clone audio",
-        ] {
-            assert!(labels.contains(&required));
-        }
-        for technical in [
-            "Prepare recordings (advanced)",
-            "Hardware check (advanced)",
-            "Technical log",
-            "Model files (advanced)",
-            "Index files (advanced)",
-            "Select model file (advanced)",
-        ] {
-            assert!(!labels.contains(&technical));
-        }
+        assert_eq!(
+            labels,
+            vec![
+                "Create trained voice",
+                "Import existing voice",
+                "Add recording",
+                "Check recordings",
+                "Train voice",
+                "Training progress",
+                "Cancel training",
+                "Continue / recover training",
+                "Test voice",
+                "Use in Clone audio",
+            ]
+        );
     }
 
     #[test]
