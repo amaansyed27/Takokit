@@ -14,8 +14,8 @@ use uuid::Uuid;
 mod layout;
 mod metadata;
 mod samples;
-use metadata::*;
 pub use layout::RvcVoiceLayout;
+use metadata::*;
 
 #[derive(Debug, Clone)]
 pub struct RvcVoiceStore {
