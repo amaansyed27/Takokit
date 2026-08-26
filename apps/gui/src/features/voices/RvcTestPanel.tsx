@@ -48,8 +48,7 @@ export function RvcTestPanel({ detail, onNavigate }: Props) {
   }
 
   function useInConvert() {
-    const target = detail.conversion_target ?? detail.managed?.id ?? detail.project.id;
-    setCloneIntent({ sourcePath: sourcePath.trim() || undefined, targetPath: target, mode: "rvc" });
+    setCloneIntent({ sourcePath: sourcePath.trim() || undefined, targetPath: detail.project.id, mode: "rvc" });
     onNavigate("convert");
   }
 
