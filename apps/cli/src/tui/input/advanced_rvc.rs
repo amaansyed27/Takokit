@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use uuid::Uuid;
 
 use crate::tui::{
     advanced_rvc::{AdvancedRvcAction, AdvancedRvcField, ADVANCED_RVC_ACTIONS, RVC_PRESETS},
@@ -179,68 +178,64 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
                 args
             }
         }
-        _ => {
+        AdvancedRvcAction::AddSample => {
             let Some((voice, _)) = selected.clone() else {
                 app.set_status("Create or import a trained voice first.");
                 return None;
             };
-            match action {
-                AdvancedRvcAction::AddSample => {
-                    if path.is_empty() {
-                        app.set_status("Add recording needs an audio file. Press F2 to browse.");
-                        return None;
-                    }
-                    vec!["samples".into(), voice, "add".into(), path]
-                }
-                AdvancedRvcAction::Inspect => vec!["inspect".into(), voice],
-                AdvancedRvcAction::Prepare => {
-                    vec!["prepare".into(), voice, "--preset".into(), preset]
-                }
-                AdvancedRvcAction::Preflight => {
-                    vec!["preflight".into(), voice, "--preset".into(), preset]
-                }
-                AdvancedRvcAction::Train => {
-                    vec!["train".into(), voice, "--preset".into(), preset]
-                }
-                AdvancedRvcAction::Status => vec!["status".into(), voice],
-                AdvancedRvcAction::Logs => vec!["logs".into(), voice],
-                AdvancedRvcAction::Cancel => vec!["cancel".into(), voice],
-                AdvancedRvcAction::Recover => vec!["recover".into(), voice],
-                AdvancedRvcAction::Checkpoints => vec!["checkpoints".into(), voice],
-                AdvancedRvcAction::Indexes => vec!["indexes".into(), voice],
-                AdvancedRvcAction::ActivateCheckpoint => {
-                    let checkpoint = match Uuid::parse_str(path.trim()) {
-                        Ok(value) => value,
-                        Err(_) => {
-                            app.set_status("Advanced model selection requires a checkpoint UUID.");
-                            return None;
-                        }
-                    };
-                    let mut args = vec!["activate".into(), voice, checkpoint.to_string()];
-                    if !index.is_empty() {
-                        let index_id = match Uuid::parse_str(index.trim()) {
-                            Ok(value) => value,
-                            Err(_) => {
-                                app.set_status("Advanced index selection requires an index UUID.");
-                                return None;
-                            }
-                        };
-                        args.extend(["--index".into(), index_id.to_string()]);
-                    }
-                    args
-                }
-                AdvancedRvcAction::TestVoice => {
-                    if path.is_empty() {
-                        app.set_status("Test voice needs source speech. Press F2 to browse.");
-                        return None;
-                    }
-                    vec!["test".into(), voice, path]
-                }
-                AdvancedRvcAction::NewVoice
-                | AdvancedRvcAction::ImportExisting
-                | AdvancedRvcAction::UseInConvert => unreachable!(),
+            if path.is_empty() {
+                app.set_status("Add recording needs an audio file. Press F2 to browse.");
+                return None;
             }
+            vec!["samples".into(), voice, "add".into(), path]
         }
+        AdvancedRvcAction::Inspect => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            vec!["inspect".into(), voice]
+        }
+        AdvancedRvcAction::Train => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            vec!["train".into(), voice, "--preset".into(), preset]
+        }
+        AdvancedRvcAction::Status => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            vec!["status".into(), voice]
+        }
+        AdvancedRvcAction::Cancel => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            vec!["cancel".into(), voice]
+        }
+        AdvancedRvcAction::Recover => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            vec!["recover".into(), voice]
+        }
+        AdvancedRvcAction::TestVoice => {
+            let Some((voice, _)) = selected.clone() else {
+                app.set_status("Create or import a trained voice first.");
+                return None;
+            };
+            if path.is_empty() {
+                app.set_status("Test voice needs source speech. Press F2 to browse.");
+                return None;
+            }
+            vec!["test".into(), voice, path]
+        }
+        AdvancedRvcAction::UseInConvert => unreachable!(),
     };
 
     let label = match selected {
