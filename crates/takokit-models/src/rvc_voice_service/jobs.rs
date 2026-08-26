@@ -52,7 +52,7 @@ impl RvcVoiceService {
         self.reconcile_job(project.id)?;
         let project = self.store.load_id(project.id)?;
         match project.latest_job_id {
-            Some(id) => self.store.load_job(project.id, id).map(Some),
+            Some(id) => self.refresh_job_progress(project.id, id).map(Some),
             None => Ok(None),
         }
     }
@@ -130,7 +130,7 @@ impl RvcVoiceService {
         let Some(job_id) = project.latest_job_id else {
             return Ok(());
         };
-        let mut job = match self.store.load_job(voice_id, job_id) {
+        let mut job = match self.refresh_job_progress(voice_id, job_id) {
             Ok(job) => job,
             Err(_) => return Ok(()),
         };
