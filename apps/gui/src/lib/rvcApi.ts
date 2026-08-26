@@ -103,6 +103,7 @@ export type RvcJob = {
   config: RvcTrainingConfig;
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "stale";
   stage: string;
+  current_epoch?: number;
   created_at: number;
   started_at?: number;
   finished_at?: number;
