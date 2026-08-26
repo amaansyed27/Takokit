@@ -85,7 +85,10 @@ impl AdvancedRvcAction {
     }
 
     pub fn requires_path(self) -> bool {
-        matches!(self, Self::ImportExisting | Self::AddSample | Self::TestVoice)
+        matches!(
+            self,
+            Self::ImportExisting | Self::AddSample | Self::TestVoice
+        )
     }
 
     pub fn shows_index_input(self) -> bool {
