@@ -4,6 +4,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{
@@ -16,6 +17,8 @@ use uuid::Uuid;
 mod layout;
 mod samples;
 pub use layout::RvcVoiceLayout;
+
+const RECOVERY_NAME_FILE: &str = "project-name.txt";
 
 #[derive(Debug, Clone)]
 pub struct RvcVoiceStore {
@@ -51,6 +54,7 @@ impl RvcVoiceStore {
         let id = Uuid::new_v4();
         let layout = self.layout(id);
         layout.ensure()?;
+        write_recovery_name(&layout, &name)?;
         let now = now_secs();
         let project = RvcVoiceProject {
             schema_version: RVC_VOICE_SCHEMA_VERSION,
@@ -106,10 +110,8 @@ impl RvcVoiceStore {
                 }
                 continue;
             }
-            if path.is_file() {
-                if let Ok(project) = read_json::<RvcVoiceProject>(&path) {
-                    projects.push(project);
-                }
+            if let Ok(project) = read_json::<RvcVoiceProject>(&path) {
+                projects.push(project);
             }
         }
         projects.sort_by(|a, b| {
@@ -149,6 +151,7 @@ impl RvcVoiceStore {
     pub fn save_project(&self, project: &RvcVoiceProject) -> TakokitResult<()> {
         let mut project = project.clone();
         project.updated_at = now_secs();
+        write_recovery_name(&self.layout(project.id), &project.name)?;
         atomic_json(&self.layout(project.id).project, &project)
     }
 
@@ -162,12 +165,7 @@ impl RvcVoiceStore {
             return Ok(None);
         }
         let samples = self.samples_id(id)?;
-        let name = samples
-            .first()
-            .and_then(|sample| Path::new(&sample.display_name).file_stem())
-            .and_then(|value| value.to_str())
-            .filter(|value| !value.trim().is_empty())
-            .map(str::to_string)
+        let name = read_recovery_name(&layout)
             .unwrap_or_else(|| format!("Recovered RVC voice {}", &id.to_string()[..8]));
         let mut jobs = Vec::new();
         if layout.jobs.is_dir() {
@@ -223,6 +221,7 @@ impl RvcVoiceStore {
             active_index_id: managed.as_ref().and_then(|voice| voice.index_id),
             last_error: None,
         };
+        write_recovery_name(&layout, &project.name)?;
         atomic_json(&layout.project, &project)?;
         Ok(Some(project))
     }
@@ -372,6 +371,31 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
+fn metadata_write_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn recovery_name_path(layout: &RvcVoiceLayout) -> PathBuf {
+    layout.root.join(RECOVERY_NAME_FILE)
+}
+
+fn write_recovery_name(layout: &RvcVoiceLayout, name: &str) -> TakokitResult<()> {
+    let path = recovery_name_path(layout);
+    fs::write(&path, name).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not preserve RVC project name at {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn read_recovery_name(layout: &RvcVoiceLayout) -> Option<String> {
+    fs::read_to_string(recovery_name_path(layout))
+        .ok()
+        .and_then(|value| validate_name(&value).ok())
+}
+
 fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
     match read_json_file(path) {
         Ok(value) => Ok(value),
@@ -388,40 +412,61 @@ fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
 }
 
 fn read_json_file<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
-    let bytes = fs::read(path).map_err(storage_error)?;
+    let bytes = fs::read(path).map_err(|error| {
+        TakokitError::Storage(format!("could not read metadata {}: {error}", path.display()))
+    })?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TakokitError::Storage(format!("invalid metadata {}: {error}", path.display()))
     })
 }
 
 fn atomic_json<T: Serialize>(path: &Path, value: &T) -> TakokitResult<()> {
+    let _guard = metadata_write_lock().lock().map_err(|_| {
+        TakokitError::Storage("RVC metadata write lock is poisoned".to_string())
+    })?;
     let parent = path.parent().ok_or_else(|| {
         TakokitError::Storage(format!("metadata path has no parent: {}", path.display()))
     })?;
     fs::create_dir_all(parent).map_err(storage_error)?;
-    let temporary = path.with_extension("json.tmp");
+    let temporary = path.with_extension(format!("json.tmp-{}", Uuid::new_v4()));
     let previous = previous_json_path(path);
     let bytes = serde_json::to_vec_pretty(value)
         .map_err(|error| TakokitError::Storage(error.to_string()))?;
-    let mut file = File::create(&temporary).map_err(storage_error)?;
-    file.write_all(&bytes).map_err(storage_error)?;
+    let mut file = File::create(&temporary).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not create temporary metadata {}: {error}",
+            temporary.display()
+        ))
+    })?;
+    file.write_all(&bytes).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not write temporary metadata {}: {error}",
+            temporary.display()
+        ))
+    })?;
     file.sync_all().map_err(storage_error)?;
     if previous.exists() {
         fs::remove_file(&previous).map_err(storage_error)?;
     }
     let replaced_existing = path.exists();
     if replaced_existing {
-        fs::rename(path, &previous).map_err(storage_error)?;
+        fs::rename(path, &previous).map_err(|error| {
+            TakokitError::Storage(format!(
+                "could not rotate metadata {} to {}: {error}",
+                path.display(),
+                previous.display()
+            ))
+        })?;
     }
     if let Err(error) = fs::rename(&temporary, path) {
         let _ = fs::remove_file(&temporary);
         if replaced_existing {
             let _ = fs::rename(&previous, path);
         }
-        return Err(storage_error(error));
-    }
-    if replaced_existing {
-        fs::remove_file(previous).map_err(storage_error)?;
+        return Err(TakokitError::Storage(format!(
+            "could not publish metadata {}: {error}",
+            path.display()
+        )));
     }
     Ok(())
 }
