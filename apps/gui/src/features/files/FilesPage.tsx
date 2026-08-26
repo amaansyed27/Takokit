@@ -99,14 +99,19 @@ export function FilesPage({ onNavigate }: RouteComponentProps) {
     }
   }
 
-  function useAudio(file: WorkspaceFile, destination: "transcribe" | "voices" | "clone") {
+  function useAudio(file: WorkspaceFile, destination: "transcribe" | "voices" | "advanced" | "clone") {
     if (destination === "transcribe") {
       setTranscribeIntent({ filePath: file.path });
       onNavigate("transcribe");
       return;
     }
     if (destination === "voices") {
-      setVoiceIntent({ samplePath: file.path });
+      setVoiceIntent({ samplePath: file.path, mode: "instant" });
+      onNavigate("voices");
+      return;
+    }
+    if (destination === "advanced") {
+      setVoiceIntent({ samplePath: file.path, mode: "advanced" });
       onNavigate("voices");
       return;
     }
@@ -192,7 +197,8 @@ export function FilesPage({ onNavigate }: RouteComponentProps) {
               ) : (
                 <>
                   <button type="button" onClick={() => useAudio(file, "transcribe")}>Transcribe</button>
-                  <button type="button" onClick={() => useAudio(file, "voices")}>Create voice</button>
+                  <button type="button" onClick={() => useAudio(file, "voices")}>Instant voice</button>
+                  <button type="button" onClick={() => useAudio(file, "advanced")}>Add to Voice Dataset</button>
                   <button type="button" onClick={() => useAudio(file, "clone")}>Clone audio <ArrowRight size={13} /></button>
                 </>
               )}

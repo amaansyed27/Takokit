@@ -5,7 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use takokit_core::{DaemonIdentity, DaemonMode, ProcessInfo, RuntimeConfig, RuntimeStatus};
-use takokit_models::{MockTextToSpeechEngine, ModelRegistry};
+use takokit_models::{MockTextToSpeechEngine, ModelRegistry, RvcVoiceService};
 use takokit_package::{InstalledRegistry, PackageRegistry};
 use takokit_store::LocalStore;
 use tokio::sync::{oneshot, Mutex};
@@ -18,6 +18,7 @@ pub struct AppState {
     pub registry: Arc<ModelRegistry>,
     pub package_registry: Arc<PackageRegistry>,
     pub installed_registry: Arc<InstalledRegistry>,
+    pub rvc_voices: Arc<RvcVoiceService>,
     pub tts: Arc<MockTextToSpeechEngine>,
     pub daemon_identity: DaemonIdentity,
     pub build_id: String,
@@ -38,6 +39,7 @@ impl AppState {
         store: LocalStore,
         build_id: impl Into<String>,
     ) -> Self {
+        let rvc_voices = Arc::new(RvcVoiceService::new(store.root()));
         Self {
             package_registry: Arc::new(PackageRegistry::bundled()),
             installed_registry: Arc::new(InstalledRegistry::new(store.manifests_dir())),
@@ -56,6 +58,7 @@ impl AppState {
             config,
             store,
             registry: Arc::new(ModelRegistry::default()),
+            rvc_voices,
             tts: Arc::new(MockTextToSpeechEngine),
             shutdown: Arc::new(Mutex::new(None)),
             executions: Arc::new(Mutex::new(HashMap::new())),
@@ -110,7 +113,8 @@ impl AppState {
                         .count()
                 })
                 .unwrap_or(0),
-            voices: self.registry.voices().len(),
+            voices: self.registry.voices().len()
+                + self.rvc_voices.list().map(|items| items.len()).unwrap_or(0),
         }
     }
 }

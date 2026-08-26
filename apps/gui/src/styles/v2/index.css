@@ -11,6 +11,11 @@
 @import "./transcribe.css";
 @import "./voices.css";
 @import "./voices-library.css";
+@import "./rvc-studio.css";
+@import "./rvc-studio-workflow.css";
+@import "./rvc-studio-samples.css";
+@import "./rvc-studio-training.css";
+@import "./rvc-studio-artifacts.css";
 @import "./convert.css";
 @import "./convert-result.css";
 @import "./files.css";
@@ -23,3 +28,7 @@
 @import "./finish.css";
 @import "./refinement.css";
 @import "./refinement-system.css";
+@import "./rvc-simple.css";
+@import "./clone-simple.css";
+@import "./voice-polish.css";
+@import "./clone-polish.css";

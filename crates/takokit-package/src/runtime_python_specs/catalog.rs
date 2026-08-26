@@ -51,12 +51,26 @@ const QWEN_OMNI_PACKAGES: &[&str] = &[
     "torchaudio",
     "torchvision",
 ];
+const RVC_PACKAGES: &[&str] = &[
+    "transformers>=4.49,<4.50",
+    "numpy==1.26.4",
+    "numba==0.58.1",
+    "librosa>=0.10.1,<0.11",
+    "praat-parselmouth>=0.4.3,<1",
+    "pyworld>=0.3.4,<0.4",
+    "torchcrepe>=0.0.22,<0.1",
+    "av==12.0.0",
+    "faiss-cpu>=1.7.4,<2",
+    "python-dotenv>=1,<2",
+    "pydub>=0.25,<1",
+];
 
 const COSYVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     repository: "https://github.com/FunAudioLLM/CosyVoice.git",
     revision: "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc",
     recursive: true,
     requirement_files: &["requirements.txt"],
+    required_files: &[],
     editable: false,
 };
 const FISH_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -64,6 +78,7 @@ const FISH_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "e5e292632cb11e7a27b2b7487f58f612bc101e13",
     recursive: false,
     requirement_files: &[],
+    required_files: &[],
     editable: true,
 };
 const OPENVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -71,6 +86,7 @@ const OPENVOICE_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "74a1d147b17a8c3092dd5430504bd83ef6c7eb23",
     recursive: false,
     requirement_files: &[],
+    required_files: &[],
     editable: false,
 };
 const GPT_SOVITS_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -78,6 +94,7 @@ const GPT_SOVITS_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "be6a4f1e9d8a22d41b7d42c22df9d7ef36f225d2",
     recursive: true,
     requirement_files: &["requirements.txt"],
+    required_files: &[],
     editable: false,
 };
 const RVC_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
@@ -85,7 +102,8 @@ const RVC_SOURCE: AdapterSourceSpec = AdapterSourceSpec {
     revision: "7b284a634667c34103eaaeed972b48ccdb4b893e",
     recursive: false,
     requirement_files: &[],
-    editable: true,
+    required_files: &[],
+    editable: false,
 };
 
 macro_rules! adapter {
@@ -378,10 +396,10 @@ pub(crate) const ADAPTER_SPECS: &[AdapterSpec] = &[
         "rvc",
         "rvc",
         "3.11",
-        &[],
+        RVC_PACKAGES,
         RVC_ADAPTER,
         Some(RVC_SOURCE),
-        "RVC."
+        "RVC conversion using pinned source plus a pure-Python Transformers HuBERT compatibility layer; the upstream fairseq package is not compiled."
     ),
     adapter!(
         "qwen_omni",

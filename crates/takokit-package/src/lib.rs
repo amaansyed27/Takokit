@@ -51,7 +51,10 @@ pub use resolution::{
 };
 pub use runner::*;
 pub use runtime::{initialize_runner_runtime, python_managed_runner_layout, runner_runtime_layout};
-pub use runtime_python::{install_python_adapter, python_adapter_record, python_adapter_records};
+pub use runtime_python::{
+    install_python_adapter, python_adapter_is_current, python_adapter_record,
+    python_adapter_records,
+};
 pub use runtime_python_specs::{adapter_for_model, runtime_model_id};
 pub use runtime_uv::{bootstrap_uv, find_uv};
 pub use voice_contract::*;

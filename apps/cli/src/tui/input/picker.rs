@@ -11,6 +11,33 @@ pub(super) fn pick_folder(initial_dir: &Path) -> Result<Option<PathBuf>, String>
     pick_path(initial_dir, true)
 }
 
+pub(super) fn pick_rvc_artifact(initial_dir: &Path) -> Result<Option<PathBuf>, String> {
+    #[cfg(windows)]
+    {
+        let initial = escape_powershell_single_quoted(&initial_dir.display().to_string());
+        let script = format!(
+            "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Windows.Forms; \\
+             [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); \\
+             $d=New-Object System.Windows.Forms.OpenFileDialog; \\
+             $d.InitialDirectory='{initial}'; \\
+             $d.Filter='RVC files|*.pth;*.index;*.takovoice|All files|*.*'; \\
+             if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ [Console]::Write($d.FileName) }}"
+        );
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-STA", "-Command", &script])
+            .output()
+            .map_err(|error| format!("could not open the Windows RVC picker: {error}"))?;
+        if !output.status.success() {
+            return Err("the Windows RVC picker failed".to_string());
+        }
+        return selected_path_from_stdout(&output.stdout);
+    }
+    #[cfg(not(windows))]
+    {
+        pick_path(initial_dir, false)
+    }
+}
+
 #[cfg(windows)]
 fn pick_path(initial_dir: &Path, folder: bool) -> Result<Option<PathBuf>, String> {
     let initial = escape_powershell_single_quoted(&initial_dir.display().to_string());

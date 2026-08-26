@@ -10,12 +10,16 @@ use std::{
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
+    thread,
+    time::{Duration, Instant},
 };
 
 const MANIFEST_FILE: &str = "adapter.toml";
 const PREVIOUS_FILE: &str = "adapter.toml.previous";
 const CORRUPT_FILE: &str = "adapter.toml.corrupt";
 const INSTALL_LOCK_FILE: &str = ".install.lock";
+const INSTALL_LOCK_WAIT: Duration = Duration::from_secs(15 * 60);
+const INSTALL_LOCK_RETRY: Duration = Duration::from_millis(250);
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub(super) struct AdapterInstallLock {
@@ -32,6 +36,14 @@ pub(super) fn lock_adapter_install(
     adapter_dir: &Path,
     adapter: &str,
 ) -> PackageResult<AdapterInstallLock> {
+    lock_adapter_install_with_timeout(adapter_dir, adapter, INSTALL_LOCK_WAIT)
+}
+
+fn lock_adapter_install_with_timeout(
+    adapter_dir: &Path,
+    adapter: &str,
+    timeout: Duration,
+) -> PackageResult<AdapterInstallLock> {
     std::fs::create_dir_all(adapter_dir)?;
     let path = adapter_dir.join(INSTALL_LOCK_FILE);
     let file = OpenOptions::new()
@@ -39,14 +51,29 @@ pub(super) fn lock_adapter_install(
         .read(true)
         .write(true)
         .open(&path)?;
-    file.try_lock_exclusive()
-        .map_err(|error| PackageError::ArtifactInstallFailed {
-            artifact: adapter.to_string(),
-            reason: format!(
-                "another Takokit process is already installing this adapter; wait for that pull to finish before retrying ({error})"
-            ),
-        })?;
-    Ok(AdapterInstallLock { file })
+    let started = Instant::now();
+    loop {
+        match file.try_lock_exclusive() {
+            Ok(()) => return Ok(AdapterInstallLock { file }),
+            Err(error) if lock_is_contended(&error) && started.elapsed() < timeout => {
+                thread::sleep(INSTALL_LOCK_RETRY.min(timeout.saturating_sub(started.elapsed())));
+            }
+            Err(error) if lock_is_contended(&error) => {
+                return Err(PackageError::ArtifactInstallFailed {
+                    artifact: adapter.to_string(),
+                    reason: format!(
+                        "timed out after {} seconds waiting for another Takokit process to finish installing this adapter ({error})",
+                        timeout.as_secs()
+                    ),
+                });
+            }
+            Err(error) => return Err(PackageError::Io(error)),
+        }
+    }
+}
+
+fn lock_is_contended(error: &std::io::Error) -> bool {
+    error.kind() == ErrorKind::WouldBlock || matches!(error.raw_os_error(), Some(11 | 33 | 35 | 36))
 }
 
 pub(super) fn default_adapter_record(spec: &AdapterSpec) -> AdapterRecord {
@@ -223,6 +250,34 @@ fn temporary_path(path: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::runtime_python_specs::adapter_spec;
+
+    #[test]
+    fn concurrent_installer_waits_for_owner_and_then_acquires_lock() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let adapter_dir = root.path().join("rvc_training");
+        std::fs::create_dir_all(&adapter_dir).expect("adapter dir");
+        let lock_path = adapter_dir.join(INSTALL_LOCK_FILE);
+        let owner = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(lock_path)
+            .expect("owner lock file");
+        owner.lock_exclusive().expect("owner lock");
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            FileExt::unlock(&owner).expect("release owner lock");
+        });
+
+        let started = Instant::now();
+        let waiting =
+            lock_adapter_install_with_timeout(&adapter_dir, "rvc_training", Duration::from_secs(2))
+                .expect("waiting installer acquires released lock");
+
+        assert!(started.elapsed() >= Duration::from_millis(250));
+        drop(waiting);
+        release.join().expect("release thread");
+    }
 
     #[test]
     fn invalid_manifest_is_quarantined_and_reset_for_reinstall() {

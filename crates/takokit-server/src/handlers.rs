@@ -32,6 +32,8 @@ mod inference;
 mod media;
 mod packages;
 mod progress;
+mod rvc_picker;
+mod rvc_voices;
 mod sessions;
 mod system;
 
@@ -41,5 +43,7 @@ pub use inference::*;
 pub use media::*;
 pub use packages::*;
 pub use progress::*;
+pub use rvc_picker::*;
+pub use rvc_voices::*;
 pub use sessions::*;
 pub use system::*;

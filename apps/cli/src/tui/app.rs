@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::workspace::{CliWorkspace, SESSION_ENV, WORKSPACE_ENV};
 
 use super::{
+    advanced_rvc::AdvancedRvcState,
     catalog::{
         capability_indexes, find_capability_index, find_model_index, find_runner_index,
         load_runtime_rows, system_rows, ModelRow, RunnerRow, SystemAction, SystemRow,
@@ -19,40 +20,10 @@ use super::{
     library::{load_library_state, LibraryModelRow},
 };
 
+mod menus;
 mod state_access;
 
-pub const HOME_ACTIONS: [(&str, &str); 8] = [
-    ("Speak", "Text → speech using a built-in or cloned voice"),
-    ("Transcribe", "Audio → text with an installed speech model"),
-    (
-        "Create voice",
-        "Reference audio → reusable cloned voice for Speak",
-    ),
-    (
-        "Convert voice",
-        "Audio → another voice while keeping the original words",
-    ),
-    ("Manage", "Inspect models, runners, and the local service"),
-    ("Sessions", "Open prior work or start a clean session"),
-    (
-        "Workspace",
-        "View or change the project-specific .tako location",
-    ),
-    (
-        "Activity",
-        "Review the latest result, output path, and next action",
-    ),
-];
-
-pub const MANAGE_ACTIONS: [(&str, &str); 4] = [
-    ("Installed models", "Use, repair, or remove local models"),
-    (
-        "Model library",
-        "Browse and pull models from the Takokit registry",
-    ),
-    ("Runners", "Inspect and repair shared execution runtimes"),
-    ("System", "Daemon status, diagnostics, logs, and GUI"),
-];
+pub use menus::{HOME_ACTIONS, MANAGE_ACTIONS};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TuiAction {
@@ -73,6 +44,10 @@ pub enum TuiAction {
         model: String,
         name: String,
         sample: String,
+    },
+    RunRvc {
+        label: String,
+        command: Vec<String>,
     },
     ConvertVoice {
         model: String,
@@ -100,7 +75,9 @@ pub enum TuiScreen {
     Home,
     Speak,
     Transcribe,
-    Clone,
+    CreateVoice,
+    InstantClone,
+    AdvancedRvc,
     Convert,
     Manage,
     Models,
@@ -118,7 +95,9 @@ impl TuiScreen {
             Self::Home => "Home",
             Self::Speak => "Speak",
             Self::Transcribe => "Transcribe",
-            Self::Clone => "Create voice",
+            Self::CreateVoice => "Create voice",
+            Self::InstantClone => "Instant Clone",
+            Self::AdvancedRvc => "Advanced RVC",
             Self::Convert => "Convert voice",
             Self::Manage => "Manage",
             Self::Models => "Installed models",
@@ -134,6 +113,7 @@ impl TuiScreen {
     pub fn parent(self) -> Self {
         match self {
             Self::Models | Self::ModelLibrary | Self::Runners | Self::System => Self::Manage,
+            Self::InstantClone | Self::AdvancedRvc => Self::CreateVoice,
             Self::Home => Self::Home,
             _ => Self::Home,
         }
@@ -142,7 +122,12 @@ impl TuiScreen {
     pub fn accepts_text(self) -> bool {
         matches!(
             self,
-            Self::Speak | Self::Transcribe | Self::Clone | Self::Convert | Self::Workspace
+            Self::Speak
+                | Self::Transcribe
+                | Self::InstantClone
+                | Self::AdvancedRvc
+                | Self::Convert
+                | Self::Workspace
         )
     }
 }
@@ -222,6 +207,7 @@ impl WorkspaceField {
 pub struct App {
     pub screen: TuiScreen,
     pub home_index: usize,
+    pub create_voice_index: usize,
     pub manage_index: usize,
     pub models: Vec<ModelRow>,
     pub library_models: Vec<LibraryModelRow>,
@@ -248,6 +234,7 @@ pub struct App {
     pub transcribe_audio: String,
     pub transcribe_audio_cursor: usize,
     pub clone_state: super::clone::CloneState,
+    pub advanced_rvc: AdvancedRvcState,
     pub convert_state: ConvertState,
     pub workspace_field: WorkspaceField,
     pub workspace_input: String,
@@ -280,6 +267,7 @@ impl App {
             load_library_state(package_registry, installed_registry);
         let (tts_models, stt_models) = capability_indexes(&models);
         let clone_state = super::clone::CloneState::new(&models);
+        let advanced_rvc = AdvancedRvcState::new(store.root())?;
         let convert_state = ConvertState::new(&models);
         let voice_profiles = VoiceProfileStore::new(store.voices_dir()).list()?;
         let sessions = workspace.store.list_sessions(None)?;
@@ -301,6 +289,7 @@ impl App {
         Ok(Self {
             screen: TuiScreen::Home,
             home_index: 0,
+            create_voice_index: 0,
             manage_index: 0,
             speak_model_index: find_capability_index(&models, &tts_models, None, "kokoro"),
             transcribe_model_index: find_capability_index(
@@ -332,6 +321,7 @@ impl App {
             transcribe_audio: String::new(),
             transcribe_audio_cursor: 0,
             clone_state,
+            advanced_rvc,
             convert_state,
             workspace_field: WorkspaceField::Path,
             workspace_input: workspace_root.clone(),
@@ -403,6 +393,7 @@ impl App {
             "whisper-tiny",
         );
         self.clone_state.reload_models(&self.models);
+        self.advanced_rvc.reload(store.root())?;
         self.convert_state.reload_models(&self.models);
         self.voice_profiles = VoiceProfileStore::new(store.voices_dir()).list()?;
         self.normalize_speak_voice_for_model();

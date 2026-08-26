@@ -4,7 +4,7 @@ use takokit_core::{
     NewSessionEvent, SessionEventState, SessionTask, SpeechRequest, TrainVoiceRequest,
     TranscriptionRequest, VoiceConversionRequest,
 };
-use takokit_models::{execute_voice_conversion, execute_voice_training};
+use takokit_models::{execute_voice_conversion, execute_voice_training, RvcVoiceService};
 use takokit_store::VoiceProfileStore;
 
 #[path = "progress.rs"]
@@ -235,10 +235,16 @@ pub(crate) async fn run_convert(
     installed_registry: &InstalledRegistry,
     workspace: &CliWorkspace,
 ) -> anyhow::Result<()> {
+    let target_voice = if args.model == "rvc" {
+        let store = LocalStore::new(LocalStore::default_root());
+        RvcVoiceService::new(store.root()).resolve_conversion_target(&args.target_voice)?
+    } else {
+        args.target_voice.clone()
+    };
     let request = VoiceConversionRequest {
         model: args.model.clone(),
         source_path: args.source.clone(),
-        target_voice: args.target_voice,
+        target_voice,
         f0_method: args.f0_method.into(),
         pitch_shift: args.pitch_shift,
         index_rate: args.index_rate,

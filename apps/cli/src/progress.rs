@@ -16,6 +16,7 @@ const MAX_DISPLAY_WIDTH: usize = 160;
 const MIN_BAR_WIDTH: usize = 12;
 const MAX_BAR_WIDTH: usize = 40;
 const POLL_INTERVAL: Duration = Duration::from_millis(250);
+#[allow(dead_code)]
 const REDRAW_INTERVAL: Duration = Duration::from_secs(1);
 
 pub(crate) struct Activity {
@@ -28,6 +29,7 @@ impl Activity {
         Self::spawn_timer(label.into())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn start_model_pull(
         label: impl Into<String>,
         client: Client,

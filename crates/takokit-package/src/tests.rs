@@ -51,6 +51,7 @@ mod package_records;
 mod pull_reliability;
 mod resolution;
 mod runtime;
+mod rvc_runtime;
 
 #[derive(Debug, Deserialize)]
 struct ModelLifecycleFixture {

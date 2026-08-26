@@ -33,11 +33,17 @@ pub(crate) async fn route_daemon_command(
         | Command::Run(_)
         | Command::Ps
         | Command::Transcribe { .. }
+        | Command::Voice {
+            command: VoiceCommand::Rvc { .. },
+        }
         | Command::Runner { .. }
         | Command::Adapter { .. } => daemon_client::Client::ensure(store, config)?,
         _ => return Ok(false),
     };
     let output = match command {
+        Command::Voice {
+            command: VoiceCommand::Rvc { command },
+        } => crate::rvc_voice_command::run_daemon(&client, command)?,
         Command::Models => client.get::<serde_json::Value>("/v1/models")?,
         Command::Runners => client.get("/v1/runners")?,
         Command::Status => client.get("/v1/status")?,

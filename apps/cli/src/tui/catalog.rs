@@ -4,7 +4,6 @@ use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
 pub struct ModelRow {
     pub id: String,
     pub title: String,
-    pub model_type: String,
     pub state: String,
     pub detail: String,
     pub tts: bool,
@@ -74,7 +73,6 @@ pub fn load_runtime_rows(
             Ok(ModelRow {
                 id: model.id,
                 title: model.name,
-                model_type: installed.model_type.clone(),
                 state: format!("{} · {runtime_state}", installed.model_type),
                 detail: format!(
                     "{}\n\nType: {}\nFamily: {}\nRunner: {}\nLocal ID: {}\nStored size: {}\nHardware: {}\n\n{}",

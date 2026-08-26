@@ -21,9 +21,10 @@ pub(crate) use runtime::build_freshness;
 pub use runtime::write_atomic;
 use runtime::{
     canonical_exe, canonical_root, daemon_lock_is_held, log_path, managed_daemon_executable,
-    port_is_occupied, preferred_daemon_executable, startup_lock, takokit_health_responds,
-    verify_identity,
+    port_is_occupied, startup_lock, verify_identity,
 };
+#[cfg(test)]
+use runtime::{preferred_daemon_executable, takokit_health_responds};
 
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);

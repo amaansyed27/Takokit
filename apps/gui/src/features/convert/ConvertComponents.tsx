@@ -97,3 +97,17 @@ export function formatBytes(bytes: number): string {
   }
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
 }
+
+export const f0Options = [
+  { value: "rmvpe", label: "RMVPE" },
+  { value: "harvest", label: "Harvest" },
+  { value: "crepe", label: "CREPE" },
+  { value: "pm", label: "Parselmouth" }
+];
+
+export const emptyReview = {
+  words: false,
+  timbre: false,
+  similarity: false,
+  artifacts: false
+};

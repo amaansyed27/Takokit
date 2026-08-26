@@ -1,3 +1,4 @@
+mod advanced_rvc;
 mod app;
 mod catalog;
 mod clone;
@@ -216,6 +217,11 @@ fn task_for_action(app: &App, action: TuiAction) -> Option<(String, Vec<String>)
                 "--consent".into(),
             ],
         ),
+        TuiAction::RunRvc { label, command } => {
+            let mut args = vec!["voice".into(), "rvc".into()];
+            args.extend(command);
+            (label, args)
+        }
         TuiAction::ConvertVoice {
             model,
             source,

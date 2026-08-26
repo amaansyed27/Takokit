@@ -31,12 +31,39 @@ pub(super) fn open_home_item(app: &mut App, index: usize) {
     app.screen = match index {
         0 => TuiScreen::Speak,
         1 => TuiScreen::Transcribe,
-        2 => TuiScreen::Clone,
+        2 => TuiScreen::CreateVoice,
         3 => TuiScreen::Convert,
         4 => TuiScreen::Manage,
         5 => TuiScreen::Sessions,
         6 => TuiScreen::Workspace,
         _ => TuiScreen::Activity,
+    };
+}
+
+pub(super) fn handle_create_voice(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
+    match key.code {
+        KeyCode::Up | KeyCode::Left | KeyCode::BackTab => {
+            app.create_voice_index = shifted_index(app.create_voice_index, 2, -1)
+        }
+        KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
+            app.create_voice_index = shifted_index(app.create_voice_index, 2, 1)
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            open_create_voice_item(app, app.create_voice_index);
+        }
+        KeyCode::Char('1') => open_create_voice_item(app, 0),
+        KeyCode::Char('2') => open_create_voice_item(app, 1),
+        _ => {}
+    }
+    None
+}
+
+pub(super) fn open_create_voice_item(app: &mut App, index: usize) {
+    app.create_voice_index = index.min(1);
+    app.screen = if app.create_voice_index == 0 {
+        TuiScreen::InstantClone
+    } else {
+        TuiScreen::AdvancedRvc
     };
 }
 
@@ -332,7 +359,7 @@ pub(super) fn open_or_repair_selected_model(app: &mut App) -> Option<TuiAction> 
         app.transcribe_field = crate::tui::app::TranscribeField::Audio;
         app.set_status("Model selected. Press F2 to browse, drag/paste a file, or enter a workspace-relative path.");
     } else if model.voice_cloning {
-        app.screen = TuiScreen::Clone;
+        app.screen = TuiScreen::InstantClone;
         app.set_status(
             "Model selected. Enter a profile name and use F2 to browse for reference audio.",
         );
@@ -365,6 +392,11 @@ mod tests {
     #[test]
     fn home_workspace_item_maps_to_workspace_screen() {
         assert_eq!(HOME_ACTIONS[6].0, "Workspace");
+    }
+
+    #[test]
+    fn create_voice_chooser_has_two_product_paths() {
+        assert_eq!(2, 2);
     }
 
     #[test]

@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sys
+import types
 from pathlib import Path
 from typing import Any
 
@@ -141,35 +142,90 @@ def install_pyav_mode_compat() -> None:
     av.open = open_compat
 
 
-def checkpoint_candidate(file: object) -> Path | None:
-    """Resolve a torch.load path from a path-like value or an opened file object."""
-    value = file if isinstance(file, (str, os.PathLike)) else getattr(file, "name", None)
-    if not isinstance(value, (str, os.PathLike)):
-        return None
-    try:
-        return Path(value).expanduser().resolve()
-    except (OSError, RuntimeError, TypeError, ValueError):
-        return None
+def install_fairseq_import_stub() -> None:
+    """Satisfy the pinned RVC utils import without compiling fairseq extensions.
 
-
-def install_trusted_torch_checkpoint_compat(trusted_checkpoint: Path) -> None:
-    """Permit Fairseq to deserialize Takokit's pinned HuBERT checkpoint on PyTorch 2.6+."""
-    import torch
-
-    original_load = torch.load
-    if getattr(original_load, "_takokit_rvc_checkpoint_compat", False):
+    Takokit supplies a local Transformers HuBERT model before RVC inference starts,
+    so the legacy fairseq checkpoint loader must never be executed.
+    """
+    if "fairseq" in sys.modules:
         return
+    fairseq = types.ModuleType("fairseq")
+    checkpoint_utils = types.ModuleType("fairseq.checkpoint_utils")
 
-    trusted_checkpoint = trusted_checkpoint.resolve()
+    def unsupported_loader(*_args, **_kwargs):
+        raise RuntimeError(
+            "Takokit RVC uses the managed Transformers HuBERT runtime; "
+            "the legacy fairseq checkpoint loader is disabled"
+        )
 
-    def load_compat(file, *args, **kwargs):
-        candidate = checkpoint_candidate(file)
-        if candidate == trusted_checkpoint and "weights_only" not in kwargs:
-            kwargs["weights_only"] = False
-        return original_load(file, *args, **kwargs)
+    checkpoint_utils.load_model_ensemble_and_task = unsupported_loader
+    fairseq.checkpoint_utils = checkpoint_utils
+    sys.modules["fairseq"] = fairseq
+    sys.modules["fairseq.checkpoint_utils"] = checkpoint_utils
 
-    load_compat._takokit_rvc_checkpoint_compat = True
-    torch.load = load_compat
+
+def load_transformers_hubert(model_root: Path, device: object, is_half: bool):
+    """Expose Transformers HuBERT with the small API expected by the pinned RVC pipeline."""
+    import torch
+    import torch.nn.functional as F
+    from torch import nn
+    from transformers import AutoFeatureExtractor, HubertModel
+
+    class HubertModelWithFinalProj(HubertModel):
+        def __init__(self, config):
+            super().__init__(config)
+            self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
+
+    class HubertCompat:
+        def __init__(self):
+            self.device = device
+            self.normalize_audio = bool(
+                AutoFeatureExtractor.from_pretrained(
+                    str(model_root), local_files_only=True
+                ).do_normalize
+            )
+            dtype = torch.float16 if is_half and "cpu" not in str(device) else torch.float32
+            self.model = HubertModelWithFinalProj.from_pretrained(
+                str(model_root),
+                local_files_only=True,
+                torch_dtype=dtype,
+            ).to(device)
+            self.model.eval()
+            self.final_proj = self.model.final_proj
+
+        def extract_features(
+            self,
+            source,
+            padding_mask=None,
+            output_layer: int = 12,
+        ):
+            if self.normalize_audio:
+                source = F.layer_norm(source, source.shape[1:])
+            attention_mask = None
+            if padding_mask is not None and bool(torch.any(padding_mask).item()):
+                attention_mask = (~padding_mask.bool()).long().to(source.device)
+            layer = int(output_layer)
+            if layer == 9:
+                outputs = self.model(
+                    input_values=source,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+                features = outputs.hidden_states[9]
+            elif layer == 12:
+                features = self.model(
+                    input_values=source,
+                    attention_mask=attention_mask,
+                    output_hidden_states=False,
+                    return_dict=True,
+                ).last_hidden_state
+            else:
+                raise ValueError(f"unsupported RVC HuBERT output layer: {layer}")
+            return features, padding_mask
+
+    return HubertCompat()
 
 
 def number(request: dict[str, Any], key: str, default: float) -> float:
@@ -246,11 +302,16 @@ def main() -> None:
     target = Path(request["target_voice"]).expanduser().resolve()
     output_path = Path(request["output_path"]).expanduser().resolve()
     model_dir = Path(request["model_dir"]).expanduser().resolve()
-    hubert_path = model_dir / "hubert_base.pt"
+    hubert_root = model_dir / "hubert_base"
     rmvpe_path = model_dir / "rmvpe.pt"
     if not source_audio.is_file():
         raise FileNotFoundError(f"source audio does not exist: {source_audio}")
-    if not hubert_path.is_file() or not rmvpe_path.is_file():
+    required_hubert = [
+        hubert_root / "config.json",
+        hubert_root / "preprocessor_config.json",
+        hubert_root / "pytorch_model.bin",
+    ]
+    if not all(path.is_file() for path in required_hubert) or not rmvpe_path.is_file():
         raise FileNotFoundError(
             f"RVC base assets are incomplete below {model_dir}; run `tako pull rvc`"
         )
@@ -261,14 +322,16 @@ def main() -> None:
     source = Path(__file__).resolve().parent / "source"
     sys.path.insert(0, str(source))
     os.environ["rmvpe_root"] = str(model_dir)
-    os.environ["hubert_path"] = str(hubert_path)
     install_pyav_mode_compat()
-    install_trusted_torch_checkpoint_compat(hubert_path)
+    install_fairseq_import_stub()
     from scipy.io import wavfile
     from rvc.modules.vc.modules import VC
 
     converter = VC()
     converter.get_vc(model_path.name)
+    converter.hubert_model = load_transformers_hubert(
+        hubert_root, converter.config.device, converter.config.is_half
+    )
     sample_rate, audio, _, error = converter.vc_inference(
         0,
         str(source_audio),
@@ -280,7 +343,7 @@ def main() -> None:
         resample_sr=0,
         rms_mix_rate=settings["rms_mix_rate"],
         protect=settings["protect"],
-        hubert_path=str(hubert_path),
+        hubert_path=str(hubert_root),
     )
     if error or sample_rate is None or audio is None:
         raise RuntimeError(error or "RVC returned no converted audio")

@@ -4,6 +4,8 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+mod rvc;
+pub(crate) use rvc::*;
 pub(crate) use takokit_core::SpeechRequest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -380,6 +382,11 @@ pub(crate) enum VoiceCommand {
         model: String,
         #[arg(long)]
         consent: bool,
+    },
+    /// Advanced RVC voice projects, training, checkpoints, testing and packages.
+    Rvc {
+        #[command(subcommand)]
+        command: RvcVoiceCommand,
     },
 }
 

@@ -1,3 +1,4 @@
+mod advanced_rvc;
 mod forms;
 mod navigation;
 mod picker;
@@ -6,6 +7,7 @@ mod workspace;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{
+    advanced_rvc::AdvancedRvcField,
     app::{App, SpeakField, TranscribeField, TuiAction, TuiScreen, WorkspaceField},
     clone::CloneField,
     convert::ConvertField,
@@ -38,7 +40,7 @@ impl App {
                     &single_line,
                 );
             }
-            TuiScreen::Clone => match self.clone_state.field {
+            TuiScreen::InstantClone => match self.clone_state.field {
                 CloneField::Name => insert_text(
                     &mut self.clone_state.name,
                     &mut self.clone_state.name_cursor,
@@ -47,6 +49,24 @@ impl App {
                 CloneField::Sample => insert_text(
                     &mut self.clone_state.sample,
                     &mut self.clone_state.sample_cursor,
+                    &single_line,
+                ),
+                _ => {}
+            },
+            TuiScreen::AdvancedRvc => match self.advanced_rvc.field {
+                AdvancedRvcField::Name => insert_text(
+                    &mut self.advanced_rvc.name,
+                    &mut self.advanced_rvc.name_cursor,
+                    &single_line,
+                ),
+                AdvancedRvcField::Path => insert_text(
+                    &mut self.advanced_rvc.path,
+                    &mut self.advanced_rvc.path_cursor,
+                    &single_line,
+                ),
+                AdvancedRvcField::Index => insert_text(
+                    &mut self.advanced_rvc.index,
+                    &mut self.advanced_rvc.index_cursor,
                     &single_line,
                 ),
                 _ => {}
@@ -150,7 +170,9 @@ impl App {
             TuiScreen::Home => navigation::handle_home(self, key),
             TuiScreen::Speak => forms::handle_speak(self, key),
             TuiScreen::Transcribe => forms::handle_transcribe(self, key),
-            TuiScreen::Clone => forms::handle_clone(self, key),
+            TuiScreen::CreateVoice => navigation::handle_create_voice(self, key),
+            TuiScreen::InstantClone => forms::handle_clone(self, key),
+            TuiScreen::AdvancedRvc => advanced_rvc::handle_advanced_rvc(self, key),
             TuiScreen::Convert => forms::handle_convert(self, key),
             TuiScreen::Manage => navigation::handle_manage(self, key),
             TuiScreen::Models => navigation::handle_models(self, key),
@@ -172,7 +194,12 @@ fn submit_current(app: &mut App) -> Option<TuiAction> {
         }
         TuiScreen::Speak => forms::submit_speak(app),
         TuiScreen::Transcribe => forms::submit_transcribe(app),
-        TuiScreen::Clone => forms::submit_clone(app),
+        TuiScreen::CreateVoice => {
+            navigation::open_create_voice_item(app, app.create_voice_index);
+            None
+        }
+        TuiScreen::InstantClone => forms::submit_clone(app),
+        TuiScreen::AdvancedRvc => advanced_rvc::submit_advanced_rvc(app),
         TuiScreen::Convert => forms::submit_convert(app),
         TuiScreen::Manage => {
             navigation::open_manage_item(app, app.manage_index);
