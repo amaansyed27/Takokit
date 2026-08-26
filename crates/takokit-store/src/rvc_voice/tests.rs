@@ -103,6 +103,7 @@ fn removing_voice_is_blocked_by_active_job() {
         config,
         status: RvcTrainingJobStatus::Running,
         stage: takokit_core::RvcTrainingStage::Train,
+        current_epoch: Some(3),
         created_at: now_secs(),
         started_at: Some(now_secs()),
         finished_at: None,
