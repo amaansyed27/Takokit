@@ -152,7 +152,9 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
         }
         AdvancedRvcAction::ImportExisting => {
             if name.is_empty() || path.is_empty() || !consent {
-                app.set_status("Import existing voice requires a name, voice file, and permission.");
+                app.set_status(
+                    "Import existing voice requires a name, voice file, and permission.",
+                );
                 return None;
             }
             if path.to_ascii_lowercase().ends_with(".takovoice") {
