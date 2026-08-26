@@ -14,7 +14,6 @@ use takokit_core::{
 };
 use takokit_models::{
     execute_speech, execute_transcription, execute_voice_conversion, execute_voice_training,
-    TextToSpeechEngine,
 };
 use takokit_package::{
     acquire_maintenance_lock, initialize_runner_runtime, install_model_complete,
