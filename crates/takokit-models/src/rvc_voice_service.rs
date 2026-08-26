@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::execute_voice_conversion;
 
 mod artifacts;
+mod cleanup;
 mod jobs;
 mod packages;
 
