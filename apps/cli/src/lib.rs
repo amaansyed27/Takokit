@@ -388,7 +388,7 @@ pub async fn run() -> anyhow::Result<()> {
                 let records = python_adapter_records(store.root()).map_err(cli_error)?;
                 print_serializable(&records)?;
             }
-            AdapterCommand::Install { adapter }) => {
+            AdapterCommand::Install { adapter } => {
                 let _maintenance_guard = acquire_maintenance_lock(store.root()).map_err(cli_error)?;
                 let adapter = normalize_adapter_id(&adapter);
                 let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
