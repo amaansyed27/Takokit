@@ -202,6 +202,8 @@ pub struct RvcTrainingJob {
     pub config: RvcTrainingConfig,
     pub status: RvcTrainingJobStatus,
     pub stage: RvcTrainingStage,
+    #[serde(default)]
+    pub current_epoch: Option<u32>,
     pub created_at: u64,
     pub started_at: Option<u64>,
     pub finished_at: Option<u64>,
