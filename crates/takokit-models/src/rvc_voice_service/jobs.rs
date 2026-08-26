@@ -275,6 +275,7 @@ impl RvcVoiceService {
             config: config.clone(),
             status: RvcTrainingJobStatus::Queued,
             stage: RvcTrainingStage::ValidateSamples,
+            current_epoch: None,
             created_at: now(),
             started_at: None,
             finished_at: None,
