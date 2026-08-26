@@ -14,11 +14,7 @@ use super::{normalize_path_field, picker};
 
 pub(super) fn handle_advanced_rvc(app: &mut App, key: KeyEvent) -> Option<TuiAction> {
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
-        app.advanced_rvc.field = if key.code == KeyCode::BackTab {
-            app.advanced_rvc.field.previous()
-        } else {
-            app.advanced_rvc.field.next()
-        };
+        app.advanced_rvc.field = app.advanced_rvc.cycle_field(key.code == KeyCode::BackTab);
         return None;
     }
 
@@ -149,14 +145,14 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
     let command = match action {
         AdvancedRvcAction::NewVoice => {
             if name.is_empty() || !consent {
-                app.set_status("New Voice requires a name and explicit consent.");
+                app.set_status("Create trained voice requires a name and voice permission.");
                 return None;
             }
             vec!["create".into(), "--name".into(), name, "--consent".into()]
         }
         AdvancedRvcAction::ImportExisting => {
             if name.is_empty() || path.is_empty() || !consent {
-                app.set_status("Import Existing requires Name, Path, and explicit consent.");
+                app.set_status("Import existing voice requires a name, voice file, and permission.");
                 return None;
             }
             if path.to_ascii_lowercase().ends_with(".takovoice") {
@@ -183,13 +179,13 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
         }
         _ => {
             let Some((voice, _)) = selected.clone() else {
-                app.set_status("Create or import an Advanced RVC voice project first.");
+                app.set_status("Create or import a trained voice first.");
                 return None;
             };
             match action {
                 AdvancedRvcAction::AddSample => {
                     if path.is_empty() {
-                        app.set_status("Add Sample requires an audio path. Press F2 to browse.");
+                        app.set_status("Add recording needs an audio file. Press F2 to browse.");
                         return None;
                     }
                     vec!["samples".into(), voice, "add".into(), path]
@@ -214,7 +210,7 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
                     let checkpoint = match Uuid::parse_str(path.trim()) {
                         Ok(value) => value,
                         Err(_) => {
-                            app.set_status("Activate Checkpoint requires a checkpoint UUID in Path. Run Checkpoints first.");
+                            app.set_status("Advanced model selection requires a checkpoint UUID.");
                             return None;
                         }
                     };
@@ -223,7 +219,7 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
                         let index_id = match Uuid::parse_str(index.trim()) {
                             Ok(value) => value,
                             Err(_) => {
-                                app.set_status("Index must be an index UUID. Run Indexes first.");
+                                app.set_status("Advanced index selection requires an index UUID.");
                                 return None;
                             }
                         };
@@ -233,9 +229,7 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
                 }
                 AdvancedRvcAction::TestVoice => {
                     if path.is_empty() {
-                        app.set_status(
-                            "Test Voice requires source audio in Path. Press F2 to browse.",
-                        );
+                        app.set_status("Test voice needs source speech. Press F2 to browse.");
                         return None;
                     }
                     vec!["test".into(), voice, path]
@@ -256,11 +250,11 @@ pub(super) fn submit_advanced_rvc(app: &mut App) -> Option<TuiAction> {
 
 fn use_in_convert(app: &mut App) -> Option<TuiAction> {
     let Some(project) = app.advanced_rvc.selected_project() else {
-        app.set_status("Create or import an Advanced RVC voice project first.");
+        app.set_status("Create or import a trained voice first.");
         return None;
     };
     if project.active_checkpoint_id.is_none() {
-        app.set_status("Select an active checkpoint before using this voice in Convert.");
+        app.set_status("Finish training or import a ready voice before using it in Clone audio.");
         return None;
     }
     let voice = project.id.to_string();
@@ -276,7 +270,7 @@ fn use_in_convert(app: &mut App) -> Option<TuiAction> {
         app.convert_state.field = ConvertField::Source;
     }
     app.screen = TuiScreen::Convert;
-    app.set_status("Managed RVC voice selected. Choose source audio, affirm consent, and convert.");
+    app.set_status("Trained voice selected. Choose source audio, confirm permission, and clone.");
     None
 }
 
