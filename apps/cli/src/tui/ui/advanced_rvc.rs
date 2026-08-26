@@ -7,7 +7,7 @@ use ratatui::{
 
 use super::widgets::{centered_rect, field, primary_button, render_text_input};
 use crate::tui::{
-    advanced_rvc::{AdvancedRvcField, ADVANCED_RVC_ACTIONS},
+    advanced_rvc::{AdvancedRvcAction, AdvancedRvcField},
     app::App,
 };
 
@@ -24,8 +24,10 @@ pub fn render_create_voice(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .split(form);
 
     frame.render_widget(
-        Paragraph::new("Create Voice\nChoose a fast reference clone or open the persistent Advanced RVC workflow.")
-            .wrap(Wrap { trim: false }),
+        Paragraph::new(
+            "Create Voice\nChoose an instant reference clone or train a reusable local voice from recordings.",
+        )
+        .wrap(Wrap { trim: false }),
         rows[0],
     );
     frame.render_widget(
@@ -38,8 +40,8 @@ pub fn render_create_voice(frame: &mut Frame<'_>, area: Rect, app: &App) {
     );
     frame.render_widget(
         field(
-            "Advanced RVC",
-            "Multi-sample dataset → inspect → prepare → preflight → train → checkpoint → test",
+            "Train a voice",
+            "Add recordings → check them → choose quality → train → test or clone audio",
             app.create_voice_index == 1,
         ),
         rows[2],
@@ -58,21 +60,22 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .constraints([
             Constraint::Length(4),
             Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
             Constraint::Length(5),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(2),
         ])
         .split(form);
 
     let state = &app.advanced_rvc;
+    let action = state.selected_action();
     frame.render_widget(
         Paragraph::new(
-            "Advanced RVC · persistent custom voice studio\nChoose a project and action. Long operations run through the normal cancellable CommandJob flow.",
+            "Train a voice · local RVC studio\nChoose what you want to do. Takokit manages preparation, checkpoints and indexes automatically.",
         )
         .wrap(Wrap { trim: false }),
         rows[0],
@@ -80,87 +83,134 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
     let project = state
         .selected_project()
-        .map(|project| {
-            format!(
-                "{} · {} · checkpoint {}",
-                project.name,
-                state_name(project.state),
-                project
-                    .active_checkpoint_id
-                    .map(|id| id.to_string())
-                    .unwrap_or_else(|| "not selected".to_string())
-            )
-        })
-        .unwrap_or_else(|| {
-            "No Advanced RVC project yet — choose New Voice or Import Existing".into()
-        });
+        .map(|project| format!("{} · {}", project.name, state_name(project.state)))
+        .unwrap_or_else(|| "No trained voice yet — choose Create trained voice".into());
     frame.render_widget(
         field(
-            "Project · ↑/↓ change",
+            "Voice · ↑/↓ change",
             project,
             state.field == AdvancedRvcField::Project,
         ),
         rows[1],
     );
 
-    render_text_input(
-        frame,
-        rows[2],
-        "Name · used by New Voice / Import Existing",
-        &state.name,
-        "My custom voice",
-        state.field == AdvancedRvcField::Name,
-        state.name_cursor,
-    );
-    render_text_input(
-        frame,
-        rows[3],
-        "Path · F2 browse · sample/checkpoint/package/test source",
-        &state.path,
-        r#"C:\Voice Project ü\sample.wav"#,
-        state.field == AdvancedRvcField::Path,
-        state.path_cursor,
-    );
-    render_text_input(
-        frame,
-        rows[4],
-        "Index · optional .index path or index UUID when activating",
-        &state.index,
-        "optional",
-        state.field == AdvancedRvcField::Index,
-        state.index_cursor,
-    );
     frame.render_widget(
         field(
-            "Preset · ↑/↓ change",
-            format!("{} · backend-owned verified RVC envelope", state.preset()),
-            state.field == AdvancedRvcField::Preset,
-        ),
-        rows[5],
-    );
-    frame.render_widget(
-        field(
-            "Consent · Space toggles",
-            if state.consent {
-                "[x] I own this voice or have explicit permission."
-            } else {
-                "[ ] Required for New Voice and Import Existing."
-            },
-            state.field == AdvancedRvcField::Consent,
-        ),
-        rows[6],
-    );
-
-    let action = state.selected_action();
-    frame.render_widget(
-        field(
-            "Action · ↑/↓ change",
+            "What do you want to do? · ↑/↓ change",
             format!("{}\n{}", action.label(), action.hint()),
             state.field == AdvancedRvcField::Action,
         )
         .wrap(Wrap { trim: false }),
-        rows[7],
+        rows[2],
     );
+
+    if action.requires_name() {
+        render_text_input(
+            frame,
+            rows[3],
+            "Voice name",
+            &state.name,
+            "For example, Studio narrator",
+            state.field == AdvancedRvcField::Name,
+            state.name_cursor,
+        );
+    } else {
+        frame.render_widget(
+            field(
+                "Voice name",
+                "Uses the selected trained voice above.",
+                false,
+            ),
+            rows[3],
+        );
+    }
+
+    if action.requires_path() {
+        render_text_input(
+            frame,
+            rows[4],
+            path_label(action),
+            &state.path,
+            path_placeholder(action),
+            state.field == AdvancedRvcField::Path,
+            state.path_cursor,
+        );
+    } else {
+        frame.render_widget(
+            field(
+                "Audio / file",
+                "No file is needed for this action.",
+                false,
+            ),
+            rows[4],
+        );
+    }
+
+    if action.shows_index_input() {
+        render_text_input(
+            frame,
+            rows[5],
+            "Legacy RVC index · optional",
+            &state.index,
+            "Only needed when importing a legacy .pth + .index pair",
+            state.field == AdvancedRvcField::Index,
+            state.index_cursor,
+        );
+    } else {
+        frame.render_widget(
+            field(
+                "Model files",
+                "Managed automatically — no checkpoint or index selection required.",
+                false,
+            ),
+            rows[5],
+        );
+    }
+
+    if action.shows_training_quality() {
+        frame.render_widget(
+            field(
+                "Training quality · ↑/↓ change",
+                format!("{} · Balanced is the recommended default", preset_label(state.preset())),
+                state.field == AdvancedRvcField::Preset,
+            ),
+            rows[6],
+        );
+    } else {
+        frame.render_widget(
+            field(
+                "Training quality",
+                "Choose a quality level when you start training.",
+                false,
+            ),
+            rows[6],
+        );
+    }
+
+    if action.requires_consent() {
+        frame.render_widget(
+            field(
+                "Voice permission · Space toggles",
+                if state.consent {
+                    "[x] I own this voice or have explicit permission to use it."
+                } else {
+                    "[ ] Permission is required before creating or importing a voice."
+                },
+                state.field == AdvancedRvcField::Consent,
+            ),
+            rows[7],
+        );
+    } else {
+        frame.render_widget(
+            field(
+                "Voice permission",
+                "Permission was recorded when this trained voice was created or imported.",
+                false,
+            ),
+            rows[7],
+        );
+    }
+
     frame.render_widget(
         primary_button(
             &format!("Run {}", action.label()),
@@ -169,13 +219,41 @@ pub fn render_advanced_rvc(frame: &mut Frame<'_>, area: Rect, app: &App) {
         rows[8],
     );
     frame.render_widget(
-        Paragraph::new(format!(
-            "Tab fields · F2 browse · Ctrl+Enter run · {} lifecycle actions · Ctrl+C cancels active job · Esc back",
-            ADVANCED_RVC_ACTIONS.len()
-        ))
+        Paragraph::new(
+            "Tab fields · F2 browse when needed · Ctrl+Enter run · Ctrl+C cancels active training · Esc back",
+        )
         .style(Style::default().add_modifier(Modifier::DIM)),
         rows[9],
     );
+}
+
+fn path_label(action: AdvancedRvcAction) -> &'static str {
+    match action {
+        AdvancedRvcAction::ImportExisting => "Voice package / legacy model · F2 browse",
+        AdvancedRvcAction::AddSample => "Recording · F2 browse",
+        AdvancedRvcAction::TestVoice => "Test speech · F2 browse",
+        AdvancedRvcAction::ActivateCheckpoint => "Model ID",
+        _ => "Audio / file",
+    }
+}
+
+fn path_placeholder(action: AdvancedRvcAction) -> &'static str {
+    match action {
+        AdvancedRvcAction::ImportExisting => "Choose a .takovoice package or legacy .pth model",
+        AdvancedRvcAction::AddSample => "Choose a clean recording of this speaker",
+        AdvancedRvcAction::TestVoice => "Choose speech from another speaker",
+        AdvancedRvcAction::ActivateCheckpoint => "checkpoint UUID",
+        _ => "Choose a file",
+    }
+}
+
+fn preset_label(preset: &str) -> &'static str {
+    match preset {
+        "quick" => "Quick test",
+        "high-quality" => "High quality",
+        "custom" => "Custom",
+        _ => "Balanced",
+    }
 }
 
 fn state_name(state: takokit_core::RvcVoiceProjectState) -> String {
@@ -201,5 +279,11 @@ mod tests {
             state_name(takokit_core::RvcVoiceProjectState::ReadyToTrain),
             "ready to train"
         );
+    }
+
+    #[test]
+    fn normal_training_copy_hides_checkpoint_management() {
+        assert_eq!(path_label(AdvancedRvcAction::AddSample), "Recording · F2 browse");
+        assert_eq!(preset_label("balanced"), "Balanced");
     }
 }
