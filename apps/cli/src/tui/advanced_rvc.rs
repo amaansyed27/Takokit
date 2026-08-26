@@ -14,32 +14,6 @@ pub enum AdvancedRvcField {
     Action,
 }
 
-impl AdvancedRvcField {
-    pub fn next(self) -> Self {
-        match self {
-            Self::Project => Self::Name,
-            Self::Name => Self::Path,
-            Self::Path => Self::Index,
-            Self::Index => Self::Preset,
-            Self::Preset => Self::Consent,
-            Self::Consent => Self::Action,
-            Self::Action => Self::Project,
-        }
-    }
-
-    pub fn previous(self) -> Self {
-        match self {
-            Self::Project => Self::Action,
-            Self::Name => Self::Project,
-            Self::Path => Self::Name,
-            Self::Index => Self::Path,
-            Self::Preset => Self::Index,
-            Self::Consent => Self::Preset,
-            Self::Action => Self::Consent,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdvancedRvcAction {
     NewVoice,
@@ -207,6 +181,45 @@ impl AdvancedRvcState {
 
     pub fn preset(&self) -> &'static str {
         RVC_PRESETS[self.preset_index.min(RVC_PRESETS.len() - 1)]
+    }
+
+    pub fn cycle_field(&self, backward: bool) -> AdvancedRvcField {
+        let fields = self.relevant_fields();
+        let index = fields
+            .iter()
+            .position(|candidate| *candidate == self.field)
+            .unwrap_or(0);
+        let next = if backward {
+            if index == 0 {
+                fields.len() - 1
+            } else {
+                index - 1
+            }
+        } else {
+            (index + 1) % fields.len()
+        };
+        fields[next]
+    }
+
+    fn relevant_fields(&self) -> Vec<AdvancedRvcField> {
+        let action = self.selected_action();
+        let mut fields = vec![AdvancedRvcField::Project, AdvancedRvcField::Action];
+        if action.requires_name() {
+            fields.push(AdvancedRvcField::Name);
+        }
+        if action.requires_path() {
+            fields.push(AdvancedRvcField::Path);
+        }
+        if action.shows_index_input() {
+            fields.push(AdvancedRvcField::Index);
+        }
+        if action.shows_training_quality() {
+            fields.push(AdvancedRvcField::Preset);
+        }
+        if action.requires_consent() {
+            fields.push(AdvancedRvcField::Consent);
+        }
+        fields
     }
 }
 
