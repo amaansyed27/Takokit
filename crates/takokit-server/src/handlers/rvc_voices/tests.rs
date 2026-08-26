@@ -23,6 +23,7 @@ fn fixture_job() -> RvcTrainingJob {
         },
         status: RvcTrainingJobStatus::Running,
         stage: RvcTrainingStage::Train,
+        current_epoch: Some(7),
         created_at: 1,
         started_at: Some(2),
         finished_at: None,
@@ -49,6 +50,7 @@ fn public_training_job_does_not_expose_process_ownership_internals() {
     }
     assert_eq!(value["status"], "running");
     assert_eq!(value["stage"], "train");
+    assert_eq!(value["current_epoch"], 7);
     assert_eq!(value["config"]["preset"], "quick");
 }
 
@@ -87,5 +89,6 @@ fn public_detail_scrubs_nested_active_job_only() {
     assert!(!active.contains_key("child_pid"));
     assert!(!active.contains_key("log_path"));
     assert!(!active.contains_key("cancellation_requested"));
+    assert_eq!(active["current_epoch"], 7);
     assert_eq!(value["project"]["name"], "Voice ü");
 }
