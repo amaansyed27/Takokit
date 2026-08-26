@@ -1,0 +1,61 @@
+name: Slice 4 Windows Distribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - slice/windows-v0.0.1-release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slice4-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile and unit validation
+    runs-on: windows-latest
+    env:
+      RUSTFLAGS: -D warnings
+      TAKOKIT_BUILD_ID: slice4-${{ github.sha }}
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache Rust build data
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate release versions
+        run: python scripts/check_release_version.py
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check core workspace
+        run: cargo check --workspace --all-targets
+
+      - name: Run core workspace tests
+        run: cargo test --workspace
+
+      - name: Build release CLI and daemon
+        run: cargo build --release --bin tako --bin takokit --bin takokit-updater
+
+      - name: Install GUI dependencies
+        working-directory: apps/gui
+        run: npm ci
+
+      - name: Build production GUI
+        working-directory: apps/gui
+        run: npm run build
+
+      - name: Check desktop shell
+        run: cargo check --manifest-path apps/desktop/Cargo.toml
