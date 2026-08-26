@@ -1,4 +1,4 @@
-import { AudioWaveform, Check, CircleAlert, Copy, FileAudio, ShieldCheck, X } from "lucide-react";
+import { AudioWaveform, Check, CircleAlert, Copy, FileAudio, Gauge, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteComponentProps } from "../../app/routes";
 import { LocalAudioPlayer } from "../../components/audio/LocalAudioPlayer";
@@ -128,154 +128,201 @@ export function ConvertPage({ runtime, onNavigate, onRefresh }: RouteComponentPr
   }
 
   return (
-    <section className="tk-page tk-convert-page tk-clone-simple-page">
+    <section className="tk-page tk-convert-page tk-clone-studio-page">
       <ProductPageHeader
         eyebrow="Voice-to-voice"
         title="Clone audio"
-        description="Choose speech, choose the voice it should sound like, then convert. The original words and timing stay intact."
+        description="Keep the original words and timing, but change the speaker to a reference or trained voice."
       />
 
-      <div className="tk-clone-simple-modes" role="tablist" aria-label="Voice source type">
-        <button className={mode === "reference" ? "is-active" : ""} type="button" onClick={() => changeMode("reference")}>
-          <FileAudio size={16} /><span><strong>Reference voice</strong><small>Use a voice recording as the target</small></span>
+      <div className="tk-convert-mode-switch tk-clone-mode-switch" role="tablist" aria-label="Voice source type">
+        <button className={mode === "reference" ? "is-active" : ""} type="button" role="tab" aria-selected={mode === "reference"} onClick={() => changeMode("reference")}>
+          <span className="tk-convert-mode-switch__icon"><FileAudio size={17} strokeWidth={1.8} /></span>
+          <span><strong>Reference voice</strong><small>Clone toward a voice recording</small></span>
         </button>
-        <button className={mode === "rvc" ? "is-active" : ""} type="button" onClick={() => changeMode("rvc")}>
-          <AudioWaveform size={16} /><span><strong>Trained voice</strong><small>Use one of your trained RVC voices</small></span>
+        <button className={mode === "rvc" ? "is-active" : ""} type="button" role="tab" aria-selected={mode === "rvc"} onClick={() => changeMode("rvc")}>
+          <span className="tk-convert-mode-switch__icon"><AudioWaveform size={17} strokeWidth={1.8} /></span>
+          <span><strong>Trained voice</strong><small>Use one of your trained voices</small></span>
         </button>
       </div>
 
       {!serverOnline ? (
-        <div className="tk-clone-simple-offline">
-          <CircleAlert size={17} /><span>Local runtime is unavailable.</span>
-          <ProductButton tone="secondary" onClick={() => void onRefresh()}>Retry</ProductButton>
-        </div>
+        <section className="tk-convert-offline" aria-live="polite">
+          <span><CircleAlert size={19} strokeWidth={1.8} /></span>
+          <div><strong>Local runtime is unavailable</strong><p>Reconnect the local runtime before starting a clone.</p></div>
+          <ProductButton type="button" tone="secondary" onClick={() => void onRefresh()}>Retry runtime</ProductButton>
+        </section>
       ) : (
-        <section className="tk-clone-simple-workflow">
-          <ConversionPathCard
-            label="Speech to convert"
-            description="Choose the recording whose words and timing you want to keep."
-            path={sourcePath}
-            busy={sourcePickerBusy}
-            actionLabel={sourcePath ? "Choose another" : "Choose audio"}
-            onBrowse={() => void browseSource()}
-            onClear={() => setSourcePath("")}
-          />
+        <div className="tk-convert-studio">
+          <section className="tk-convert-workflow tk-clone-workflow" aria-label="Voice cloning input">
+            <div className="tk-convert-workflow__header">
+              <div><span>Voice conversion</span><small>{mode === "rvc" ? "Trained voice" : "Reference voice"}</small></div>
+              {selectedModel?.executable ? <span className="tk-model-state is-ready"><span className="tk-status-dot is-online" /> Ready</span> : null}
+            </div>
 
-          <div className="tk-clone-simple-arrow"><span>to</span></div>
+            <div className="tk-clone-input-stack">
+              <ConversionPathCard
+                label="Source speech"
+                description="Choose the recording whose words and timing you want to keep."
+                path={sourcePath}
+                busy={sourcePickerBusy}
+                actionLabel={sourcePath ? "Choose another" : "Choose audio"}
+                onBrowse={() => void browseSource()}
+                onClear={() => setSourcePath("")}
+              />
 
-          {mode === "reference" ? (
-            <ConversionPathCard
-              label="Target voice"
-              description="Choose a clear recording of the voice you want the output to resemble."
-              path={targetPath}
-              busy={targetPickerBusy}
-              actionLabel={targetPath ? "Choose another" : "Choose voice"}
-              onBrowse={() => void browseTargetReference()}
-              onClear={() => setTargetPath("")}
-            />
-          ) : (
-            <div className="tk-clone-simple-target">
-              <div><span>Target voice</span><strong>{selectedManagedRvcVoice?.name ?? "Choose a trained voice"}</strong><small>Takokit automatically uses that voice's active model and index.</small></div>
-              {managedRvcVoices.length ? (
-                <ProductSelect
-                  label="Trained voice"
-                  value={selectedManagedRvcVoice?.id ?? (targetPath && !targetPath.includes("\\") && !targetPath.includes("/") ? targetPath : "")}
-                  onChange={(event) => setTargetPath(event.target.value)}
-                  options={[{ value: "", label: "Choose a voice" }, ...managedRvcVoices.map((voice) => ({ value: voice.id, label: voice.name }))]}
+              <div className="tk-convert-arrow" aria-hidden="true"><span /><AudioWaveform size={17} strokeWidth={1.7} /><span /></div>
+
+              {mode === "reference" ? (
+                <ConversionPathCard
+                  label="Target voice"
+                  description="Choose a clear recording of the voice you want the output to resemble."
+                  path={targetPath}
+                  busy={targetPickerBusy}
+                  actionLabel={targetPath ? "Choose another" : "Choose voice"}
+                  onBrowse={() => void browseTargetReference()}
+                  onClear={() => setTargetPath("")}
                 />
               ) : (
-                <div className="tk-clone-simple-no-voice"><span>No trained voice is ready yet.</span><ProductButton tone="secondary" onClick={() => onNavigate("voices")}>Train a voice</ProductButton></div>
+                <div className={selectedManagedRvcVoice ? "tk-managed-voice-target is-selected" : "tk-managed-voice-target"}>
+                  <span className="tk-convert-path__icon"><AudioWaveform size={21} strokeWidth={1.7} /></span>
+                  <div className="tk-managed-voice-target__copy">
+                    <span>Target voice</span>
+                    <strong>{selectedManagedRvcVoice?.name ?? "Choose a trained voice"}</strong>
+                    <small>{selectedManagedRvcVoice ? "Takokit will use its active model and index automatically." : "Only ready trained voices appear here."}</small>
+                  </div>
+                  {managedRvcVoices.length ? (
+                    <ProductSelect
+                      label="Trained voice"
+                      value={selectedManagedRvcVoice?.id ?? (targetPath && !targetPath.includes("\\") && !targetPath.includes("/") ? targetPath : "")}
+                      onChange={(event) => setTargetPath(event.target.value)}
+                      options={[{ value: "", label: "Choose a voice" }, ...managedRvcVoices.map((voice) => ({ value: voice.id, label: voice.name }))]}
+                    />
+                  ) : (
+                    <div className="tk-managed-voice-target__empty"><span>No trained voice is ready.</span><ProductButton tone="secondary" onClick={() => onNavigate("voices")}>Train a voice</ProductButton></div>
+                  )}
+                </div>
               )}
             </div>
-          )}
 
-          <label className="tk-clone-simple-consent">
-            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-            <ShieldCheck size={16} />
-            <span><strong>I own these voices or have permission to use them.</strong><small>Required before voice cloning.</small></span>
-          </label>
+            <label className={consent ? "tk-consent-card is-checked" : "tk-consent-card"}>
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span className="tk-consent-card__check">{consent ? <Check size={14} strokeWidth={2.3} /> : null}</span>
+              <span className="tk-consent-card__icon"><ShieldCheck size={18} strokeWidth={1.8} /></span>
+              <span><strong>Voice permission</strong><small>I own these voices or have explicit permission to use them.</small></span>
+            </label>
 
-          {blocker ? <div className="tk-inline-error">{blocker} <button type="button" className="tk-text-button" onClick={() => onNavigate("models")}>Open Models</button></div> : null}
-          {pickerError ? <div className="tk-inline-error" role="alert">{pickerError}</div> : null}
-          {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
+            <ConvertAdvancedSettings
+              mode={mode}
+              model={selectedModel?.id ?? ""}
+              modelOptions={modeModels.map((item) => ({ value: item.id, label: item.name }))}
+              modelHint={selectedModel ? `${selectedModel.runtime} · ${selectedModel.runner}` : undefined}
+              onModelChange={setModel}
+              sourcePath={sourcePath}
+              targetPath={targetPath}
+              onSourcePathChange={setSourcePath}
+              onTargetPathChange={setTargetPath}
+              onBrowseLegacyTarget={() => void browseLegacyTarget()}
+              legacyBusy={targetPickerBusy}
+              f0Method={f0Method}
+              pitchShift={pitchShift}
+              indexRate={indexRate}
+              rmsMixRate={rmsMixRate}
+              protect={protect}
+              filterRadius={filterRadius}
+              onF0MethodChange={setF0Method}
+              onPitchShiftChange={setPitchShift}
+              onIndexRateChange={setIndexRate}
+              onRmsMixRateChange={setRmsMixRate}
+              onProtectChange={setProtect}
+              onFilterRadiusChange={setFilterRadius}
+            />
 
-          <div className="tk-clone-simple-submit">
-            <ProductButton tone="primary" loading={isConverting} disabled={!canConvert} onClick={() => void submit()}>
-              <AudioWaveform size={16} /> {isConverting ? "Cloning voice" : "Clone voice"}
-            </ProductButton>
-            <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>Choose from Files</button>
-          </div>
+            {blocker ? <div className="tk-inline-error">{blocker} <button type="button" className="tk-text-button" onClick={() => onNavigate("models")}>Open Models</button></div> : null}
+            {pickerError ? <div className="tk-inline-error" role="alert">{pickerError}</div> : null}
+            {error ? <div className="tk-inline-error" role="alert">{error}</div> : null}
 
-          <ConvertAdvancedSettings
-            mode={mode}
-            model={selectedModel?.id ?? ""}
-            modelOptions={modeModels.map((item) => ({ value: item.id, label: item.name }))}
-            modelHint={selectedModel ? `${selectedModel.runtime} · ${selectedModel.runner}` : undefined}
-            onModelChange={setModel}
-            sourcePath={sourcePath}
-            targetPath={targetPath}
-            onSourcePathChange={setSourcePath}
-            onTargetPathChange={setTargetPath}
-            onBrowseLegacyTarget={() => void browseLegacyTarget()}
-            legacyBusy={targetPickerBusy}
-            f0Method={f0Method}
-            pitchShift={pitchShift}
-            indexRate={indexRate}
-            rmsMixRate={rmsMixRate}
-            protect={protect}
-            filterRadius={filterRadius}
-            onF0MethodChange={setF0Method}
-            onPitchShiftChange={setPitchShift}
-            onIndexRateChange={setIndexRate}
-            onRmsMixRateChange={setRmsMixRate}
-            onProtectChange={setProtect}
-            onFilterRadiusChange={setFilterRadius}
-          />
-        </section>
+            <div className="tk-convert-workflow__footer">
+              <button className="tk-text-button" type="button" onClick={() => onNavigate("files")}>Choose from Files</button>
+              <ProductButton tone="primary" loading={isConverting} disabled={!canConvert} onClick={() => void submit()}>
+                <AudioWaveform size={16} strokeWidth={1.9} /> {isConverting ? "Cloning voice" : "Clone voice"}
+              </ProductButton>
+            </div>
+          </section>
+
+          <aside className="tk-convert-controls tk-clone-controls" aria-label="Cloning setup">
+            <div className="tk-control-section">
+              <div className="tk-control-section__heading"><span>Cloning setup</span><small>Local</small></div>
+              {modeModels.length > 1 ? (
+                <ProductSelect
+                  label="Model"
+                  value={selectedModel?.id ?? ""}
+                  onChange={(event) => setModel(event.target.value)}
+                  options={modeModels.map((item) => ({ value: item.id, label: item.name }))}
+                />
+              ) : null}
+            </div>
+
+            {selectedModel ? (
+              <div className="tk-selected-model">
+                <div className="tk-selected-model__title">
+                  <span className="tk-selected-model__icon"><Gauge size={16} strokeWidth={1.8} /></span>
+                  <div><strong>{selectedModel.name}</strong><span>{mode === "rvc" ? "Trained voice engine" : "Reference voice engine"}</span></div>
+                </div>
+                <dl>
+                  <div><dt>Backend</dt><dd>{selectedModel.backend}</dd></div>
+                  <div><dt>Runtime</dt><dd>{selectedModel.runtime}</dd></div>
+                  {mode === "rvc" ? <div><dt>Ready voices</dt><dd>{managedRvcVoices.length}</dd></div> : null}
+                </dl>
+                {blocker ? <div className="tk-model-blocker"><span>{blocker}</span><button type="button" onClick={() => onNavigate("models")}>Manage model →</button></div> : <div className="tk-model-ready"><Check size={14} strokeWidth={2} /> Executable locally</div>}
+              </div>
+            ) : null}
+          </aside>
+        </div>
       )}
 
-      <section className="tk-clone-simple-result" aria-live="polite">
-        <header className="tk-clone-simple-result__heading">
-          <div><h2>Result</h2><p>{result ? "Listen before deciding whether the clone is good enough." : "Your latest cloned audio will appear here."}</p></div>
+      <section className="tk-speak-result tk-clone-result" aria-live="polite">
+        <div className="tk-section-heading">
+          <div><h2>Output</h2><p>{result ? "Listen to the clone before using it." : "Your latest cloned audio will appear here."}</p></div>
           {result || error ? <ProductButton tone="ghost" disabled={isConverting} onClick={clearResult}><X size={14} /> Clear</ProductButton> : null}
-        </header>
+        </div>
 
         {result ? (
-          <div className="tk-clone-simple-result__body">
-            <div className="tk-clone-simple-result__status"><Check size={14} /><span><strong>Cloning complete</strong><small>{result.model} · {formatBytes(result.bytes)}</small></span></div>
-            <LocalAudioPlayer path={result.output_path} label="Cloned audio" />
-            <div className="tk-output-path"><code title={result.output_path}>{result.output_path}</code><button type="button" onClick={() => void navigator.clipboard.writeText(result.output_path)} title="Copy output path"><Copy size={14} /></button></div>
+          <div className="tk-result-card">
+            <div className="tk-result-card__icon"><AudioWaveform size={18} strokeWidth={1.8} /></div>
+            <div className="tk-result-card__body">
+              <div className="tk-result-card__heading">
+                <div><strong>Clone ready</strong><span>{result.model} · {formatBytes(result.bytes)}</span></div>
+                <span className="tk-result-success"><Check size={13} strokeWidth={2.2} /> Saved</span>
+              </div>
+              <LocalAudioPlayer path={result.output_path} label="Cloned audio" />
+              <div className="tk-output-path"><code title={result.output_path}>{result.output_path}</code><button type="button" onClick={() => void navigator.clipboard.writeText(result.output_path)} title="Copy output path"><Copy size={14} /></button></div>
 
-            {result.quality_review_required ? (
-              <details className="tk-clone-simple-review">
-                <summary>Quality check</summary>
-                <p>Listen to the result and confirm these before treating this run as a quality pass.</p>
-                <div className="tk-listening-review__items">
-                  <ReviewItem checked={review.words} label="Words remain intelligible and unchanged" onChange={(checked) => setReview((current) => ({ ...current, words: checked }))} />
-                  <ReviewItem checked={review.timbre} label="Voice changed materially from the source" onChange={(checked) => setReview((current) => ({ ...current, timbre: checked }))} />
-                  <ReviewItem checked={review.similarity} label="Output resembles the target voice" onChange={(checked) => setReview((current) => ({ ...current, similarity: checked }))} />
-                  <ReviewItem checked={review.artifacts} label="No severe robotic, tearing or dropout artifacts" onChange={(checked) => setReview((current) => ({ ...current, artifacts: checked }))} />
-                </div>
-                <div className={qualityPassed ? "tk-listening-review__status is-passed" : "tk-listening-review__status"}>{qualityPassed ? <Check size={14} /> : <CircleAlert size={14} />}{qualityPassed ? "Listening check passed" : "Listening check incomplete"}</div>
-              </details>
-            ) : null}
+              {result.quality_review_required ? (
+                <details className="tk-clone-quality-review">
+                  <summary>Listening check</summary>
+                  <div className="tk-listening-review__items">
+                    <ReviewItem checked={review.words} label="Words remain intelligible and unchanged" onChange={(checked) => setReview((current) => ({ ...current, words: checked }))} />
+                    <ReviewItem checked={review.timbre} label="Voice changed materially from the source" onChange={(checked) => setReview((current) => ({ ...current, timbre: checked }))} />
+                    <ReviewItem checked={review.similarity} label="Output resembles the target voice" onChange={(checked) => setReview((current) => ({ ...current, similarity: checked }))} />
+                    <ReviewItem checked={review.artifacts} label="No severe robotic, tearing or dropout artifacts" onChange={(checked) => setReview((current) => ({ ...current, artifacts: checked }))} />
+                  </div>
+                  <div className={qualityPassed ? "tk-listening-review__status is-passed" : "tk-listening-review__status"}>{qualityPassed ? <Check size={14} /> : <CircleAlert size={14} />}{qualityPassed ? "Listening check passed" : "Listening check incomplete"}</div>
+                </details>
+              ) : null}
 
-            {resultIsRvc ? (
-              <details className="tk-clone-simple-advanced">
-                <summary>Technical RVC details</summary>
-                <dl className="tk-clone-simple-evidence">
-                  <div><dt>Model file</dt><dd>{displayFileName(result.checkpoint.checkpoint_path)}</dd></div>
-                  <div><dt>Index</dt><dd>{result.checkpoint.index_path ? displayFileName(result.checkpoint.index_path) : "None"}</dd></div>
-                  <div><dt>F0</dt><dd>{result.effective_settings.f0_method}</dd></div>
-                  <div><dt>Pitch</dt><dd>{result.effective_settings.pitch_shift}</dd></div>
-                </dl>
-              </details>
-            ) : null}
+              {resultIsRvc ? (
+                <details className="tk-clone-technical-details">
+                  <summary>Technical details</summary>
+                  <dl><div><dt>Model</dt><dd>{displayFileName(result.checkpoint.checkpoint_path)}</dd></div><div><dt>Index</dt><dd>{result.checkpoint.index_path ? displayFileName(result.checkpoint.index_path) : "None"}</dd></div></dl>
+                </details>
+              ) : null}
+            </div>
           </div>
         ) : isConverting ? (
-          <div className="tk-result-empty"><AudioWaveform size={19} /><div><strong>Cloning voice…</strong><span>The conversion continues if you leave this page.</span></div></div>
+          <div className="tk-result-empty"><AudioWaveform size={19} strokeWidth={1.7} /><div><strong>Cloning voice…</strong><span>The conversion continues if you leave this page.</span></div></div>
         ) : (
-          <div className="tk-result-empty"><AudioWaveform size={19} /><div><strong>No result yet</strong><span>Choose source audio and a target voice above.</span></div></div>
+          <div className="tk-result-empty"><AudioWaveform size={19} strokeWidth={1.7} /><div><strong>No clone yet</strong><span>Choose source speech and a target voice above.</span></div></div>
         )}
       </section>
     </section>
