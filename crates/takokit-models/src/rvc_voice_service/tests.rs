@@ -168,6 +168,77 @@ fn artifact_discovery_rejects_another_voice_projects_checkpoint() {
 }
 
 #[test]
+fn completed_retrain_rebinds_same_index_bytes_to_new_checkpoint() {
+    let temp = tempfile::tempdir().unwrap();
+    let service = RvcVoiceService::new(temp.path());
+    let project = service
+        .create(CreateRvcVoiceRequest {
+            name: "Retrain pairing".into(),
+            consent_affirmed: true,
+            consent_note: None,
+        })
+        .unwrap();
+    let layout = service.store.layout(project.id);
+    let old_checkpoint_path = layout.checkpoints.join("old.pth");
+    let new_checkpoint_path = layout.checkpoints.join("new.pth");
+    let index_path = layout.indexes.join("voice.index");
+    fs::write(&old_checkpoint_path, b"old checkpoint").unwrap();
+    fs::write(&new_checkpoint_path, b"new checkpoint").unwrap();
+    fs::write(&index_path, b"same index bytes").unwrap();
+
+    let old_checkpoint = RvcCheckpoint {
+        id: Uuid::new_v4(),
+        voice_id: project.id,
+        path: old_checkpoint_path.clone(),
+        sha256: sha256_file(&old_checkpoint_path).unwrap(),
+        bytes: fs::metadata(&old_checkpoint_path).unwrap().len(),
+        epoch: Some(1),
+        sample_rate_hz: Some(40_000),
+        model_version: Some("v2".into()),
+        f0: Some(true),
+        created_at: now(),
+        valid_for_inference: true,
+    };
+    service.store.save_checkpoint(&old_checkpoint).unwrap();
+    let stale_index = RvcIndexArtifact {
+        id: Uuid::new_v4(),
+        voice_id: project.id,
+        path: index_path.clone(),
+        sha256: sha256_file(&index_path).unwrap(),
+        bytes: fs::metadata(&index_path).unwrap().len(),
+        checkpoint_id: Some(old_checkpoint.id),
+        created_at: now(),
+        valid: true,
+    };
+    service.store.save_index(&stale_index).unwrap();
+    write_atomic_json(
+        &layout.jobs.join("latest-result.json"),
+        &serde_json::json!({
+            "checkpoint": new_checkpoint_path,
+            "index": index_path,
+            "epoch": 2
+        }),
+    )
+    .unwrap();
+
+    service
+        .refresh_completed_artifacts(&project.id.to_string())
+        .unwrap();
+
+    let detail = service.show(&project.id.to_string()).unwrap();
+    let active_checkpoint = detail.project.active_checkpoint_id.unwrap();
+    let active_index = detail.project.active_index_id.unwrap();
+    assert_ne!(active_checkpoint, old_checkpoint.id);
+    let active_index_record = detail
+        .indexes
+        .into_iter()
+        .find(|item| item.id == active_index)
+        .unwrap();
+    assert_eq!(active_index_record.checkpoint_id, Some(active_checkpoint));
+    assert_eq!(detail.project.state, RvcVoiceProjectState::Ready);
+}
+
+#[test]
 fn managed_test_and_normal_convert_resolve_the_same_project_target() {
     let (temp, service, project) = imported_service();
     let normal_target = service
