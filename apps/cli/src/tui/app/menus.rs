@@ -3,7 +3,7 @@ pub const HOME_ACTIONS: [(&str, &str); 8] = [
     ("Transcribe", "Audio → text with an installed speech model"),
     (
         "Create voice",
-        "Instant Clone or persistent Advanced RVC Voice Studio",
+        "Instant reference clone or train a reusable local voice",
     ),
     (
         "Convert voice",
