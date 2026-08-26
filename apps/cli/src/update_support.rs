@@ -155,7 +155,7 @@ pub(super) fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8
         let response = ureq::get(source)
             .timeout(Duration::from_secs(30))
             .call()?;
-        let mut reader = response.into_reader();
+        let reader = response.into_reader();
         let mut bytes = Vec::new();
         let limit = maximum.saturating_add(1) as u64;
         reader.take(limit).read_to_end(&mut bytes)?;
