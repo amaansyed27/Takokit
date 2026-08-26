@@ -65,8 +65,7 @@ export function RvcTrainingPanel({ detail, onChanged }: Props) {
 
   const selectedPreset = presets.find((preset) => preset.id === selected);
   const config = useMemo(() => selected === "custom" ? custom : selectedPreset?.config ?? null, [selected, custom, selectedPreset]);
-  const epoch = currentEpoch(logs);
-  const totalEpochs = job?.config.epochs ?? config?.epochs ?? 0;
+  const epoch = job?.current_epoch ?? null;
 
   async function startTraining() {
     if (!config || !detail.dataset.ready_for_preparation || running) return;
@@ -203,13 +202,6 @@ export function RvcTrainingPanel({ detail, onChanged }: Props) {
       ) : null}
     </div>
   );
-}
-
-function currentEpoch(logs: string): number | null {
-  const matches = Array.from(logs.matchAll(/====>\s*Epoch:\s*(\d+)/g));
-  if (matches.length === 0) return null;
-  const value = Number(matches[matches.length - 1][1]);
-  return Number.isFinite(value) ? value : null;
 }
 
 function stageLabel(stage: string): string {
