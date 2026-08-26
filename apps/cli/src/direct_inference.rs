@@ -26,24 +26,17 @@ pub(crate) async fn run_speak(
         instruction: args.instruction,
         reference_text: args.reference_text,
     };
+    let plan = resolve_execution_plan(
+        package_registry,
+        installed_registry,
+        &request.model,
+        CapabilityKind::TextToSpeech,
+    )
+    .map_err(cli_error)?;
     let activity = Activity::start(format!("Generating speech with {}", request.model));
-    let result = if request.model != "mock-tts" {
-        let plan = resolve_execution_plan(
-            package_registry,
-            installed_registry,
-            &request.model,
-            CapabilityKind::TextToSpeech,
-        )
-        .map_err(cli_error)?;
-        execute_speech(&plan, request.clone(), &workspace.outputs_dir())
-            .await
-            .map_err(runtime_error)
-    } else {
-        MockTextToSpeechEngine
-            .synthesize(request.clone(), &workspace.outputs_dir())
-            .await
-            .map_err(anyhow::Error::from)
-    };
+    let result = execute_speech(&plan, request.clone(), &workspace.outputs_dir())
+        .await
+        .map_err(runtime_error);
     drop(activity);
     match result {
         Ok(response) => {
