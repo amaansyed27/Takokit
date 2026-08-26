@@ -5,8 +5,7 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
     process::Command,
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use zip::ZipArchive;
 
@@ -84,14 +83,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(error.into());
     }
 
-    match verify_install(&args.install_root, &args.expected_version) {
+    let verification = verify_install(&args.install_root, &args.expected_version)
+        .and_then(|_| restart_daemon_if_requested(&args));
+    match verification {
         Ok(()) => {
             remove_dir_if_exists(&backup)?;
             write_state(
                 &args,
                 "completed",
                 None,
-                "Update installed and verified. Rollback tree removed.",
+                if args.restart_daemon {
+                    "Update installed and verified; the owned Takokit daemon restarted successfully. Rollback tree removed."
+                } else {
+                    "Update installed and verified. Rollback tree removed."
+                },
             )?;
             Ok(())
         }
@@ -99,12 +104,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let failed = parent.join(format!("Takokit.failed.{nonce}"));
             let _ = fs::rename(&args.install_root, &failed);
             let rollback_result = fs::rename(&backup, &args.install_root);
+            let rollback_restart = if args.restart_daemon && rollback_result.is_ok() {
+                restart_daemon(&args.install_root).map_err(|restart_error| restart_error.to_string())
+            } else {
+                Ok(())
+            };
             write_state(
                 &args,
                 "rolled_back",
                 None,
                 &format!(
-                    "Post-update verification failed ({error}); rollback result: {rollback_result:?}"
+                    "Post-update verification failed ({error}); rollback result: {rollback_result:?}; rollback daemon restart: {rollback_restart:?}"
                 ),
             )?;
             Err(error)
@@ -119,6 +129,7 @@ struct Args {
     bundle: PathBuf,
     expected_version: String,
     journal: PathBuf,
+    restart_daemon: bool,
 }
 
 impl Args {
@@ -128,6 +139,7 @@ impl Args {
         let mut bundle = None;
         let mut expected_version = None;
         let mut journal = None;
+        let mut restart_daemon = false;
         let mut args = env::args().skip(1);
         while let Some(flag) = args.next() {
             let value = args
@@ -139,6 +151,7 @@ impl Args {
                 "--bundle" => bundle = Some(PathBuf::from(value)),
                 "--expected-version" => expected_version = Some(value),
                 "--journal" => journal = Some(PathBuf::from(value)),
+                "--restart-daemon" => restart_daemon = parse_bool(&value)?,
                 _ => return Err(format!("unknown updater argument {flag}").into()),
             }
         }
@@ -148,14 +161,27 @@ impl Args {
             bundle: bundle.ok_or("missing --bundle")?,
             expected_version: expected_version.ok_or("missing --expected-version")?,
             journal: journal.ok_or("missing --journal")?,
+            restart_daemon,
         })
+    }
+}
+
+fn parse_bool(value: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    match value.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" => Ok(true),
+        "0" | "false" | "no" => Ok(false),
+        _ => Err(format!("invalid boolean {value}").into()),
     }
 }
 
 fn validate_install_root(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let metadata = root.join("distribution.json");
-    let bytes = fs::read(&metadata)
-        .map_err(|error| format!("installed distribution metadata missing at {}: {error}", metadata.display()))?;
+    let bytes = fs::read(&metadata).map_err(|error| {
+        format!(
+            "installed distribution metadata missing at {}: {error}",
+            metadata.display()
+        )
+    })?;
     let value: serde_json::Value = serde_json::from_slice(&bytes)?;
     if value.get("product").and_then(|v| v.as_str()) != Some("Takokit")
         || value.get("mode").and_then(|v| v.as_str()) != Some("installed")
@@ -173,6 +199,7 @@ fn validate_replacement(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     for required in [
         "bin/tako.exe",
         "bin/takokit.exe",
+        "bin/Takokit.exe",
         "bin/takokit-updater.exe",
         "distribution.json",
         "resources/registry/index.json",
@@ -223,9 +250,40 @@ fn verify_install(root: &Path, expected_version: &str) -> Result<(), Box<dyn std
         return Err(format!("{} version exited with {}", tako.display(), output.status).into());
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    if !stdout.lines().next().is_some_and(|line| line.trim() == format!("takokit {expected_version}")) {
+    if !stdout
+        .lines()
+        .next()
+        .is_some_and(|line| line.trim() == format!("takokit {expected_version}"))
+    {
         return Err(format!(
             "updated binary version mismatch; expected {expected_version}, output was {stdout:?}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn restart_daemon_if_requested(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    if args.restart_daemon {
+        restart_daemon(&args.install_root)?;
+    }
+    Ok(())
+}
+
+fn restart_daemon(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let tako = root.join("bin").join("tako.exe");
+    let mut command = Command::new(&tako);
+    command.args(["daemon", "start"]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    let output = command.output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "updated Takokit daemon failed to restart: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
         )
         .into());
     }
@@ -308,6 +366,23 @@ fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(not(windows))]
 fn wait_for_parent(_pid: u32) -> Result<(), Box<dyn std::error::Error>> {
-    thread::sleep(Duration::from_millis(10));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_zip_rejects_parent_traversal() {
+        let path = Path::new("../evil.exe");
+        assert!(path.components().any(|component| matches!(component, Component::ParentDir)));
+    }
+
+    #[test]
+    fn boolean_parser_is_strict() {
+        assert_eq!(parse_bool("true").unwrap(), true);
+        assert_eq!(parse_bool("0").unwrap(), false);
+        assert!(parse_bool("sometimes").is_err());
+    }
 }
