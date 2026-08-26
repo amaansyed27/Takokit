@@ -83,7 +83,10 @@ pub(super) fn read_json<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
 
 fn read_json_file<T: DeserializeOwned>(path: &Path) -> TakokitResult<T> {
     let bytes = fs::read(path).map_err(|error| {
-        TakokitError::Storage(format!("could not read metadata {}: {error}", path.display()))
+        TakokitError::Storage(format!(
+            "could not read metadata {}: {error}",
+            path.display()
+        ))
     })?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TakokitError::Storage(format!("invalid metadata {}: {error}", path.display()))
