@@ -38,9 +38,12 @@ jobs:
       - name: Validate release versions
         run: python scripts/check_release_version.py
 
-      # Temporary Slice 4 development step. The formatted output is uploaded below
-      # and committed back to the branch; the final release workflow restores
-      # `cargo fmt --all -- --check` before Windows acceptance.
+      - name: Audit source file sizes
+        run: python scripts/audit_file_sizes.py
+
+      # Temporary Slice 4 bootstrap step. The formatted output and newly generated
+      # desktop lockfile are uploaded below, committed back to the branch, and then
+      # this becomes `cargo fmt --all -- --check` for final release acceptance.
       - name: Canonically format Rust sources
         run: cargo fmt --all
 
@@ -50,19 +53,23 @@ jobs:
       - name: Run core workspace tests
         run: cargo test --workspace
 
-      - name: Build release CLI and daemon
-        run: cargo build --release --bin tako --bin takokit --bin takokit-updater
+      - name: Build release CLI, daemon, updater, and release tool
+        run: cargo build --release --bin tako --bin takokit --bin takokit-updater --bin takokit-release-tool
 
       - name: Install GUI dependencies
         working-directory: apps/gui
         run: npm ci
 
+      - name: Audit production GUI dependencies
+        working-directory: apps/gui
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Build production GUI
         working-directory: apps/gui
         run: npm run build
 
-      - name: Check desktop shell
-        run: cargo check --manifest-path apps/desktop/Cargo.toml
+      - name: Build release desktop shell and bootstrap its lockfile
+        run: cargo build --release --manifest-path apps/desktop/Cargo.toml --bin Takokit
 
       - name: Capture canonical formatted source and lockfiles
         if: always()
@@ -72,7 +79,11 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'slice4-formatted-source'
           if (Test-Path $out) { Remove-Item -Recurse -Force $out }
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          $files = git ls-files '*.rs' 'Cargo.toml' 'Cargo.lock' 'apps/desktop/Cargo.toml' 'apps/desktop/Cargo.lock'
+          $files = @(git ls-files '*.rs' 'Cargo.toml' 'Cargo.lock' 'apps/desktop/Cargo.toml')
+          if (Test-Path 'apps/desktop/Cargo.lock') {
+            $files += 'apps/desktop/Cargo.lock'
+          }
+          $files = $files | Sort-Object -Unique
           foreach ($file in $files) {
             if (-not (Test-Path $file)) { continue }
             $dest = Join-Path $out $file
@@ -83,7 +94,7 @@ jobs:
 
       - name: Upload canonical source snapshot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: slice4-formatted-source-${{ github.sha }}
           path: slice4-formatted-source.zip
