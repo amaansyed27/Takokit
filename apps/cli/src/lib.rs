@@ -2,12 +2,15 @@ mod daemon;
 mod daemon_client;
 mod direct_inference;
 mod display;
+mod distribution;
 mod doctor;
 mod gui;
 mod license_command;
+mod reset_command;
 mod session_commands;
 mod storage_command;
 mod tui;
+mod update_command;
 mod workspace;
 
 use clap::Parser;
@@ -16,9 +19,7 @@ use serde::Serialize;
 use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, RuntimeConfig, TakokitError};
-use takokit_models::{
-    execute_speech, execute_transcription, MockTextToSpeechEngine, TextToSpeechEngine,
-};
+use takokit_models::{execute_speech, execute_transcription, MockTextToSpeechEngine, TextToSpeechEngine};
 use takokit_package::{
     acquire_maintenance_lock, bootstrap_uv, custom_model_record, custom_model_records, find_uv,
     initialize_runner_runtime, install_model_complete, install_python_adapter,
@@ -57,6 +58,7 @@ pub async fn run() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    distribution::configure_installed_resources();
 
     let Cli {
         direct,
@@ -108,17 +110,12 @@ pub async fn run() -> anyhow::Result<()> {
             )
             .await?
         }
-        Some(Command::Serve {
-            daemon_child,
-            instance_id,
-        }) => {
+        Some(Command::Serve { daemon_child, instance_id }) => {
             if daemon_child {
                 daemon::child(
                     store,
                     config,
-                    instance_id.ok_or_else(|| {
-                        anyhow::anyhow!("managed daemon child requires --instance-id")
-                    })?,
+                    instance_id.ok_or_else(|| anyhow::anyhow!("managed daemon child requires --instance-id"))?,
                 )
                 .await?;
             } else {
@@ -147,8 +144,7 @@ pub async fn run() -> anyhow::Result<()> {
             gui::open_gui(&store, &config, workspace.as_ref().expect("GUI workspace")).await?
         }
         Some(Command::Doctor(args)) => {
-            let report =
-                doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
+            let report = doctor::run_doctor(&config, &store, &package_registry, &installed_registry);
             if args.json || json_output_requested() {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -166,19 +162,19 @@ pub async fn run() -> anyhow::Result<()> {
             DepsCommand::Bootstrap => {
                 let uv = bootstrap_uv(store.root()).map_err(cli_error)?;
                 println!("uv ready: {}", uv.display());
-                println!(
-                    "log: {}",
-                    store.logs_dir().join("uv-bootstrap.log").display()
-                );
+                println!("log: {}", store.logs_dir().join("uv-bootstrap.log").display());
             }
         },
-        Some(Command::Samples {
-            command: SamplesCommand::Create,
-        }) => create_samples(&store, &package_registry, &installed_registry).await?,
+        Some(Command::Samples { command: SamplesCommand::Create }) => {
+            create_samples(&store, &package_registry, &installed_registry).await?
+        }
         Some(Command::Version) => {
             println!("takokit {}", env!("CARGO_PKG_VERSION"));
             println!("build: {}", daemon::current_build_id());
             println!("storage: {}", store.root().display());
+            if let Some(metadata) = distribution::distribution_metadata() {
+                println!("distribution: {}", metadata.mode);
+            }
         }
         Some(Command::Status) => {
             let state = AppState::new_with_build_id(config, store, daemon::current_build_id());
@@ -189,6 +185,12 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Storage(args)) => {
             run_storage_command(store.root(), args, json_output_requested())?;
+        }
+        Some(Command::Update { command }) => {
+            update_command::run_update_command(&store, &config, command, json_output_requested())?;
+        }
+        Some(Command::Reset(args)) => {
+            reset_command::run_reset_command(&store, &config, args, json_output_requested())?;
         }
         Some(Command::Licenses { command }) => {
             run_license_command(store.root(), command)?;
@@ -202,20 +204,14 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Runners) => print_runners(&package_registry, &installed_registry)?,
         Some(Command::CustomModel { command }) => match command {
             CustomModelCommand::Add { manifest } => {
-                let record = register_custom_model(store.root(), &package_registry, &manifest)
-                    .map_err(cli_error)?;
+                let record = register_custom_model(store.root(), &package_registry, &manifest).map_err(cli_error)?;
                 print_serializable(&record)?;
             }
             CustomModelCommand::List => {
-                print_serializable(
-                    &custom_model_records(store.root(), &package_registry).map_err(cli_error)?,
-                )?;
+                print_serializable(&custom_model_records(store.root(), &package_registry).map_err(cli_error)?)?;
             }
             CustomModelCommand::Show { model } => {
-                print_serializable(
-                    &custom_model_record(store.root(), &package_registry, &model)
-                        .map_err(cli_error)?,
-                )?;
+                print_serializable(&custom_model_record(store.root(), &package_registry, &model).map_err(cli_error)?)?;
             }
             CustomModelCommand::Rm { model } => {
                 let id = require_custom_model_id(&model).map_err(cli_error)?;
@@ -248,9 +244,7 @@ pub async fn run() -> anyhow::Result<()> {
                     "models": package_registry.registry_models().map_err(cli_error)?.len()
                 }))?;
             }
-            LibraryTarget::Show { model } => {
-                print_library_model(&package_registry, &model)?;
-            }
+            LibraryTarget::Show { model } => print_library_model(&package_registry, &model)?,
         },
         Some(Command::Speak(args)) => {
             run_speak(
@@ -277,39 +271,29 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Show { model }) => {
             let manifest = package_registry.model(&model).map_err(cli_error)?;
-            let info = model_info_from_plan(&package_registry, &installed_registry, &manifest.id)
-                .map_err(cli_error)?;
+            let info = model_info_from_plan(&package_registry, &installed_registry, &manifest.id).map_err(cli_error)?;
             let installed_record = installed_registry.installed_model_record(&manifest.id).ok();
             println!("{}", format_model_show(&info, installed_record.as_ref()));
         }
         Some(Command::Plan(args)) => {
-            let plan = plan_model(&package_registry, &installed_registry, &args.model)
-                .map_err(cli_error)?;
+            let plan = plan_model(&package_registry, &installed_registry, &args.model).map_err(cli_error)?;
             print_or_json_plan(&plan, args.json || json_output_requested())?;
         }
         Some(Command::Rm(args)) => {
-            let resolved = package_registry
-                .resolve_model_reference(&args.model)
-                .map_err(cli_error)?;
+            let resolved = package_registry.resolve_model_reference(&args.model).map_err(cli_error)?;
             let report = remove_model_complete(
                 &package_registry,
                 &installed_registry,
                 &resolved.target,
-                RemoveModelOptions {
-                    dry_run: args.dry_run,
-                },
+                RemoveModelOptions { dry_run: args.dry_run },
             )
             .map_err(cli_error)?;
             print_serializable(&report)?;
         }
         Some(Command::List { target }) => match target {
-            None | Some(ListTarget::Models) => {
-                print_models(&package_registry, &installed_registry)?
-            }
+            None | Some(ListTarget::Models) => print_models(&package_registry, &installed_registry)?,
             Some(ListTarget::Runners) => print_runners(&package_registry, &installed_registry)?,
-            Some(ListTarget::Voices) => {
-                print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?
-            }
+            Some(ListTarget::Voices) => print_serializable(&VoiceProfileStore::new(store.voices_dir()).list()?)?,
         },
         Some(Command::Run(args)) => {
             run_model(
@@ -324,8 +308,7 @@ pub async fn run() -> anyhow::Result<()> {
             if direct {
                 print_value(&serde_json::json!([]))?;
             } else {
-                let value: serde_json::Value =
-                    daemon_client::Client::ensure(&store, &config)?.get("/v1/ps")?;
+                let value: serde_json::Value = daemon_client::Client::ensure(&store, &config)?.get("/v1/ps")?;
                 print_value(&value)?;
             }
         }
@@ -339,9 +322,7 @@ pub async fn run() -> anyhow::Result<()> {
             )
             .await?
         }
-        Some(Command::Clone(args)) => {
-            run_clone(args, workspace.as_ref().expect("clone workspace"))?
-        }
+        Some(Command::Clone(args)) => run_clone(args, workspace.as_ref().expect("clone workspace"))?,
         Some(Command::Convert(args)) => {
             run_convert(
                 args,
@@ -364,18 +345,13 @@ pub async fn run() -> anyhow::Result<()> {
         Some(Command::Runner { command }) => match command {
             RunnerCommand::Pull { runner } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                let report = installed_registry
-                    .install_runner(&manifest)
-                    .map_err(cli_error)?;
+                let report = installed_registry.install_runner(&manifest).map_err(cli_error)?;
                 print_serializable(&report)?;
             }
             RunnerCommand::Install { runner } => {
-                let _maintenance_guard =
-                    acquire_maintenance_lock(store.root()).map_err(cli_error)?;
+                let _maintenance_guard = acquire_maintenance_lock(store.root()).map_err(cli_error)?;
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
-                let report =
-                    initialize_runner_runtime(store.root(), &installed_registry, &manifest)
-                        .map_err(cli_error)?;
+                let report = initialize_runner_runtime(store.root(), &installed_registry, &manifest).map_err(cli_error)?;
                 print_serializable(&report)?;
             }
             RunnerCommand::Doctor { runner, json } => {
@@ -389,9 +365,7 @@ pub async fn run() -> anyhow::Result<()> {
             RunnerCommand::Show { runner } => {
                 let manifest = package_registry.runner(&runner).map_err(cli_error)?;
                 let installed = installed_registry.is_runner_installed(&manifest.id);
-                let record = installed_registry
-                    .installed_runner_record(&manifest.id)
-                    .ok();
+                let record = installed_registry.installed_runner_record(&manifest.id).ok();
                 let layout = runner_runtime_layout(store.root(), &manifest);
                 println!(
                     "{}",
@@ -405,13 +379,8 @@ pub async fn run() -> anyhow::Result<()> {
                 );
             }
             RunnerCommand::Rm { runner } => {
-                let removed = installed_registry
-                    .remove_runner(&runner)
-                    .map_err(cli_error)?;
-                print_value(&serde_json::json!({
-                    "id": runner,
-                    "removed": removed
-                }))?;
+                let removed = installed_registry.remove_runner(&runner).map_err(cli_error)?;
+                print_value(&serde_json::json!({"id": runner, "removed": removed}))?;
             }
         },
         Some(Command::Adapter { command }) => match command {
@@ -419,9 +388,8 @@ pub async fn run() -> anyhow::Result<()> {
                 let records = python_adapter_records(store.root()).map_err(cli_error)?;
                 print_serializable(&records)?;
             }
-            AdapterCommand::Install { adapter } => {
-                let _maintenance_guard =
-                    acquire_maintenance_lock(store.root()).map_err(cli_error)?;
+            AdapterCommand::Install { adapter }) => {
+                let _maintenance_guard = acquire_maintenance_lock(store.root()).map_err(cli_error)?;
                 let adapter = normalize_adapter_id(&adapter);
                 let record = install_python_adapter(store.root(), &adapter).map_err(cli_error)?;
                 print_serializable(&record)?;
@@ -449,14 +417,8 @@ fn command_uses_workspace(command: &Option<Command>) -> bool {
             | Some(Command::Run(_))
             | Some(Command::Transcribe { .. })
             | Some(Command::Clone(_))
-            | Some(Command::Voice {
-                command: VoiceCommand::Add { .. }
-            })
-            | Some(Command::Voice {
-                command: VoiceCommand::Rvc {
-                    command: RvcVoiceCommand::Test { .. },
-                },
-            })
+            | Some(Command::Voice { command: VoiceCommand::Add { .. } })
+            | Some(Command::Voice { command: VoiceCommand::Rvc { command: RvcVoiceCommand::Test { .. } } })
             | Some(Command::Convert(_))
             | Some(Command::Train(_))
     )
@@ -473,15 +435,8 @@ fn surface_title(command: &Option<Command>) -> &'static str {
         Some(Command::Speak(_)) => "CLI speech",
         Some(Command::Transcribe { .. }) => "CLI transcription",
         Some(Command::Clone(_)) => "CLI voice cloning",
-        Some(Command::Voice {
-            command: VoiceCommand::Add { .. },
-        }) => "CLI voice profile",
-        Some(Command::Voice {
-            command:
-                VoiceCommand::Rvc {
-                    command: RvcVoiceCommand::Test { .. },
-                },
-        }) => "CLI RVC voice test",
+        Some(Command::Voice { command: VoiceCommand::Add { .. } }) => "CLI voice profile",
+        Some(Command::Voice { command: VoiceCommand::Rvc { command: RvcVoiceCommand::Test { .. } } }) => "CLI RVC voice test",
         Some(Command::Convert(_)) => "CLI voice conversion",
         Some(Command::Train(_)) => "CLI voice training",
         _ => "Takokit CLI",
