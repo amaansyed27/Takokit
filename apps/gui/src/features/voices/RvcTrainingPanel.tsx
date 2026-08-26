@@ -1,5 +1,5 @@
 import { CircleAlert, Cpu, Play, RotateCcw, Square, Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductButton } from "../../components/ui/ProductButton";
 import {
   cancelRvcJob,
@@ -30,6 +30,7 @@ export function RvcTrainingPanel({ detail, onChanged }: Props) {
   const [logs, setLogs] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollInFlight = useRef(false);
 
   useEffect(() => {
     void getRvcPresets().then((items) => {
@@ -42,11 +43,14 @@ export function RvcTrainingPanel({ detail, onChanged }: Props) {
   const running = job?.status === "queued" || job?.status === "running";
   useEffect(() => {
     if (!running) return;
-    const timer = window.setInterval(() => void poll(), 1600);
+    void poll();
+    const timer = window.setInterval(() => void poll(), 3000);
     return () => window.clearInterval(timer);
   }, [running, voice]);
 
   async function poll() {
+    if (pollInFlight.current) return;
+    pollInFlight.current = true;
     try {
       const [nextJob, nextLogs] = await Promise.all([getRvcJob(voice), getRvcLogs(voice)]);
       setJob(nextJob);
@@ -54,6 +58,8 @@ export function RvcTrainingPanel({ detail, onChanged }: Props) {
       if (nextJob && !["queued", "running"].includes(nextJob.status)) await onChanged();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Training state could not be refreshed.");
+    } finally {
+      pollInFlight.current = false;
     }
   }
 
