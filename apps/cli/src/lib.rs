@@ -19,7 +19,7 @@ use serde::Serialize;
 use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, RuntimeConfig, TakokitError};
-use takokit_models::{execute_speech, execute_transcription, MockTextToSpeechEngine, TextToSpeechEngine};
+use takokit_models::{execute_speech, execute_transcription};
 use takokit_package::{
     acquire_maintenance_lock, bootstrap_uv, custom_model_record, custom_model_records, find_uv,
     initialize_runner_runtime, install_model_complete, install_python_adapter,
