@@ -1,0 +1,420 @@
+.tk-rvc-simple-landing,
+.tk-rvc-simple-studio {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.tk-rvc-simple-heading,
+.tk-rvc-simple-studio__header,
+.tk-rvc-simple-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.tk-rvc-simple-heading > span,
+.tk-rvc-simple-studio__header > div:first-child > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--tk-text-tertiary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tk-rvc-simple-heading h2,
+.tk-rvc-simple-studio__header h2,
+.tk-rvc-simple-section-heading h3,
+.tk-rvc-simple-library h3 {
+  margin: 0;
+  color: var(--tk-text);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.tk-rvc-simple-heading h2,
+.tk-rvc-simple-studio__header h2 { font-size: 28px; }
+.tk-rvc-simple-section-heading h3,
+.tk-rvc-simple-library h3 { font-size: 18px; }
+
+.tk-rvc-simple-heading p,
+.tk-rvc-simple-studio__header p,
+.tk-rvc-simple-section-heading p,
+.tk-rvc-simple-library p,
+.tk-rvc-simple-import p,
+.tk-rvc-simple-legacy p,
+.tk-rvc-simple-running p,
+.tk-rvc-simple-train-action p {
+  margin: 5px 0 0;
+  color: var(--tk-text-secondary);
+  line-height: 1.55;
+}
+
+.tk-rvc-simple-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px 20px;
+  padding: 22px 0;
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.tk-rvc-simple-create > .tk-field { grid-column: 1 / -1; max-width: 560px; }
+.tk-rvc-simple-create > .tk-inline-error,
+.tk-rvc-simple-create > .tk-rvc-simple-note { grid-column: 1 / -1; }
+
+.tk-rvc-simple-consent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  color: var(--tk-text-secondary);
+  cursor: pointer;
+}
+.tk-rvc-simple-consent span { display: inline-flex; align-items: center; gap: 8px; }
+.tk-rvc-simple-consent strong { color: var(--tk-text); font-size: 13px; }
+
+.tk-rvc-simple-note { color: var(--tk-text-secondary); font-size: 13px; }
+
+.tk-rvc-simple-library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tk-rvc-simple-library > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tk-rvc-simple-library > header > span {
+  color: var(--tk-text-tertiary);
+  font-size: 13px;
+}
+
+.tk-rvc-simple-voice-list {
+  border-top: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-voice-list > button {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 4px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tk-transition);
+}
+.tk-rvc-simple-voice-list > button:hover { background: var(--tk-surface-soft); }
+.tk-rvc-simple-voice-list > button > span { display: grid; gap: 3px; }
+.tk-rvc-simple-voice-list small { color: var(--tk-text-tertiary); }
+
+.tk-rvc-simple-advanced {
+  border-top: 1px solid var(--tk-line);
+  color: var(--tk-text-secondary);
+}
+.tk-rvc-simple-advanced > summary,
+.tk-rvc-simple-legacy > summary {
+  padding: 14px 2px;
+  cursor: pointer;
+  color: var(--tk-text-secondary);
+  font-weight: 600;
+}
+.tk-rvc-simple-advanced[open] > summary,
+.tk-rvc-simple-legacy[open] > summary { color: var(--tk-text); }
+
+.tk-rvc-simple-import,
+.tk-rvc-simple-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 18px;
+}
+.tk-rvc-simple-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tk-rvc-simple-file-row .tk-input { flex: 1; min-width: 0; }
+.tk-rvc-simple-legacy {
+  border-top: 1px solid var(--tk-line);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.tk-rvc-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tk-rvc-simple-facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 18px;
+  color: var(--tk-text-tertiary);
+  font-size: 12px;
+}
+.tk-rvc-simple-facts span { white-space: nowrap; }
+.tk-rvc-simple-facts strong { color: var(--tk-text-secondary); font-weight: 650; }
+.tk-rvc-simple-facts .is-ready strong { color: var(--tk-success); }
+
+.tk-rvc-simple-steps {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-steps button {
+  border: 0;
+  background: transparent;
+  color: var(--tk-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tk-rvc-simple-steps button:hover { color: var(--tk-text); background: var(--tk-surface-soft); }
+.tk-rvc-simple-steps button.is-active { color: var(--tk-text); background: var(--tk-nav-active); }
+.tk-rvc-simple-steps button.is-done { color: var(--tk-success); }
+
+.tk-rvc-simple-next {
+  align-self: flex-start;
+  border: 0;
+  border-left: 2px solid var(--tk-accent);
+  background: transparent;
+  color: var(--tk-text);
+  display: grid;
+  gap: 2px;
+  padding: 4px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.tk-rvc-simple-next span { color: var(--tk-text-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+
+.tk-rvc-simple-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.tk-rvc-simple-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tk-rvc-simple-picker {
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+  padding: 10px 0;
+}
+.tk-rvc-simple-picker > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px 10px;
+}
+.tk-rvc-simple-picker > button {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-text);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 4px;
+  text-align: left;
+  cursor: pointer;
+}
+.tk-rvc-simple-picker > button span:nth-child(2) { display: grid; gap: 2px; }
+.tk-rvc-simple-picker small { color: var(--tk-text-tertiary); }
+
+.tk-rvc-simple-dataset-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--tk-text-tertiary);
+  font-size: 12px;
+}
+.tk-rvc-simple-dataset-line strong { color: var(--tk-text-secondary); }
+.tk-rvc-simple-dataset-line .has-warning strong { color: var(--tk-warning); }
+
+.tk-rvc-simple-recordings {
+  border-top: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-recordings > article {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-recordings > article.is-excluded { opacity: .55; }
+.tk-rvc-simple-recording-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.tk-rvc-simple-recording-name span { display: grid; gap: 2px; min-width: 0; }
+.tk-rvc-simple-recording-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-rvc-simple-recording-name small { color: var(--tk-text-tertiary); }
+.tk-rvc-simple-recording-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.tk-rvc-simple-recording-actions label { color: var(--tk-text-secondary); font-size: 12px; }
+.tk-rvc-simple-recording-actions button { border: 0; background: transparent; color: var(--tk-text-tertiary); cursor: pointer; }
+.tk-rvc-simple-recording-actions button:hover { color: var(--tk-danger); }
+
+.tk-rvc-simple-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--tk-line);
+  border: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-presets button {
+  border: 0;
+  background: var(--tk-bg);
+  color: var(--tk-text);
+  display: grid;
+  gap: 5px;
+  padding: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.tk-rvc-simple-presets button:hover { background: var(--tk-surface-soft); }
+.tk-rvc-simple-presets button.is-active { background: var(--tk-surface-strong); box-shadow: inset 0 -2px 0 var(--tk-accent); }
+.tk-rvc-simple-presets button span { color: var(--tk-text-tertiary); font-size: 12px; line-height: 1.4; }
+
+.tk-rvc-simple-train-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tk-rvc-simple-train-action p { font-size: 12px; }
+.tk-rvc-simple-preflight { margin: -8px 0 0; color: var(--tk-text-tertiary); font-size: 12px; }
+.tk-rvc-simple-preflight.is-recommended { color: var(--tk-success); }
+.tk-rvc-simple-preflight.is-unsupported { color: var(--tk-danger); }
+
+.tk-rvc-simple-running {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-running > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tk-rvc-simple-running > div:first-child span { color: var(--tk-text-tertiary); font-size: 12px; }
+.tk-rvc-simple-running progress { width: 100%; height: 6px; accent-color: var(--tk-accent); }
+.tk-rvc-simple-indeterminate { height: 3px; background: linear-gradient(90deg, transparent, var(--tk-accent), transparent); background-size: 180% 100%; animation: tk-rvc-simple-progress 1.4s linear infinite; }
+@keyframes tk-rvc-simple-progress { to { background-position: -180% 0; } }
+
+.tk-rvc-simple-custom-toggle {
+  align-self: flex-start;
+  border: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-text-secondary);
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.tk-rvc-simple-custom-toggle.is-active { color: var(--tk-text); border-color: var(--tk-line-strong); background: var(--tk-surface-soft); }
+
+.tk-rvc-simple-log pre {
+  max-height: 330px;
+  overflow: auto;
+  margin: 0 0 14px;
+  padding: 12px;
+  background: var(--tk-sidebar-bg);
+  border: 1px solid var(--tk-line);
+  color: var(--tk-text-secondary);
+  font: 11px/1.55 var(--tk-font-mono);
+  white-space: pre-wrap;
+}
+
+.tk-rvc-simple-test-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-test-source > div { display: grid; gap: 3px; min-width: 0; }
+.tk-rvc-simple-test-source span,
+.tk-rvc-simple-test-source small { color: var(--tk-text-tertiary); font-size: 12px; }
+.tk-rvc-simple-test-source strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-rvc-simple-test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-test-result > header { display: flex; justify-content: space-between; gap: 12px; }
+.tk-rvc-simple-test-result > header span { color: var(--tk-success); font-size: 12px; }
+
+.tk-rvc-simple-model-tools > .tk-rvc-panel,
+.tk-rvc-simple-model-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 2px 18px !important;
+}
+.tk-rvc-simple-model-panel { display: flex; flex-direction: column; gap: 16px; }
+.tk-rvc-simple-ready-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--tk-success);
+}
+.tk-rvc-simple-ready-line span { color: var(--tk-text-secondary); }
+.tk-rvc-simple-ready-line strong { color: var(--tk-text); }
+.tk-rvc-simple-package-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 0;
+  border-top: 1px solid var(--tk-line);
+  border-bottom: 1px solid var(--tk-line);
+}
+.tk-rvc-simple-package-tools p { margin: 3px 0 0; color: var(--tk-text-tertiary); font-size: 12px; }
+.tk-rvc-simple-package-tools label { color: var(--tk-text-secondary); font-size: 12px; white-space: nowrap; }
+.tk-rvc-simple-artifact-list p { margin: 5px 0; color: var(--tk-text-tertiary); font-size: 12px; }
+
+@media (max-width: 760px) {
+  .tk-rvc-simple-create { grid-template-columns: 1fr; }
+  .tk-rvc-simple-heading,
+  .tk-rvc-simple-studio__header,
+  .tk-rvc-simple-section-heading { flex-direction: column; }
+  .tk-rvc-simple-facts { justify-content: flex-start; }
+  .tk-rvc-simple-steps { overflow-x: auto; }
+  .tk-rvc-simple-presets { grid-template-columns: 1fr; }
+  .tk-rvc-simple-recordings > article { grid-template-columns: 1fr; }
+  .tk-rvc-simple-package-tools { grid-template-columns: 1fr; }
+  .tk-rvc-simple-file-row { align-items: stretch; flex-direction: column; }
+  .tk-rvc-simple-test-source { align-items: stretch; flex-direction: column; }
+}
