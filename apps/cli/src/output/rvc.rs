@@ -1,5 +1,50 @@
 use serde_json::{Map, Value};
 
+pub(super) fn is_training_job(map: &Map<String, Value>) -> bool {
+    map.contains_key("voice_id")
+        && map.contains_key("config")
+        && map.contains_key("status")
+        && map.contains_key("stage")
+        && map.contains_key("checkpoint_ids")
+}
+
+pub(super) fn format_training_job(map: &Map<String, Value>) -> String {
+    let mut lines = vec!["RVC training".to_string()];
+    lines.push(format!("  {:<20} {}", "status", text(map, "status")));
+    lines.push(format!("  {:<20} {}", "stage", text(map, "stage")));
+
+    if let Some(config) = map.get("config").and_then(Value::as_object) {
+        let total_epochs = config.get("epochs").and_then(Value::as_u64);
+        let current_epoch = map.get("current_epoch").and_then(Value::as_u64);
+        match (current_epoch, total_epochs) {
+            (Some(current), Some(total)) => {
+                lines.push(format!("  {:<20} {current} / {total}", "epoch"));
+            }
+            (None, Some(total)) => {
+                lines.push(format!("  {:<20} {total}", "total epochs"));
+            }
+            _ => {}
+        }
+        for (key, label) in [
+            ("preset", "quality preset"),
+            ("batch_size", "batch size"),
+            ("device", "device"),
+            ("precision", "precision"),
+        ] {
+            if let Some(value) = config.get(key).filter(|value| !value.is_null()) {
+                lines.push(format!("  {label:<20} {}", scalar(value)));
+            }
+        }
+    }
+
+    if let Some(failure) = map.get("failure").and_then(Value::as_object) {
+        if let Some(message) = failure.get("message").and_then(Value::as_str) {
+            lines.push(format!("  {:<20} {message}", "failure"));
+        }
+    }
+    lines.join("\n")
+}
+
 pub(super) fn is_voice_conversion_report(map: &Map<String, Value>) -> bool {
     map.contains_key("execution_status")
         && map.contains_key("quality_status")
@@ -147,6 +192,31 @@ fn scalar(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn training_job_renders_real_epoch_over_configured_total() {
+        let value = serde_json::json!({
+            "id": "job",
+            "voice_id": "voice",
+            "status": "running",
+            "stage": "train",
+            "current_epoch": 183,
+            "checkpoint_ids": [],
+            "config": {
+                "preset": "balanced",
+                "epochs": 200,
+                "batch_size": 8,
+                "device": "auto",
+                "precision": "auto"
+            }
+        });
+        let map = value.as_object().expect("training job object");
+        assert!(is_training_job(map));
+        let rendered = format_training_job(map);
+        assert!(rendered.contains("epoch                183 / 200"));
+        assert!(rendered.contains("status               running"));
+        assert!(rendered.contains("stage                train"));
+    }
 
     #[test]
     fn execution_pass_does_not_render_as_quality_pass() {
