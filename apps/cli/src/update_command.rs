@@ -108,10 +108,12 @@ fn check(store: &LocalStore, source: UpdateSourceArgs) -> anyhow::Result<Verifie
         .ok_or_else(|| anyhow::anyhow!(
             "no update manifest is configured for this distribution; pass --manifest for a private/test channel"
         ))?;
+    validate_source_location(&manifest_source)?;
     let signature_source = source
         .signature
         .clone()
         .unwrap_or_else(|| sibling_signature_source(&manifest_source));
+    validate_source_location(&signature_source)?;
     let manifest_bytes = read_source(&manifest_source, 4 * 1024 * 1024)?;
     let signature_bytes = read_source(&signature_source, 64 * 1024)?;
     let manifest = parse_manifest(&manifest_bytes)?;
@@ -347,6 +349,7 @@ fn stage_artifact(
             "artifact {} has no download URL and the manifest is not a local file",
             artifact.name
         ))?;
+    validate_source_location(&source)?;
     let bytes = read_source(&source, usize::MAX)?;
     validate_artifact(artifact, &bytes)?;
     if let Some(parent) = destination.parent() {
@@ -360,7 +363,7 @@ fn stage_artifact(
 }
 
 fn local_sibling_artifact(manifest_source: &str, name: &str) -> Option<String> {
-    if is_http(manifest_source) {
+    if is_remote_source(manifest_source) {
         return None;
     }
     let manifest = PathBuf::from(manifest_source);
@@ -368,7 +371,7 @@ fn local_sibling_artifact(manifest_source: &str, name: &str) -> Option<String> {
 }
 
 fn sibling_signature_source(manifest_source: &str) -> String {
-    if is_http(manifest_source) {
+    if is_remote_source(manifest_source) {
         if let Some(prefix) = manifest_source.strip_suffix("release-manifest.json") {
             return format!("{prefix}release-manifest.sig");
         }
@@ -380,12 +383,27 @@ fn sibling_signature_source(manifest_source: &str) -> String {
         .into_owned()
 }
 
+fn validate_source_location(source: &str) -> anyhow::Result<()> {
+    if source.starts_with("https://") {
+        return Ok(());
+    }
+    if source.contains("://") {
+        anyhow::bail!("untrusted update source scheme; remote update metadata and artifacts require HTTPS");
+    }
+    let path = Path::new(source);
+    if path.as_os_str().is_empty() {
+        anyhow::bail!("update source path is empty");
+    }
+    Ok(())
+}
+
 fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8>> {
-    if is_http(source) {
+    validate_source_location(source)?;
+    if is_remote_source(source) {
         let response = ureq::get(source)
             .timeout(Duration::from_secs(30))
             .call()?;
-        let mut reader = response.into_reader();
+        let reader = response.into_reader();
         let mut bytes = Vec::new();
         let limit = maximum.saturating_add(1) as u64;
         reader.take(limit).read_to_end(&mut bytes)?;
@@ -402,8 +420,8 @@ fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8>> {
     }
 }
 
-fn is_http(source: &str) -> bool {
-    source.starts_with("https://") || source.starts_with("http://")
+fn is_remote_source(source: &str) -> bool {
+    source.starts_with("https://")
 }
 
 fn read_config(store: &LocalStore, metadata: Option<&DistributionMetadata>) -> UpdateConfig {
@@ -493,5 +511,13 @@ mod tests {
         assert!(!contains_active_rvc_job(temp.path()));
         fs::write(temp.path().join("live.json"), r#"{"status":"training"}"#).unwrap();
         assert!(contains_active_rvc_job(temp.path()));
+    }
+
+    #[test]
+    fn remote_update_sources_require_https() {
+        assert!(validate_source_location("https://updates.example.test/release-manifest.json").is_ok());
+        assert!(validate_source_location("http://updates.example.test/release-manifest.json").is_err());
+        assert!(validate_source_location("ftp://updates.example.test/release-manifest.json").is_err());
+        assert!(validate_source_location(r"C:\Temp\Takokit\release-manifest.json").is_ok());
     }
 }
