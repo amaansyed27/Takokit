@@ -20,7 +20,15 @@ def cargo_metadata(manifest: Path | None = None) -> dict:
     command = ["cargo", "metadata", "--format-version", "1", "--locked"]
     if manifest is not None:
         command += ["--manifest-path", str(manifest)]
-    return json.loads(subprocess.check_output(command, cwd=ROOT, text=True))
+    return json.loads(
+        subprocess.check_output(
+            command,
+            cwd=ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+        )
+    )
 
 
 def rust_dependencies(metadata: dict) -> list[tuple[str, str, str, str]]:
