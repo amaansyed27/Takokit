@@ -19,6 +19,8 @@ def cargo_version(path: Path):
 checks.append(("workspace Cargo version", cargo_version(ROOT / "Cargo.toml")))
 checks.append(("desktop Cargo version", cargo_version(ROOT / "apps/desktop/Cargo.toml")))
 checks.append(("GUI package version", json.loads((ROOT / "apps/gui/package.json").read_text(encoding="utf-8"))["version"]))
+checks.append(("GUI lockfile version", json.loads((ROOT / "apps/gui/package-lock.json").read_text(encoding="utf-8"))["version"]))
+checks.append(("GUI lockfile root package version", json.loads((ROOT / "apps/gui/package-lock.json").read_text(encoding="utf-8"))["packages"][""]["version"]))
 checks.append(("Tauri version", json.loads((ROOT / "apps/desktop/tauri.conf.json").read_text(encoding="utf-8"))["version"]))
 
 installer = ROOT / "packaging/windows/Takokit.iss"
@@ -42,7 +44,7 @@ for label, version in checks:
         print(f"ok: {label} = {version}")
 
 # Guard against accidental public product versions in release-facing metadata only.
-for path in [ROOT / "apps/gui/package.json", ROOT / "apps/desktop/tauri.conf.json"]:
+for path in [ROOT / "apps/gui/package.json", ROOT / "apps/gui/package-lock.json", ROOT / "apps/desktop/tauri.conf.json"]:
     text = path.read_text(encoding="utf-8")
     if '"0.1.0"' in text or '"0.2.0"' in text:
         print(f"ERROR: stale public product version found in {path.relative_to(ROOT)}")
