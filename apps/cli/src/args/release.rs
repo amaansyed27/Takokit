@@ -23,6 +23,18 @@ impl UpdateChannelArg {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum UpdateToggleArg {
+    On,
+    Off,
+}
+
+impl UpdateToggleArg {
+    pub(crate) fn enabled(self) -> bool {
+        matches!(self, Self::On)
+    }
+}
+
 #[derive(Debug, Args)]
 pub(crate) struct StorageArgs {
     /// Emit the storage report as JSON.
@@ -51,15 +63,32 @@ pub(crate) enum StorageCommand {
 pub(crate) enum UpdateCommand {
     /// Inspect the configured signed release manifest.
     Check(UpdateSourceArgs),
+    /// Download and verify the current update without installing it.
+    Download(UpdateSourceArgs),
     /// Stage a verified update and launch the external updater helper.
     Apply(UpdateSourceArgs),
-    /// Show local update channel, distribution mode, and update journal state.
+    /// Show version, channel, automatic-check settings, and update journal state.
     Status,
     /// Persist the release channel used for automatic/manual checks.
     Channel { channel: UpdateChannelArg },
+    /// Configure conservative automatic checking and opt-in background download.
+    Configure(UpdateConfigureArgs),
+    /// Internal background check launched opportunistically by installed Takokit surfaces.
+    #[command(hide = true)]
+    AutoCheck,
 }
 
 #[derive(Debug, Args)]
+pub(crate) struct UpdateConfigureArgs {
+    /// Enable or disable automatic signed-manifest checks.
+    #[arg(long, value_enum)]
+    pub(crate) automatic_checks: Option<UpdateToggleArg>,
+    /// Enable or disable automatic verified download. Installation always remains manual.
+    #[arg(long, value_enum)]
+    pub(crate) automatic_download: Option<UpdateToggleArg>,
+}
+
+#[derive(Debug, Args, Clone, Default)]
 pub(crate) struct UpdateSourceArgs {
     /// Override the release manifest URL/path. Intended for private/test channels.
     #[arg(long)]
