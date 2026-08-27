@@ -44,8 +44,8 @@ AllowNoIcons=yes
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Takokit"; Filename: "{app}\bin\Takokit.exe"; WorkingDir: "{localappdata}\Takokit"; Comment: "Takokit local voice AI runtime"
-Name: "{autoprograms}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
+Name: "{group}\Takokit"; Filename: "{app}\bin\Takokit.exe"; WorkingDir: "{localappdata}\Takokit"; Comment: "Takokit local voice AI runtime"
+Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
 
 [Code]
 const
