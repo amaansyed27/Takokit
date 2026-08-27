@@ -197,7 +197,7 @@ Negative fixtures:
 - release-manifest-bad-hash.json/.sig: valid signature, wrong artifact hash
 - release-manifest-incompatible.json/.sig: valid signature, incompatible storage schema
 - release-manifest-invalid-signature.sig: invalid signature for the valid manifest
-- release-manifest-corrupt-artifact.json/.sig + $CorruptName: corrupted archive bytes
+- release-manifest-corrupt-artifact.json/.sig + ${CorruptName}: corrupted archive bytes
 
 The helper failpoint integration test covers interruption during replacement/rollback separately; no public 0.0.2 tag or GitHub Release is created.
 "@
