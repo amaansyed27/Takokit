@@ -16,8 +16,8 @@ use takokit_store::LocalStore;
 mod update_support;
 use update_support::{
     config_path, now, print_value, read_config, read_journal, read_source,
-    refuse_active_runtime_operations, sibling_signature_source, stage_artifact, update_journal_path,
-    validate_source_location, write_json_atomic, UpdateConfig,
+    refuse_active_runtime_operations, sibling_signature_source, stage_artifact,
+    update_journal_path, validate_source_location, write_json_atomic, UpdateConfig,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,11 +82,7 @@ fn print_status(store: &LocalStore, json: bool) -> anyhow::Result<()> {
     print_value(&report, json)
 }
 
-fn set_channel(
-    store: &LocalStore,
-    channel: UpdateChannelArg,
-    json: bool,
-) -> anyhow::Result<()> {
+fn set_channel(store: &LocalStore, channel: UpdateChannelArg, json: bool) -> anyhow::Result<()> {
     let config = UpdateConfig {
         channel: channel.as_str().to_string(),
     };
@@ -147,9 +143,7 @@ fn check(store: &LocalStore, source: UpdateSourceArgs) -> anyhow::Result<Verifie
                 .iter()
                 .find(|artifact| artifact.role == "update_bundle")
                 .cloned()
-                .ok_or_else(|| {
-                    anyhow::anyhow!("signed manifest has no update_bundle artifact")
-                })?,
+                .ok_or_else(|| anyhow::anyhow!("signed manifest has no update_bundle artifact"))?,
         ),
     };
     Ok(VerifiedUpdate {

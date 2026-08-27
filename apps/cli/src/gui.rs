@@ -21,9 +21,12 @@ pub async fn open_gui(
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x0800_0000);
         }
-        command
-            .spawn()
-            .with_context(|| format!("launch installed Takokit desktop app at {}", desktop.display()))?;
+        command.spawn().with_context(|| {
+            format!(
+                "launch installed Takokit desktop app at {}",
+                desktop.display()
+            )
+        })?;
         println!("Takokit desktop: {url}");
         return Ok(());
     }

@@ -14,7 +14,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let bytes = fs::read(&manifest)?;
             let parsed = parse_manifest(&bytes)?;
             let envelope = if test {
-                if !parsed.test_fixture || parsed.channel != "test" || parsed.signing_key_id != TEST_KEY_ID {
+                if !parsed.test_fixture
+                    || parsed.channel != "test"
+                    || parsed.signing_key_id != TEST_KEY_ID
+                {
                     return Err("--test may sign only an explicitly marked test fixture".into());
                 }
                 sign_test_fixture(&bytes)?
@@ -22,8 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if parsed.test_fixture || parsed.signing_key_id != PRODUCTION_KEY_ID {
                     return Err("production signing requires production manifest metadata".into());
                 }
-                let seed = env::var("TAKOKIT_RELEASE_SIGNING_KEY_HEX")
-                    .map_err(|_| "TAKOKIT_RELEASE_SIGNING_KEY_HEX is required for production signing")?;
+                let seed = env::var("TAKOKIT_RELEASE_SIGNING_KEY_HEX").map_err(|_| {
+                    "TAKOKIT_RELEASE_SIGNING_KEY_HEX is required for production signing"
+                })?;
                 sign_with_seed(&bytes, &seed, PRODUCTION_KEY_ID)?
             };
             fs::write(signature, serde_json::to_vec_pretty(&envelope)?)?;
@@ -36,7 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let envelope = parse_signature(&fs::read(signature)?)?;
             verify_signature(&bytes, &envelope, allow_test)?;
             let parsed = parse_manifest(&bytes)?;
-            println!("verified {} {} with {}", parsed.product, parsed.version, envelope.key_id);
+            println!(
+                "verified {} {} with {}",
+                parsed.product, parsed.version, envelope.key_id
+            );
         }
         _ => {
             eprintln!("usage: takokit-release-tool sign <manifest> <signature> [--test]");
@@ -47,7 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn path(args: &mut impl Iterator<Item = String>, label: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn path(
+    args: &mut impl Iterator<Item = String>,
+    label: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     args.next()
         .map(PathBuf::from)
         .ok_or_else(|| format!("missing {label} path").into())

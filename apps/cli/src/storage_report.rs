@@ -1,8 +1,7 @@
 use serde::Serialize;
 use std::{
     collections::HashSet,
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -56,7 +55,10 @@ enum FileIdentity {
         index_low: u32,
     },
     #[cfg(unix)]
-    Unix { device: u64, inode: u64 },
+    Unix {
+        device: u64,
+        inode: u64,
+    },
     Fallback(PathBuf),
 }
 
@@ -192,10 +194,7 @@ fn merge_totals(target: &mut ScanTotals, source: ScanTotals) {
 pub(super) fn print_storage_report(report: &StorageReport) {
     println!("Takokit storage");
     println!("  root              {}", report.root.display());
-    println!(
-        "  estimated unique  {}",
-        format_bytes(report.unique_bytes)
-    );
+    println!("  estimated unique  {}", format_bytes(report.unique_bytes));
     println!("  logical paths     {}", format_bytes(report.logical_bytes));
     println!(
         "  hardlink savings  {}",
@@ -265,9 +264,7 @@ pub(super) fn format_bytes(bytes: u64) -> String {
 
 #[cfg(windows)]
 fn file_identity(path: &Path, _metadata: &fs::Metadata) -> FileIdentity {
-    use std::{
-        ffi::c_void, fs::File, mem::MaybeUninit, os::windows::io::AsRawHandle,
-    };
+    use std::{ffi::c_void, fs::File, mem::MaybeUninit, os::windows::io::AsRawHandle};
 
     #[repr(C)]
     struct FileTime {
@@ -299,9 +296,8 @@ fn file_identity(path: &Path, _metadata: &fs::Metadata) -> FileIdentity {
 
     if let Ok(file) = File::open(path) {
         let mut information = MaybeUninit::<ByHandleFileInformation>::uninit();
-        let success = unsafe {
-            GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr())
-        };
+        let success =
+            unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
         if success != 0 {
             let information = unsafe { information.assume_init() };
             return FileIdentity::Windows {

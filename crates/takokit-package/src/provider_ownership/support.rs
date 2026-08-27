@@ -148,7 +148,9 @@ pub(super) fn collect_unused_blobs_ignoring(
     for path in files {
         let item = ProviderCleanupItem {
             category: "provider-blob".to_string(),
-            bytes: fs::metadata(&path).map(|metadata| metadata.len()).unwrap_or(0),
+            bytes: fs::metadata(&path)
+                .map(|metadata| metadata.len())
+                .unwrap_or(0),
             path: path.clone(),
             reason: if referenced.contains(&path) {
                 "retained because an installed model references this durable blob".to_string()
@@ -194,12 +196,13 @@ pub(super) fn scan_cache_files(
     }
     let metadata = fs::metadata(current)?;
     if metadata.is_file() {
-        let relative = current
-            .strip_prefix(base)
-            .map_err(|_| PackageError::ArtifactInstallFailed {
-                artifact: provider.to_string(),
-                reason: "provider cache path escaped its provider root".to_string(),
-            })?;
+        let relative =
+            current
+                .strip_prefix(base)
+                .map_err(|_| PackageError::ArtifactInstallFailed {
+                    artifact: provider.to_string(),
+                    reason: "provider cache path escaped its provider root".to_string(),
+                })?;
         let relative = PathBuf::from(provider).join(relative);
         let modified_nanos = metadata
             .modified()

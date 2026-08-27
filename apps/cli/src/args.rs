@@ -445,8 +445,6 @@ fn parse_range(value: &str, minimum: f32, maximum: f32, label: &str) -> Result<f
     if parsed.is_finite() && (minimum..=maximum).contains(&parsed) {
         Ok(parsed)
     } else {
-        Err(format!(
-            "{label} must be between {minimum} and {maximum}"
-        ))
+        Err(format!("{label} must be between {minimum} and {maximum}"))
     }
 }

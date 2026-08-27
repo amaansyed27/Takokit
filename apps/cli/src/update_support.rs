@@ -111,13 +111,7 @@ fn local_sibling_artifact(manifest_source: &str, name: &str) -> Option<String> {
         return None;
     }
     let manifest = PathBuf::from(manifest_source);
-    Some(
-        manifest
-            .parent()?
-            .join(name)
-            .to_string_lossy()
-            .into_owned(),
-    )
+    Some(manifest.parent()?.join(name).to_string_lossy().into_owned())
 }
 
 pub(super) fn sibling_signature_source(manifest_source: &str) -> String {
@@ -152,9 +146,7 @@ pub(super) fn validate_source_location(source: &str) -> anyhow::Result<()> {
 pub(super) fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8>> {
     validate_source_location(source)?;
     if is_remote_source(source) {
-        let response = ureq::get(source)
-            .timeout(Duration::from_secs(30))
-            .call()?;
+        let response = ureq::get(source).timeout(Duration::from_secs(30)).call()?;
         let reader = response.into_reader();
         let mut bytes = Vec::new();
         let limit = maximum.saturating_add(1) as u64;
@@ -253,27 +245,22 @@ mod tests {
     #[test]
     fn local_manifest_resolves_sibling_signature_and_artifact() {
         let manifest = Path::new("C:/Temp/Takokit/release-manifest.json");
-        assert!(sibling_signature_source(manifest.to_str().unwrap())
-            .ends_with("release-manifest.sig"));
-        assert!(local_sibling_artifact(manifest.to_str().unwrap(), "update.zip")
-            .unwrap()
-            .ends_with("update.zip"));
+        assert!(
+            sibling_signature_source(manifest.to_str().unwrap()).ends_with("release-manifest.sig")
+        );
+        assert!(
+            local_sibling_artifact(manifest.to_str().unwrap(), "update.zip")
+                .unwrap()
+                .ends_with("update.zip")
+        );
     }
 
     #[test]
     fn active_job_detection_is_state_specific() {
         let temp = tempfile::tempdir().unwrap();
-        fs::write(
-            temp.path().join("done.json"),
-            r#"{"status":"completed"}"#,
-        )
-        .unwrap();
+        fs::write(temp.path().join("done.json"), r#"{"status":"completed"}"#).unwrap();
         assert!(!contains_active_rvc_job(temp.path()));
-        fs::write(
-            temp.path().join("live.json"),
-            r#"{"status":"training"}"#,
-        )
-        .unwrap();
+        fs::write(temp.path().join("live.json"), r#"{"status":"training"}"#).unwrap();
         assert!(contains_active_rvc_job(temp.path()));
     }
 

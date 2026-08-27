@@ -177,9 +177,7 @@ pub(super) fn verify_install(
     Ok(())
 }
 
-pub(super) fn restart_daemon_if_requested(
-    args: &Args,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub(super) fn restart_daemon_if_requested(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     if args.restart_daemon {
         restart_daemon(&args.install_root)?;
     }
@@ -279,9 +277,7 @@ pub(super) fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>
     match status {
         WAIT_OBJECT_0 => Ok(()),
         WAIT_TIMEOUT => Err(format!("parent process {pid} did not exit within 30 seconds").into()),
-        other => {
-            Err(format!("waiting for parent process {pid} failed with status {other}").into())
-        }
+        other => Err(format!("waiting for parent process {pid} failed with status {other}").into()),
     }
 }
 

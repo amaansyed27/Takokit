@@ -325,7 +325,10 @@ fn run_adapter(
 ) -> TakokitResult<ManagedAdapterResponse> {
     if let (Some(storage_root), Some(model_id)) = (
         payload.cache_dir.parent(),
-        payload.model_dir.file_name().and_then(|value| value.to_str()),
+        payload
+            .model_dir
+            .file_name()
+            .and_then(|value| value.to_str()),
     ) {
         ensure_provider_cache_from_ownership(storage_root, model_id).map_err(|error| {
             TakokitError::Storage(format!(

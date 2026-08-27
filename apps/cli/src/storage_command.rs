@@ -17,8 +17,8 @@ mod storage_cache;
 #[path = "storage_report.rs"]
 mod storage_report;
 
-pub(crate) use storage_report::{inspect_storage, StorageReport};
 use storage_report::{format_bytes, print_storage_report};
+pub(crate) use storage_report::{inspect_storage, StorageReport};
 
 #[derive(Debug, Serialize)]
 struct StorageEnvelope<'a> {
@@ -92,12 +92,7 @@ pub(crate) fn run_storage_command(
     Ok(())
 }
 
-fn run_cleanup(
-    root: &Path,
-    scope: StorageScope,
-    dry_run: bool,
-    json: bool,
-) -> anyhow::Result<()> {
+fn run_cleanup(root: &Path, scope: StorageScope, dry_run: bool, json: bool) -> anyhow::Result<()> {
     match scope {
         StorageScope::Uv => {
             let report = clean_uv_cache(root, dry_run)?;

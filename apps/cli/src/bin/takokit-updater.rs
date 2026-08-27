@@ -223,8 +223,7 @@ mod tests {
         assert!(!args.install_root.join("replacement.txt").exists());
         assert!(!backup.exists());
         assert!(replacement.join("replacement.txt").is_file());
-        let journal: Journal =
-            serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
+        let journal: Journal = serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
         assert_eq!(journal.state, "rolled_back");
     }
 
@@ -258,8 +257,7 @@ mod tests {
             .join("Takokit.failed.fixture")
             .join("replacement.txt")
             .is_file());
-        let journal: Journal =
-            serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
+        let journal: Journal = serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
         assert_eq!(journal.state, "rolled_back");
     }
 }

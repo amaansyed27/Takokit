@@ -158,9 +158,8 @@ pub fn verify_signature(
                 "this build has no production release public key configured".to_string(),
             )
         })?;
-        VerifyingKey::from_bytes(&decode_32(public, "production public key")?).map_err(|error| {
-            ReleaseError::SigningKey(format!("production public key: {error}"))
-        })?
+        VerifyingKey::from_bytes(&decode_32(public, "production public key")?)
+            .map_err(|error| ReleaseError::SigningKey(format!("production public key: {error}")))?
     } else {
         return Err(ReleaseError::Signature(format!(
             "untrusted signing key id {}",
@@ -272,9 +271,9 @@ pub fn safe_artifact_name(name: &str) -> bool {
     let path = Path::new(name);
     !name.trim().is_empty()
         && !path.is_absolute()
-        && path.components().all(|component| {
-            matches!(component, std::path::Component::Normal(_))
-        })
+        && path
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
 }
 
 fn normalize_arch(value: &str) -> &str {
