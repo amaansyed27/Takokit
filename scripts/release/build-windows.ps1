@@ -108,6 +108,16 @@ $BuildTimestamp = if ($env:SOURCE_DATE_EPOCH) {
     $CommitTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
 }
 $BuildId = if ($env:TAKOKIT_BUILD_ID) { $env:TAKOKIT_BUILD_ID } else { "windows-v$Version-$CommitSha" }
+$StableManifestUrl = if ($env:TAKOKIT_STABLE_UPDATE_MANIFEST_URL) {
+    $env:TAKOKIT_STABLE_UPDATE_MANIFEST_URL
+} else {
+    'https://github.com/amaansyed27/Takokit/releases/latest/download/release-manifest.json'
+}
+$PreviewManifestUrl = if ($env:TAKOKIT_PREVIEW_UPDATE_MANIFEST_URL) {
+    $env:TAKOKIT_PREVIEW_UPDATE_MANIFEST_URL
+} else {
+    'https://github.com/amaansyed27/Takokit/releases/download/preview/release-manifest.json'
+}
 $env:TAKOKIT_BUILD_ID = $BuildId
 $env:SOURCE_DATE_EPOCH = [DateTimeOffset]$CommitTime | ForEach-Object { $_.ToUnixTimeSeconds().ToString() }
 
@@ -189,7 +199,11 @@ function Materialize-DistributionTree {
         version = $Version
         mode = $Mode
         install_root = $null
-        update_manifest_url = $null
+        update_manifest_url = $StableManifestUrl
+        update_manifest_urls = [ordered]@{
+            stable = $StableManifestUrl
+            preview = $PreviewManifestUrl
+        }
         default_channel = 'stable'
     }
     Write-Json (Join-Path $Destination 'distribution.json') $metadata
