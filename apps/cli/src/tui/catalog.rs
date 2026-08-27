@@ -1,4 +1,5 @@
 use takokit_package::{plan_model, InstalledRegistry, PackageRegistry};
+use takokit_store::LocalStore;
 
 #[derive(Debug, Clone)]
 pub struct ModelRow {
@@ -27,6 +28,15 @@ pub struct RunnerRow {
 pub enum SystemAction {
     Status,
     Doctor,
+    UpdateStatus,
+    UpdateCheck,
+    UpdateInstall,
+    UpdateStable,
+    UpdatePreview,
+    AutomaticChecksOn,
+    AutomaticChecksOff,
+    AutomaticDownloadOn,
+    AutomaticDownloadOff,
     StartDaemon,
     StopDaemon,
     RestartDaemon,
@@ -36,9 +46,9 @@ pub enum SystemAction {
 
 #[derive(Debug, Clone)]
 pub struct SystemRow {
-    pub title: &'static str,
-    pub state: &'static str,
-    pub detail: &'static str,
+    pub title: String,
+    pub state: String,
+    pub detail: String,
     pub action: SystemAction,
 }
 
@@ -175,51 +185,158 @@ pub fn find_capability_index(
         .unwrap_or(0)
 }
 
-pub fn system_rows() -> Vec<SystemRow> {
+pub fn system_rows(store: &LocalStore) -> Vec<SystemRow> {
+    let update = update_display_state(store);
+    let available = update
+        .available
+        .as_deref()
+        .map(|version| format!("available {version}"))
+        .unwrap_or_else(|| "no checked update".to_string());
+    let auto_checks = if update.automatic_checks { "on" } else { "off" };
+    let auto_download = if update.automatic_download { "on" } else { "off" };
     vec![
-        SystemRow {
-            title: "Runtime status",
-            state: "read",
-            detail: "Check the daemon, storage, and currently available runtime state.",
-            action: SystemAction::Status,
-        },
-        SystemRow {
-            title: "Doctor",
-            state: "diagnostics",
-            detail: "Run the complete local setup and model readiness check.",
-            action: SystemAction::Doctor,
-        },
-        SystemRow {
-            title: "Start daemon",
-            state: "service",
-            detail: "Start Takokit's managed local API service.",
-            action: SystemAction::StartDaemon,
-        },
-        SystemRow {
-            title: "Stop daemon",
-            state: "service",
-            detail: "Stop the managed local API service.",
-            action: SystemAction::StopDaemon,
-        },
-        SystemRow {
-            title: "Restart daemon",
-            state: "service",
-            detail: "Restart the managed local API service.",
-            action: SystemAction::RestartDaemon,
-        },
-        SystemRow {
-            title: "View logs",
-            state: "diagnostics",
-            detail: "Show the latest daemon log location and output.",
-            action: SystemAction::Logs,
-        },
-        SystemRow {
-            title: "Open GUI",
-            state: "interface",
-            detail: "Open the browser GUI in this same project session.",
-            action: SystemAction::OpenGui,
-        },
+        row(
+            "Runtime status",
+            "read",
+            "Check the daemon, storage, and currently available runtime state.",
+            SystemAction::Status,
+        ),
+        row(
+            "Doctor",
+            "diagnostics",
+            "Run the complete local setup and model readiness check.",
+            SystemAction::Doctor,
+        ),
+        row(
+            "Update status",
+            &available,
+            &format!(
+                "Current version {} · channel {} · automatic checks {} · automatic download {}.",
+                env!("CARGO_PKG_VERSION"), update.channel, auto_checks, auto_download
+            ),
+            SystemAction::UpdateStatus,
+        ),
+        row(
+            "Check for updates",
+            "signed manifest",
+            "Verify the selected channel's signed release manifest without installing anything.",
+            SystemAction::UpdateCheck,
+        ),
+        row(
+            "Install available update",
+            "manual",
+            "Explicitly verify, stage, and install the available update. Active work blocks installation.",
+            SystemAction::UpdateInstall,
+        ),
+        row(
+            "Use stable update channel",
+            if update.channel == "stable" { "selected" } else { "channel" },
+            "Select stable signed application releases.",
+            SystemAction::UpdateStable,
+        ),
+        row(
+            "Use preview update channel",
+            if update.channel == "preview" { "selected" } else { "channel" },
+            "Select preview signed application releases.",
+            SystemAction::UpdatePreview,
+        ),
+        row(
+            "Enable automatic update checks",
+            if update.automatic_checks { "enabled" } else { "setting" },
+            "Check signed release metadata opportunistically at most once per day.",
+            SystemAction::AutomaticChecksOn,
+        ),
+        row(
+            "Disable automatic update checks",
+            if !update.automatic_checks { "enabled" } else { "setting" },
+            "Disable opportunistic background release checks.",
+            SystemAction::AutomaticChecksOff,
+        ),
+        row(
+            "Enable automatic update download",
+            if update.automatic_download { "enabled" } else { "opt-in" },
+            "Opt in to verified background download only. Installation and restart remain manual.",
+            SystemAction::AutomaticDownloadOn,
+        ),
+        row(
+            "Disable automatic update download",
+            if !update.automatic_download { "enabled" } else { "setting" },
+            "Keep update downloads user-initiated after a check.",
+            SystemAction::AutomaticDownloadOff,
+        ),
+        row(
+            "Start daemon",
+            "service",
+            "Start Takokit's managed local API service.",
+            SystemAction::StartDaemon,
+        ),
+        row(
+            "Stop daemon",
+            "service",
+            "Stop the managed local API service.",
+            SystemAction::StopDaemon,
+        ),
+        row(
+            "Restart daemon",
+            "service",
+            "Restart the managed local API service.",
+            SystemAction::RestartDaemon,
+        ),
+        row(
+            "View logs",
+            "diagnostics",
+            "Show the latest daemon log location and output.",
+            SystemAction::Logs,
+        ),
+        row(
+            "Open GUI",
+            "interface",
+            "Open the installed Takokit GUI in this same project session.",
+            SystemAction::OpenGui,
+        ),
     ]
+}
+
+fn row(title: &str, state: &str, detail: &str, action: SystemAction) -> SystemRow {
+    SystemRow {
+        title: title.to_string(),
+        state: state.to_string(),
+        detail: detail.to_string(),
+        action,
+    }
+}
+
+struct UpdateDisplayState {
+    channel: String,
+    automatic_checks: bool,
+    automatic_download: bool,
+    available: Option<String>,
+}
+
+fn update_display_state(store: &LocalStore) -> UpdateDisplayState {
+    let value = std::fs::read(store.root().join("runtime").join("update-config.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    let string = |key: &str| {
+        value
+            .as_ref()
+            .and_then(|value| value.get(key))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    };
+    let boolean = |key: &str, fallback: bool| {
+        value
+            .as_ref()
+            .and_then(|value| value.get(key))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(fallback)
+    };
+    UpdateDisplayState {
+        channel: string("channel").unwrap_or_else(|| "stable".to_string()),
+        automatic_checks: boolean("automatic_checks", true),
+        automatic_download: boolean("automatic_download", false),
+        available: string("last_available_version"),
+    }
 }
 
 fn format_size(bytes: u64) -> String {
@@ -249,5 +366,18 @@ mod tests {
 
         assert!(models.is_empty());
         assert!(!runners.is_empty());
+    }
+
+    #[test]
+    fn system_update_rows_show_safe_automatic_defaults() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(temp.path());
+        let rows = system_rows(&store);
+        let update = rows
+            .iter()
+            .find(|row| row.action == SystemAction::UpdateStatus)
+            .unwrap();
+        assert!(update.detail.contains("automatic checks on"));
+        assert!(update.detail.contains("automatic download off"));
     }
 }
