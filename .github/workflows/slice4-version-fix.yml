@@ -1,0 +1,68 @@
+name: Slice 4 one-shot version metadata fix
+
+on:
+  push:
+    branches:
+      - slice/windows-v0.0.1-release
+    paths:
+      - .github/workflows/slice4-version-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: slice/windows-v0.0.1-release
+          fetch-depth: 0
+      - name: Normalize GUI lockfile version and strengthen gate
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          lock_path = Path("apps/gui/package-lock.json")
+          lock = json.loads(lock_path.read_text(encoding="utf-8"))
+          if lock.get("version") != "0.1.0":
+              raise SystemExit(f"unexpected package-lock top-level version: {lock.get('version')!r}")
+          root_package = lock.get("packages", {}).get("")
+          if not isinstance(root_package, dict) or root_package.get("version") != "0.1.0":
+              raise SystemExit("unexpected package-lock root package version")
+          lock["version"] = "0.0.1"
+          root_package["version"] = "0.0.1"
+          lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+          checker_path = Path("scripts/check_release_version.py")
+          checker = checker_path.read_text(encoding="utf-8")
+          old = 'checks.append(("GUI package version", json.loads((ROOT / "apps/gui/package.json").read_text(encoding="utf-8"))["version"]))\nchecks.append(("Tauri version",'
+          new = 'checks.append(("GUI package version", json.loads((ROOT / "apps/gui/package.json").read_text(encoding="utf-8"))["version"]))\nchecks.append(("GUI lockfile version", json.loads((ROOT / "apps/gui/package-lock.json").read_text(encoding="utf-8"))["version"]))\nchecks.append(("GUI lockfile root package version", json.loads((ROOT / "apps/gui/package-lock.json").read_text(encoding="utf-8"))["packages"][""]["version"]))\nchecks.append(("Tauri version",'
+          if checker.count(old) != 1:
+              raise SystemExit("could not locate GUI version check insertion point")
+          checker = checker.replace(old, new, 1)
+          old_guard = 'for path in [ROOT / "apps/gui/package.json", ROOT / "apps/desktop/tauri.conf.json"]:'
+          new_guard = 'for path in [ROOT / "apps/gui/package.json", ROOT / "apps/gui/package-lock.json", ROOT / "apps/desktop/tauri.conf.json"]:'
+          if checker.count(old_guard) != 1:
+              raise SystemExit("could not locate stale-version guard")
+          checker_path.write_text(checker.replace(old_guard, new_guard, 1), encoding="utf-8", newline="\n")
+
+      - name: Validate version metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_release_version.py
+          python scripts/audit_file_sizes.py
+          git diff --check
+          node -e "const p=require('./apps/gui/package-lock.json'); if(p.version!=='0.0.1'||p.packages[''].version!=='0.0.1') process.exit(1)"
+      - name: Commit version metadata fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/gui/package-lock.json scripts/check_release_version.py
+          git diff --cached --exit-code && { echo "Patch produced no changes"; exit 1; } || true
+          git commit -m "Normalize GUI release lockfile version"
+          git push origin HEAD:slice/windows-v0.0.1-release
