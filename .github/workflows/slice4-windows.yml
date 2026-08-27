@@ -97,9 +97,15 @@ jobs:
             throw "Unexpected Inno Setup signer: $($signature.SignerCertificate.Subject)"
           }
 
-          & $installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' "/DIR=$installRoot"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup installer failed with exit code $LASTEXITCODE"
+          $innoInstall = Start-Process -FilePath $installer -ArgumentList @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            '/CURRENTUSER',
+            "/DIR=$installRoot"
+          ) -Wait -PassThru
+          if ($innoInstall.ExitCode -ne 0) {
+            throw "Inno Setup installer failed with exit code $($innoInstall.ExitCode)"
           }
           $iscc = Join-Path $installRoot 'ISCC.exe'
           if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
