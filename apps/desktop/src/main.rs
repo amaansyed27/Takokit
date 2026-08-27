@@ -20,7 +20,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("desktop executable has no parent directory")?;
     let tako = bin_dir.join("tako.exe");
     if !tako.is_file() {
-        return Err(format!("Takokit CLI is missing from the installed application: {}", tako.display()).into());
+        return Err(format!(
+            "Takokit CLI is missing from the installed application: {}",
+            tako.display()
+        )
+        .into());
     }
 
     let mut daemon = Command::new(&tako);
@@ -37,7 +41,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!(
             "Takokit could not start its managed daemon.\n\n{}{}",
             stderr.trim(),
-            if stdout.trim().is_empty() { String::new() } else { format!("\n{}", stdout.trim()) }
+            if stdout.trim().is_empty() {
+                String::new()
+            } else {
+                format!("\n{}", stdout.trim())
+            }
         )
         .into());
     }
@@ -88,10 +96,18 @@ fn show_startup_error(message: &str) {
     use std::{ffi::OsStr, ptr};
     #[link(name = "user32")]
     extern "system" {
-        fn MessageBoxW(hwnd: *mut std::ffi::c_void, text: *const u16, caption: *const u16, kind: u32) -> i32;
+        fn MessageBoxW(
+            hwnd: *mut std::ffi::c_void,
+            text: *const u16,
+            caption: *const u16,
+            kind: u32,
+        ) -> i32;
     }
     let text: Vec<u16> = OsStr::new(message).encode_wide().chain(Some(0)).collect();
-    let caption: Vec<u16> = OsStr::new("Takokit startup error").encode_wide().chain(Some(0)).collect();
+    let caption: Vec<u16> = OsStr::new("Takokit startup error")
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
     unsafe {
         let _ = MessageBoxW(ptr::null_mut(), text.as_ptr(), caption.as_ptr(), 0x10);
     }
