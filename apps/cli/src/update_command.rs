@@ -17,7 +17,7 @@ mod update_support;
 use update_support::{
     now, print_value, read_config, read_journal, read_source, refuse_active_runtime_operations,
     sibling_signature_source, stage_artifact, update_journal_path, validate_source_location,
-    write_config, UpdateConfig,
+    write_config,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,8 +104,7 @@ pub(crate) fn maybe_spawn_automatic_check(store: &LocalStore) {
         return;
     }
     settings.last_check_attempt_unix = Some(timestamp);
-    if let Err(error) = write_config(store, &settings) {
-        tracing::debug!(%error, "could not persist automatic update-check attempt");
+    if write_config(store, &settings).is_err() {
         return;
     }
     let Ok(executable) = std::env::current_exe() else {
