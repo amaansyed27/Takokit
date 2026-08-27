@@ -268,7 +268,7 @@ try {
     $Sentinel = Join-Path $InstallerHome 'preserve-me.txt'
     Set-Content -LiteralPath $Sentinel -Value 'preserve' -NoNewline
 
-    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' "/DIR=$InstallRoot"
+    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' ('/DIR="' + $InstallRoot + '"')
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe') -PathType Leaf) 'Installer did not install the desktop shell.'
@@ -298,7 +298,7 @@ try {
     $Report.installer_shortcut_workspace = $true
 
     # Reinstall/repair must not duplicate the PATH entry.
-    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' "/DIR=$InstallRoot"
+    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' ('/DIR="' + $InstallRoot + '"')
     $reinstallCount = Get-PathEntryCount (Get-UserPath) $InstalledBin
     Assert-True ($reinstallCount -eq 1) "Reinstall duplicated the Takokit PATH entry ($reinstallCount entries)."
     Assert-True ((Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')).Version -eq $Version) 'Reinstall did not leave a runnable v0.0.1 CLI.'
