@@ -30,7 +30,7 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=..\..\assets\favicon\favicon.ico
-UninstallDisplayIcon={app}\bin\Takokit.exe
+UninstallDisplayIcon={app}\Takokit.exe
 UninstallDisplayName=Takokit {#MyAppVersion}
 ChangesEnvironment=yes
 CloseApplications=no
@@ -44,7 +44,7 @@ AllowNoIcons=yes
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Takokit"; Filename: "{app}\bin\Takokit.exe"; WorkingDir: "{localappdata}\Takokit"; Comment: "Takokit local voice AI runtime"
+Name: "{group}\Takokit"; Filename: "{app}\Takokit.exe"; WorkingDir: "{localappdata}\Takokit"; Comment: "Takokit local voice AI runtime"
 Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
 
 [Code]

@@ -107,7 +107,7 @@ pub(super) fn validate_replacement(root: &Path) -> Result<(), Box<dyn std::error
     for required in [
         "bin/tako.exe",
         "bin/takokit.exe",
-        "bin/Takokit.exe",
+        "Takokit.exe",
         "bin/takokit-updater.exe",
         "distribution.json",
         "resources/registry/index.json",

@@ -14,10 +14,11 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let bin_dir = env::current_exe()?
+    let app_root = env::current_exe()?
         .parent()
         .map(PathBuf::from)
         .ok_or("desktop executable has no parent directory")?;
+    let bin_dir = app_root.join("bin");
     let tako = bin_dir.join("tako.exe");
     if !tako.is_file() {
         return Err(format!(

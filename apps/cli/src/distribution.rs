@@ -34,7 +34,7 @@ pub(crate) fn application_root() -> Option<PathBuf> {
 }
 
 pub(crate) fn desktop_executable() -> Option<PathBuf> {
-    let candidate = application_root()?.join("bin").join("Takokit.exe");
+    let candidate = application_root()?.join("Takokit.exe");
     candidate.is_file().then_some(candidate)
 }
 

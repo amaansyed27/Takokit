@@ -164,7 +164,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $BaseTree 'resources\icons'
 Copy-Item 'target\release\tako.exe' (Join-Path $BaseTree 'bin\tako.exe')
 Copy-Item 'target\release\takokit.exe' (Join-Path $BaseTree 'bin\takokit.exe')
 Copy-Item 'target\release\takokit-updater.exe' (Join-Path $BaseTree 'bin\takokit-updater.exe')
-Copy-Item 'apps\desktop\target\release\Takokit.exe' (Join-Path $BaseTree 'bin\Takokit.exe')
+Copy-Item 'apps\desktop\target\release\Takokit.exe' (Join-Path $BaseTree 'Takokit.exe')
 Copy-DirectoryContents (Join-Path $RepoRoot 'apps\gui\dist') (Join-Path $BaseTree 'resources\gui')
 Copy-DirectoryContents (Join-Path $RepoRoot 'registry') (Join-Path $BaseTree 'resources\registry')
 Copy-Item 'assets\favicon\favicon.ico' (Join-Path $BaseTree 'resources\icons\takokit.ico')

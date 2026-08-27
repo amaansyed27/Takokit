@@ -271,7 +271,7 @@ try {
     Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' "/DIR=$InstallRoot"
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'Takokit.exe') -PathType Leaf) 'Installer did not install the desktop shell.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe') -PathType Leaf) 'Installer did not install the desktop shell.'
     $installedVersion = Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')
     Assert-True ($installedVersion.Version -eq $Version) "Installed version mismatch: $($installedVersion.Version)"
     Assert-True ($installedVersion.Output -match '(?m)^distribution:\s+installed\s*$') 'Installed CLI did not report distribution: installed.'
@@ -282,10 +282,14 @@ try {
     $Report.installer_path_dedupe = $true
 
     $StartMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Takokit'
+    $GuiShortcutPath = Join-Path $StartMenu 'Takokit.lnk'
     $TuiShortcutPath = Join-Path $StartMenu 'Takokit (TUI).lnk'
+    Assert-True (Test-Path -LiteralPath $GuiShortcutPath -PathType Leaf) "GUI Start Menu shortcut is missing: $GuiShortcutPath"
     Assert-True (Test-Path -LiteralPath $TuiShortcutPath -PathType Leaf) "TUI Start Menu shortcut is missing: $TuiShortcutPath"
     $Shell = New-Object -ComObject WScript.Shell
+    $GuiShortcut = $Shell.CreateShortcut($GuiShortcutPath)
     $TuiShortcut = $Shell.CreateShortcut($TuiShortcutPath)
+    Assert-True ([string]::Equals($GuiShortcut.TargetPath, (Join-Path $InstallRoot 'Takokit.exe'), [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the installed desktop shell.'
     $ExpectedDocuments = [Environment]::GetFolderPath('MyDocuments')
     $ExpectedWorkspace = Join-Path $ExpectedDocuments 'Takokit'
     Assert-True ([string]::Equals($TuiShortcut.TargetPath, (Join-Path $InstalledBin 'tako.exe'), [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut does not target the installed tako.exe.'
