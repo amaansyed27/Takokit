@@ -35,6 +35,7 @@ mod rvc_picker;
 mod rvc_voices;
 mod sessions;
 mod system;
+mod update;
 
 pub use error::ApiError;
 pub use files::*;
@@ -46,3 +47,4 @@ pub use rvc_picker::*;
 pub use rvc_voices::*;
 pub use sessions::*;
 pub use system::*;
+pub use update::*;
