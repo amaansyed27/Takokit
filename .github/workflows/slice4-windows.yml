@@ -124,7 +124,18 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & ./scripts/release/test-windows-distribution.ps1 -OutputRoot 'dist/windows-ci'
+          try {
+            & ./scripts/release/test-windows-distribution.ps1 -OutputRoot 'dist/windows-ci'
+          } catch {
+            $failure = ($_ | Out-String).Trim()
+            New-Item -ItemType Directory -Force -Path 'dist/windows-ci' | Out-Null
+            Set-Content -LiteralPath 'dist/windows-ci/acceptance-failure.txt' -Value $failure -Encoding utf8
+            if ($env:GITHUB_STEP_SUMMARY) {
+              "### Windows acceptance failure" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+              $failure | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+            }
+            throw
+          }
 
       - name: Require complete acceptance report
         shell: pwsh
