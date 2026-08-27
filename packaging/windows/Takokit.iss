@@ -50,7 +50,6 @@ Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--wo
 [Code]
 const
   WM_SETTINGCHANGE = $001A;
-  HWND_BROADCAST = $FFFF;
   SMTO_ABORTIFHUNG = $0002;
 
 function SendMessageTimeout(hWnd: HWND; Msg: UINT; wParam: WPARAM;
