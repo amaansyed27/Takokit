@@ -2,7 +2,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 use thiserror::Error;
 
 pub const PRODUCT: &str = "Takokit";
@@ -81,10 +81,27 @@ pub struct DistributionMetadata {
     pub mode: String,
     #[serde(default)]
     pub install_root: Option<String>,
+    /// Backward-compatible manifest URL for the default channel.
     #[serde(default)]
     pub update_manifest_url: Option<String>,
+    /// Channel-specific signed-manifest locations used by automatic/manual checks.
+    #[serde(default)]
+    pub update_manifest_urls: BTreeMap<String, String>,
     #[serde(default = "default_channel")]
     pub default_channel: String,
+}
+
+impl DistributionMetadata {
+    pub fn manifest_url_for_channel(&self, channel: &str) -> Option<String> {
+        self.update_manifest_urls
+            .get(channel)
+            .cloned()
+            .or_else(|| {
+                (channel == self.default_channel)
+                    .then(|| self.update_manifest_url.clone())
+                    .flatten()
+            })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -349,7 +366,7 @@ mod tests {
             url: None,
         };
         validate_artifact(&artifact, payload).unwrap();
-        assert!(validate_artifact(&artifact, b"corrupt").is_err());
+        assert!(validate_artifact(artifact, b"corrupt").is_err());
     }
 
     #[test]
@@ -357,5 +374,21 @@ mod tests {
         assert!(safe_artifact_name("Takokit/update.zip"));
         assert!(!safe_artifact_name("../evil.exe"));
         assert!(!safe_artifact_name("/absolute.exe"));
+    }
+
+    #[test]
+    fn distribution_metadata_prefers_channel_specific_manifest() {
+        let metadata: DistributionMetadata = serde_json::from_str(
+            r#"{"product":"Takokit","version":"0.0.1","mode":"installed","update_manifest_url":"https://example.test/stable.json","update_manifest_urls":{"stable":"https://example.test/stable-v2.json","preview":"https://example.test/preview.json"},"default_channel":"stable"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            metadata.manifest_url_for_channel("stable").as_deref(),
+            Some("https://example.test/stable-v2.json")
+        );
+        assert_eq!(
+            metadata.manifest_url_for_channel("preview").as_deref(),
+            Some("https://example.test/preview.json")
+        );
     }
 }
