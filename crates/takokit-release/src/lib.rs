@@ -366,7 +366,7 @@ mod tests {
             url: None,
         };
         validate_artifact(&artifact, payload).unwrap();
-        assert!(validate_artifact(artifact, b"corrupt").is_err());
+        assert!(validate_artifact(&artifact, b"corrupt").is_err());
     }
 
     #[test]
