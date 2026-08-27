@@ -102,7 +102,7 @@ jobs:
             '/SUPPRESSMSGBOXES',
             '/NORESTART',
             '/CURRENTUSER',
-            "/DIR=$installRoot"
+            ('/DIR="' + $installRoot + '"')
           ) -Wait -PassThru
           if ($innoInstall.ExitCode -ne 0) {
             throw "Inno Setup installer failed with exit code $($innoInstall.ExitCode)"
