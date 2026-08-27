@@ -185,8 +185,9 @@ pub fn find_capability_index(
         .unwrap_or(0)
 }
 
-pub fn system_rows(store: &LocalStore) -> Vec<SystemRow> {
-    let update = update_display_state(store);
+pub fn system_rows() -> Vec<SystemRow> {
+    let store = LocalStore::new(LocalStore::default_root());
+    let update = update_display_state(&store);
     let available = update
         .available
         .as_deref()
@@ -370,9 +371,7 @@ mod tests {
 
     #[test]
     fn system_update_rows_show_safe_automatic_defaults() {
-        let temp = tempfile::tempdir().unwrap();
-        let store = LocalStore::new(temp.path());
-        let rows = system_rows(&store);
+        let rows = system_rows();
         let update = rows
             .iter()
             .find(|row| row.action == SystemAction::UpdateStatus)
