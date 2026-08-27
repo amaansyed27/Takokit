@@ -209,7 +209,10 @@ fn checked(store: &LocalStore, source: UpdateSourceArgs) -> anyhow::Result<Verif
     }
 }
 
-fn check_unrecorded(store: &LocalStore, source: UpdateSourceArgs) -> anyhow::Result<VerifiedUpdate> {
+fn check_unrecorded(
+    store: &LocalStore,
+    source: UpdateSourceArgs,
+) -> anyhow::Result<VerifiedUpdate> {
     let metadata = distribution::distribution_metadata();
     let config = read_config(store, metadata.as_ref());
     let manifest_source = source
@@ -300,7 +303,10 @@ fn download(store: &LocalStore, source: UpdateSourceArgs, json: bool) -> anyhow:
     )
 }
 
-fn download_verified(store: &LocalStore, verified: &VerifiedUpdate) -> anyhow::Result<Option<PathBuf>> {
+fn download_verified(
+    store: &LocalStore,
+    verified: &VerifiedUpdate,
+) -> anyhow::Result<Option<PathBuf>> {
     let Some(artifact) = verified.artifact.as_ref() else {
         return Ok(None);
     };

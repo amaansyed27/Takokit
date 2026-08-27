@@ -51,7 +51,9 @@ impl UpdateConfig {
         }
         self.last_check_attempt_unix
             .or(self.last_check_unix)
-            .is_none_or(|previous| timestamp.saturating_sub(previous) >= AUTO_CHECK_INTERVAL_SECONDS)
+            .is_none_or(|previous| {
+                timestamp.saturating_sub(previous) >= AUTO_CHECK_INTERVAL_SECONDS
+            })
     }
 }
 

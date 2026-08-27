@@ -50,9 +50,7 @@ fn distribution_metadata_at(root: &Path) -> Option<DistributionMetadata> {
 }
 
 fn maybe_start_automatic_update_check() {
-    if std::env::args()
-        .any(|argument| matches!(argument.as_str(), "update" | "serve"))
-    {
+    if std::env::args().any(|argument| matches!(argument.as_str(), "update" | "serve")) {
         return;
     }
     let store = LocalStore::new(LocalStore::default_root());

@@ -81,9 +81,8 @@ pub async fn run_launcher(
                 }
                 if matches!(state.screen, TuiScreen::System) {
                     state.system = catalog::system_rows();
-                    state.system_index = state
-                        .system_index
-                        .min(state.system.len().saturating_sub(1));
+                    state.system_index =
+                        state.system_index.min(state.system.len().saturating_sub(1));
                 }
                 if !success {
                     state.screen = TuiScreen::Activity;

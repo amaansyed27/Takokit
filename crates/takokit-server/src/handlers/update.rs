@@ -122,7 +122,10 @@ async fn command_response(args: Vec<String>) -> (StatusCode, Json<Value>) {
 }
 
 async fn run_json_command(args: &[&str]) -> Result<Value, String> {
-    let args = args.iter().map(|value| (*value).to_string()).collect::<Vec<_>>();
+    let args = args
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
     tokio::task::spawn_blocking(move || {
         let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
         run_json_command_blocking(&borrowed)
@@ -192,10 +195,8 @@ mod tests {
 
     #[test]
     fn settings_payload_rejects_unknown_channel() {
-        let request: UpdateSettingsRequest = serde_json::from_str(
-            r#"{"channel":"nightly","automatic_checks":true}"#,
-        )
-        .unwrap();
+        let request: UpdateSettingsRequest =
+            serde_json::from_str(r#"{"channel":"nightly","automatic_checks":true}"#).unwrap();
         assert_eq!(request.channel.as_deref(), Some("nightly"));
         assert!(request.automatic_checks.unwrap());
     }

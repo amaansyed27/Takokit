@@ -93,14 +93,11 @@ pub struct DistributionMetadata {
 
 impl DistributionMetadata {
     pub fn manifest_url_for_channel(&self, channel: &str) -> Option<String> {
-        self.update_manifest_urls
-            .get(channel)
-            .cloned()
-            .or_else(|| {
-                (channel == self.default_channel)
-                    .then(|| self.update_manifest_url.clone())
-                    .flatten()
-            })
+        self.update_manifest_urls.get(channel).cloned().or_else(|| {
+            (channel == self.default_channel)
+                .then(|| self.update_manifest_url.clone())
+                .flatten()
+        })
     }
 }
 

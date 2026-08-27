@@ -194,7 +194,11 @@ pub fn system_rows() -> Vec<SystemRow> {
         .map(|version| format!("available {version}"))
         .unwrap_or_else(|| "no checked update".to_string());
     let auto_checks = if update.automatic_checks { "on" } else { "off" };
-    let auto_download = if update.automatic_download { "on" } else { "off" };
+    let auto_download = if update.automatic_download {
+        "on"
+    } else {
+        "off"
+    };
     vec![
         row(
             "Runtime status",
