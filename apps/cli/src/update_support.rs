@@ -9,9 +9,58 @@ use takokit_core::RuntimeConfig;
 use takokit_release::{validate_artifact, DistributionMetadata, ReleaseArtifact};
 use takokit_store::LocalStore;
 
+pub(super) const AUTO_CHECK_INTERVAL_SECONDS: u64 = 24 * 60 * 60;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct UpdateConfig {
+    #[serde(default = "default_channel")]
     pub(super) channel: String,
+    #[serde(default = "default_automatic_checks")]
+    pub(super) automatic_checks: bool,
+    #[serde(default)]
+    pub(super) automatic_download: bool,
+    #[serde(default)]
+    pub(super) last_check_unix: Option<u64>,
+    #[serde(default)]
+    pub(super) last_check_attempt_unix: Option<u64>,
+    #[serde(default)]
+    pub(super) last_available_version: Option<String>,
+    #[serde(default)]
+    pub(super) last_downloaded_version: Option<String>,
+    #[serde(default)]
+    pub(super) last_error: Option<String>,
+}
+
+impl UpdateConfig {
+    pub(super) fn new(channel: String) -> Self {
+        Self {
+            channel,
+            automatic_checks: true,
+            automatic_download: false,
+            last_check_unix: None,
+            last_check_attempt_unix: None,
+            last_available_version: None,
+            last_downloaded_version: None,
+            last_error: None,
+        }
+    }
+
+    pub(super) fn automatic_check_due(&self, timestamp: u64) -> bool {
+        if !self.automatic_checks {
+            return false;
+        }
+        self.last_check_attempt_unix
+            .or(self.last_check_unix)
+            .is_none_or(|previous| timestamp.saturating_sub(previous) >= AUTO_CHECK_INTERVAL_SECONDS)
+    }
+}
+
+fn default_channel() -> String {
+    "stable".to_string()
+}
+
+fn default_automatic_checks() -> bool {
+    true
 }
 
 pub(super) fn refuse_active_runtime_operations(
@@ -172,15 +221,22 @@ pub(super) fn read_config(
     store: &LocalStore,
     metadata: Option<&DistributionMetadata>,
 ) -> UpdateConfig {
-    fs::read(config_path(store))
+    let fallback_channel = metadata
+        .map(|value| value.default_channel.clone())
+        .filter(|value| matches!(value.as_str(), "stable" | "preview"))
+        .unwrap_or_else(default_channel);
+    let mut config = fs::read(config_path(store))
         .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_else(|| UpdateConfig {
-            channel: metadata
-                .map(|value| value.default_channel.clone())
-                .filter(|value| matches!(value.as_str(), "stable" | "preview"))
-                .unwrap_or_else(|| "stable".to_string()),
-        })
+        .and_then(|bytes| serde_json::from_slice::<UpdateConfig>(&bytes).ok())
+        .unwrap_or_else(|| UpdateConfig::new(fallback_channel));
+    if !matches!(config.channel.as_str(), "stable" | "preview") {
+        config.channel = "stable".to_string();
+    }
+    config
+}
+
+pub(super) fn write_config(store: &LocalStore, config: &UpdateConfig) -> anyhow::Result<()> {
+    write_json_atomic(&config_path(store), config)
 }
 
 pub(super) fn config_path(store: &LocalStore) -> PathBuf {
@@ -276,5 +332,13 @@ mod tests {
             validate_source_location("ftp://updates.example.test/release-manifest.json").is_err()
         );
         assert!(validate_source_location(r"C:\Temp\Takokit\release-manifest.json").is_ok());
+    }
+
+    #[test]
+    fn automatic_checks_default_on_but_background_download_defaults_off() {
+        let config: UpdateConfig = serde_json::from_str(r#"{"channel":"stable"}"#).unwrap();
+        assert!(config.automatic_checks);
+        assert!(!config.automatic_download);
+        assert!(config.automatic_check_due(AUTO_CHECK_INTERVAL_SECONDS));
     }
 }
