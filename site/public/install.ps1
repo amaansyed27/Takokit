@@ -117,6 +117,22 @@ function Confirm-ReleaseMetadata {
     }
 }
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = $null
+    $sha256 = $null
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $hash = $sha256.ComputeHash($stream)
+        return ([System.BitConverter]::ToString($hash)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        if ($null -ne $sha256) { $sha256.Dispose() }
+        if ($null -ne $stream) { $stream.Dispose() }
+    }
+}
+
 function Quote-WindowsArgument {
     param([Parameter(Mandatory)][string]$Argument)
     if ($Argument -notmatch '[\s"]') { return $Argument }
@@ -220,7 +236,7 @@ try {
     }
 
     Write-Host 'Verifying download...'
-    $actualSha256 = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actualSha256 = Get-Sha256Hex -Path $installerPath
     if ($actualSha256 -ne $release.installer_sha256) {
         Stop-Install "checksum mismatch. Expected $($release.installer_sha256), got $actualSha256."
     }
