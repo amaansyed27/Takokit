@@ -7,9 +7,11 @@ const scriptUrl = new URL("../public/install.ps1", import.meta.url);
 test("PowerShell bootstrap uses release metadata and the canonical installer", async () => {
   const script = await readFile(scriptUrl, "utf8");
   assert.match(script, /v1\/releases\/stable\/windows-x86_64\.json/);
-  assert.match(script, /Get-FileHash/);
+  assert.match(script, /System\.Security\.Cryptography\.SHA256/);
+  assert.match(script, /ComputeHash/);
   assert.match(script, /SHA-256|sha256/i);
   assert.match(script, /installer\.sha256/);
+  assert.match(script, /checksum mismatch/);
   assert.match(script, /\/VERYSILENT/);
   assert.match(script, /Confirm-InstalledTakokit/);
 });
