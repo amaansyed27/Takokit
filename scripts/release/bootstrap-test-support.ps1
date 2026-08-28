@@ -45,49 +45,91 @@ function Test-LoopbackPort {
 function Start-BootstrapFixtureServer {
     param([Parameter(Mandatory)][string]$Root)
 
-    $python = Get-Command python -ErrorAction SilentlyContinue
-    $pythonArgs = @('-m', 'http.server')
-    if (-not $python) {
-        $python = Get-Command py -ErrorAction SilentlyContinue
-        if (-not $python) { throw 'Python is required only for the local bootstrap test fixture server.' }
-        $pythonArgs = @('-3', '-m', 'http.server')
-    }
-
     $port = Get-FreeLoopbackPort
-    $arguments = @($pythonArgs) + @([string]$port, '--bind', '127.0.0.1', '--directory', $Root)
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $python.Source
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.Arguments = Join-WindowsProcessArguments -Arguments $arguments
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    if ($null -eq $process) { throw 'Failed to start local bootstrap fixture server.' }
+    $job = Start-Job -ArgumentList $Root, $port -ScriptBlock {
+        param([string]$Root, [int]$Port)
+        $ErrorActionPreference = 'Stop'
+        $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+        $listener.Start()
+        try {
+            while ($true) {
+                $client = $listener.AcceptTcpClient()
+                $reader = $null
+                try {
+                    $stream = $client.GetStream()
+                    $reader = [System.IO.StreamReader]::new(
+                        $stream,
+                        [System.Text.Encoding]::ASCII,
+                        $false,
+                        1024,
+                        $true
+                    )
+                    $requestLine = $reader.ReadLine()
+                    if ([string]::IsNullOrWhiteSpace($requestLine)) { continue }
+                    while (($header = $reader.ReadLine()) -ne $null -and $header -ne '') {}
+
+                    $parts = $requestLine.Split(' ')
+                    $status = '200 OK'
+                    $body = [byte[]]@()
+                    $contentType = 'application/octet-stream'
+                    if ($parts.Count -lt 2 -or $parts[0] -ne 'GET') {
+                        $status = '405 Method Not Allowed'
+                    } else {
+                        $urlPath = $parts[1].Split('?')[0]
+                        $decoded = [System.Uri]::UnescapeDataString($urlPath).TrimStart('/')
+                        $relative = $decoded.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+                        $candidate = [System.IO.Path]::GetFullPath((Join-Path $Root $relative))
+                        if (
+                            -not $candidate.StartsWith($rootFull, [StringComparison]::OrdinalIgnoreCase) -or
+                            -not (Test-Path -LiteralPath $candidate -PathType Leaf)
+                        ) {
+                            $status = '404 Not Found'
+                        } else {
+                            $body = [System.IO.File]::ReadAllBytes($candidate)
+                            if ($candidate.EndsWith('.json', [StringComparison]::OrdinalIgnoreCase)) {
+                                $contentType = 'application/json; charset=utf-8'
+                            }
+                        }
+                    }
+
+                    $headerText = "HTTP/1.1 $status`r`nContent-Type: $contentType`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n"
+                    $headerBytes = [System.Text.Encoding]::ASCII.GetBytes($headerText)
+                    $stream.Write($headerBytes, 0, $headerBytes.Length)
+                    if ($body.Length -gt 0) { $stream.Write($body, 0, $body.Length) }
+                    $stream.Flush()
+                } finally {
+                    if ($null -ne $reader) { $reader.Dispose() }
+                    $client.Dispose()
+                }
+            }
+        } finally {
+            $listener.Stop()
+        }
+    }
 
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if ($process.HasExited) {
-            $errorText = $process.StandardError.ReadToEnd()
-            throw "Bootstrap fixture server exited early: $errorText"
+        if ($job.State -eq 'Failed') {
+            $failure = (Receive-Job -Job $job -Keep -ErrorAction SilentlyContinue | Out-String).Trim()
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            throw "Bootstrap fixture server failed: $failure"
         }
         if (Test-LoopbackPort -Port $port) {
-            return [pscustomobject]@{ Process = $process; Port = $port }
+            return [pscustomobject]@{ Job = $job; Port = $port }
         }
         Start-Sleep -Milliseconds 100
     }
-    try { $process.Kill() } catch {}
+    Stop-Job -Job $job -ErrorAction SilentlyContinue
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
     throw 'Timed out starting local bootstrap fixture server.'
 }
 
 function Stop-BootstrapFixtureServer {
     param($Server)
-    if ($null -eq $Server -or $null -eq $Server.Process) { return }
-    if (-not $Server.Process.HasExited) {
-        try { $Server.Process.Kill() } catch {}
-        try { $Server.Process.WaitForExit(5000) } catch {}
-    }
-    $Server.Process.Dispose()
+    if ($null -eq $Server -or $null -eq $Server.Job) { return }
+    Stop-Job -Job $Server.Job -ErrorAction SilentlyContinue
+    Remove-Job -Job $Server.Job -Force -ErrorAction SilentlyContinue
 }
 
 function Get-BootstrapInstallerRecord {
