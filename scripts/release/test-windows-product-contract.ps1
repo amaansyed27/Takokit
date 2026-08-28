@@ -213,7 +213,7 @@ try {
     $versionOutput = & $PortableTako version 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "Portable tako version failed: $versionOutput"
     Assert-True ($versionOutput -match '(?m)^distribution:\s+portable\s*$') 'Portable CLI did not identify itself as portable.'
-    $rvcOutput = & $PortableTako voice rvc presets 2>&1 | Out-String
+    $rvcOutput = & $PortableTako --direct voice rvc presets 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "Packaged RVC command failed without repository/toolchain PATH: $rvcOutput"
     $env:Path = $OriginalProcessPath
     Set-Location $OriginalLocation
