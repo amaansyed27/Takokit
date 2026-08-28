@@ -52,6 +52,34 @@ function Invoke-InnoInstaller {
     }
 }
 
+function Invoke-InnoUninstaller {
+    param(
+        [Parameter(Mandatory)][string]$Uninstaller,
+        [Parameter(Mandatory)][string]$LogPath
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Uninstaller
+    $startInfo.UseShellExecute = $false
+    foreach ($argument in @(
+        '/VERYSILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        "/LOG=$LogPath"
+    )) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "Failed to start uninstaller: $Uninstaller"
+    }
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        throw "$Uninstaller failed with exit code $($process.ExitCode). See Inno log: $LogPath"
+    }
+}
+
 function Invoke-ExpectFailure {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -103,6 +131,30 @@ function Get-PathEntryCount {
             ForEach-Object { $_.Trim().TrimEnd('\') } |
             Where-Object { $_ -and [string]::Equals($_, $normalizedEntry, [StringComparison]::OrdinalIgnoreCase) }
     ).Count
+}
+
+function Wait-UninstallCompletion {
+    param(
+        [Parameter(Mandatory)][string]$InstalledTako,
+        [Parameter(Mandatory)][string]$InstalledBin,
+        [Parameter(Mandatory)][string]$GuiShortcutPath,
+        [Parameter(Mandatory)][string]$TuiShortcutPath,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $cliGone = -not (Test-Path -LiteralPath $InstalledTako)
+        $pathGone = (Get-PathEntryCount (Get-UserPath) $InstalledBin) -eq 0
+        $guiShortcutGone = -not (Test-Path -LiteralPath $GuiShortcutPath)
+        $tuiShortcutGone = -not (Test-Path -LiteralPath $TuiShortcutPath)
+        if ($cliGone -and $pathGone -and $guiShortcutGone -and $tuiShortcutGone) {
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    throw "Timed out waiting for Inno uninstall completion (cliGone=$cliGone, pathGone=$pathGone, guiShortcutGone=$guiShortcutGone, tuiShortcutGone=$tuiShortcutGone)."
 }
 
 function Copy-FreshInstalledTree {
@@ -339,10 +391,14 @@ try {
 
     $Uninstaller = Join-Path $InstallRoot 'unins000.exe'
     Assert-True (Test-Path -LiteralPath $Uninstaller -PathType Leaf) 'Takokit uninstaller is missing.'
-    Invoke-Checked $Uninstaller '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
-    Start-Sleep -Milliseconds 500
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe'))) 'Uninstall left the installed CLI behind.'
+    $UninstallLog = Join-Path $OutputRoot 'installer-acceptance-uninstall.log'
+    Invoke-InnoUninstaller -Uninstaller $Uninstaller -LogPath $UninstallLog
+    $InstalledTako = Join-Path $InstalledBin 'tako.exe'
+    Wait-UninstallCompletion -InstalledTako $InstalledTako -InstalledBin $InstalledBin -GuiShortcutPath $GuiShortcutPath -TuiShortcutPath $TuiShortcutPath
+    Assert-True (-not (Test-Path -LiteralPath $InstalledTako)) 'Uninstall left the installed CLI behind.'
     Assert-True ((Get-PathEntryCount (Get-UserPath) $InstalledBin) -eq 0) 'Uninstall left the Takokit PATH entry behind.'
+    Assert-True (-not (Test-Path -LiteralPath $GuiShortcutPath)) 'Uninstall left the GUI Start Menu shortcut behind.'
+    Assert-True (-not (Test-Path -LiteralPath $TuiShortcutPath)) 'Uninstall left the TUI Start Menu shortcut behind.'
     $Report.installer_uninstall = $true
     Assert-True (Test-Path -LiteralPath $Sentinel -PathType Leaf) 'Normal uninstall deleted TAKOKIT_HOME user data.'
     $Report.uninstall_preserved_takokit_home = $true
