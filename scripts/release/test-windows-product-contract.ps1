@@ -96,6 +96,18 @@ function Wait-ManagedDaemon {
     throw "Timed out waiting for managed daemon at $infoPath"
 }
 
+function Wait-DaemonStopped {
+    param([uint32]$ProcessId, [string]$HostName, [int]$Port, [int]$TimeoutSeconds = 20)
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ((-not (Test-ProcessAlive $ProcessId)) -and (-not (Test-TcpPort -HostName $HostName -Port $Port))) {
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "Timed out waiting for managed daemon $ProcessId to stop and release $HostName`:$Port."
+}
+
 function Wait-InstalledUninstall {
     param(
         [string]$InstalledTako,
@@ -140,6 +152,51 @@ function Verify-Sha256Sums {
     }
 }
 
+function Invoke-TakoGui {
+    param(
+        [string]$TakoExe,
+        [string]$Workspace,
+        [string]$WorkingDirectory
+    )
+    $oldPath = $env:Path
+    $oldLocation = Get-Location
+    try {
+        $env:Path = "$env:WINDIR\System32;$env:WINDIR;$env:WINDIR\System32\Wbem"
+        Set-Location $WorkingDirectory
+        $output = & $TakoExe gui --workspace $Workspace 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            throw "tako gui failed from $WorkingDirectory`: $output"
+        }
+        Assert-True ($output -match 'Takokit local web GUI') "tako gui did not report the localhost GUI URL: $output"
+        return $output.Trim()
+    } finally {
+        $env:Path = $oldPath
+        Set-Location $oldLocation
+    }
+}
+
+function Assert-GuiServed {
+    param([string]$HostName, [int]$Port)
+    $guiUrl = "http://${HostName}:$Port/gui"
+    $response = Invoke-WebRequest -Uri $guiUrl -UseBasicParsing
+    Assert-True ($response.StatusCode -eq 200) "Packaged GUI returned HTTP $($response.StatusCode)."
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$response.Content)) 'Packaged GUI returned an empty index document.'
+
+    $assetPath = @(
+        [regex]::Matches([string]$response.Content, '(?:src|href)="([^"]+)"') |
+            ForEach-Object { $_.Groups[1].Value } |
+            Where-Object { $_ -like '/gui/assets/*' }
+    ) | Select-Object -First 1
+    Assert-True (-not [string]::IsNullOrWhiteSpace($assetPath)) 'Packaged GUI index did not reference a /gui/assets production asset.'
+    $assetResponse = Invoke-WebRequest -Uri "http://${HostName}:$Port$assetPath" -UseBasicParsing
+    Assert-True ($assetResponse.StatusCode -eq 200) "Packaged GUI asset $assetPath returned HTTP $($assetResponse.StatusCode)."
+    Assert-True ([string]$assetResponse.Content -ne '') "Packaged GUI asset $assetPath was empty."
+
+    $identity = Invoke-RestMethod -Uri "http://${HostName}:$Port/v1/daemon/identity"
+    Assert-True ($null -ne $identity) 'Packaged GUI daemon/API identity endpoint did not respond.'
+    return $guiUrl
+}
+
 $Installer = Join-Path $OutputRoot "Takokit-v$Version-windows-x86_64-installer.exe"
 $PortableZip = Join-Path $OutputRoot "Takokit-v$Version-windows-x86_64.zip"
 foreach ($required in @($Installer, $PortableZip)) {
@@ -157,12 +214,14 @@ $TuiShortcutPath = Join-Path $StartMenu 'Takokit (TUI).lnk'
 $DefaultHome = Join-Path $HOME '.takokit'
 $DefaultHomeExisted = Test-Path -LiteralPath $DefaultHome
 $DefaultSentinel = Join-Path $DefaultHome ("slice4-preserve-" + [Guid]::NewGuid().ToString('N') + '.txt')
-$GuiProcess = $null
 $Report = [ordered]@{
     sha256sums_verified = $false
     packaged_product = $false
     rvc_resources_packaged = $false
     portable_side_effects = $false
+    portable_gui_served = $false
+    gui_cli_launch = $false
+    gui_web_assets = $false
     gui_safe_workspace = $false
     installed_daemon_owned = $false
     uninstall_daemon_cleanup = $false
@@ -185,7 +244,6 @@ try {
     $PortableRoot = $PortableFolder.FullName
     $PortableTako = Join-Path $PortableRoot 'bin\tako.exe'
     foreach ($relative in @(
-        'Takokit.exe',
         'bin\tako.exe',
         'bin\takokit.exe',
         'bin\takokit-updater.exe',
@@ -200,13 +258,15 @@ try {
         $path = Join-Path $PortableRoot $relative
         Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Packaged product resource is missing: $relative"
     }
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $PortableRoot 'Takokit.exe'))) 'Portable package still contains the removed native desktop wrapper.'
     $Report.packaged_product = $true
     $Report.rvc_resources_packaged = $true
 
     $PortableUserPathBefore = Get-UserPath
     $OutsideRepo = Join-Path $TempRoot 'outside-repository'
     $PortableHome = Join-Path $TempRoot 'portable-home'
-    New-Item -ItemType Directory -Force -Path $OutsideRepo | Out-Null
+    $PortableWorkspace = Join-Path $TempRoot 'Portable Workspace ü'
+    New-Item -ItemType Directory -Force -Path $OutsideRepo, $PortableWorkspace | Out-Null
     Set-Location $OutsideRepo
     $env:TAKOKIT_HOME = $PortableHome
     $env:Path = "$env:WINDIR\System32;$env:WINDIR;$env:WINDIR\System32\Wbem"
@@ -216,6 +276,28 @@ try {
     $rvcOutput = & $PortableTako --direct voice rvc presets 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "Packaged RVC command failed without repository/toolchain PATH: $rvcOutput"
     $env:Path = $OriginalProcessPath
+
+    $PortableUnsafeTakoPaths = @(
+        (Join-Path $PortableRoot '.tako'),
+        (Join-Path $HOME '.tako'),
+        (Join-Path $env:WINDIR 'System32\.tako'),
+        (Join-Path $OutsideRepo '.tako')
+    )
+    foreach ($unsafe in $PortableUnsafeTakoPaths) {
+        Assert-True (-not (Test-Path -LiteralPath $unsafe)) "Portable GUI unsafe .tako precondition failed: $unsafe already exists."
+    }
+    $portableGuiOutput = Invoke-TakoGui -TakoExe $PortableTako -Workspace $PortableWorkspace -WorkingDirectory $OutsideRepo
+    $portableDaemon = Wait-ManagedDaemon -TakokitHome $PortableHome
+    $portableGuiUrl = Assert-GuiServed -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
+    Assert-True ($portableGuiOutput.Contains($portableGuiUrl)) 'Portable tako gui output did not contain the served GUI URL.'
+    foreach ($unsafe in $PortableUnsafeTakoPaths) {
+        Assert-True (-not (Test-Path -LiteralPath $unsafe)) "Portable GUI launch created unsafe workspace state: $unsafe"
+    }
+    $portableStop = & $PortableTako daemon stop 2>&1 | Out-String
+    Assert-True ($LASTEXITCODE -eq 0) "Portable daemon stop failed: $portableStop"
+    Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
+    $Report.portable_gui_served = $true
+
     Set-Location $OriginalLocation
     Assert-True ([string]::Equals($PortableUserPathBefore, (Get-UserPath), [StringComparison]::Ordinal)) 'Portable execution modified user PATH.'
     Assert-True (-not (Test-Path -LiteralPath $StartMenu)) 'Portable execution created Start Menu entries.'
@@ -223,7 +305,7 @@ try {
     Assert-True (@(Get-ChildItem -LiteralPath $PortableRoot -Filter 'unins*.exe' -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Portable tree contains an installer-managed uninstaller.'
     $Report.portable_side_effects = $true
 
-    # Install again and prove the real desktop launch uses packaged binaries, owns a daemon,
+    # Install and prove the real CLI-launched web GUI uses packaged binaries/assets,
     # avoids unsafe inherited workspace locations, and is fully cleaned up by uninstall.
     Remove-Item Env:TAKOKIT_HOME -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $DefaultHome | Out-Null
@@ -242,8 +324,16 @@ try {
         "/DIR=$InstallRoot", "/LOG=$InstallLog"
     )
     $InstalledTako = Join-Path $InstalledBin 'tako.exe'
-    Assert-True (Test-Path -LiteralPath $InstalledTako -PathType Leaf) 'Contract install is missing bin\tako.exe.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe') -PathType Leaf) 'Contract install is missing root Takokit.exe.'
+    foreach ($relative in @(
+        'bin\tako.exe',
+        'bin\takokit.exe',
+        'bin\takokit-updater.exe',
+        'resources\gui\index.html',
+        'resources\registry\index.json'
+    )) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot $relative) -PathType Leaf) "Contract install is missing $relative."
+    }
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe'))) 'Contract install still contains the removed native desktop wrapper.'
     Assert-True ((Get-PathEntryCount (Get-UserPath) $InstalledBin) -eq 1) 'Contract install did not register exactly one owned PATH entry.'
     Assert-True (Test-Path -LiteralPath $GuiShortcutPath -PathType Leaf) 'Contract install is missing GUI Start Menu shortcut.'
     Assert-True (Test-Path -LiteralPath $TuiShortcutPath -PathType Leaf) 'Contract install is missing TUI Start Menu shortcut.'
@@ -252,11 +342,17 @@ try {
     $Shell = New-Object -ComObject WScript.Shell
     $GuiShortcut = $Shell.CreateShortcut($GuiShortcutPath)
     $TuiShortcut = $Shell.CreateShortcut($TuiShortcutPath)
-    $ExpectedGuiTarget = Join-Path $InstallRoot 'Takokit.exe'
-    $ExpectedTuiTarget = Join-Path $InstalledBin 'tako.exe'
-    Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedGuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut target is not the packaged desktop executable.'
+    $ExpectedGuiTarget = $InstalledTako
+    $ExpectedTuiTarget = $InstalledTako
+    $ExpectedDocuments = [Environment]::GetFolderPath('MyDocuments')
+    $ExpectedWorkspace = Join-Path $ExpectedDocuments 'Takokit'
+    Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedGuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the packaged CLI executable.'
+    Assert-True ($GuiShortcut.Arguments -match '(^|\s)gui(\s|$)') 'GUI shortcut does not invoke the gui command.'
+    Assert-True ($GuiShortcut.Arguments -match '--workspace') 'GUI shortcut has no deliberate workspace argument.'
+    Assert-True ($GuiShortcut.Arguments.Contains($ExpectedWorkspace)) "GUI shortcut workspace is not the safe Documents/Takokit path: $($GuiShortcut.Arguments)"
     Assert-True ([string]::Equals($TuiShortcut.TargetPath, $ExpectedTuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut target is not the packaged CLI executable.'
     Assert-True ($TuiShortcut.Arguments -match '--workspace') 'TUI shortcut has no deliberate workspace argument.'
+    Assert-True ($TuiShortcut.Arguments.Contains($ExpectedWorkspace)) "TUI shortcut workspace is not the safe Documents/Takokit path: $($TuiShortcut.Arguments)"
 
     $GuiWorkingDir = $GuiShortcut.WorkingDirectory
     Assert-True (-not [string]::IsNullOrWhiteSpace($GuiWorkingDir)) 'GUI shortcut has no working directory.'
@@ -271,20 +367,19 @@ try {
         Assert-True (-not (Test-Path -LiteralPath $unsafe)) "Unsafe .tako precondition failed: $unsafe already exists."
     }
 
-    $GuiProcess = Start-Process -FilePath $ExpectedGuiTarget -WorkingDirectory $GuiWorkingDir -PassThru
+    $guiOutput = Invoke-TakoGui -TakoExe $ExpectedGuiTarget -Workspace $ExpectedWorkspace -WorkingDirectory $GuiWorkingDir
     $daemon = Wait-ManagedDaemon -TakokitHome $DefaultHome
-    $GuiProcess.Refresh()
-    Assert-True (-not $GuiProcess.HasExited) 'Packaged Takokit desktop exited during first launch.'
+    $guiUrl = Assert-GuiServed -HostName ([string]$daemon.host) -Port ([int]$daemon.port)
+    Assert-True ($guiOutput.Contains($guiUrl)) 'Installed tako gui output did not contain the served GUI URL.'
     foreach ($unsafe in $UnsafeTakoPaths) {
         Assert-True (-not (Test-Path -LiteralPath $unsafe)) "GUI launch created unsafe workspace state: $unsafe"
     }
+    $Report.gui_cli_launch = $true
+    $Report.gui_web_assets = $true
     $Report.gui_safe_workspace = $true
     $Report.installed_daemon_owned = $true
 
-    Stop-Process -Id $GuiProcess.Id -Force -ErrorAction SilentlyContinue
-    $GuiProcess = $null
-    Start-Sleep -Milliseconds 500
-    Assert-True (Test-ProcessAlive ([uint32]$daemon.pid)) 'Managed daemon did not remain available after closing the desktop shell.'
+    Assert-True (Test-ProcessAlive ([uint32]$daemon.pid)) 'Managed daemon did not remain available after tako gui returned.'
     Assert-True (Test-TcpPort -HostName ([string]$daemon.host) -Port ([int]$daemon.port)) 'Managed daemon port was not available before uninstall.'
 
     $Uninstaller = Join-Path $InstallRoot 'unins000.exe'
@@ -321,9 +416,6 @@ try {
     )
     Write-Host ($Report | ConvertTo-Json -Depth 6)
 } finally {
-    if ($null -ne $GuiProcess) {
-        Stop-Process -Id $GuiProcess.Id -Force -ErrorAction SilentlyContinue
-    }
     $env:Path = $OriginalProcessPath
     Set-Location $OriginalLocation
     if ($null -eq $OriginalTakokitHome) {

@@ -1,5 +1,4 @@
 /target/
-/apps/desktop/target/
 /apps/gui/node_modules/
 /apps/gui/dist/
 /.takokit/

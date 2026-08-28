@@ -37,7 +37,6 @@ jobs:
         with:
           workspaces: |
             . -> target
-            apps/desktop -> target
 
       - name: Install Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -59,8 +58,6 @@ jobs:
         run: |
           cargo fmt --all -- --check
           if ($LASTEXITCODE -ne 0) { throw 'Core Rust formatting check failed.' }
-          cargo fmt --manifest-path apps/desktop/Cargo.toml -- --check
-          if ($LASTEXITCODE -ne 0) { throw 'Desktop Rust formatting check failed.' }
 
       - name: Check locked core workspace
         run: cargo check --workspace --all-targets --locked

@@ -10,7 +10,6 @@ members = [
   "crates/takokit-server",
   "crates/takokit-store",
 ]
-exclude = ["apps/desktop"]
 resolver = "2"
 
 [workspace.package]

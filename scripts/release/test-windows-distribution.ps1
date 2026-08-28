@@ -273,6 +273,7 @@ try {
     $PortableFolder = Get-ChildItem -LiteralPath $PortableExtract -Directory | Select-Object -First 1
     Assert-True ($null -ne $PortableFolder) 'Portable ZIP did not contain a top-level Takokit directory.'
     $PortableTako = Join-Path $PortableFolder.FullName 'bin\tako.exe'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $PortableFolder.FullName 'Takokit.exe'))) 'Portable ZIP still contains the removed native desktop wrapper.'
     $env:TAKOKIT_HOME = Join-Path $TempRoot 'portable-home'
     $portableVersion = Get-TakoVersion $PortableTako
     Assert-True ($portableVersion.Version -eq $Version) "Portable version mismatch: $($portableVersion.Version)"
@@ -355,7 +356,8 @@ try {
     Invoke-InnoInstaller -Installer $Installer -InstallRoot $InstallRoot -LogPath $InstallLog
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe') -PathType Leaf) 'Installer did not install the desktop shell.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-updater.exe') -PathType Leaf) 'Installer did not install takokit-updater.exe.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe'))) 'Installer still installed the removed native desktop wrapper.'
     $installedVersion = Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')
     Assert-True ($installedVersion.Version -eq $Version) "Installed version mismatch: $($installedVersion.Version)"
     Assert-True ($installedVersion.Output -match '(?m)^distribution:\s+installed\s*$') 'Installed CLI did not report distribution: installed.'
@@ -373,10 +375,14 @@ try {
     $Shell = New-Object -ComObject WScript.Shell
     $GuiShortcut = $Shell.CreateShortcut($GuiShortcutPath)
     $TuiShortcut = $Shell.CreateShortcut($TuiShortcutPath)
-    Assert-True ([string]::Equals($GuiShortcut.TargetPath, (Join-Path $InstallRoot 'Takokit.exe'), [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the installed desktop shell.'
     $ExpectedDocuments = [Environment]::GetFolderPath('MyDocuments')
     $ExpectedWorkspace = Join-Path $ExpectedDocuments 'Takokit'
-    Assert-True ([string]::Equals($TuiShortcut.TargetPath, (Join-Path $InstalledBin 'tako.exe'), [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut does not target the installed tako.exe.'
+    $ExpectedTako = Join-Path $InstalledBin 'tako.exe'
+    Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedTako, [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the installed tako.exe.'
+    Assert-True ($GuiShortcut.Arguments -match '(^|\s)gui(\s|$)') 'GUI shortcut does not invoke tako gui.'
+    Assert-True ($GuiShortcut.Arguments -match '--workspace') 'GUI shortcut does not pass an explicit workspace.'
+    Assert-True ($GuiShortcut.Arguments.Contains($ExpectedWorkspace)) "GUI shortcut workspace is not the safe Documents/Takokit path: $($GuiShortcut.Arguments)"
+    Assert-True ([string]::Equals($TuiShortcut.TargetPath, $ExpectedTako, [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut does not target the installed tako.exe.'
     Assert-True ($TuiShortcut.Arguments -match '--workspace') 'TUI shortcut does not pass an explicit workspace.'
     Assert-True ($TuiShortcut.Arguments.Contains($ExpectedWorkspace)) "TUI shortcut workspace is not the safe Documents/Takokit path: $($TuiShortcut.Arguments)"
     $Report.installer_shortcut_workspace = $true

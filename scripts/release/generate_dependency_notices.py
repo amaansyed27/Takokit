@@ -16,13 +16,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def cargo_metadata(manifest: Path | None = None) -> dict:
-    command = ["cargo", "metadata", "--format-version", "1", "--locked"]
-    if manifest is not None:
-        command += ["--manifest-path", str(manifest)]
+def cargo_metadata() -> dict:
     return json.loads(
         subprocess.check_output(
-            command,
+            ["cargo", "metadata", "--format-version", "1", "--locked"],
             cwd=ROOT,
             text=True,
             encoding="utf-8",
@@ -74,7 +71,10 @@ def dedupe(rows: list[tuple[str, str, str, str]]) -> list[tuple[str, str, str, s
 
 
 def markdown_table(rows: list[tuple[str, str, str, str]]) -> list[str]:
-    lines = ["| Package | Version | Declared license | Source |", "| --- | --- | --- | --- |"]
+    lines = [
+        "| Package | Version | Declared license | Source |",
+        "| --- | --- | --- | --- |",
+    ]
     for name, version, license_id, source in dedupe(rows):
         safe_source = source.replace("|", "%7C")
         lines.append(f"| `{name}` | `{version}` | `{license_id}` | {safe_source} |")
@@ -87,11 +87,6 @@ def main() -> None:
     args = parser.parse_args()
 
     rust = rust_dependencies(cargo_metadata())
-    desktop_lock = ROOT / "apps" / "desktop" / "Cargo.lock"
-    desktop_manifest = ROOT / "apps" / "desktop" / "Cargo.toml"
-    if desktop_manifest.is_file() and desktop_lock.is_file():
-        rust += rust_dependencies(cargo_metadata(desktop_manifest))
-
     npm = npm_dependencies(ROOT / "apps" / "gui" / "package-lock.json")
 
     lines = [

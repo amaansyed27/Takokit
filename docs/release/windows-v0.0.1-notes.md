@@ -5,8 +5,9 @@ Takokit 0.0.1 is the first Windows distribution candidate that is intended to be
 ## Included
 
 - `tako.exe` CLI and Ratatui TUI
-- managed `takokit.exe` daemon
-- packaged Takokit desktop GUI
+- managed `takokit.exe` daemon/API
+- packaged React web GUI served locally by the Takokit daemon and opened with `tako gui`
+- `takokit-updater.exe` staged updater helper
 - canonical model/runner registry
 - managed runner and Python-adapter bootstrap architecture
 - TTS, STT, voice cloning and conversion flows from Slices 1–2
@@ -15,6 +16,8 @@ Takokit 0.0.1 is the first Windows distribution candidate that is intended to be
 - provider-aware durable checkpoint ownership and safe storage cleanup
 - reset/uninstall safety contracts
 - signed release metadata and staged Windows updater
+
+The Windows package does not include a separate native desktop/WebView host. The GUI is the existing React application served at the local daemon `/gui` route and opened in the user's default browser.
 
 ## Test-signing notice
 
