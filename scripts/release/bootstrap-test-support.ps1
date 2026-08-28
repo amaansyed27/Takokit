@@ -69,7 +69,9 @@ function Start-BootstrapFixtureServer {
             while ($true) {
                 $client = $listener.AcceptTcpClient()
                 $reader = $null
+                $file = $null
                 try {
+                    $client.NoDelay = $true
                     $stream = $client.GetStream()
                     $reader = [System.IO.StreamReader]::new(
                         $stream,
@@ -84,7 +86,8 @@ function Start-BootstrapFixtureServer {
 
                     $parts = $requestLine.Split(' ')
                     $status = '200 OK'
-                    $body = [byte[]]@()
+                    $candidate = $null
+                    $contentLength = [long]0
                     $contentType = 'application/octet-stream'
                     if ($parts.Count -lt 2 -or $parts[0] -ne 'GET') {
                         $status = '405 Method Not Allowed'
@@ -98,20 +101,28 @@ function Start-BootstrapFixtureServer {
                             -not (Test-Path -LiteralPath $candidate -PathType Leaf)
                         ) {
                             $status = '404 Not Found'
+                            $candidate = $null
                         } else {
-                            $body = [System.IO.File]::ReadAllBytes($candidate)
+                            $contentLength = (Get-Item -LiteralPath $candidate).Length
                             if ($candidate.EndsWith('.json', [StringComparison]::OrdinalIgnoreCase)) {
                                 $contentType = 'application/json; charset=utf-8'
                             }
                         }
                     }
 
-                    $headerText = "HTTP/1.1 $status`r`nContent-Type: $contentType`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n"
+                    $headerText = "HTTP/1.1 $status`r`nContent-Type: $contentType`r`nContent-Length: $contentLength`r`nConnection: close`r`n`r`n"
                     $headerBytes = [System.Text.Encoding]::ASCII.GetBytes($headerText)
                     $stream.Write($headerBytes, 0, $headerBytes.Length)
-                    if ($body.Length -gt 0) { $stream.Write($body, 0, $body.Length) }
+                    if ($null -ne $candidate) {
+                        $file = [System.IO.File]::OpenRead($candidate)
+                        $buffer = New-Object byte[] 65536
+                        while (($read = $file.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                            $stream.Write($buffer, 0, $read)
+                        }
+                    }
                     $stream.Flush()
                 } finally {
+                    if ($null -ne $file) { $file.Dispose() }
                     if ($null -ne $reader) { $reader.Dispose() }
                     $client.Dispose()
                 }
@@ -233,7 +244,7 @@ function Invoke-BootstrapScriptProcess {
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $arguments = [System.Collections.Generic.List[string]]::new()
-    foreach ($argument in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $BootstrapScript,
+    foreach ($argument in @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $BootstrapScript,
         '-ReleaseMetadataUrl', $MetadataUrl, '-AllowTestFixture', '-AllowInsecureLoopbackForTesting')) {
         $arguments.Add($argument)
     }
@@ -246,6 +257,8 @@ function Invoke-BootstrapScriptProcess {
         $arguments.Add($ArchitectureOverride)
     }
     $startInfo.Arguments = Join-WindowsProcessArguments -Arguments $arguments.ToArray()
+    $startInfo.EnvironmentVariables['NO_PROXY'] = '127.0.0.1,localhost'
+    $startInfo.EnvironmentVariables['no_proxy'] = '127.0.0.1,localhost'
     if ($TempDirectory) {
         $startInfo.EnvironmentVariables['TEMP'] = $TempDirectory
         $startInfo.EnvironmentVariables['TMP'] = $TempDirectory
