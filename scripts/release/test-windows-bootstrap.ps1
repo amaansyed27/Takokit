@@ -137,7 +137,9 @@ try {
 
     $failingName = 'Takokit-v9.9.9-windows-x86_64-installer.exe'
     $failingExe = Join-Path $FixtureRoot $failingName
-    Add-Type -TypeDefinition 'public static class BootstrapFailure { public static int Main(string[] args) { return 42; } }' -OutputAssembly $failingExe -OutputType ConsoleApplication
+    $failingSource = Join-Path $env:SystemRoot 'System32\where.exe'
+    Assert-BootstrapTest (Test-Path -LiteralPath $failingSource -PathType Leaf) 'Windows where.exe fixture source is missing.'
+    Copy-Item -LiteralPath $failingSource -Destination $failingExe -Force
     $failingHash = (Get-FileHash -LiteralPath $failingExe -Algorithm SHA256).Hash.ToLowerInvariant()
 
     $Server = Start-BootstrapFixtureServer -Root $FixtureRoot
@@ -176,7 +178,7 @@ try {
     Assert-BootstrapTest (($invalidTrust.StdOut + $invalidTrust.StdErr) -match 'invalid trust identity') 'Invalid test trust state was not rejected.'
 
     $installerFailure = Invoke-Case -Name 'installer failure' -MetadataPath $failingInstallerMetadata -CaseInstallRoot $BadHashInstallRoot -ExpectFailure
-    Assert-BootstrapTest (($installerFailure.StdOut + $installerFailure.StdErr) -match 'exit code 42') 'Installer failure code was not propagated.'
+    Assert-BootstrapTest (($installerFailure.StdOut + $installerFailure.StdErr) -match 'installer failed with exit code') 'Installer failure code was not propagated.'
     $Report.installer_failure_propagated = $true
 
     $first = Invoke-Case -Name 'valid install' -MetadataPath $validMetadata -CaseInstallRoot $InstallRoot
