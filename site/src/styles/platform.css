@@ -6,8 +6,8 @@
 
 .platform-install {
   width: 100%;
-  max-width: 720px;
-  margin-block: 1.5rem;
+  max-width: 760px;
+  margin-block: 1.5rem 3rem;
   border-block: 1px solid var(--line);
   padding-block: 1.25rem;
 }
@@ -19,7 +19,8 @@
   gap: 1rem;
 }
 
-.platform-install h2 {
+.platform-install h2,
+.windows-download h2 {
   margin-bottom: 0;
   font-size: clamp(1.2rem, 3vw, 1.65rem);
   letter-spacing: -0.025em;
@@ -32,11 +33,12 @@
 }
 
 .platform-switcher button {
-  min-height: 38px;
+  min-height: 42px;
   border: 0;
   border-bottom: 3px solid transparent;
-  padding: 0.45rem 0.7rem;
+  padding: 0.55rem 0.8rem;
   background: transparent;
+  color: var(--ink);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -46,6 +48,10 @@
   font-weight: 750;
 }
 
+.platform-panel {
+  min-height: 150px;
+}
+
 .platform-install-label {
   margin: 1rem 0 0;
   color: var(--ink-soft);
@@ -53,15 +59,80 @@
   font-weight: 700;
 }
 
-.platform-install .command-bar {
+.platform-install .command-bar,
+.windows-download .command-bar {
   margin-block: 0.65rem;
 }
 
-.platform-install-note {
-  max-width: 660px;
+.platform-install-note,
+.windows-download__security,
+.windows-download__requirement {
+  max-width: 680px;
   margin-bottom: 0;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.platform-unavailable {
+  margin-block: 0.9rem 0.5rem;
+  border-left: 3px solid var(--line-strong, var(--line));
+  padding: 0.65rem 0.8rem;
+  color: var(--ink-soft);
+}
+
+.windows-download {
+  max-width: 760px;
+  margin-block: 2rem 3rem;
+}
+
+.windows-download .eyebrow {
+  margin-bottom: 0.4rem;
+}
+
+.download-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-block: 1.4rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.download-divider::before,
+.download-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+  content: "";
+}
+
+.download-primary {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ink);
+  padding: 0.7rem 1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.download-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.download-primary:disabled {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.windows-download__requirement {
+  margin-top: 0.85rem;
 }
 
 .hero-quickstart {
@@ -84,6 +155,10 @@
   }
 
   .platform-switcher {
+    width: 100%;
+  }
+
+  .download-primary {
     width: 100%;
   }
 }

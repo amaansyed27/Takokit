@@ -1,41 +1,72 @@
+import { useEffect, useState } from "react";
 import { CommandBar } from "../components/CommandBar";
 import { PlatformInstall } from "../components/PlatformInstall";
+import { installCommand } from "../lib/platform";
+
+const WINDOWS_RELEASE_ENDPOINT = "/v1/releases/stable/windows-x86_64.json";
 
 export function DownloadPage() {
+  const [release, setRelease] = useState({ status: "checking", version: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const response = await fetch(WINDOWS_RELEASE_ENDPOINT, {
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) throw new Error("stable release unavailable");
+        const metadata = await response.json();
+        if (
+          metadata?.channel !== "stable" ||
+          metadata?.platform !== "windows" ||
+          metadata?.architecture !== "x86_64" ||
+          metadata?.test_fixture !== false
+        ) {
+          throw new Error("stable release metadata is invalid");
+        }
+        if (!cancelled) setRelease({ status: "ready", version: metadata.version });
+      } catch {
+        if (!cancelled) setRelease({ status: "unavailable", version: null });
+      }
+    };
+    check();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <main className="shell page download-page">
       <header className="compact-page-head">
-        <p className="eyebrow">Initial public testing</p>
-        <h1>Install Takokit</h1>
-        <p>Takokit detects your platform and shows the correct PowerShell or shell command. Until signed release packages are published, this installer performs the documented source build and installs the resulting binary to your user account.</p>
+        <p className="eyebrow">Windows distribution</p>
+        <h1>Download Takokit</h1>
+        <p>Install the same canonical Takokit application either from PowerShell or with the normal Windows installer.</p>
       </header>
 
       <PlatformInstall heading="Install for your machine" />
 
-      <div className="platform-tabs" aria-label="Platform installation details">
-        <section>
-          <span>Windows</span>
-          <h2>User installation</h2>
-          <p>The PowerShell installer places <code>tako.exe</code> in <code>%LOCALAPPDATA%\Takokit\bin</code> and adds that directory to your user PATH.</p>
-          <CommandBar>tako doctor</CommandBar>
-        </section>
-        <section>
-          <span>Linux</span>
-          <h2>User installation</h2>
-          <p>The shell installer places <code>tako</code> in <code>~/.local/bin</code>. Add that directory to PATH when your distribution does not include it automatically.</p>
-          <CommandBar>tako doctor</CommandBar>
-        </section>
-        <section>
-          <span>macOS</span>
-          <h2>User installation</h2>
-          <p>The shell installer places <code>tako</code> in <code>~/.local/bin</code>. The current path is source-built and does not imply signed or notarized packaging.</p>
-          <CommandBar>tako doctor</CommandBar>
-        </section>
-      </div>
+      <section className="windows-download" aria-labelledby="windows-download-heading">
+        <p className="eyebrow">Windows x86_64</p>
+        <h2 id="windows-download-heading">PowerShell</h2>
+        <CommandBar label="Takokit PowerShell installer command">{installCommand("windows")}</CommandBar>
+        <p className="windows-download__security">The bootstrap resolves Takokit stable release metadata, verifies the installer SHA-256, then runs the same Inno Setup installer used by the download button.</p>
+
+        <div className="download-divider" aria-hidden="true"><span>or</span></div>
+
+        {release.status === "ready" ? (
+          <a className="download-primary" href="/download/windows">
+            Download for Windows{release.version ? ` · v${release.version}` : ""}
+          </a>
+        ) : (
+          <button className="download-primary" type="button" disabled aria-disabled="true">
+            {release.status === "checking" ? "Checking Windows release…" : "Windows stable release not published yet"}
+          </button>
+        )}
+        <p className="windows-download__requirement">Windows 10 or Windows 11 · x86_64 · Microsoft Edge WebView2 Runtime required for the desktop GUI.</p>
+      </section>
 
       <aside className="truth-note">
-        <h2>Current installer status</h2>
-        <p>The <code>irm</code> and <code>curl</code> commands are real and platform-aware, but they currently require Git, Rust stable, Node.js LTS, and npm because signed prebuilt artifacts are not published yet. The scripts can later switch to release archives without changing the homepage commands.</p>
+        <h2>Release status</h2>
+        <p>Linux and macOS installers are not published yet. The Windows stable endpoint also fails closed until an approved stable release with production release-signing identity is published.</p>
       </aside>
     </main>
   );

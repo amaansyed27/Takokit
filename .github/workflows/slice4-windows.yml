@@ -44,7 +44,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/gui/package-lock.json
+          cache-dependency-path: |
+            apps/gui/package-lock.json
+            site/package-lock.json
 
       - name: Validate release versions
         run: python scripts/check_release_version.py
@@ -73,6 +75,22 @@ jobs:
       - name: Audit production GUI dependencies
         working-directory: apps/gui
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Install companion site dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Test companion install and release routes
+        working-directory: site
+        run: npm test
+
+      - name: Validate companion site contracts
+        working-directory: site
+        run: npm run validate
+
+      - name: Build companion site
+        working-directory: site
+        run: npm run build
 
       - name: Provision verified Inno Setup 7.1.0
         shell: pwsh
@@ -154,13 +172,31 @@ jobs:
             throw
           }
 
+      - name: Run PowerShell bootstrap acceptance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            & ./scripts/release/test-windows-bootstrap.ps1 -OutputRoot 'dist/windows-ci'
+          } catch {
+            $failure = ($_ | Out-String).Trim()
+            New-Item -ItemType Directory -Force -Path 'dist/windows-ci' | Out-Null
+            Set-Content -LiteralPath 'dist/windows-ci/bootstrap-acceptance-failure.txt' -Value $failure -Encoding utf8
+            if ($env:GITHUB_STEP_SUMMARY) {
+              "### PowerShell bootstrap acceptance failure" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+              $failure | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+            }
+            throw
+          }
+
       - name: Require complete acceptance reports
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           foreach ($reportPath in @(
             'dist/windows-ci/acceptance-report.json',
-            'dist/windows-ci/product-contract-report.json'
+            'dist/windows-ci/product-contract-report.json',
+            'dist/windows-ci/bootstrap-acceptance-report.json'
           )) {
             if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
               throw "Windows acceptance report was not produced: $reportPath"
@@ -207,6 +243,8 @@ jobs:
             dist/windows-ci/*.txt
             dist/windows-ci/*.md
             dist/windows-ci/*.log
+            dist/windows-ci/*.ps1
+            dist/windows-ci/bootstrap-test/**
             dist/windows-ci/test-update/**
           if-no-files-found: warn
           retention-days: 14
