@@ -16,6 +16,7 @@ $record = Get-BootstrapInstallerRecord -OutputRoot $OutputRoot
 $Version = [string]$record.Manifest.version
 $InstallerName = [string]$record.Installer.name
 $InstallerHash = (Get-FileHash -LiteralPath $record.InstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$BootstrapLogPath = Join-Path $OutputRoot 'bootstrap-acceptance.log'
 
 Assert-BootstrapTest (Test-Path -LiteralPath $BootstrapScript -PathType Leaf) "Missing bootstrap script: $BootstrapScript"
 Assert-BootstrapTest ($InstallerHash -eq ([string]$record.Installer.sha256).ToLowerInvariant()) 'Canonical installer hash does not match release-manifest.json.'
@@ -61,6 +62,11 @@ function Add-ResultLog {
     if ($Result.StdOut) { $Log.Add($Result.StdOut.TrimEnd()) }
     if ($Result.StdErr) { $Log.Add($Result.StdErr.TrimEnd()) }
     $Log.Add("exit=$($Result.ExitCode)")
+}
+
+function Format-CaseFailure {
+    param([string]$Message, $Result)
+    return "$Message`nstdout:`n$($Result.StdOut)`nstderr:`n$($Result.StdErr)`nexit=$($Result.ExitCode)"
 }
 
 function New-Metadata {
@@ -145,14 +151,14 @@ try {
     $Server = Start-BootstrapFixtureServer -Root $FixtureRoot
     $baseUrl = "http://127.0.0.1:$($Server.Port)"
     $validMetadata = New-Metadata -Name 'valid.json' -ArtifactUrl "$baseUrl/$InstallerName"
-    $badHashMetadata = New-Metadata -Name 'bad-hash.json' -ArtifactUrl "$baseUrl/$InstallerName" -Sha256 ('0' * 64)
+    $badHashMetadata = New-Metadata -Name 'bad-hash.json' -ArtifactName $failingName -ArtifactUrl "$baseUrl/$failingName" -Sha256 ('0' * 64) -VersionValue '9.9.9'
     $failedDownloadMetadata = New-Metadata -Name 'failed-download.json' -ArtifactUrl "$baseUrl/missing-installer.exe"
     $failingInstallerMetadata = New-Metadata -Name 'installer-failure.json' -ArtifactName $failingName -ArtifactUrl "$baseUrl/$failingName" -Sha256 $failingHash -VersionValue '9.9.9'
     $invalidTrustMetadata = New-Metadata -Name 'invalid-trust.json' -ArtifactUrl "$baseUrl/$InstallerName" -Channel 'stable' -TestFixture $true
     Set-Content -LiteralPath (Join-Path $FixtureRoot 'malformed.json') -Value '{ this is not json' -NoNewline
 
     $badHash = Invoke-Case -Name 'bad hash' -MetadataPath $badHashMetadata -CaseInstallRoot $BadHashInstallRoot -ExpectFailure
-    Assert-BootstrapTest (($badHash.StdOut + $badHash.StdErr) -match 'checksum mismatch') 'Bad hash did not produce checksum rejection.'
+    Assert-BootstrapTest (($badHash.StdOut + $badHash.StdErr) -match 'checksum mismatch') (Format-CaseFailure 'Bad hash did not produce checksum rejection.' $badHash)
     $Report.bad_hash_rejected = $true
     Assert-BootstrapTest (-not (Test-Path -LiteralPath $BadHashInstallRoot)) 'Installer executed despite a bad hash.'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath $UninstallKey)) 'Bad hash unexpectedly registered an installation.'
@@ -167,22 +173,22 @@ try {
     $Report.malformed_metadata_rejected = $true
 
     $downloadFailure = Invoke-Case -Name 'failed download' -MetadataPath $failedDownloadMetadata -CaseInstallRoot $BadHashInstallRoot -ExpectFailure
-    Assert-BootstrapTest (($downloadFailure.StdOut + $downloadFailure.StdErr) -match 'download failed') 'Missing installer did not produce a download failure.'
+    Assert-BootstrapTest (($downloadFailure.StdOut + $downloadFailure.StdErr) -match 'download failed') (Format-CaseFailure 'Missing installer did not produce a download failure.' $downloadFailure)
     $Report.failed_download_rejected = $true
 
     $unsupported = Invoke-Case -Name 'unsupported architecture' -MetadataPath $validMetadata -CaseInstallRoot $BadHashInstallRoot -ArchitectureOverride 'Arm64' -ExpectFailure
-    Assert-BootstrapTest (($unsupported.StdOut + $unsupported.StdErr) -match 'x86_64 is required') 'Unsupported architecture was not rejected.'
+    Assert-BootstrapTest (($unsupported.StdOut + $unsupported.StdErr) -match 'x86_64 is required') (Format-CaseFailure 'Unsupported architecture was not rejected.' $unsupported)
     $Report.unsupported_architecture_rejected = $true
 
     $invalidTrust = Invoke-Case -Name 'invalid trust' -MetadataPath $invalidTrustMetadata -CaseInstallRoot $BadHashInstallRoot -ExpectFailure
-    Assert-BootstrapTest (($invalidTrust.StdOut + $invalidTrust.StdErr) -match 'invalid trust identity') 'Invalid test trust state was not rejected.'
+    Assert-BootstrapTest (($invalidTrust.StdOut + $invalidTrust.StdErr) -match 'invalid trust identity') (Format-CaseFailure 'Invalid test trust state was not rejected.' $invalidTrust)
 
     $installerFailure = Invoke-Case -Name 'installer failure' -MetadataPath $failingInstallerMetadata -CaseInstallRoot $BadHashInstallRoot -ExpectFailure
-    Assert-BootstrapTest (($installerFailure.StdOut + $installerFailure.StdErr) -match 'installer failed with exit code') 'Installer failure code was not propagated.'
+    Assert-BootstrapTest (($installerFailure.StdOut + $installerFailure.StdErr) -match 'installer failed with exit code') (Format-CaseFailure 'Installer failure code was not propagated.' $installerFailure)
     $Report.installer_failure_propagated = $true
 
     $first = Invoke-Case -Name 'valid install' -MetadataPath $validMetadata -CaseInstallRoot $InstallRoot
-    Assert-BootstrapTest ($first.StdOut -match "Takokit installed successfully") 'Valid bootstrap did not report success.'
+    Assert-BootstrapTest ($first.StdOut -match "Takokit installed successfully") (Format-CaseFailure 'Valid bootstrap did not report success.' $first)
     $Report.valid_windows_x86_64_release = $true
     $Report.valid_installer_sha256 = $true
     $InstalledBin = Join-Path $InstallRoot 'bin'
@@ -194,7 +200,7 @@ try {
     Assert-BootstrapTest ((Get-UserPathEntryCount ([Environment]::GetEnvironmentVariable('Path', 'User')) $InstalledBin) -eq 1) 'Bootstrap install did not own exactly one PATH entry.'
 
     $second = Invoke-Case -Name 'reinstall' -MetadataPath $validMetadata -CaseInstallRoot $InstallRoot
-    Assert-BootstrapTest ($second.StdOut -match "Takokit installed successfully") 'Second bootstrap execution failed.'
+    Assert-BootstrapTest ($second.StdOut -match "Takokit installed successfully") (Format-CaseFailure 'Second bootstrap execution failed.' $second)
     $Report.reinstall_succeeded = $true
     Assert-BootstrapTest ((Get-UserPathEntryCount ([Environment]::GetEnvironmentVariable('Path', 'User')) $InstalledBin) -eq 1) 'Bootstrap reinstall duplicated the PATH entry.'
     $Report.path_entry_deduplicated = $true
@@ -219,9 +225,11 @@ try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $ManualRoot $name) -Force
     }
     Write-TestJson -Path (Join-Path $OutputRoot 'bootstrap-acceptance-report.json') -Value $Report
-    [System.IO.File]::WriteAllLines((Join-Path $OutputRoot 'bootstrap-acceptance.log'), $Log, [System.Text.UTF8Encoding]::new($false))
     Write-Host ($Report | ConvertTo-Json -Depth 4)
 } finally {
+    if ($Log.Count -gt 0) {
+        [System.IO.File]::WriteAllLines($BootstrapLogPath, $Log, [System.Text.UTF8Encoding]::new($false))
+    }
     Stop-BootstrapFixtureServer -Server $Server
     $env:TEMP = $OriginalTemp
     $env:TMP = $OriginalTmp
