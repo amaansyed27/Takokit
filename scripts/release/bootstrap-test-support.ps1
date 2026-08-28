@@ -33,13 +33,26 @@ function Get-FreeLoopbackPort {
 function Test-LoopbackPort {
     param([int]$Port)
     $client = [System.Net.Sockets.TcpClient]::new()
+    $reader = $null
     try {
         $pending = $client.BeginConnect('127.0.0.1', $Port, $null, $null)
         if (-not $pending.AsyncWaitHandle.WaitOne(300)) { return $false }
         $client.EndConnect($pending)
-        return $client.Connected
+        if (-not $client.Connected) { return $false }
+
+        $stream = $client.GetStream()
+        $stream.ReadTimeout = 1000
+        $request = [System.Text.Encoding]::ASCII.GetBytes("GET /__bootstrap_health__ HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n`r`n")
+        $stream.Write($request, 0, $request.Length)
+        $stream.Flush()
+        $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::ASCII, $false, 1024, $true)
+        $statusLine = $reader.ReadLine()
+        return -not [string]::IsNullOrWhiteSpace($statusLine) -and $statusLine.StartsWith('HTTP/1.1 ')
     } catch { return $false }
-    finally { $client.Dispose() }
+    finally {
+        if ($null -ne $reader) { $reader.Dispose() }
+        $client.Dispose()
+    }
 }
 
 function Start-BootstrapFixtureServer {
