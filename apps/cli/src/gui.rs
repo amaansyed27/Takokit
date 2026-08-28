@@ -96,9 +96,7 @@ mod tests {
             let mut request = [0_u8; 1024];
             let _ = stream.read(&mut request);
             stream
-                .write_all(
-                    b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
-                )
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
                 .unwrap();
         });
 
@@ -114,12 +112,9 @@ mod tests {
         drop(listener);
         let url = format!("http://{address}/gui");
 
-        let error = wait_for_gui_ready_at(
-            &url,
-            Duration::from_millis(120),
-            Duration::from_millis(20),
-        )
-        .unwrap_err();
+        let error =
+            wait_for_gui_ready_at(&url, Duration::from_millis(120), Duration::from_millis(20))
+                .unwrap_err();
         assert!(error.to_string().contains(&url));
     }
 
