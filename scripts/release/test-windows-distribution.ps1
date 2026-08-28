@@ -21,6 +21,37 @@ function Invoke-Checked {
     }
 }
 
+function Invoke-InnoInstaller {
+    param(
+        [Parameter(Mandatory)][string]$Installer,
+        [Parameter(Mandatory)][string]$InstallRoot,
+        [Parameter(Mandatory)][string]$LogPath
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Installer
+    $startInfo.UseShellExecute = $false
+    foreach ($argument in @(
+        '/VERYSILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        '/CURRENTUSER',
+        "/DIR=$InstallRoot",
+        "/LOG=$LogPath"
+    )) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "Failed to start installer: $Installer"
+    }
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        throw "$Installer failed with exit code $($process.ExitCode). See Inno log: $LogPath"
+    }
+}
+
 function Invoke-ExpectFailure {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -268,7 +299,8 @@ try {
     $Sentinel = Join-Path $InstallerHome 'preserve-me.txt'
     Set-Content -LiteralPath $Sentinel -Value 'preserve' -NoNewline
 
-    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' ('/DIR="' + $InstallRoot + '"')
+    $InstallLog = Join-Path $OutputRoot 'installer-acceptance-install.log'
+    Invoke-InnoInstaller -Installer $Installer -InstallRoot $InstallRoot -LogPath $InstallLog
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe') -PathType Leaf) 'Installer did not install the desktop shell.'
@@ -298,7 +330,8 @@ try {
     $Report.installer_shortcut_workspace = $true
 
     # Reinstall/repair must not duplicate the PATH entry.
-    Invoke-Checked $Installer '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' '/CURRENTUSER' ('/DIR="' + $InstallRoot + '"')
+    $ReinstallLog = Join-Path $OutputRoot 'installer-acceptance-reinstall.log'
+    Invoke-InnoInstaller -Installer $Installer -InstallRoot $InstallRoot -LogPath $ReinstallLog
     $reinstallCount = Get-PathEntryCount (Get-UserPath) $InstalledBin
     Assert-True ($reinstallCount -eq 1) "Reinstall duplicated the Takokit PATH entry ($reinstallCount entries)."
     Assert-True ((Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')).Version -eq $Version) 'Reinstall did not leave a runnable v0.0.1 CLI.'
