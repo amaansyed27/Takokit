@@ -158,6 +158,37 @@ function Invoke-Installer {
     if ($process.ExitCode -ne 0) { Stop-Install "installer failed with exit code $($process.ExitCode)." }
 }
 
+function Invoke-NativeCapture {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $Path
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Arguments = (($Arguments | ForEach-Object { Quote-WindowsArgument $_ }) -join ' ')
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { Stop-Install 'installed CLI validation process could not be started.' }
+    try {
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            StdOut = $stdout
+            StdErr = $stderr
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Get-TakokitInstallRoot {
     param([string]$PreferredRoot)
 
@@ -193,8 +224,11 @@ function Confirm-InstalledTakokit {
         Stop-Install "installed CLI was not found at $takoExe"
     }
 
-    $output = (& $takoExe version 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) { Stop-Install 'installed CLI failed its version check.' }
+    $result = Invoke-NativeCapture -Path $takoExe -Arguments @('version')
+    if ($result.ExitCode -ne 0) {
+        Stop-Install "installed CLI failed its version check with exit code $($result.ExitCode)."
+    }
+    $output = ($result.StdOut + "`n" + $result.StdErr).Trim()
     if ($output -notmatch [regex]::Escape($Version)) {
         Stop-Install "installed CLI version does not match Takokit $Version."
     }
