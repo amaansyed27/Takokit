@@ -30,14 +30,13 @@ pub async fn ensure_server(store: &LocalStore, config: &RuntimeConfig) -> anyhow
 
 fn wait_for_gui_ready_at(url: &str, timeout: Duration, poll: Duration) -> anyhow::Result<()> {
     let deadline = Instant::now() + timeout;
-    let mut last_error = "no response".to_string();
 
     loop {
-        match ureq::get(url).timeout(Duration::from_secs(1)).call() {
+        let last_error = match ureq::get(url).timeout(Duration::from_secs(1)).call() {
             Ok(response) if response.status() == 200 => return Ok(()),
-            Ok(response) => last_error = format!("HTTP {}", response.status()),
-            Err(error) => last_error = error.to_string(),
-        }
+            Ok(response) => format!("HTTP {}", response.status()),
+            Err(error) => error.to_string(),
+        };
 
         if Instant::now() >= deadline {
             return Err(anyhow::anyhow!(
