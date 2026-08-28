@@ -10,6 +10,14 @@ use std::{
 use zip::ZipArchive;
 
 const TEST_FAILPOINT_ENV: &str = "TAKOKIT_UPDATER_TEST_FAILPOINT";
+const REQUIRED_REPLACEMENT_FILES: &[&str] = &[
+    "bin/tako.exe",
+    "bin/takokit.exe",
+    "bin/takokit-updater.exe",
+    "distribution.json",
+    "resources/registry/index.json",
+    "resources/gui/index.html",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(super) struct Journal {
@@ -104,15 +112,7 @@ pub(super) fn validate_install_root(root: &Path) -> Result<(), Box<dyn std::erro
 }
 
 pub(super) fn validate_replacement(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    for required in [
-        "bin/tako.exe",
-        "bin/takokit.exe",
-        "Takokit.exe",
-        "bin/takokit-updater.exe",
-        "distribution.json",
-        "resources/registry/index.json",
-        "resources/gui/index.html",
-    ] {
+    for required in REQUIRED_REPLACEMENT_FILES {
         if !root.join(required).is_file() {
             return Err(format!("update bundle is missing required file {required}").into());
         }
@@ -290,6 +290,16 @@ pub(super) fn wait_for_parent(_pid: u32) -> Result<(), Box<dyn std::error::Error
 mod tests {
     use super::*;
 
+    fn write_replacement_fixture(root: &Path) {
+        for required in REQUIRED_REPLACEMENT_FILES {
+            let path = root.join(required);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(path, b"fixture").unwrap();
+        }
+    }
+
     #[test]
     fn update_zip_rejects_parent_traversal() {
         let path = Path::new("../evil.exe");
@@ -303,5 +313,24 @@ mod tests {
         assert!(parse_bool("true").unwrap());
         assert!(!parse_bool("0").unwrap());
         assert!(parse_bool("sometimes").is_err());
+    }
+
+    #[test]
+    fn replacement_validation_accepts_wrapper_free_runtime() {
+        let temp = tempfile::tempdir().unwrap();
+        write_replacement_fixture(temp.path());
+
+        assert!(validate_replacement(temp.path()).is_ok());
+        assert!(!temp.path().join("Takokit.exe").exists());
+    }
+
+    #[test]
+    fn replacement_validation_still_requires_real_daemon_binary() {
+        let temp = tempfile::tempdir().unwrap();
+        write_replacement_fixture(temp.path());
+        fs::remove_file(temp.path().join("bin/takokit.exe")).unwrap();
+
+        let error = validate_replacement(temp.path()).unwrap_err().to_string();
+        assert!(error.contains("bin/takokit.exe"));
     }
 }
