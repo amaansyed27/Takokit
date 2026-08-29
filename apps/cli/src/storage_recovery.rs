@@ -112,8 +112,7 @@ mod tests {
         fs::create_dir_all(checkpoint.parent().expect("checkpoint parent"))
             .expect("provider directory");
         fs::write(&checkpoint, vec![7_u8; 4096]).expect("provider checkpoint");
-        capture_provider_ownership(root.path(), "model-a", &before)
-            .expect("first model ownership");
+        capture_provider_ownership(root.path(), "model-a", &before).expect("first model ownership");
 
         let journal = root
             .path()
@@ -152,8 +151,7 @@ mod tests {
             .expect("provider directory");
         fs::write(&checkpoint, vec![11_u8; 4096]).expect("provider checkpoint");
 
-        capture_provider_ownership(root.path(), "model-a", &before)
-            .expect("model-a ownership");
+        capture_provider_ownership(root.path(), "model-a", &before).expect("model-a ownership");
         let current = snapshot_provider_cache(root.path()).expect("current snapshot");
         capture_provider_ownership(root.path(), "model-b", &current)
             .expect("model-b shared ownership");
@@ -164,15 +162,13 @@ mod tests {
         let blob = ledger.artifacts[0].blob_path.clone();
         assert!(blob.is_file());
 
-        remove_model_provider_ownership(root.path(), "model-a", false)
-            .expect("remove first owner");
+        remove_model_provider_ownership(root.path(), "model-a", false).expect("remove first owner");
         assert!(blob.is_file());
         assert!(read_model_provider_ownership(root.path(), "model-b")
             .expect("model-b ledger read")
             .is_some());
 
-        remove_model_provider_ownership(root.path(), "model-b", false)
-            .expect("remove final owner");
+        remove_model_provider_ownership(root.path(), "model-b", false).expect("remove final owner");
         assert!(!blob.exists());
     }
 }
