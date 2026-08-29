@@ -24,15 +24,21 @@ struct ProviderCleanupJournal<'a> {
 /// the maintenance lock rather than replaying stale paths from the old process.
 pub(crate) fn begin_provider_cleanup(root: &Path, scope: &str) -> anyhow::Result<bool> {
     let path = provider_cleanup_journal_path(root);
-    let recovered_from_interrupted_run = path.is_file();
+    if path.is_file() {
+        // Never replace a surviving journal before recovery finishes. Keeping
+        // the old file closes the crash window where delete-then-rename could
+        // otherwise temporarily erase the only interruption marker on Windows.
+        return Ok(true);
+    }
+
     let journal = ProviderCleanupJournal {
         schema_version: PROVIDER_CLEANUP_JOURNAL_SCHEMA,
         state: "running",
         scope,
         recovery: "recompute-under-maintenance-lock",
     };
-    write_json_atomic(&path, &journal)?;
-    Ok(recovered_from_interrupted_run)
+    write_new_json_atomic(&path, &journal)?;
+    Ok(false)
 }
 
 /// Clear the provider cleanup journal only after cleanup completed successfully.
@@ -49,17 +55,12 @@ pub(crate) fn provider_cleanup_journal_path(root: &Path) -> PathBuf {
     root.join("runtime").join(PROVIDER_CLEANUP_JOURNAL_FILE)
 }
 
-fn write_json_atomic(path: &Path, value: &impl Serialize) -> anyhow::Result<()> {
+fn write_new_json_atomic(path: &Path, value: &impl Serialize) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     let temporary = path.with_extension("json.tmp");
     fs::write(&temporary, serde_json::to_vec_pretty(value)?)?;
-    match fs::remove_file(path) {
-        Ok(()) => {}
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-        Err(error) => return Err(error.into()),
-    }
     fs::rename(temporary, path)?;
     Ok(())
 }
@@ -85,15 +86,17 @@ mod tests {
     fn cleanup_journal_marks_interruption_and_clears_after_success() {
         let root = tempfile::tempdir().expect("tempdir");
         assert!(!begin_provider_cleanup(root.path(), "all-safe").expect("first journal"));
-        assert!(provider_cleanup_journal_path(root.path()).is_file());
+        let journal_path = provider_cleanup_journal_path(root.path());
+        assert!(journal_path.is_file());
+        let first_journal = fs::read_to_string(&journal_path).expect("first journal contents");
 
-        assert!(begin_provider_cleanup(root.path(), "all-safe").expect("recovery journal"));
-        let journal = fs::read_to_string(provider_cleanup_journal_path(root.path()))
-            .expect("journal contents");
-        assert!(journal.contains("recompute-under-maintenance-lock"));
+        assert!(begin_provider_cleanup(root.path(), "unused").expect("recovery journal"));
+        let recovered_journal = fs::read_to_string(&journal_path).expect("recovery journal contents");
+        assert_eq!(recovered_journal, first_journal);
+        assert!(recovered_journal.contains("recompute-under-maintenance-lock"));
 
         finish_provider_cleanup(root.path()).expect("finish cleanup");
-        assert!(!provider_cleanup_journal_path(root.path()).exists());
+        assert!(!journal_path.exists());
     }
 
     #[test]
