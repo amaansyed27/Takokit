@@ -12,7 +12,8 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $BaseInstalledTree = [System.IO.Path]::GetFullPath($BaseInstalledTree)
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $ReleaseTool = [System.IO.Path]::GetFullPath($ReleaseTool)
-$FixtureVersion = '0.0.2'
+$BaseVersion = '0.1.0'
+$FixtureVersion = '0.1.1'
 $FixtureBuildId = "test-update-v$FixtureVersion-$CommitSha"
 
 function Invoke-Checked {
@@ -59,7 +60,7 @@ function New-TestManifest {
             minimum_readable = $StorageMin
             maximum_readable = $StorageMax
         }
-        minimum_compatible_version = '0.0.1'
+        minimum_compatible_version = $BaseVersion
         signing_key_id = 'takokit-test-fixture-v1'
         test_fixture = $true
         artifacts = @(
@@ -100,12 +101,12 @@ try {
     $CargoText = Get-Content -LiteralPath $CargoToml -Raw
     $UpdatedCargoText = [regex]::Replace(
         $CargoText,
-        '(?m)^version\s*=\s*"0\.0\.1"\s*$',
-        'version = "0.0.2"',
+        '(?m)^version\s*=\s*"0\.1\.0"\s*$',
+        'version = "0.1.1"',
         1
     )
     if ($UpdatedCargoText -eq $CargoText) {
-        throw 'Could not rewrite isolated fixture workspace version from 0.0.1 to 0.0.2.'
+        throw 'Could not rewrite isolated fixture workspace version from 0.1.0 to 0.1.1.'
     }
     Write-Utf8NoBom $CargoToml $UpdatedCargoText
 
@@ -199,7 +200,7 @@ Negative fixtures:
 - release-manifest-invalid-signature.sig: invalid signature for the valid manifest
 - release-manifest-corrupt-artifact.json/.sig + ${CorruptName}: corrupted archive bytes
 
-The helper failpoint integration test covers interruption during replacement/rollback separately; no public 0.0.2 tag or GitHub Release is created.
+The helper failpoint integration test covers interruption during replacement/rollback separately; no public 0.1.1 tag or GitHub Release is created.
 "@
     Write-Utf8NoBom (Join-Path $OutputRoot 'README.md') $Readme
 

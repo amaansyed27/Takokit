@@ -61,7 +61,7 @@ export function DownloadPage() {
             {release.status === "checking" ? "Checking Windows release…" : "Windows stable release not published yet"}
           </button>
         )}
-        <p className="windows-download__requirement">Windows 10 or Windows 11 · x86_64 · Microsoft Edge WebView2 Runtime required for the desktop GUI.</p>
+        <p className="windows-download__requirement">Windows 10 or Windows 11 · x86_64 · Run <code>tako</code> for the TUI or <code>tako gui</code> for the local browser GUI.</p>
       </section>
 
       <aside className="truth-note">

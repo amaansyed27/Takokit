@@ -142,6 +142,26 @@ for (const requiredText of [
 ]) {
   if (!hero.includes(requiredText)) throw new Error(`landing hero is missing: ${requiredText}`);
 }
+if (/WebView|Tauri|native desktop/i.test(hero)) {
+  throw new Error("landing hero describes a native desktop wrapper");
+}
+
+const platform = await readFile(resolve(siteRoot, "src/lib/platform.js"), "utf8");
+if (!platform.includes("tako gui") || /WebView|Tauri/i.test(platform)) {
+  throw new Error("Windows platform copy does not describe the local browser GUI correctly");
+}
+
+const gettingStarted = await readFile(resolve(siteRoot, "src/docs/pages/getting-started.js"), "utf8");
+for (const forbidden of ["Build from source", "git clone", "cargo build", "npm ci"]) {
+  if (gettingStarted.includes(forbidden)) {
+    throw new Error(`normal-user install docs still contain ${forbidden}`);
+  }
+}
+for (const requiredText of ["v0.1.0", "install.ps1", "tako gui"]) {
+  if (!gettingStarted.includes(requiredText)) {
+    throw new Error(`normal-user install docs are missing ${requiredText}`);
+  }
+}
 
 const rollingCommand = await readFile(
   resolve(siteRoot, "src/components/landing/RollingPullCommand.jsx"),

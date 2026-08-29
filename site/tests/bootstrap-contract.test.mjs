@@ -14,6 +14,7 @@ test("PowerShell bootstrap uses release metadata and the canonical installer", a
   assert.match(script, /checksum mismatch/);
   assert.match(script, /\/VERYSILENT/);
   assert.match(script, /Confirm-InstalledTakokit/);
+  assert.match(script, /tako gui/);
 });
 
 test("PowerShell bootstrap contains no source-build or CI artifact dependency", async () => {
@@ -30,6 +31,7 @@ test("PowerShell bootstrap contains no source-build or CI artifact dependency", 
     assert.ok(!script.includes(forbidden), `bootstrap must not contain ${forbidden}`);
   }
   assert.ok(!/Takokit-v0\.0\.1-windows-x86_64-installer/.test(script));
+  assert.ok(!/Takokit-v0\.1\.0-windows-x86_64-installer/.test(script));
 });
 
 test("PowerShell bootstrap fails closed around stable/test trust", async () => {

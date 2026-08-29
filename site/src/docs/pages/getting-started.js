@@ -1,33 +1,31 @@
 export const GETTING_STARTED_DOCS = {
   install: {
     title: "Install Takokit",
-    intro: "Takokit is currently source-distributed while Windows-first packaging is prepared.",
+    intro: "Takokit v0.1.0 is distributed for Windows through one verified installer.",
     sections: [
       {
         id: "prerequisites",
         title: "Prerequisites",
         body: [
-          "Install Git, Rust stable, Node.js LTS, and npm. A compatible GPU driver is required only when the model you choose requires a GPU.",
+          "Use Windows 10 or Windows 11 on x86_64. A compatible GPU driver is required only when the model you choose requires a GPU.",
         ],
       },
       {
-        id: "build-from-source",
-        title: "Build from source",
+        id: "install-windows",
+        title: "Install on Windows",
         body: [
-          "Build the React GUI assets first, then build the locked Rust workspace from the repository root.",
+          "Run the PowerShell bootstrap, or use Download for Windows on the download page. Both resolve and verify the same canonical installer.",
         ],
         commands: [
-          "npm ci --prefix apps/gui",
-          "npm run build --prefix apps/gui",
-          "cargo build --release --locked",
+          "irm https://takokit.dawnlightlabs.com/install.ps1 | iex",
         ],
       },
       {
         id: "verify-installation",
         title: "Verify the installation",
-        body: ["Run the generated binary directly before adding it to PATH."],
-        commands: [".\\target\\release\\tako.exe version", ".\\target\\release\\tako.exe doctor"],
-        note: "Signed installers and package-manager commands will be documented only after real release artifacts exist.",
+        body: ["Open a new terminal, verify the installed CLI, then launch either interface."],
+        commands: ["tako version", "tako doctor", "tako", "tako gui"],
+        note: "The GUI is served locally by Takokit and opens in your default browser. Linux and macOS packages are coming later.",
       },
     ],
   },

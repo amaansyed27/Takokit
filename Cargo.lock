@@ -2207,14 +2207,14 @@ dependencies = [
 
 [[package]]
 name = "takokit-audio"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-cli"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2243,7 +2243,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-core"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2253,7 +2253,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-models"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-package"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "dirs",
  "fs2",
@@ -2291,7 +2291,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-release"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2304,14 +2304,14 @@ dependencies = [
 
 [[package]]
 name = "takokit-safety"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-server"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2333,7 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-store"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "dirs",
  "fs2",

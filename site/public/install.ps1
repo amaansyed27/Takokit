@@ -288,6 +288,7 @@ try {
     Write-Host ''
     Write-Host 'Open a new terminal and run:'
     Write-Host '  tako'
+    Write-Host '  tako gui'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
