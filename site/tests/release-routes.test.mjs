@@ -13,7 +13,7 @@ const installerHash = "a".repeat(64);
 function stableManifest(overrides = {}) {
   return {
     product: "Takokit",
-    version: "0.0.1",
+    version: "0.1.0",
     channel: "stable",
     commit_sha: "abc123",
     os: "windows",
@@ -22,10 +22,10 @@ function stableManifest(overrides = {}) {
     test_fixture: false,
     artifacts: [{
       role: "installer",
-      name: "Takokit-v0.0.1-windows-x86_64-installer.exe",
+      name: "Takokit-v0.1.0-windows-x86_64-installer.exe",
       sha256: installerHash,
       size: 1234,
-      url: "https://downloads.example.test/Takokit-v0.0.1-windows-x86_64-installer.exe",
+      url: "https://downloads.example.test/Takokit-v0.1.0-windows-x86_64-installer.exe",
     }],
     ...overrides,
   };
@@ -144,7 +144,7 @@ test("Windows direct download redirects only to the projected stable installer",
     assert.equal(response.redirectStatus, 307);
     assert.equal(
       response.redirectUrl,
-      "https://downloads.example.test/Takokit-v0.0.1-windows-x86_64-installer.exe",
+      "https://downloads.example.test/Takokit-v0.1.0-windows-x86_64-installer.exe",
     );
   } finally {
     globalThis.fetch = originalFetch;

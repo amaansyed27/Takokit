@@ -16,7 +16,7 @@ export function LandingHero() {
           <p className="landing-kicker">Local voice runtime</p>
           <h1 id="landing-hero-title">Run open voice models locally.</h1>
           <p className="landing-hero__summary">
-            One runtime for speech generation, transcription, voice cloning, and conversion across Windows, Linux, and macOS.
+            One Windows runtime for speech generation, transcription, voice cloning, and conversion through the CLI, TUI, and local browser GUI.
           </p>
 
           <div className="landing-hero__quickstart">

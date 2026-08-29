@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = "0.0.1"
+EXPECTED = "0.1.0"
 
 checks = []
 
@@ -41,6 +41,24 @@ checks.append(
         ][""]["version"],
     )
 )
+checks.append(
+    (
+        "site package version",
+        json.loads((ROOT / "site/package.json").read_text(encoding="utf-8"))["version"],
+    )
+)
+checks.append(
+    (
+        "site lockfile version",
+        json.loads((ROOT / "site/package-lock.json").read_text(encoding="utf-8"))["version"],
+    )
+)
+checks.append(
+    (
+        "site lockfile root package version",
+        json.loads((ROOT / "site/package-lock.json").read_text(encoding="utf-8"))["packages"][""]["version"],
+    )
+)
 
 installer = ROOT / "packaging/windows/Takokit.iss"
 if installer.exists():
@@ -54,6 +72,29 @@ if release_ps1.exists():
     match = re.search(r'\[string\]\$Version\s*=\s*"([^"]+)"', text)
     checks.append(("release script default", match.group(1) if match else "<missing>"))
 
+for relative, label, pattern in [
+    (
+        "scripts/release/test-windows-distribution.ps1",
+        "distribution acceptance version",
+        r"(?m)^\$Version\s*=\s*'([^']+)'",
+    ),
+    (
+        "scripts/release/test-windows-product-contract.ps1",
+        "product contract version",
+        r"(?m)^\$Version\s*=\s*'([^']+)'",
+    ),
+]:
+    text = (ROOT / relative).read_text(encoding="utf-8")
+    match = re.search(pattern, text)
+    checks.append((label, match.group(1) if match else "<missing>"))
+
+release_notes = ROOT / f"docs/release/windows-v{EXPECTED}-notes.md"
+checks.append(("release notes filename", EXPECTED if release_notes.exists() else "<missing>"))
+
+workflow = (ROOT / ".github/workflows/slice4-windows.yml").read_text(encoding="utf-8")
+artifact_match = re.search(r"name:\s+takokit-v([0-9.]+)-windows-x86_64-", workflow)
+checks.append(("Windows CI artifact version", artifact_match.group(1) if artifact_match else "<missing>"))
+
 failed = False
 for label, version in checks:
     if version != EXPECTED:
@@ -61,13 +102,6 @@ for label, version in checks:
         failed = True
     else:
         print(f"ok: {label} = {version}")
-
-# Guard against accidental public product versions in release-facing metadata only.
-for path in [ROOT / "apps/gui/package.json", ROOT / "apps/gui/package-lock.json"]:
-    text = path.read_text(encoding="utf-8")
-    if '"0.1.0"' in text or '"0.2.0"' in text:
-        print(f"ERROR: stale public product version found in {path.relative_to(ROOT)}")
-        failed = True
 
 if failed:
     sys.exit(1)

@@ -6,7 +6,7 @@ export const PLATFORM_DETAILS = {
     label: "Windows",
     shell: "PowerShell",
     available: true,
-    note: "Windows 10 or Windows 11 on x86_64. The desktop GUI requires Microsoft Edge WebView2 Runtime.",
+    note: "Windows 10 or Windows 11 on x86_64. Run tako for the TUI or tako gui for the local browser GUI.",
   },
   linux: {
     label: "Linux",

@@ -1,10 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.0.1",
+    [string]$Version = "0.1.0",
     [string]$OutputRoot,
     [switch]$SkipBuild,
     [switch]$SkipInstaller,
     [switch]$IncludeTestUpdateFixture,
+    [switch]$RequireProductionSigning,
     [switch]$AllowDirty
 )
 
@@ -86,10 +87,19 @@ function Find-Iscc {
     throw 'Inno Setup compiler (ISCC.exe) was not found. Install pinned Inno Setup before building the installer.'
 }
 
-if ($Version -ne '0.0.1') {
-    throw "The public-test Windows distribution version is locked to 0.0.1; got $Version"
+if ($Version -ne '0.1.0') {
+    throw "The Windows distribution version is locked to 0.1.0; got $Version"
 }
 Invoke-Checked python 'scripts/check_release_version.py'
+
+$HasProductionSigningKey = -not [string]::IsNullOrWhiteSpace($env:TAKOKIT_RELEASE_SIGNING_KEY_HEX)
+$HasProductionPublicKey = -not [string]::IsNullOrWhiteSpace($env:TAKOKIT_RELEASE_PUBLIC_KEY_HEX)
+if ($RequireProductionSigning -and (-not $HasProductionSigningKey -or -not $HasProductionPublicKey)) {
+    throw 'Production release assembly requires TAKOKIT_RELEASE_SIGNING_KEY_HEX and TAKOKIT_RELEASE_PUBLIC_KEY_HEX.'
+}
+if ($HasProductionSigningKey -ne $HasProductionPublicKey) {
+    throw 'Production signing private and public key material must be configured together.'
+}
 
 $CommitSha = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $CommitSha) { throw 'Could not resolve git commit SHA.' }
@@ -242,13 +252,23 @@ $Installer = Join-Path $OutputRoot "Takokit-v$Version-windows-x86_64-installer.e
 if (-not $SkipInstaller -and -not (Test-Path -LiteralPath $Installer -PathType Leaf)) {
     throw "Installer compiler did not produce $Installer"
 }
+$AuthenticodeStatusPath = Join-Path $OutputRoot 'authenticode-status.json'
+if (Test-Path -LiteralPath $Installer -PathType Leaf) {
+    $Authenticode = Get-AuthenticodeSignature -LiteralPath $Installer
+    Write-Json $AuthenticodeStatusPath ([ordered]@{
+        artifact = [System.IO.Path]::GetFileName($Installer)
+        status = [string]$Authenticode.Status
+        status_message = [string]$Authenticode.StatusMessage
+        signer_subject = if ($Authenticode.SignerCertificate) { $Authenticode.SignerCertificate.Subject } else { $null }
+        signer_thumbprint = if ($Authenticode.SignerCertificate) { $Authenticode.SignerCertificate.Thumbprint } else { $null }
+    })
+}
 
 $ArtifactRecords = @()
 if (Test-Path -LiteralPath $Installer) { $ArtifactRecords += Get-ArtifactRecord 'installer' $Installer }
 $ArtifactRecords += Get-ArtifactRecord 'portable' $PortableZip
 $ArtifactRecords += Get-ArtifactRecord 'update_bundle' $UpdateBundle
 
-$HasProductionSigningKey = -not [string]::IsNullOrWhiteSpace($env:TAKOKIT_RELEASE_SIGNING_KEY_HEX)
 $SigningKeyId = if ($HasProductionSigningKey) { 'takokit-release-v1' } else { 'takokit-test-fixture-v1' }
 $Channel = if ($HasProductionSigningKey) { 'stable' } else { 'test' }
 $TestFixture = -not $HasProductionSigningKey
@@ -268,7 +288,7 @@ $Manifest = [ordered]@{
         minimum_readable = 1
         maximum_readable = 1
     }
-    minimum_compatible_version = '0.0.1'
+    minimum_compatible_version = '0.1.0'
     signing_key_id = $SigningKeyId
     test_fixture = $TestFixture
     artifacts = $ArtifactRecords
@@ -287,14 +307,16 @@ if ($HasProductionSigningKey) {
     Invoke-Checked $ReleaseTool 'verify' $ManifestPath $SignaturePath '--allow-test'
 }
 
-$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.0.1-notes.md'
-$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.0.1.md'
+$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.1.0-notes.md'
+$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.1.0.md'
 if (-not (Test-Path -LiteralPath $ReleaseNotesSource)) {
     throw "Release notes source is missing: $ReleaseNotesSource"
 }
 Copy-Item -LiteralPath $ReleaseNotesSource -Destination $ReleaseNotes
+$ProvenancePath = Join-Path $OutputRoot 'build-provenance.json'
+Copy-Item -LiteralPath (Join-Path $BaseTree 'build-provenance.json') -Destination $ProvenancePath
 
-$ChecksumFiles = @($Installer, $PortableZip, $UpdateBundle, $ManifestPath, $SignaturePath, $ReleaseNotes) |
+$ChecksumFiles = @($Installer, $PortableZip, $UpdateBundle, $ManifestPath, $SignaturePath, $ReleaseNotes, $ProvenancePath, $AuthenticodeStatusPath) |
     Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
 $ChecksumLines = foreach ($file in $ChecksumFiles) {
     "$(Get-Sha256 $file)  $([System.IO.Path]::GetFileName($file))"
@@ -317,6 +339,8 @@ $Summary = [ordered]@{
     manifest = $ManifestPath
     signature = $SignaturePath
     checksums = (Join-Path $OutputRoot 'SHA256SUMS.txt')
+    provenance = $ProvenancePath
+    authenticode = if (Test-Path -LiteralPath $AuthenticodeStatusPath) { $AuthenticodeStatusPath } else { $null }
     test_update = if ($IncludeTestUpdateFixture) { (Join-Path $OutputRoot 'test-update') } else { $null }
 }
 Write-Json (Join-Path $OutputRoot 'build-summary.json') $Summary

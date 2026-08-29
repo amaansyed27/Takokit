@@ -97,7 +97,8 @@ JSON.parse(manifest.body);
 const installPowerShell = await request("/install.ps1", /text\/plain/i);
 assert.doesNotMatch(installPowerShell.body, /<html|<div id="root"/i, "/install.ps1 returned the SPA shell");
 assert.match(installPowerShell.body, /v1\/releases\/stable\/windows-x86_64\.json/);
-assert.match(installPowerShell.body, /Get-FileHash/);
+assert.match(installPowerShell.body, /System\.Security\.Cryptography\.SHA256/);
+assert.match(installPowerShell.body, /ComputeHash/);
 assert.doesNotMatch(installPowerShell.body, /git clone|cargo build|npm ci/i);
 
 const stableUrl = new URL("v1/releases/stable/windows-x86_64.json", base);

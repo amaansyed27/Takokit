@@ -29,7 +29,7 @@ export function SiteFooter() {
       </div>
       <div className="shell footer-base">
         <span>© {new Date().getFullYear()} Takokit</span>
-        <span>Windows · Linux · macOS</span>
+        <span>Windows available · Linux and macOS coming later</span>
       </div>
     </footer>
   );
