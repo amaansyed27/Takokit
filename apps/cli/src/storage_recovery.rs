@@ -91,7 +91,8 @@ mod tests {
         let first_journal = fs::read_to_string(&journal_path).expect("first journal contents");
 
         assert!(begin_provider_cleanup(root.path(), "unused").expect("recovery journal"));
-        let recovered_journal = fs::read_to_string(&journal_path).expect("recovery journal contents");
+        let recovered_journal =
+            fs::read_to_string(&journal_path).expect("recovery journal contents");
         assert_eq!(recovered_journal, first_journal);
         assert!(recovered_journal.contains("recompute-under-maintenance-lock"));
 
