@@ -14,9 +14,12 @@ use takokit_package::{
 
 #[path = "storage_cache.rs"]
 mod storage_cache;
+#[path = "storage_recovery.rs"]
+mod storage_recovery;
 #[path = "storage_report.rs"]
 mod storage_report;
 
+use storage_recovery::{begin_provider_cleanup, finish_provider_cleanup};
 use storage_report::{format_bytes, print_storage_report};
 pub(crate) use storage_report::{inspect_storage, StorageReport};
 
@@ -130,7 +133,15 @@ fn run_cleanup(root: &Path, scope: StorageScope, dry_run: bool, json: bool) -> a
                 StorageScope::AllSafe => "all-safe",
                 StorageScope::Uv => unreachable!(),
             };
+            let recovered_cleanup = if dry_run {
+                false
+            } else {
+                begin_provider_cleanup(root, scope_name)?
+            };
             let report = clean_provider_storage(root, scope_name, dry_run)?;
+            if !dry_run {
+                finish_provider_cleanup(root)?;
+            }
             let after = provider_ownership_status(root)?;
             if json {
                 println!(
@@ -138,6 +149,7 @@ fn run_cleanup(root: &Path, scope: StorageScope, dry_run: bool, json: bool) -> a
                     serde_json::to_string_pretty(&serde_json::json!({
                         "migration": migration,
                         "cleanup": report,
+                        "cleanup_recovered_from_interrupted_run": recovered_cleanup,
                         "provider_ownership_before": before,
                         "provider_ownership_after": after,
                     }))?
@@ -161,6 +173,12 @@ fn run_cleanup(root: &Path, scope: StorageScope, dry_run: bool, json: bool) -> a
                     println!(
                         "  provider bytes {}",
                         format_bytes(migration.provider_bytes)
+                    );
+                    println!();
+                }
+                if recovered_cleanup {
+                    println!(
+                        "Recovered an interrupted provider cleanup by recomputing its safe plan under the maintenance lock."
                     );
                     println!();
                 }
