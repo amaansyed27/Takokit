@@ -4,7 +4,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+mod release;
 mod rvc;
+pub(crate) use release::*;
 pub(crate) use rvc::*;
 pub(crate) use takokit_core::SpeechRequest;
 
@@ -68,6 +70,11 @@ pub(crate) enum Command {
     Version,
     Status,
     Storage(StorageArgs),
+    Update {
+        #[command(subcommand)]
+        command: UpdateCommand,
+    },
+    Reset(ResetArgs),
     Licenses {
         #[command(subcommand)]
         command: LicenseCommand,
@@ -144,7 +151,8 @@ pub(crate) enum DaemonCommand {
 #[derive(Debug, Args)]
 pub(crate) struct SpeakArgs {
     pub(crate) text: String,
-    #[arg(long, default_value = "mock-tts")]
+    /// Real installed model to use. Takokit has no release-facing mock default.
+    #[arg(long)]
     pub(crate) model: String,
     #[arg(long, default_value = "default")]
     pub(crate) voice: String,
@@ -220,24 +228,22 @@ pub(crate) struct PlanArgs {
 }
 
 #[derive(Debug, Args)]
-pub(crate) struct StorageArgs {
-    /// Emit the storage report as JSON.
+pub(crate) struct ResetArgs {
+    /// Preview exact global-data cleanup without deleting anything.
     #[arg(long)]
-    pub(crate) json: bool,
-    #[command(subcommand)]
-    pub(crate) command: Option<StorageCommand>,
-}
-
-#[derive(Debug, Subcommand)]
-pub(crate) enum StorageCommand {
-    /// Show the last automatic cleanup result and whether background cleanup is enabled.
-    Status,
-    /// Remove Takokit's isolated uv package cache. Installed hardlinked packages remain valid.
-    Clean {
-        /// Show what would be removed without changing files.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    pub(crate) dry_run: bool,
+    /// Remove the Takokit global data root after explicit acknowledgement.
+    #[arg(long)]
+    pub(crate) all: bool,
+    /// Required acknowledgement for destructive global reset.
+    #[arg(long, value_name = "RESOLVED_TAKOKIT_HOME")]
+    pub(crate) confirm: Option<PathBuf>,
+    /// Also remove one explicitly selected project's `.tako` directory.
+    #[arg(long, value_name = "WORKSPACE")]
+    pub(crate) project_data: Option<PathBuf>,
+    /// Separate acknowledgement for project `.tako` deletion.
+    #[arg(long, value_name = "RESOLVED_TAKO_DIR")]
+    pub(crate) confirm_project_data: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

@@ -5,6 +5,7 @@ members = [
   "crates/takokit-core",
   "crates/takokit-models",
   "crates/takokit-package",
+  "crates/takokit-release",
   "crates/takokit-safety",
   "crates/takokit-server",
   "crates/takokit-store",
@@ -12,10 +13,10 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/takokit/takokit"
+repository = "https://github.com/amaansyed27/Takokit"
 authors = ["Takokit contributors"]
 
 [workspace.dependencies]
@@ -34,6 +35,7 @@ open = "5"
 percent-encoding = "2"
 rand_core = { version = "0.6", features = ["getrandom"] }
 ratatui = "0.30.2"
+semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

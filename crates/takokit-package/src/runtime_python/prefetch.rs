@@ -2,9 +2,10 @@
 
 use crate::{
     artifact_io::sha256_file,
+    capture_provider_ownership,
     runtime_command::{configure_managed_command, runner_python_path},
     runtime_python_specs::{model_prefetch_required, runtime_model_id},
-    *,
+    snapshot_provider_cache, *,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -38,6 +39,10 @@ struct ModelPrefetchMarker {
     adapter_script_sha256: String,
     #[serde(default)]
     size_bytes: u64,
+    #[serde(default)]
+    provider_ownership_schema: u32,
+    #[serde(default)]
+    owned_provider_artifacts: u64,
 }
 
 impl ModelPrefetchMarker {
@@ -59,6 +64,7 @@ pub(crate) fn prefetch_python_adapter_model(
         return Ok(None);
     }
 
+    let provider_before = snapshot_provider_cache(takokit_root)?;
     let model_dir = takokit_root.join("models").join(&model.id);
     let marker_path = model_dir.join(".takokit-prefetch.json");
     let layout = python_managed_runner_layout(takokit_root);
@@ -85,6 +91,8 @@ pub(crate) fn prefetch_python_adapter_model(
         adapter: adapter.to_string(),
         adapter_script_sha256: sha256_file(&script)?,
         size_bytes: 0,
+        provider_ownership_schema: crate::PROVIDER_OWNERSHIP_SCHEMA,
+        owned_provider_artifacts: 0,
     };
     let previous_marker = std::fs::read(&marker_path)
         .ok()
@@ -98,7 +106,8 @@ pub(crate) fn prefetch_python_adapter_model(
     // A marker is only a record of a previous successful prefetch. It is not
     // proof that an external cache still contains every checkpoint byte. Make
     // the model non-reusable while the adapter revalidates/resumes its cache,
-    // then publish a fresh marker atomically after a successful response.
+    // then publish a fresh marker atomically after both provider prefetch and
+    // durable Takokit ownership complete successfully.
     remove_file_if_exists(&marker_path)?;
 
     let cache_dir = takokit_root.join("cache");
@@ -204,6 +213,7 @@ pub(crate) fn prefetch_python_adapter_model(
         });
     }
 
+    let ownership = capture_provider_ownership(takokit_root, &model.id, &provider_before)?;
     let previous_size_bytes = previous_marker
         .as_ref()
         .filter(|marker| marker.same_install(&expected))
@@ -215,15 +225,18 @@ pub(crate) fn prefetch_python_adapter_model(
         .filter(|bytes| *bytes > 0)
         .or(previous_size_bytes)
         .unwrap_or_default();
+    completed_marker.provider_ownership_schema = ownership.schema_version;
+    completed_marker.owned_provider_artifacts = ownership.artifacts.len() as u64;
     write_marker_atomic(&marker_path, &completed_marker)?;
     Ok(Some(response.detail.unwrap_or_else(|| {
         format!(
-            "{} managed checkpoint prefetch; marker: {}",
+            "{} managed checkpoint prefetch; durable provider artifacts: {}; marker: {}",
             if previously_marked {
                 "Revalidated"
             } else {
                 "Completed"
             },
+            completed_marker.owned_provider_artifacts,
             marker_path.display()
         )
     })))

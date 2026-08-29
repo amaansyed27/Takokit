@@ -114,6 +114,8 @@ pub fn remove_model_complete(
         }
     }
 
+    append_provider_ownership_plan(&root, model_id, &mut deleted, &mut retained)?;
+
     if let Some(adapter) = target_manifest.required_adapter.as_deref() {
         let path = python_managed_runner_layout(&root).adapters.join(adapter);
         if remaining_adapters.contains(adapter) {
@@ -203,6 +205,49 @@ pub fn remove_model_complete(
     remove_file_if_present(&journal)?;
     report.removed = true;
     Ok(report)
+}
+
+fn append_provider_ownership_plan(
+    root: &Path,
+    model_id: &str,
+    deleted: &mut Vec<ModelRemovalItem>,
+    retained: &mut Vec<ModelRemovalItem>,
+) -> PackageResult<()> {
+    let Some(target) = read_model_provider_ownership(root, model_id)? else {
+        return Ok(());
+    };
+    let target_blobs = target
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.blob_path.clone())
+        .collect::<HashSet<_>>();
+    let cleanup = remove_model_provider_ownership(root, model_id, true)?;
+
+    for candidate in cleanup.removed {
+        if candidate.category != "ownership-ledger" && !target_blobs.contains(&candidate.path) {
+            continue;
+        }
+        deleted.push(ModelRemovalItem {
+            kind: candidate.category,
+            id: model_id.to_string(),
+            path: candidate.path,
+            logical_bytes: candidate.bytes,
+            reason: candidate.reason,
+        });
+    }
+    for candidate in cleanup.retained {
+        if !target_blobs.contains(&candidate.path) {
+            continue;
+        }
+        retained.push(ModelRemovalItem {
+            kind: candidate.category,
+            id: model_id.to_string(),
+            path: candidate.path,
+            logical_bytes: candidate.bytes,
+            reason: candidate.reason,
+        });
+    }
+    Ok(())
 }
 
 fn python_abi_paths(root: &Path, abi: &str) -> PackageResult<Vec<PathBuf>> {

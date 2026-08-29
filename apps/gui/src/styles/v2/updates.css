@@ -1,0 +1,122 @@
+.tk-update-settings {
+  gap: 16px;
+}
+
+.tk-update-settings .tk-settings-group__header {
+  align-items: center;
+}
+
+.tk-update-check,
+.tk-update-install-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tk-update-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--tk-border);
+  border-bottom: 1px solid var(--tk-border);
+}
+
+.tk-update-summary > div {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+  border-right: 1px solid var(--tk-border);
+}
+
+.tk-update-summary > div:last-child {
+  border-right: 0;
+}
+
+.tk-update-summary span,
+.tk-update-toggle small,
+.tk-update-install-row span,
+.tk-update-message {
+  color: var(--tk-text-muted);
+  font-size: 12px;
+}
+
+.tk-update-summary strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.tk-update-controls {
+  display: grid;
+  gap: 1px;
+  background: var(--tk-border);
+  border: 1px solid var(--tk-border);
+}
+
+.tk-update-channel,
+.tk-update-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 14px;
+  background: var(--tk-surface);
+}
+
+.tk-update-channel > span,
+.tk-update-toggle strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tk-update-channel select {
+  min-width: 120px;
+}
+
+.tk-update-toggle > span {
+  display: grid;
+  gap: 3px;
+}
+
+.tk-update-toggle input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.tk-update-install-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px;
+  border: 1px solid var(--tk-border);
+}
+
+.tk-update-install-row > div {
+  display: grid;
+  gap: 4px;
+}
+
+.tk-update-install-row strong {
+  font-size: 13px;
+}
+
+.tk-update-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--tk-text-muted);
+}
+
+@media (max-width: 900px) {
+  .tk-update-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tk-update-summary > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .tk-update-install-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

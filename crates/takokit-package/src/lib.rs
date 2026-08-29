@@ -12,6 +12,7 @@ mod model;
 mod orchestrator;
 mod planning;
 mod progress;
+mod provider_ownership;
 mod records;
 mod registry;
 mod registry_index;
@@ -41,6 +42,13 @@ pub use orchestrator::install_model_complete;
 pub use progress::{
     model_progress_path, read_model_progress, InstallProgress, InstallProgressMonitor,
     InstallProgressReporter, InstallProgressState,
+};
+pub use provider_ownership::{
+    capture_provider_ownership, clean_provider_storage, ensure_provider_cache_from_ownership,
+    migrate_legacy_provider_cache, provider_ownership_status, read_model_provider_ownership,
+    remove_model_provider_ownership, snapshot_provider_cache, ModelProviderOwnership,
+    ProviderCacheSnapshot, ProviderCleanupItem, ProviderCleanupReport, ProviderMigrationReport,
+    ProviderOwnedArtifact, ProviderOwnershipStatus, PROVIDER_OWNERSHIP_SCHEMA,
 };
 pub use records::*;
 pub use registry::PackageRegistry;

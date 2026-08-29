@@ -9,7 +9,9 @@ use takokit_core::{
     TrainVoiceResponse, TranscriptionRequest, TranscriptionResponse, VoiceConversionRequest,
     VoiceConversionResponse,
 };
-use takokit_package::{adapter_for_model, runtime_model_id, ExecutionPlan};
+use takokit_package::{
+    adapter_for_model, ensure_provider_cache_from_ownership, runtime_model_id, ExecutionPlan,
+};
 use takokit_store::VoiceProfileStore;
 use uuid::Uuid;
 
@@ -321,6 +323,20 @@ fn run_adapter(
     layout: &AdapterLayout,
     payload: &ManagedAdapterRequest<'_>,
 ) -> TakokitResult<ManagedAdapterResponse> {
+    if let (Some(storage_root), Some(model_id)) = (
+        payload.cache_dir.parent(),
+        payload
+            .model_dir
+            .file_name()
+            .and_then(|value| value.to_str()),
+    ) {
+        ensure_provider_cache_from_ownership(storage_root, model_id).map_err(|error| {
+            TakokitError::Storage(format!(
+                "could not reconstruct durable provider cache for {model_id}: {error}"
+            ))
+        })?;
+    }
+
     let encoded = serde_json::to_vec(payload).map_err(|error| {
         TakokitError::Audio(format!("could not encode {adapter} request: {error}"))
     })?;

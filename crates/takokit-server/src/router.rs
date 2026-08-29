@@ -25,6 +25,13 @@ pub fn server_router(state: AppState) -> Router {
         .route("/v1/system/picker/rvc", get(handlers::pick_rvc_artifact))
         .route("/v1/system/audio", get(handlers::local_audio))
         .route("/v1/system/storage", get(handlers::storage_overview))
+        .route("/v1/system/update", get(handlers::update_status))
+        .route("/v1/system/update/check", post(handlers::update_check))
+        .route("/v1/system/update/apply", post(handlers::update_apply))
+        .route(
+            "/v1/system/update/settings",
+            post(handlers::update_settings),
+        )
         .route("/v1/system/open", post(handlers::open_location))
         .route(
             "/v1/files",

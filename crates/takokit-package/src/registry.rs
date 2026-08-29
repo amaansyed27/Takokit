@@ -29,7 +29,7 @@ impl PackageRegistry {
     }
 
     pub fn bundled() -> Self {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../registry");
+        let root = bundled_registry_root();
         let home = std::env::var("TAKOKIT_HOME")
             .ok()
             .filter(|value| !value.trim().is_empty())
@@ -87,8 +87,6 @@ impl PackageRegistry {
         self.read_model_manifest(reference)
     }
 
-    /// Pulls refresh the small control-plane index first. Network failure is
-    /// deliberately non-fatal: the verified bundled or cached index remains usable.
     pub fn model_for_pull(&self, reference: &str) -> PackageResult<ModelManifest> {
         if let Some(manifest) = self.custom_model(reference)? {
             return Ok(manifest);
@@ -228,11 +226,9 @@ impl PackageRegistry {
     pub fn runners(&self) -> PackageResult<Vec<RunnerManifest>> {
         read_manifest_dir(&self.root.join("runners"))
     }
-
     pub fn library_models(&self) -> PackageResult<Vec<LibraryModelManifest>> {
         read_manifest_dir(&self.root.join("library").join("models"))
     }
-
     pub fn library_runners(&self) -> PackageResult<Vec<LibraryRunnerManifest>> {
         read_manifest_dir(&self.root.join("library").join("runners"))
     }
@@ -305,10 +301,35 @@ impl PackageRegistry {
     fn read_model(&self, id: &str) -> std::io::Result<String> {
         std::fs::read_to_string(self.root.join("models").join(format!("{id}.toml")))
     }
-
     fn read_runner(&self, id: &str) -> std::io::Result<String> {
         std::fs::read_to_string(self.root.join("runners").join(format!("{id}.toml")))
     }
+}
+
+fn bundled_registry_root() -> PathBuf {
+    if let Some(root) = std::env::var_os("TAKOKIT_REGISTRY_DIR")
+        .map(PathBuf::from)
+        .filter(|path| path.join("index.json").is_file())
+    {
+        return root;
+    }
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(bin) = executable.parent() {
+            let candidates = [
+                bin.join("resources").join("registry"),
+                bin.parent()
+                    .unwrap_or(bin)
+                    .join("resources")
+                    .join("registry"),
+            ];
+            for candidate in candidates {
+                if candidate.join("index.json").is_file() {
+                    return candidate;
+                }
+            }
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../registry")
 }
 
 fn registry_offline() -> bool {
@@ -325,16 +346,25 @@ where
     if !dir.exists() {
         return Ok(manifests);
     }
-
     let mut entries = std::fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(|entry| entry.file_name());
-
     for entry in entries {
         if entry.path().extension().and_then(|value| value.to_str()) == Some("toml") {
             let source = std::fs::read_to_string(entry.path())?;
             manifests.push(toml::from_str(&source)?);
         }
     }
-
     Ok(manifests)
+}
+
+#[cfg(test)]
+mod installed_resource_tests {
+    use super::*;
+    #[test]
+    fn bundled_registry_has_index() {
+        assert!(PackageRegistry::bundled()
+            .root()
+            .join("index.json")
+            .is_file());
+    }
 }

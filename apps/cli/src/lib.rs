@@ -2,12 +2,15 @@ mod daemon;
 mod daemon_client;
 mod direct_inference;
 mod display;
+mod distribution;
 mod doctor;
 mod gui;
 mod license_command;
+mod reset_command;
 mod session_commands;
 mod storage_command;
 mod tui;
+mod update_command;
 mod workspace;
 
 use clap::Parser;
@@ -16,9 +19,7 @@ use serde::Serialize;
 use std::{path::PathBuf, time::Instant};
 use takokit_audio::{write_silence_wav, WavSpec};
 use takokit_core::{CapabilityKind, RuntimeConfig, TakokitError};
-use takokit_models::{
-    execute_speech, execute_transcription, MockTextToSpeechEngine, TextToSpeechEngine,
-};
+use takokit_models::{execute_speech, execute_transcription};
 use takokit_package::{
     acquire_maintenance_lock, bootstrap_uv, custom_model_record, custom_model_records, find_uv,
     initialize_runner_runtime, install_model_complete, install_python_adapter,
@@ -57,6 +58,7 @@ pub async fn run() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    distribution::configure_installed_resources();
 
     let Cli {
         direct,
@@ -179,6 +181,9 @@ pub async fn run() -> anyhow::Result<()> {
             println!("takokit {}", env!("CARGO_PKG_VERSION"));
             println!("build: {}", daemon::current_build_id());
             println!("storage: {}", store.root().display());
+            if let Some(metadata) = distribution::distribution_metadata() {
+                println!("distribution: {}", metadata.mode);
+            }
         }
         Some(Command::Status) => {
             let state = AppState::new_with_build_id(config, store, daemon::current_build_id());
@@ -189,6 +194,12 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Some(Command::Storage(args)) => {
             run_storage_command(store.root(), args, json_output_requested())?;
+        }
+        Some(Command::Update { command }) => {
+            update_command::run_update_command(&store, &config, command, json_output_requested())?;
+        }
+        Some(Command::Reset(args)) => {
+            reset_command::run_reset_command(&store, &config, args, json_output_requested())?;
         }
         Some(Command::Licenses { command }) => {
             run_license_command(store.root(), command)?;
@@ -248,9 +259,7 @@ pub async fn run() -> anyhow::Result<()> {
                     "models": package_registry.registry_models().map_err(cli_error)?.len()
                 }))?;
             }
-            LibraryTarget::Show { model } => {
-                print_library_model(&package_registry, &model)?;
-            }
+            LibraryTarget::Show { model } => print_library_model(&package_registry, &model)?,
         },
         Some(Command::Speak(args)) => {
             run_speak(
@@ -408,10 +417,7 @@ pub async fn run() -> anyhow::Result<()> {
                 let removed = installed_registry
                     .remove_runner(&runner)
                     .map_err(cli_error)?;
-                print_value(&serde_json::json!({
-                    "id": runner,
-                    "removed": removed
-                }))?;
+                print_value(&serde_json::json!({"id": runner, "removed": removed}))?;
             }
         },
         Some(Command::Adapter { command }) => match command {
@@ -454,8 +460,8 @@ fn command_uses_workspace(command: &Option<Command>) -> bool {
             })
             | Some(Command::Voice {
                 command: VoiceCommand::Rvc {
-                    command: RvcVoiceCommand::Test { .. },
-                },
+                    command: RvcVoiceCommand::Test { .. }
+                }
             })
             | Some(Command::Convert(_))
             | Some(Command::Train(_))

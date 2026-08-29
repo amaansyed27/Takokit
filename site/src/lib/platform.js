@@ -1,20 +1,24 @@
-export const PLATFORM_ORDER = ["windows", "macos", "linux"];
+export const PUBLIC_SITE_ORIGIN = "https://takokit.dawnlightlabs.com";
+export const PLATFORM_ORDER = ["windows", "linux", "macos"];
 
 export const PLATFORM_DETAILS = {
   windows: {
     label: "Windows",
     shell: "PowerShell",
-    note: "Installs to your user account. Git, Rust, Node.js, and npm are required while signed binaries are still in progress.",
-  },
-  macos: {
-    label: "macOS",
-    shell: "Terminal",
-    note: "Installs to ~/.local/bin. Git, Rust, Node.js, and npm are required while signed binaries are still in progress.",
+    available: true,
+    note: "Windows 10 or Windows 11 on x86_64. The desktop GUI requires Microsoft Edge WebView2 Runtime.",
   },
   linux: {
     label: "Linux",
     shell: "Terminal",
-    note: "Installs to ~/.local/bin. Git, Rust, Node.js, and npm are required while signed binaries are still in progress.",
+    available: false,
+    note: "Packaging is not available yet. Linux distribution work remains a later slice.",
+  },
+  macos: {
+    label: "macOS",
+    shell: "Terminal",
+    available: false,
+    note: "Packaging is not available yet. macOS distribution work remains a later slice.",
   },
 };
 
@@ -31,8 +35,7 @@ export function detectPlatform(source = globalThis.navigator) {
   return "windows";
 }
 
-export function installCommand(platform, origin) {
-  const base = String(origin || "https://takokit-library.vercel.app").replace(/\/+$/, "");
-  if (platform === "windows") return `irm ${base}/install.ps1 | iex`;
-  return `curl -fsSL ${base}/install.sh | sh`;
+export function installCommand(platform) {
+  if (platform !== "windows") return null;
+  return `irm ${PUBLIC_SITE_ORIGIN}/install.ps1 | iex`;
 }

@@ -79,6 +79,11 @@ pub async fn run_launcher(
                         "\n\nThe task finished, but refreshing local state failed: {error:#}"
                     ));
                 }
+                if matches!(state.screen, TuiScreen::System) {
+                    state.system = catalog::system_rows();
+                    state.system_index =
+                        state.system_index.min(state.system.len().saturating_sub(1));
+                }
                 if !success {
                     state.screen = TuiScreen::Activity;
                 }
@@ -127,8 +132,12 @@ pub async fn run_launcher(
                 }
                 TuiAction::Refresh => {
                     match state.reload(config, store, package_registry, installed_registry) {
-                        Ok(()) => state
-                            .set_status("Local model, runner, voice, and session state refreshed."),
+                        Ok(()) => {
+                            state.system = catalog::system_rows();
+                            state.set_status(
+                                "Local model, runner, voice, session, and update state refreshed.",
+                            )
+                        }
                         Err(error) => state.set_status(format!("Refresh failed: {error:#}")),
                     }
                 }
@@ -292,6 +301,62 @@ fn system_task(action: SystemAction) -> (String, Vec<String>) {
     match action {
         SystemAction::Status => ("Checking runtime status".into(), vec!["status".into()]),
         SystemAction::Doctor => ("Running diagnostics".into(), vec!["doctor".into()]),
+        SystemAction::UpdateStatus => (
+            "Loading update status".into(),
+            vec!["update".into(), "status".into()],
+        ),
+        SystemAction::UpdateCheck => (
+            "Checking for updates".into(),
+            vec!["update".into(), "check".into()],
+        ),
+        SystemAction::UpdateInstall => (
+            "Installing verified update".into(),
+            vec!["update".into(), "apply".into()],
+        ),
+        SystemAction::UpdateStable => (
+            "Selecting stable updates".into(),
+            vec!["update".into(), "channel".into(), "stable".into()],
+        ),
+        SystemAction::UpdatePreview => (
+            "Selecting preview updates".into(),
+            vec!["update".into(), "channel".into(), "preview".into()],
+        ),
+        SystemAction::AutomaticChecksOn => (
+            "Enabling automatic update checks".into(),
+            vec![
+                "update".into(),
+                "configure".into(),
+                "--automatic-checks".into(),
+                "on".into(),
+            ],
+        ),
+        SystemAction::AutomaticChecksOff => (
+            "Disabling automatic update checks".into(),
+            vec![
+                "update".into(),
+                "configure".into(),
+                "--automatic-checks".into(),
+                "off".into(),
+            ],
+        ),
+        SystemAction::AutomaticDownloadOn => (
+            "Enabling verified automatic update download".into(),
+            vec![
+                "update".into(),
+                "configure".into(),
+                "--automatic-download".into(),
+                "on".into(),
+            ],
+        ),
+        SystemAction::AutomaticDownloadOff => (
+            "Disabling automatic update download".into(),
+            vec![
+                "update".into(),
+                "configure".into(),
+                "--automatic-download".into(),
+                "off".into(),
+            ],
+        ),
         SystemAction::StartDaemon => (
             "Starting the local service".into(),
             vec!["daemon".into(), "start".into()],
@@ -321,5 +386,13 @@ mod tests {
         let (label, args) = system_task(SystemAction::Doctor);
         assert_eq!(label, "Running diagnostics");
         assert_eq!(args, vec!["doctor"]);
+    }
+
+    #[test]
+    fn update_system_tasks_use_public_update_commands() {
+        let (_, check) = system_task(SystemAction::UpdateCheck);
+        let (_, install) = system_task(SystemAction::UpdateInstall);
+        assert_eq!(check, vec!["update", "check"]);
+        assert_eq!(install, vec!["update", "apply"]);
     }
 }

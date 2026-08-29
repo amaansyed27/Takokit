@@ -14,7 +14,6 @@ use takokit_core::{
 };
 use takokit_models::{
     execute_speech, execute_transcription, execute_voice_conversion, execute_voice_training,
-    TextToSpeechEngine,
 };
 use takokit_package::{
     acquire_maintenance_lock, initialize_runner_runtime, install_model_complete,
@@ -36,6 +35,7 @@ mod rvc_picker;
 mod rvc_voices;
 mod sessions;
 mod system;
+mod update;
 
 pub use error::ApiError;
 pub use files::*;
@@ -47,3 +47,4 @@ pub use rvc_picker::*;
 pub use rvc_voices::*;
 pub use sessions::*;
 pub use system::*;
+pub use update::*;

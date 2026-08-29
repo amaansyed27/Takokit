@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectPlatform, installCommand } from "../src/lib/platform.js";
+import {
+  detectPlatform,
+  installCommand,
+  PLATFORM_DETAILS,
+  PUBLIC_SITE_ORIGIN,
+} from "../src/lib/platform.js";
 
 test("detectPlatform identifies Windows", () => {
   assert.equal(detectPlatform({ platform: "Win32" }), "windows");
@@ -14,13 +19,18 @@ test("detectPlatform identifies Linux", () => {
   assert.equal(detectPlatform({ userAgent: "Mozilla/5.0 (X11; Linux x86_64)" }), "linux");
 });
 
-test("installCommand uses PowerShell on Windows and curl elsewhere", () => {
+test("Windows command is the stable Dawnlight PowerShell bootstrap", () => {
+  assert.equal(PUBLIC_SITE_ORIGIN, "https://takokit.dawnlightlabs.com");
   assert.equal(
-    installCommand("windows", "https://example.com/"),
-    "irm https://example.com/install.ps1 | iex",
+    installCommand("windows"),
+    "irm https://takokit.dawnlightlabs.com/install.ps1 | iex",
   );
-  assert.equal(
-    installCommand("linux", "https://example.com/"),
-    "curl -fsSL https://example.com/install.sh | sh",
-  );
+});
+
+test("unpublished platforms do not expose fake install commands", () => {
+  assert.equal(PLATFORM_DETAILS.windows.available, true);
+  assert.equal(PLATFORM_DETAILS.linux.available, false);
+  assert.equal(PLATFORM_DETAILS.macos.available, false);
+  assert.equal(installCommand("linux"), null);
+  assert.equal(installCommand("macos"), null);
 });

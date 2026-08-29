@@ -10,6 +10,7 @@ import {
 import type { RouteComponentProps } from "../../app/routes";
 import { ProductPageHeader } from "../../components/ui/ProductPageHeader";
 import { useTheme, type TakokitTheme } from "../../hooks/useTheme";
+import { UpdateSettings } from "./UpdateSettings";
 
 export function SettingsPage({ runtime, onNavigate }: RouteComponentProps) {
   const { theme, setTheme } = useTheme();
@@ -77,6 +78,8 @@ export function SettingsPage({ runtime, onNavigate }: RouteComponentProps) {
               />
             </div>
           </section>
+
+          <UpdateSettings />
 
           <section className="tk-settings-group">
             <header className="tk-settings-group__header">

@@ -18,16 +18,22 @@ test("Vercel builds the canonical Vite source", async () => {
   await access(new URL("scripts/verify-deployment.mjs", root));
 });
 
-test("SPA, registry, installer, and cache configuration are present", async () => {
+test("SPA, stable release, direct download, and raw installer routes are explicit", async () => {
   const config = JSON.parse(await readFile(new URL("vercel.json", root), "utf8"));
   assert.equal(config.cleanUrls, true);
   assert.ok(config.rewrites.some((rule) => rule.source === "/v1/registry.json"));
-  assert.ok(config.rewrites.some((rule) => rule.destination === "/"));
+  assert.ok(config.rewrites.some((rule) => rule.source === "/v1/releases/stable/windows-x86_64.json"));
+  assert.ok(config.rewrites.some((rule) => rule.source === "/download/windows"));
+  const spa = config.rewrites.find((rule) => rule.destination === "/");
+  assert.ok(spa);
+  assert.match(spa.source, /install\\\.ps1/);
+  assert.match(spa.source, /download\/windows/);
   assert.ok(!config.rewrites.some((rule) => rule.destination === "/index.html"));
-  assert.ok(config.headers.some((rule) => rule.source === "/assets/(.*)"));
-  assert.ok(config.headers.some((rule) => rule.source === "/brand/(.*)"));
-  assert.ok(config.headers.some((rule) => rule.source === "/install.ps1"));
-  assert.ok(config.headers.some((rule) => rule.source === "/install.sh"));
+
+  const installHeaders = config.headers.find((rule) => rule.source === "/install.ps1");
+  assert.ok(installHeaders);
+  assert.ok(installHeaders.headers.some((header) =>
+    header.key === "Content-Type" && header.value === "text/plain; charset=utf-8"));
 });
 
 test("registry API follows the deployed Git revision and exposes diagnostics", async () => {
