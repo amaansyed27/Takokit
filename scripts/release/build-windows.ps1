@@ -20,7 +20,7 @@ $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 Set-Location $RepoRoot
 
 if (Test-Path -LiteralPath (Join-Path $RepoRoot 'apps\desktop')) {
-    throw 'Release gate: apps\desktop must not exist; Takokit GUI is browser-served and takokit-tray.exe is controller-only.'
+    throw 'Release gate: apps\desktop must not exist; Takokit GUI is browser-served and resident mode is integrated into tako.exe.'
 }
 
 function Invoke-Checked {
@@ -138,7 +138,7 @@ $env:TAKOKIT_BUILD_ID = $BuildId
 $env:SOURCE_DATE_EPOCH = [DateTimeOffset]$CommitTime | ForEach-Object { $_.ToUnixTimeSeconds().ToString() }
 
 if (-not $SkipBuild) {
-    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater' '--bin' 'takokit-tray'
+    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater'
     Invoke-Checked cargo 'build' '--release' '--locked' '-p' 'takokit-release' '--bin' 'takokit-release-tool'
     Push-Location (Join-Path $RepoRoot 'apps\gui')
     try {
@@ -153,7 +153,6 @@ $RequiredFiles = @(
     'target\release\tako.exe',
     'target\release\takokit.exe',
     'target\release\takokit-updater.exe',
-    'target\release\takokit-tray.exe',
     'target\release\takokit-release-tool.exe',
     'apps\gui\dist\index.html',
     'registry\index.json',
@@ -179,7 +178,6 @@ New-Item -ItemType Directory -Force -Path (Join-Path $BaseTree 'resources\icons'
 Copy-Item 'target\release\tako.exe' (Join-Path $BaseTree 'bin\tako.exe')
 Copy-Item 'target\release\takokit.exe' (Join-Path $BaseTree 'bin\takokit.exe')
 Copy-Item 'target\release\takokit-updater.exe' (Join-Path $BaseTree 'bin\takokit-updater.exe')
-Copy-Item 'target\release\takokit-tray.exe' (Join-Path $BaseTree 'bin\takokit-tray.exe')
 Copy-DirectoryContents (Join-Path $RepoRoot 'apps\gui\dist') (Join-Path $BaseTree 'resources\gui')
 Copy-DirectoryContents (Join-Path $RepoRoot 'registry') (Join-Path $BaseTree 'resources\registry')
 Copy-Item 'assets\favicon\favicon.ico' (Join-Path $BaseTree 'resources\icons\takokit.ico')

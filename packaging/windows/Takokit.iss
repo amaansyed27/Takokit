@@ -45,16 +45,19 @@ AllowNoIcons=yes
 [Files]
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+Type: files; Name: "{app}\bin\takokit-tray.exe"
+
 [Icons]
-Name: "{group}\Takokit"; Filename: "{app}\bin\tako.exe"; Parameters: "gui --workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open the Takokit local web GUI"
+Name: "{group}\Takokit"; Filename: "{app}\bin\tako.exe"; Parameters: "--resident"; WorkingDir: "{app}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Run the Takokit local voice runtime"; Flags: runminimized
 Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
-Name: "{group}\Takokit Tray"; Filename: "{app}\bin\takokit-tray.exe"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Start the Takokit server controller"
 
 [Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Takokit"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "TakokitTray"; Flags: uninsdeletevalue dontcreatekey
 
 [Run]
-Filename: "{app}\bin\takokit-tray.exe"; Description: "Start Takokit tray controller"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\bin\tako.exe"; Parameters: "--resident"; Description: "Start Takokit"; Flags: nowait postinstall skipifsilent runhidden
 
 [Code]
 const
@@ -170,12 +173,16 @@ end;
 procedure StopOwnedTakokitDaemon;
 var
   TakoExe: string;
-  TrayExe: string;
+  ResidentExe: string;
+  LegacyTrayExe: string;
   ResultCode: Integer;
 begin
-  TrayExe := ExpandConstant('{app}\bin\takokit-tray.exe');
-  if FileExists(TrayExe) then
-    Exec(TrayExe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  LegacyTrayExe := ExpandConstant('{app}\bin\takokit-tray.exe');
+  if FileExists(LegacyTrayExe) then
+    Exec(LegacyTrayExe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  ResidentExe := ExpandConstant('{app}\bin\tako.exe');
+  if FileExists(ResidentExe) then
+    Exec(ResidentExe, '--resident --resident-quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   TakoExe := ExpandConstant('{app}\bin\tako.exe');
   if FileExists(TakoExe) then
   begin
@@ -195,7 +202,10 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
     AddOwnedPathEntry;
+    RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'TakokitTray');
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

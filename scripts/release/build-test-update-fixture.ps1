@@ -124,7 +124,7 @@ try {
     $env:TAKOKIT_BUILD_ID = $FixtureBuildId
     Push-Location $Worktree
     try {
-        Invoke-Checked cargo 'build' '--release' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater' '--bin' 'takokit-tray'
+        Invoke-Checked cargo 'build' '--release' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater'
     } finally {
         Pop-Location
     }
@@ -133,7 +133,6 @@ try {
     Copy-Item -LiteralPath (Join-Path $Target 'release\tako.exe') -Destination (Join-Path $FixtureTree 'bin\tako.exe') -Force
     Copy-Item -LiteralPath (Join-Path $Target 'release\takokit.exe') -Destination (Join-Path $FixtureTree 'bin\takokit.exe') -Force
     Copy-Item -LiteralPath (Join-Path $Target 'release\takokit-updater.exe') -Destination (Join-Path $FixtureTree 'bin\takokit-updater.exe') -Force
-    Copy-Item -LiteralPath (Join-Path $Target 'release\takokit-tray.exe') -Destination (Join-Path $FixtureTree 'bin\takokit-tray.exe') -Force
 
     $Distribution = [ordered]@{
         product = 'Takokit'

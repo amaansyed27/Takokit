@@ -358,7 +358,7 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-updater.exe') -PathType Leaf) 'Installer did not install takokit-updater.exe.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-tray.exe') -PathType Leaf) 'Installer did not install takokit-tray.exe.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-tray.exe'))) 'Installer ships the removed takokit-tray.exe.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe'))) 'Installer still installed the removed native desktop wrapper.'
     $installedVersion = Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')
     Assert-True ($installedVersion.Version -eq $Version) "Installed version mismatch: $($installedVersion.Version)"
@@ -381,13 +381,15 @@ try {
     $ExpectedWorkspace = Join-Path $ExpectedDocuments 'Takokit'
     $ExpectedTako = Join-Path $InstalledBin 'tako.exe'
     Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedTako, [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the installed tako.exe.'
-    Assert-True ($GuiShortcut.Arguments -match '(^|\s)gui(\s|$)') 'GUI shortcut does not invoke tako gui.'
-    Assert-True ($GuiShortcut.Arguments -match '--workspace') 'GUI shortcut does not pass an explicit workspace.'
-    Assert-True ($GuiShortcut.Arguments.Contains($ExpectedWorkspace)) "GUI shortcut workspace is not the safe Documents/Takokit path: $($GuiShortcut.Arguments)"
+    Assert-True ($GuiShortcut.Arguments -match '(^|\s)--resident(\s|$)') 'Primary Takokit shortcut does not invoke integrated resident mode.'
+    Assert-True ($GuiShortcut.Arguments -notmatch '(^|\s)gui(\s|$)') 'Primary Takokit shortcut still opens the browser GUI directly.'
     Assert-True ([string]::Equals($TuiShortcut.TargetPath, $ExpectedTako, [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut does not target the installed tako.exe.'
     Assert-True ($TuiShortcut.Arguments -match '--workspace') 'TUI shortcut does not pass an explicit workspace.'
     Assert-True ($TuiShortcut.Arguments.Contains($ExpectedWorkspace)) "TUI shortcut workspace is not the safe Documents/Takokit path: $($TuiShortcut.Arguments)"
     $Report.installer_shortcut_workspace = $true
+
+    & (Join-Path $PSScriptRoot 'test-windows-resident.ps1') -TakoExe $ExpectedTako -OutputRoot (Join-Path $OutputRoot 'resident-installer-acceptance') -Port 5167 -AssertNoSibling
+    Assert-True ($LASTEXITCODE -eq 0) 'Installed resident Takokit acceptance failed.'
 
     # Reinstall/repair must not duplicate the PATH entry.
     $ReinstallLog = Join-Path $OutputRoot 'installer-acceptance-reinstall.log'
