@@ -60,6 +60,37 @@ async fn openai_speech_rejects_unknown_fields_with_openai_error_envelope() {
 }
 
 #[tokio::test]
+async fn openai_transcription_rejects_truncated_wav_before_execution() {
+    let boundary = "takokit-truncated-wav";
+    let body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"broken.wav\"\r\nContent-Type: audio/wav\r\n\r\nRIFFbad\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nwhisper-tiny\r\n--{boundary}--\r\n"
+    );
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/transcriptions")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["param"], "file");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("malformed"));
+}
+
+#[tokio::test]
 async fn hostile_host_and_origin_are_rejected_on_loopback() {
     for (header, value, code) in [
         ("host", "attacker.example", "invalid_host"),

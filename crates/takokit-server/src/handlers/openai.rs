@@ -239,6 +239,7 @@ pub async fn openai_transcription(
                 if bytes.len() > MAX_AUDIO_UPLOAD_BYTES {
                     return Err(OpenAiError::too_large());
                 }
+                validate_audio_upload(&extension, &bytes)?;
                 let path = temp.path().join(format!("upload.{extension}"));
                 tokio::fs::write(&path, &bytes).await.map_err(|error| {
                     OpenAiError::runtime(format!("Could not stage audio: {error}"))
@@ -305,6 +306,31 @@ pub async fn openai_transcription(
             .into_response())
     } else {
         Ok(Json(serde_json::json!({ "text": result.text })).into_response())
+    }
+}
+
+fn validate_audio_upload(extension: &str, bytes: &[u8]) -> Result<(), OpenAiError> {
+    let valid = match extension {
+        "wav" => {
+            bytes.len() >= 44 && bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WAVE")
+        }
+        "mp3" => {
+            bytes.len() >= 4
+                && (bytes.starts_with(b"ID3") || (bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0))
+        }
+        "flac" => bytes.len() >= 4 && bytes.starts_with(b"fLaC"),
+        "ogg" => bytes.len() >= 4 && bytes.starts_with(b"OggS"),
+        "m4a" => bytes.len() >= 12 && bytes.get(4..8) == Some(b"ftyp"),
+        "webm" => bytes.len() >= 4 && bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]),
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(OpenAiError::invalid(
+            Some("file"),
+            "Audio upload is malformed or does not match its declared file type.",
+        ))
     }
 }
 
