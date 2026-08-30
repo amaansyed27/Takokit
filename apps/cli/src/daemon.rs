@@ -38,7 +38,7 @@ pub(crate) fn current_build_id() -> &'static str {
 }
 
 #[cfg(windows)]
-mod windows_handle_inheritance {
+pub(crate) mod windows_handle_inheritance {
     use std::ffi::c_void;
 
     type Handle = *mut c_void;

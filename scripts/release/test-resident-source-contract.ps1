@@ -18,6 +18,7 @@ Assert-True ($Cargo -match 'name\s*=\s*"Takokit"') 'Cargo does not declare the m
 Assert-True ($Cargo -match 'name\s*=\s*"takokit-server"') 'Cargo does not declare the distinct internal server runtime.'
 Assert-True ($Application -match 'windows_subsystem\s*=\s*"windows"') 'Takokit application is not a Windows GUI-subsystem executable.'
 Assert-True ($ApplicationLifecycle -match 'creation_flags\(0x0000_0008 \| 0x0000_0200\)') 'CLI resident launch is not detached from its invoking console/pipeline.'
+Assert-True ($ApplicationLifecycle -match 'windows_handle_inheritance::suppress\(\)') 'CLI resident launch can inherit and hold its invoking pipeline handles.'
 Assert-True ($Installer -match 'Filename:\s*"\{app\}\\bin\\Takokit\.exe"') 'Primary Takokit shortcut does not launch the main Windows application.'
 Assert-True ($Installer -notmatch 'Name:\s*"\{group\}\\Takokit Tray"') 'Installer still creates a separate Takokit Tray shortcut.'
 Assert-True ($Installer -match 'ValueName:\s*"Takokit"') 'Installer does not own the canonical Takokit startup value.'

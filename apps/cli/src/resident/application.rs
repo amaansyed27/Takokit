@@ -23,6 +23,8 @@ pub(crate) fn ensure_running(open_gui: bool) -> anyhow::Result<()> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0000_0008 | 0x0000_0200);
     }
+    #[cfg(windows)]
+    let _guard = crate::daemon::windows_handle_inheritance::suppress();
     command
         .spawn()
         .map_err(|error| anyhow::anyhow!("start {}: {error}", executable.display()))?;
