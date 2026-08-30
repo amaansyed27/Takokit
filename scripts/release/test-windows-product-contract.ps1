@@ -244,6 +244,7 @@ try {
     Assert-True ($null -ne $PortableFolder) 'Portable ZIP has no top-level directory.'
     $PortableRoot = $PortableFolder.FullName
     $PortableTako = Join-Path $PortableRoot 'bin\tako.exe'
+    $PortableApplication = Join-Path $PortableRoot 'bin\Takokit.exe'
     foreach ($relative in @(
         'bin\tako.exe',
         'bin\Takokit.exe',
@@ -298,6 +299,8 @@ try {
     $portableStop = & $PortableTako daemon stop 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "Portable daemon stop failed: $portableStop"
     Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
+    $portableQuit = Start-Process -FilePath $PortableApplication -ArgumentList @('--quit') -PassThru -WindowStyle Hidden
+    Assert-True ($portableQuit.WaitForExit(5000)) 'Portable resident quit request did not return.'
     $Report.portable_gui_served = $true
 
     Set-Location $OriginalLocation
