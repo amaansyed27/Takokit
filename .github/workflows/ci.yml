@@ -107,7 +107,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build release binaries
-        run: cargo build --release --bin tako --bin takokit
+        run: cargo build --release --bin tako --bin takokit-server
 
       - name: Pull RVC in clean managed home (Windows)
         if: runner.os == 'Windows'
