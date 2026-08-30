@@ -15,6 +15,24 @@ fn main() {
         });
 
     println!("cargo:rustc-env=TAKOKIT_BUILD_ID={build_id}");
+
+    #[cfg(windows)]
+    embed_windows_branding();
+}
+
+#[cfg(windows)]
+fn embed_windows_branding() {
+    let icon = Path::new("../../assets/favicon/favicon.ico");
+    println!("cargo:rerun-if-changed={}", icon.display());
+    let mut resource = winresource::WindowsResource::new();
+    resource
+        .set_icon(icon.to_string_lossy().as_ref())
+        .set("ProductName", "Takokit")
+        .set("FileDescription", "Takokit local voice AI runtime")
+        .set("CompanyName", "Dawnlight Labs");
+    resource
+        .compile()
+        .expect("compile Takokit Windows icon resource");
 }
 
 fn explicit_build_id() -> Option<String> {

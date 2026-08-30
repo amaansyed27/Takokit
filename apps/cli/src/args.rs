@@ -38,6 +38,15 @@ impl From<RvcF0MethodArg> for takokit_core::RvcF0Method {
 #[derive(Debug, Parser)]
 #[command(name = "takokit", version, about = "Local voice AI runtime")]
 pub(crate) struct Cli {
+    /// Run the installed resident Takokit application (internal Windows entrypoint).
+    #[arg(long, hide = true)]
+    pub(crate) resident: bool,
+    /// Ask the installed resident Takokit application to quit (internal Windows entrypoint).
+    #[arg(long, hide = true)]
+    pub(crate) resident_quit: bool,
+    /// Send an internal action to the running resident application.
+    #[arg(long, hide = true)]
+    pub(crate) resident_action: Option<String>,
     #[arg(long, global = true)]
     pub(crate) direct: bool,
     /// Override the output format. When omitted, terminal output stays human-readable.

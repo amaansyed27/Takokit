@@ -7,6 +7,8 @@ mod doctor;
 mod gui;
 mod license_command;
 mod reset_command;
+#[cfg(windows)]
+mod resident;
 mod session_commands;
 mod storage_command;
 mod tui;
@@ -63,12 +65,23 @@ pub async fn run() -> anyhow::Result<()> {
     distribution::configure_installed_resources();
 
     let Cli {
+        resident,
+        resident_quit: _,
+        resident_action: _,
         direct,
         output,
         workspace: workspace_arg,
         session: session_arg,
         command,
     } = Cli::parse();
+    #[cfg(windows)]
+    if resident {
+        return resident::run();
+    }
+    #[cfg(not(windows))]
+    if resident {
+        anyhow::bail!("Takokit resident mode is available on Windows only");
+    }
     if let Some(output) = output {
         set_json_output(matches!(output, OutputFormat::Json));
     }
