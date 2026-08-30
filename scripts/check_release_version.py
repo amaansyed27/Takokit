@@ -63,7 +63,7 @@ checks.append(
 installer = ROOT / "packaging/windows/Takokit.iss"
 if installer.exists():
     text = installer.read_text(encoding="utf-8")
-    match = re.search(r'(?m)^#define\s+MyAppVersion\s+"([^"]+)"', text)
+    match = re.search(r'(?m)^\s*#define\s+MyAppVersion\s+"([^"]+)"', text)
     checks.append(("installer version", match.group(1) if match else "<missing>"))
 
 release_ps1 = ROOT / "scripts/release/build-windows.ps1"
