@@ -1,4 +1,5 @@
 /target/
+/dist/
 /apps/gui/node_modules/
 /apps/gui/dist/
 /.takokit/
