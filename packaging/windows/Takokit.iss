@@ -1,5 +1,7 @@
 #define MyAppName "Takokit"
-#define MyAppVersion "0.2.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.2.0"
+#endif
 #define MyAppPublisher "Dawnlight Labs"
 
 #ifndef SourceRoot

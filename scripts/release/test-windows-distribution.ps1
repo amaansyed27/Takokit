@@ -244,7 +244,8 @@ foreach ($required in @($Installer, $PortableZip, $Manifest, $Signature, $Releas
 Invoke-Checked $ReleaseTool 'verify' $Manifest $Signature '--allow-test'
 Invoke-Checked $ReleaseTool 'verify' $FixtureManifest $FixtureSignature '--allow-test'
 
-$TempRoot = Join-Path $env:RUNNER_TEMP ("takokit-slice4-acceptance-" + [Guid]::NewGuid().ToString('N'))
+$AcceptanceTemp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+$TempRoot = Join-Path $AcceptanceTemp ("takokit-slice5-acceptance-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $TempRoot | Out-Null
 $OriginalUserPath = Get-UserPath
 $OriginalTakokitHome = $env:TAKOKIT_HOME

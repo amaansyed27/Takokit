@@ -42,6 +42,9 @@ function New-TestManifest {
         [string]$ArtifactName,
         [uint64]$ArtifactSize,
         [string]$ArtifactSha,
+        [string]$InstallerName,
+        [uint64]$InstallerSize,
+        [string]$InstallerSha,
         [uint32]$StorageMin = 1,
         [uint32]$StorageMax = 1
     )
@@ -69,6 +72,13 @@ function New-TestManifest {
                 name = $ArtifactName
                 size = $ArtifactSize
                 sha256 = $ArtifactSha
+                url = $null
+            },
+            [ordered]@{
+                role = 'installer'
+                name = $InstallerName
+                size = $InstallerSize
+                sha256 = $InstallerSha
                 url = $null
             }
         )
@@ -151,22 +161,35 @@ try {
     $BundleItem = Get-Item -LiteralPath $Bundle
     $BundleSha = Get-Sha256 $Bundle
 
+    $IsccCandidates = @(
+        (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+    $Iscc = $IsccCandidates | Select-Object -First 1
+    if (-not $Iscc) { throw 'Inno Setup compiler is required for the update fixture installer.' }
+    Invoke-Checked $Iscc "/DMyAppVersion=$FixtureVersion" "/DSourceRoot=$FixtureTree" "/DOutputRoot=$OutputRoot" (Join-Path $Worktree 'packaging\windows\Takokit.iss')
+    $InstallerName = "Takokit-v$FixtureVersion-windows-x86_64-installer.exe"
+    $Installer = Join-Path $OutputRoot $InstallerName
+    $InstallerItem = Get-Item -LiteralPath $Installer
+    $InstallerSha = Get-Sha256 $Installer
+
     $Manifest = Join-Path $OutputRoot 'release-manifest.json'
     $Signature = Join-Path $OutputRoot 'release-manifest.sig'
-    New-TestManifest -Path $Manifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha
+    New-TestManifest -Path $Manifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha -InstallerName $InstallerName -InstallerSize $InstallerItem.Length -InstallerSha $InstallerSha
     Invoke-Checked $ReleaseTool 'sign' $Manifest $Signature '--test'
     Invoke-Checked $ReleaseTool 'verify' $Manifest $Signature '--allow-test'
 
     # Signed bad-hash manifest: metadata authenticates successfully, artifact verification must fail.
     $BadHashManifest = Join-Path $OutputRoot 'release-manifest-bad-hash.json'
     $BadHashSignature = Join-Path $OutputRoot 'release-manifest-bad-hash.sig'
-    New-TestManifest -Path $BadHashManifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha ('0' * 64)
+    New-TestManifest -Path $BadHashManifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha ('0' * 64) -InstallerName $InstallerName -InstallerSize $InstallerItem.Length -InstallerSha $InstallerSha
     Invoke-Checked $ReleaseTool 'sign' $BadHashManifest $BadHashSignature '--test'
 
     # Signed incompatible storage schema manifest: signature is valid but compatibility must reject it.
     $IncompatibleManifest = Join-Path $OutputRoot 'release-manifest-incompatible.json'
     $IncompatibleSignature = Join-Path $OutputRoot 'release-manifest-incompatible.sig'
-    New-TestManifest -Path $IncompatibleManifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha -StorageMin 99 -StorageMax 99
+    New-TestManifest -Path $IncompatibleManifest -ArtifactName $BundleName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha -InstallerName $InstallerName -InstallerSize $InstallerItem.Length -InstallerSha $InstallerSha -StorageMin 99 -StorageMax 99
     Invoke-Checked $ReleaseTool 'sign' $IncompatibleManifest $IncompatibleSignature '--test'
 
     # Invalid detached signature for the otherwise valid manifest.
@@ -181,7 +204,7 @@ try {
     [System.IO.File]::AppendAllText($CorruptBundle, 'TAKOKIT_CORRUPTION_FIXTURE')
     $CorruptManifest = Join-Path $OutputRoot 'release-manifest-corrupt-artifact.json'
     $CorruptSignature = Join-Path $OutputRoot 'release-manifest-corrupt-artifact.sig'
-    New-TestManifest -Path $CorruptManifest -ArtifactName $CorruptName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha
+    New-TestManifest -Path $CorruptManifest -ArtifactName $CorruptName -ArtifactSize $BundleItem.Length -ArtifactSha $BundleSha -InstallerName $InstallerName -InstallerSize $InstallerItem.Length -InstallerSha $InstallerSha
     Invoke-Checked $ReleaseTool 'sign' $CorruptManifest $CorruptSignature '--test'
 
     $Readme = @"
