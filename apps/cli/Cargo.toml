@@ -18,6 +18,10 @@ path = "src/bin/tako.rs"
 name = "takokit-updater"
 path = "src/bin/takokit-updater.rs"
 
+[[bin]]
+name = "takokit-tray"
+path = "src/bin/takokit-tray.rs"
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
@@ -41,6 +45,16 @@ sha2.workspace = true
 ureq.workspace = true
 uuid.workspace = true
 zip.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3"

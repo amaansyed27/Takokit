@@ -11,19 +11,19 @@ import { workspaceHeaders } from "./workspace";
 const API_BASE = window.location.origin;
 
 export function generateSessionSpeech(request: SpeechApiRequest): Promise<SpeechApiResponse> {
-  return requestJson<SpeechApiResponse>("/v1/audio/speech", request);
+  return requestJson<SpeechApiResponse>("/api/v1/audio/speech", request);
 }
 
 export function transcribeSessionAudio(
   request: TranscriptionApiRequest
 ): Promise<TranscriptionApiResponse> {
-  return requestJson<TranscriptionApiResponse>("/v1/audio/transcriptions", request);
+  return requestJson<TranscriptionApiResponse>("/api/v1/audio/transcriptions", request);
 }
 
 export function convertSessionVoice(
   request: VoiceConversionApiRequest
 ): Promise<VoiceConversionApiResponse> {
-  return requestJson<VoiceConversionApiResponse>("/v1/audio/conversions", request);
+  return requestJson<VoiceConversionApiResponse>("/api/v1/audio/conversions", request);
 }
 
 async function requestJson<T>(path: string, body: unknown): Promise<T> {

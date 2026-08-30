@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
-$Version = '0.1.0'
+$Version = '0.2.0'
 $AppId = '{C5EC7671-2A42-43A6-9ED4-BC9FE091BC91}'
 $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\${AppId}_is1"
 
@@ -247,6 +247,7 @@ try {
         'bin\tako.exe',
         'bin\takokit.exe',
         'bin\takokit-updater.exe',
+        'bin\takokit-tray.exe',
         'resources\gui\index.html',
         'resources\registry\index.json',
         'resources\registry\models\rvc.toml',
@@ -328,6 +329,7 @@ try {
         'bin\tako.exe',
         'bin\takokit.exe',
         'bin\takokit-updater.exe',
+        'bin\takokit-tray.exe',
         'resources\gui\index.html',
         'resources\registry\index.json'
     )) {

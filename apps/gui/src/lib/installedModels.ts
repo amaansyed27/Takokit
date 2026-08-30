@@ -15,7 +15,7 @@ export async function withVerifiedInstalledModels(runtime: RuntimeSnapshot): Pro
     return { ...runtime, models: [] };
   }
 
-  const response = await fetch(`${apiConfig.localBaseUrl}/v1/models/installed`);
+  const response = await fetch(`${apiConfig.localBaseUrl}/api/v1/models/installed`);
   if (!response.ok) {
     throw new Error(`Installed model inventory failed with ${response.status}`);
   }

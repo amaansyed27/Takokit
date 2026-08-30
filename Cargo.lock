@@ -148,6 +148,7 @@ dependencies = [
  "matchit",
  "memchr",
  "mime",
+ "multer",
  "percent-encoding",
  "pin-project-lite",
  "rustversion",
@@ -636,6 +637,15 @@ name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "252afb9ae5eaa683babdc6a068b3f5726eb19e05070c731f9b2a23a7c3e8ed34"
+
+[[package]]
+name = "encoding_rs"
+version = "0.8.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "equivalent"
@@ -1333,6 +1343,23 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "multer"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83e87776546dc87511aa5ee218730c92b666d7264ab6ed41f9d215af9cd5224b"
+dependencies = [
+ "bytes",
+ "encoding_rs",
+ "futures-util",
+ "http",
+ "httparse",
+ "memchr",
+ "mime",
+ "spin",
+ "version_check",
 ]
 
 [[package]]
@@ -2101,6 +2128,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+
+[[package]]
 name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2207,14 +2240,14 @@ dependencies = [
 
 [[package]]
 name = "takokit-audio"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2238,12 +2271,13 @@ dependencies = [
  "tracing-subscriber",
  "ureq",
  "uuid",
+ "windows-sys 0.61.2",
  "zip",
 ]
 
 [[package]]
 name = "takokit-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2253,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-models"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -2274,7 +2308,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-package"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dirs",
  "fs2",
@@ -2291,7 +2325,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-release"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2304,14 +2338,14 @@ dependencies = [
 
 [[package]]
 name = "takokit-safety"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2333,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-store"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dirs",
  "fs2",

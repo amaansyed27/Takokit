@@ -27,7 +27,7 @@ async fn rvc_project_create_list_show_and_dry_run_remove_are_persistent() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/voices/rvc")
+                .uri("/api/v1/voices/rvc")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     r#"{"name":"Studio Voice ü","consent_affirmed":true,"consent_note":"route test"}"#,
@@ -46,7 +46,7 @@ async fn rvc_project_create_list_show_and_dry_run_remove_are_persistent() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/voices/rvc")
+                .uri("/api/v1/voices/rvc")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -64,7 +64,7 @@ async fn rvc_project_create_list_show_and_dry_run_remove_are_persistent() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/voices/rvc/{id}"))
+                .uri(format!("/api/v1/voices/rvc/{id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -80,7 +80,7 @@ async fn rvc_project_create_list_show_and_dry_run_remove_are_persistent() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/v1/voices/rvc/{id}?dry_run=true"))
+                .uri(format!("/api/v1/voices/rvc/{id}?dry_run=true"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -94,7 +94,7 @@ async fn rvc_project_create_list_show_and_dry_run_remove_are_persistent() {
     let still_there = app
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/voices/rvc/{id}"))
+                .uri(format!("/api/v1/voices/rvc/{id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -124,7 +124,7 @@ async fn imported_rvc_checkpoint_and_index_join_shared_voice_inventory() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/voices/rvc/import")
+                .uri("/api/v1/voices/rvc/import")
                 .header("content-type", "application/json")
                 .body(Body::from(request.to_string()))
                 .unwrap(),
@@ -140,7 +140,7 @@ async fn imported_rvc_checkpoint_and_index_join_shared_voice_inventory() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/voices/rvc/{id}/checkpoints"))
+                .uri(format!("/api/v1/voices/rvc/{id}/checkpoints"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -155,7 +155,7 @@ async fn imported_rvc_checkpoint_and_index_join_shared_voice_inventory() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/voices/rvc/{id}/indexes"))
+                .uri(format!("/api/v1/voices/rvc/{id}/indexes"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -169,7 +169,7 @@ async fn imported_rvc_checkpoint_and_index_join_shared_voice_inventory() {
     let voices = app
         .oneshot(
             Request::builder()
-                .uri("/v1/voices")
+                .uri("/api/v1/voices")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -193,7 +193,7 @@ async fn rvc_presets_endpoint_exposes_backend_owned_product_presets() {
     let response = server_router(test_state(&temp))
         .oneshot(
             Request::builder()
-                .uri("/v1/voices/rvc/presets")
+                .uri("/api/v1/voices/rvc/presets")
                 .body(Body::empty())
                 .unwrap(),
         )

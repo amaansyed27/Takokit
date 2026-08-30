@@ -7,7 +7,7 @@ export async function loadLocalAudio(path: string): Promise<string> {
   if (!value) throw new Error("Choose an audio file first.");
 
   const query = new URLSearchParams({ path: value });
-  const response = await fetch(`${API_BASE}/v1/system/audio?${query.toString()}`, {
+  const response = await fetch(`${API_BASE}/api/v1/system/audio?${query.toString()}`, {
     headers: workspaceHeaders()
   });
 

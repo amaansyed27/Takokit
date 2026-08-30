@@ -42,18 +42,18 @@ export const MANAGE_DOCS = {
     ],
   },
   daemon: {
-    title: "Daemon",
-    intro: "CLI, TUI, GUI, and API workflows share the managed daemon and one local registry state.",
+    title: "Server",
+    intro: "CLI, TUI, GUI, tray, and API workflows share one managed server. Daemon commands remain v0.1 aliases.",
     sections: [
       {
         id: "lifecycle",
         title: "Lifecycle",
-        commands: ["tako daemon start", "tako daemon status", "tako daemon restart", "tako daemon stop"],
+        commands: ["tako server start", "tako server status", "tako server restart", "tako server stop"],
       },
       {
         id: "logs",
-        title: "Daemon logs",
-        commands: ["tako daemon logs"],
+        title: "Server logs",
+        commands: ["tako server logs"],
       },
     ],
   },

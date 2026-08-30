@@ -122,7 +122,7 @@ export class TakokitApiError extends Error {
 
 export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechApiResponse> {
   if (!request.input.trim()) throw new Error("Speech text cannot be empty.");
-  return requestJson<SpeechApiResponse>("generate speech", "/v1/audio/speech", {
+  return requestJson<SpeechApiResponse>("generate speech", "/api/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
@@ -131,7 +131,7 @@ export async function generateSpeech(request: SpeechApiRequest): Promise<SpeechA
 
 export async function transcribeAudio(request: TranscriptionApiRequest): Promise<TranscriptionApiResponse> {
   if (!request.file_path.trim()) throw new Error("Choose an existing audio path.");
-  return requestJson<TranscriptionApiResponse>("transcribe audio", "/v1/audio/transcriptions", {
+  return requestJson<TranscriptionApiResponse>("transcribe audio", "/api/v1/audio/transcriptions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
@@ -141,7 +141,7 @@ export async function transcribeAudio(request: TranscriptionApiRequest): Promise
 export async function convertVoice(request: VoiceConversionApiRequest): Promise<VoiceConversionApiResponse> {
   if (!request.source_path.trim()) throw new Error("Choose an existing source audio path.");
   if (!request.target_voice.trim()) throw new Error("Choose the conversion target required by this model.");
-  return requestJson<VoiceConversionApiResponse>("convert voice", "/v1/audio/conversions", {
+  return requestJson<VoiceConversionApiResponse>("convert voice", "/api/v1/audio/conversions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request)
@@ -149,40 +149,40 @@ export async function convertVoice(request: VoiceConversionApiRequest): Promise<
 }
 
 export async function getDoctor(): Promise<DoctorResponse> {
-  const response = await getJson<{ data: DoctorResponse }>("load diagnostics", "/v1/doctor");
+  const response = await getJson<{ data: DoctorResponse }>("load diagnostics", "/api/v1/doctor");
   return response.data;
 }
 
 export async function getRunnerDoctor(id: string): Promise<Record<string, unknown>> {
   const response = await getJson<{ data: Record<string, unknown> }>(
     "inspect runner",
-    `/v1/runners/${encodeURIComponent(id)}/doctor`
+    `/api/v1/runners/${encodeURIComponent(id)}/doctor`
   );
   return response.data;
 }
 
 export async function getLibraryModels(): Promise<LibraryEntry[]> {
-  const response = await getJson<{ data: LibraryEntry[] }>("load model library", "/v1/library/models");
+  const response = await getJson<{ data: LibraryEntry[] }>("load model library", "/api/v1/library/models");
   return response.data;
 }
 
 export async function getLibraryRunners(): Promise<LibraryEntry[]> {
-  const response = await getJson<{ data: LibraryEntry[] }>("load runner library", "/v1/library/runners");
+  const response = await getJson<{ data: LibraryEntry[] }>("load runner library", "/api/v1/library/runners");
   return response.data;
 }
 
 export async function getModel(id: string): Promise<ModelSummary> {
-  const response = await getJson<{ data: ApiModel }>("inspect model", `/v1/models/${encodeURIComponent(id)}`);
+  const response = await getJson<{ data: ApiModel }>("inspect model", `/api/v1/models/${encodeURIComponent(id)}`);
   return toModelSummary(response.data, response.data.installed);
 }
 
 export async function getModelPlan(id: string): Promise<ModelPlan> {
-  const response = await getJson<{ data: ModelPlan }>("plan model", `/v1/models/${encodeURIComponent(id)}/plan`);
+  const response = await getJson<{ data: ModelPlan }>("plan model", `/api/v1/models/${encodeURIComponent(id)}/plan`);
   return response.data;
 }
 
 export async function pullModel(id: string): Promise<ModelInstallResponse> {
-  return requestJson<ModelInstallResponse>("pull model", "/v1/models/pull", {
+  return requestJson<ModelInstallResponse>("pull model", "/api/v1/models/pull", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: id })
@@ -192,24 +192,24 @@ export async function pullModel(id: string): Promise<ModelInstallResponse> {
 export async function previewModelRemoval(id: string): Promise<ModelRemovalReport> {
   return requestJson<ModelRemovalReport>(
     "preview model removal",
-    `/v1/models/${encodeURIComponent(id)}?dry_run=true`,
+    `/api/v1/models/${encodeURIComponent(id)}?dry_run=true`,
     { method: "DELETE" }
   );
 }
 
 export async function removeModel(id: string): Promise<ModelRemovalReport | void> {
-  return requestJson<ModelRemovalReport>("remove model", `/v1/models/${encodeURIComponent(id)}`, {
+  return requestJson<ModelRemovalReport>("remove model", `/api/v1/models/${encodeURIComponent(id)}`, {
     method: "DELETE"
   });
 }
 
 export async function getRunner(id: string): Promise<RunnerSummary> {
-  const response = await getJson<{ data: ApiRunner }>("inspect runner", `/v1/runners/${encodeURIComponent(id)}`);
+  const response = await getJson<{ data: ApiRunner }>("inspect runner", `/api/v1/runners/${encodeURIComponent(id)}`);
   return response.data;
 }
 
 export async function pullRunner(id: string): Promise<PullResponse> {
-  return requestJson<PullResponse>("pull runner", "/v1/runners/pull", {
+  return requestJson<PullResponse>("pull runner", "/api/v1/runners/pull", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ runner: id })
@@ -217,7 +217,7 @@ export async function pullRunner(id: string): Promise<PullResponse> {
 }
 
 export async function installRunner(id: string): Promise<PullResponse> {
-  return requestJson<PullResponse>("install runner", "/v1/runners/install", {
+  return requestJson<PullResponse>("install runner", "/api/v1/runners/install", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ runner: id })
@@ -225,11 +225,11 @@ export async function installRunner(id: string): Promise<PullResponse> {
 }
 
 export async function removeRunner(id: string): Promise<void> {
-  await requestJson<unknown>("remove runner", `/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await requestJson<unknown>("remove runner", `/api/v1/runners/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function installAdapter(id: string): Promise<void> {
-  await requestJson<{ data: unknown }>("install adapter", "/v1/adapters/install", {
+  await requestJson<{ data: unknown }>("install adapter", "/api/v1/adapters/install", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ adapter: id })
@@ -243,13 +243,13 @@ export const apiConfig = {
 
 export async function loadRuntimeSnapshot(): Promise<RuntimeSnapshot> {
   const [status, identity, capabilities, models, installed, runners, voices] = await Promise.all([
-    getJson<ApiStatus>("load daemon status", "/v1/status"),
-    getJson<ApiDaemonIdentity>("load daemon identity", "/v1/daemon/identity"),
-    getJson<{ data: ApiCapability[] }>("load capabilities", "/v1/capabilities"),
-    getJson<{ data: ApiModel[] }>("load models", "/v1/models"),
-    getJson<InstalledModelsResponse>("load installed inventory", "/v1/models/installed"),
-    getJson<{ data: ApiRunner[] }>("load runners", "/v1/runners"),
-    getJson<{ data: ApiVoice[] }>("load voices", "/v1/voices")
+    getJson<ApiStatus>("load daemon status", "/api/v1/status"),
+    getJson<ApiDaemonIdentity>("load daemon identity", "/api/v1/daemon/identity"),
+    getJson<{ data: ApiCapability[] }>("load capabilities", "/api/v1/capabilities"),
+    getJson<{ data: ApiModel[] }>("load models", "/api/v1/models"),
+    getJson<InstalledModelsResponse>("load installed inventory", "/api/v1/models/installed"),
+    getJson<{ data: ApiRunner[] }>("load runners", "/api/v1/runners"),
+    getJson<{ data: ApiVoice[] }>("load voices", "/api/v1/voices")
   ]);
 
   const installedReferences = new Set<string>();

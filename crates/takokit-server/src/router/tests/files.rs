@@ -20,7 +20,7 @@ async fn workspace_upload_accepts_body_above_axum_default_limit() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/files?name=long-sample.mp3")
+                .uri("/api/v1/files?name=long-sample.mp3")
                 .header("content-type", "audio/mpeg")
                 .header(crate::workspace::WORKSPACE_HEADER, encoded)
                 .body(Body::from(payload.clone()))

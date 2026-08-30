@@ -4,7 +4,7 @@ import { workspaceHeaders } from "./workspace";
 const API_BASE = window.location.origin;
 
 export async function getStorageOverview(): Promise<StorageOverview> {
-  const response = await fetch(`${API_BASE}/v1/system/storage`, {
+  const response = await fetch(`${API_BASE}/api/v1/system/storage`, {
     headers: workspaceHeaders()
   });
   if (!response.ok) throw new Error(await responseError(response));
@@ -15,7 +15,7 @@ export async function getStorageOverview(): Promise<StorageOverview> {
 export type OpenStorageTarget = "storage" | "workspace" | "logs" | "voices";
 
 export async function openStorageLocation(target: OpenStorageTarget): Promise<void> {
-  const response = await fetch(`${API_BASE}/v1/system/open`, {
+  const response = await fetch(`${API_BASE}/api/v1/system/open`, {
     method: "POST",
     headers: workspaceHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ target })

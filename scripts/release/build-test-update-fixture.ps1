@@ -12,8 +12,8 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $BaseInstalledTree = [System.IO.Path]::GetFullPath($BaseInstalledTree)
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $ReleaseTool = [System.IO.Path]::GetFullPath($ReleaseTool)
-$BaseVersion = '0.1.0'
-$FixtureVersion = '0.1.1'
+$BaseVersion = '0.2.0'
+$FixtureVersion = '0.2.1'
 $FixtureBuildId = "test-update-v$FixtureVersion-$CommitSha"
 
 function Invoke-Checked {
@@ -101,12 +101,12 @@ try {
     $CargoText = Get-Content -LiteralPath $CargoToml -Raw
     $UpdatedCargoText = [regex]::Replace(
         $CargoText,
-        '(?m)^version\s*=\s*"0\.1\.0"\s*$',
-        'version = "0.1.1"',
+        '(?m)^version\s*=\s*"0\.2\.0"\s*$',
+        'version = "0.2.1"',
         1
     )
     if ($UpdatedCargoText -eq $CargoText) {
-        throw 'Could not rewrite isolated fixture workspace version from 0.1.0 to 0.1.1.'
+        throw 'Could not rewrite isolated fixture workspace version from 0.2.0 to 0.2.1.'
     }
     Write-Utf8NoBom $CargoToml $UpdatedCargoText
 
@@ -114,7 +114,7 @@ try {
     $env:TAKOKIT_BUILD_ID = $FixtureBuildId
     Push-Location $Worktree
     try {
-        Invoke-Checked cargo 'build' '--release' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater'
+        Invoke-Checked cargo 'build' '--release' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater' '--bin' 'takokit-tray'
     } finally {
         Pop-Location
     }
@@ -123,6 +123,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $Target 'release\tako.exe') -Destination (Join-Path $FixtureTree 'bin\tako.exe') -Force
     Copy-Item -LiteralPath (Join-Path $Target 'release\takokit.exe') -Destination (Join-Path $FixtureTree 'bin\takokit.exe') -Force
     Copy-Item -LiteralPath (Join-Path $Target 'release\takokit-updater.exe') -Destination (Join-Path $FixtureTree 'bin\takokit-updater.exe') -Force
+    Copy-Item -LiteralPath (Join-Path $Target 'release\takokit-tray.exe') -Destination (Join-Path $FixtureTree 'bin\takokit-tray.exe') -Force
 
     $Distribution = [ordered]@{
         product = 'Takokit'

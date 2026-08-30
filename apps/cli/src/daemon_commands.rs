@@ -38,43 +38,44 @@ pub(crate) async fn route_daemon_command(
         }
         | Command::Runner { .. }
         | Command::Adapter { .. } => daemon_client::Client::ensure(store, config)?,
+        Command::Server { .. } | Command::Daemon { .. } => return Ok(false),
         _ => return Ok(false),
     };
     let output = match command {
         Command::Voice {
             command: VoiceCommand::Rvc { command },
         } => crate::rvc_voice_command::run_daemon(&client, command)?,
-        Command::Models => client.get::<serde_json::Value>("/v1/models")?,
-        Command::Runners => client.get("/v1/runners")?,
-        Command::Status => client.get("/v1/status")?,
-        Command::Doctor(_) => client.get("/v1/doctor")?,
-        Command::Capabilities => client.get("/v1/capabilities")?,
+        Command::Models => client.get::<serde_json::Value>("/api/v1/models")?,
+        Command::Runners => client.get("/api/v1/runners")?,
+        Command::Status => client.get("/api/v1/status")?,
+        Command::Doctor(_) => client.get("/api/v1/doctor")?,
+        Command::Capabilities => client.get("/api/v1/capabilities")?,
         Command::Pull(args) => post_model_pull_with_activity(
             &client,
             format!("Pulling {}", args.model),
             &args.model,
-            "/v1/models/pull",
+            "/api/v1/models/pull",
             &serde_json::json!({
                 "model": args.model,
                 "metadata_only": args.metadata_only,
                 "accepted_license": args.accept_license,
             }),
         )?,
-        Command::Show { model } => client.get(&format!("/v1/models/{model}"))?,
-        Command::Plan(args) => client.get(&format!("/v1/models/{}/plan", args.model))?,
+        Command::Show { model } => client.get(&format!("/api/v1/models/{model}"))?,
+        Command::Plan(args) => client.get(&format!("/api/v1/models/{}/plan", args.model))?,
         Command::Rm(args) => client.delete_json(&format!(
-            "/v1/models/{}?dry_run={}",
+            "/api/v1/models/{}?dry_run={}",
             args.model, args.dry_run
         ))?,
         Command::List { target } => match target {
-            None | Some(ListTarget::Models) => client.get("/v1/models/installed")?,
-            Some(ListTarget::Runners) => client.get("/v1/runners")?,
-            Some(ListTarget::Voices) => client.get("/v1/voices")?,
+            None | Some(ListTarget::Models) => client.get("/api/v1/models/installed")?,
+            Some(ListTarget::Runners) => client.get("/api/v1/runners")?,
+            Some(ListTarget::Voices) => client.get("/api/v1/voices")?,
         },
         Command::Speak(args) => post_with_activity(
             &client,
             format!("Generating speech with {}", args.model),
-            "/v1/audio/speech",
+            "/api/v1/audio/speech",
             &SpeechRequest {
                 model: args.model.clone(),
                 input: args.text.clone(),
@@ -88,7 +89,7 @@ pub(crate) async fn route_daemon_command(
         Command::Transcribe { audio, model } => post_with_activity(
             &client,
             format!("Transcribing with {model}"),
-            "/v1/audio/transcriptions",
+            "/api/v1/audio/transcriptions",
             &takokit_core::TranscriptionRequest {
                 file_path: audio.clone(),
                 model: Some(model.clone()),
@@ -96,7 +97,7 @@ pub(crate) async fn route_daemon_command(
         )?,
         Command::Run(args) => {
             validate_run_args(args)?;
-            let model: serde_json::Value = client.get(&format!("/v1/models/{}", args.model))?;
+            let model: serde_json::Value = client.get(&format!("/api/v1/models/{}", args.model))?;
             let capabilities = model["data"]["capabilities"]
                 .as_array()
                 .cloned()
@@ -110,7 +111,7 @@ pub(crate) async fn route_daemon_command(
                 (Some(text), None) if supports("text_to_speech") => post_with_activity(
                     &client,
                     format!("Generating speech with {}", args.model),
-                    "/v1/audio/speech",
+                    "/api/v1/audio/speech",
                     &SpeechRequest {
                         model: args.model.clone(),
                         input: text.clone(),
@@ -124,7 +125,7 @@ pub(crate) async fn route_daemon_command(
                 (None, Some(file)) if supports("speech_to_text") => post_with_activity(
                     &client,
                     format!("Transcribing with {}", args.model),
-                    "/v1/audio/transcriptions",
+                    "/api/v1/audio/transcriptions",
                     &takokit_core::TranscriptionRequest {
                         file_path: file.clone(),
                         model: Some(args.model.clone()),
@@ -149,39 +150,39 @@ pub(crate) async fn route_daemon_command(
                 }
             }
         }
-        Command::Ps => client.get("/v1/ps")?,
+        Command::Ps => client.get("/api/v1/ps")?,
         Command::Runner { command } => match command {
             RunnerCommand::Pull { runner } => post_retryable_with_activity(
                 &client,
                 format!("Pulling runner {runner}"),
-                "/v1/runners/pull",
+                "/api/v1/runners/pull",
                 &serde_json::json!({"runner":runner}),
             )?,
             RunnerCommand::Install { runner } => post_retryable_with_activity(
                 &client,
                 format!("Installing runner {runner}"),
-                "/v1/runners/install",
+                "/api/v1/runners/install",
                 &serde_json::json!({"runner":runner}),
             )?,
             RunnerCommand::Doctor { runner, .. } => {
-                client.get(&format!("/v1/runners/{runner}/doctor"))?
+                client.get(&format!("/api/v1/runners/{runner}/doctor"))?
             }
-            RunnerCommand::Show { runner } => client.get(&format!("/v1/runners/{runner}"))?,
+            RunnerCommand::Show { runner } => client.get(&format!("/api/v1/runners/{runner}"))?,
             RunnerCommand::Rm { runner } => {
-                client.delete(&format!("/v1/runners/{runner}"))?;
+                client.delete(&format!("/api/v1/runners/{runner}"))?;
                 serde_json::json!({"id":runner,"removed":true})
             }
         },
         Command::Adapter { command } => match command {
-            AdapterCommand::List => client.get("/v1/adapters")?,
+            AdapterCommand::List => client.get("/api/v1/adapters")?,
             AdapterCommand::Install { adapter } => post_retryable_with_activity(
                 &client,
                 format!("Installing adapter {adapter}"),
-                "/v1/adapters/install",
+                "/api/v1/adapters/install",
                 &serde_json::json!({"adapter":adapter}),
             )?,
             AdapterCommand::Doctor { adapter, .. } => client.get(&format!(
-                "/v1/adapters/{}/doctor",
+                "/api/v1/adapters/{}/doctor",
                 normalize_adapter_id(adapter)
             ))?,
         },

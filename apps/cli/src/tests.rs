@@ -77,6 +77,32 @@ fn cli_parses_version_command() {
 }
 
 #[test]
+fn cli_parses_foreground_serve_options_and_server_alias() {
+    let serve = Cli::try_parse_from(["tako", "serve", "--host", "127.0.0.1", "--port", "5051"])
+        .expect("serve options");
+    let server = Cli::try_parse_from(["tako", "server", "restart"]).expect("server alias");
+    let daemon = Cli::try_parse_from(["tako", "daemon", "restart"]).expect("daemon alias");
+
+    assert!(matches!(
+        serve.command,
+        Some(Command::Serve { host: Some(host), port: Some(5051), daemon_child: false, .. })
+            if host == "127.0.0.1"
+    ));
+    assert!(matches!(
+        server.command,
+        Some(Command::Server {
+            command: DaemonCommand::Restart
+        })
+    ));
+    assert!(matches!(
+        daemon.command,
+        Some(Command::Daemon {
+            command: DaemonCommand::Restart
+        })
+    ));
+}
+
+#[test]
 fn tako_alias_parses_doctor_and_respects_configured_storage_root() {
     let cli = Cli::try_parse_from(["tako", "doctor"]).expect("tako doctor cli parse");
     let storage_root = cli_storage_root();

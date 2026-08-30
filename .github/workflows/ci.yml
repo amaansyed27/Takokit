@@ -65,6 +65,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Check API namespace and OpenAPI contract
+        run: python scripts/check_api_contract.py
+
       - name: Check workspace (Linux)
         if: runner.os == 'Linux'
         shell: bash

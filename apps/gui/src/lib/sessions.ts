@@ -48,7 +48,7 @@ export async function resumeSession(id: string): Promise<SessionRecord> {
 
 export async function listSessions(query = ""): Promise<SessionSummary[]> {
   const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
-  const response = await fetch(`${API_BASE}/v1/sessions${suffix}`, {
+  const response = await fetch(`${API_BASE}/api/v1/sessions${suffix}`, {
     headers: workspaceHeaders()
   });
   const body = await expectJson<{ data: SessionSummary[] }>(response);
@@ -56,7 +56,7 @@ export async function listSessions(query = ""): Promise<SessionSummary[]> {
 }
 
 export async function getSession(id: string): Promise<SessionRecord> {
-  const response = await fetch(`${API_BASE}/v1/sessions/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${API_BASE}/api/v1/sessions/${encodeURIComponent(id)}`, {
     headers: workspaceHeaders()
   });
   const body = await expectJson<{ data: SessionRecord }>(response);
@@ -64,7 +64,7 @@ export async function getSession(id: string): Promise<SessionRecord> {
 }
 
 export async function removeSession(id: string): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/v1/sessions/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${API_BASE}/api/v1/sessions/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: workspaceHeaders()
   });
@@ -75,7 +75,7 @@ export async function removeSession(id: string): Promise<boolean> {
 export async function loadSessionOutput(id: string, outputPath: string): Promise<string> {
   const filename = outputFilename(outputPath);
   const response = await fetch(
-    `${API_BASE}/v1/sessions/${encodeURIComponent(id)}/outputs/${encodeURIComponent(filename)}`,
+    `${API_BASE}/api/v1/sessions/${encodeURIComponent(id)}/outputs/${encodeURIComponent(filename)}`,
     { headers: workspaceHeaders() }
   );
   if (!response.ok) throw new Error(await responseError(response));
@@ -89,7 +89,7 @@ export function outputFilename(path: string): string {
 }
 
 async function openSession(workspace: string, sessionId?: string, title?: string): Promise<SessionRecord> {
-  const response = await fetch(`${API_BASE}/v1/sessions/open`, {
+  const response = await fetch(`${API_BASE}/api/v1/sessions/open`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

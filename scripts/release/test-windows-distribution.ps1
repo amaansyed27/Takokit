@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
-$Version = '0.1.0'
+$Version = '0.2.0'
 $FixtureVersion = '0.1.1'
 
 function Invoke-Checked {
@@ -282,7 +282,7 @@ try {
     Assert-True ($portableUpdateFailure -match 'self-update is disabled for portable distributions') 'Portable self-update refusal was not explicit.'
     $Report.portable = $true
 
-    # Signed valid 0.1.0 -> test 0.1.1 update.
+    # Signed valid candidate -> next-patch test update.
     $ValidInstall = Join-Path $TempRoot 'Takokit Update Valid ü'
     $ValidHome = Join-Path $TempRoot 'update-home-valid'
     Copy-FreshInstalledTree $ValidInstall
@@ -311,7 +311,7 @@ try {
     Assert-True ((Get-TakoVersion (Join-Path $SchemaInstall 'bin\tako.exe')).Version -eq $Version) 'Schema rejection changed the installed version.'
     $Report.updater_incompatible_schema = $true
 
-    # Signed wrong-hash and corrupt-artifact fixtures must fail without replacing v0.1.0.
+    # Signed wrong-hash and corrupt-artifact fixtures must fail without replacing the candidate.
     $BadHashManifest = Join-Path $FixtureRoot 'release-manifest-bad-hash.json'
     $BadHashSignature = Join-Path $FixtureRoot 'release-manifest-bad-hash.sig'
     $BadHashInstall = Join-Path $TempRoot 'Takokit Update Bad Hash'
@@ -357,6 +357,7 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'tako.exe') -PathType Leaf) 'Installer did not install tako.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit.exe') -PathType Leaf) 'Installer did not install takokit.exe.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-updater.exe') -PathType Leaf) 'Installer did not install takokit-updater.exe.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstalledBin 'takokit-tray.exe') -PathType Leaf) 'Installer did not install takokit-tray.exe.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe'))) 'Installer still installed the removed native desktop wrapper.'
     $installedVersion = Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')
     Assert-True ($installedVersion.Version -eq $Version) "Installed version mismatch: $($installedVersion.Version)"
@@ -392,7 +393,7 @@ try {
     Invoke-InnoInstaller -Installer $Installer -InstallRoot $InstallRoot -LogPath $ReinstallLog
     $reinstallCount = Get-PathEntryCount (Get-UserPath) $InstalledBin
     Assert-True ($reinstallCount -eq 1) "Reinstall duplicated the Takokit PATH entry ($reinstallCount entries)."
-    Assert-True ((Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')).Version -eq $Version) 'Reinstall did not leave a runnable v0.1.0 CLI.'
+    Assert-True ((Get-TakoVersion (Join-Path $InstalledBin 'tako.exe')).Version -eq $Version) 'Reinstall did not leave a runnable candidate CLI.'
     $Report.installer_reinstall = $true
 
     $Uninstaller = Join-Path $InstallRoot 'unins000.exe'

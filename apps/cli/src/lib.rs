@@ -72,7 +72,15 @@ pub async fn run() -> anyhow::Result<()> {
     }
     let store = LocalStore::new(cli_storage_root());
     store.ensure_layout()?;
-    let config = RuntimeConfig::local(store.root().to_path_buf());
+    let mut config = RuntimeConfig::local(store.root().to_path_buf());
+    if let Some(Command::Serve { host, port, .. }) = command.as_ref() {
+        if let Some(host) = host {
+            config.host = host.clone();
+        }
+        if let Some(port) = port {
+            config.port = *port;
+        }
+    }
     let package_registry = PackageRegistry::bundled();
     let installed_registry = InstalledRegistry::new(store.manifests_dir());
     let workspace = if command_uses_workspace(&command) {
@@ -111,6 +119,8 @@ pub async fn run() -> anyhow::Result<()> {
             .await?
         }
         Some(Command::Serve {
+            host: _,
+            port: _,
             daemon_child,
             instance_id,
         }) => {
@@ -124,6 +134,14 @@ pub async fn run() -> anyhow::Result<()> {
                 )
                 .await?;
             } else {
+                validate_server_binding(&config)?;
+                println!("Takokit {}", env!("CARGO_PKG_VERSION"));
+                println!("Server listening on {}", config.local_base_url());
+                println!("OpenAI API: {}/v1", config.local_base_url());
+                println!("Takokit API: {}/api/v1", config.local_base_url());
+                println!("GUI: {}/gui", config.local_base_url());
+                println!();
+                println!("Ctrl+C to stop");
                 run_server(AppState::new_with_build_id(
                     config,
                     store,
@@ -133,6 +151,19 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         Some(Command::Daemon { command }) => match command {
+            DaemonCommand::Start => print_serializable(&daemon::start(&store, &config)?)?,
+            DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
+            DaemonCommand::Restart => {
+                let _ = daemon::stop(&store, &config)?;
+                print_serializable(&daemon::start(&store, &config)?)?;
+            }
+            DaemonCommand::Status => match daemon::status(&store, &config)? {
+                Some(info) => print_serializable(&info)?,
+                None => println!("not running"),
+            },
+            DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
+        },
+        Some(Command::Server { command }) => match command {
             DaemonCommand::Start => print_serializable(&daemon::start(&store, &config)?)?,
             DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
             DaemonCommand::Restart => {
@@ -334,7 +365,7 @@ pub async fn run() -> anyhow::Result<()> {
                 print_value(&serde_json::json!([]))?;
             } else {
                 let value: serde_json::Value =
-                    daemon_client::Client::ensure(&store, &config)?.get("/v1/ps")?;
+                    daemon_client::Client::ensure(&store, &config)?.get("/api/v1/ps")?;
                 print_value(&value)?;
             }
         }
@@ -444,6 +475,27 @@ pub async fn run() -> anyhow::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn validate_server_binding(config: &RuntimeConfig) -> anyhow::Result<()> {
+    config
+        .host
+        .parse::<std::net::IpAddr>()
+        .map_err(|_| anyhow::anyhow!("invalid --host {}; use an IP address", config.host))?;
+    let loopback = config
+        .host
+        .parse::<std::net::IpAddr>()
+        .is_ok_and(|address| address.is_loopback());
+    if !loopback
+        && std::env::var("TAKOKIT_API_TOKEN")
+            .ok()
+            .is_none_or(|token| token.trim().len() < 24)
+    {
+        return Err(anyhow::anyhow!(
+            "non-loopback binding requires TAKOKIT_API_TOKEN with at least 24 characters"
+        ));
+    }
     Ok(())
 }
 

@@ -13,7 +13,7 @@ export type WorkspaceFile = {
 };
 
 export async function listWorkspaceFiles(): Promise<WorkspaceFile[]> {
-  const response = await fetch(`${API_BASE}/v1/files`, {
+  const response = await fetch(`${API_BASE}/api/v1/files`, {
     headers: workspaceHeaders()
   });
   if (!response.ok) throw new Error(await responseError(response));
@@ -23,7 +23,7 @@ export async function listWorkspaceFiles(): Promise<WorkspaceFile[]> {
 
 export async function uploadWorkspaceFile(file: Blob, name: string): Promise<WorkspaceFile> {
   const query = new URLSearchParams({ name });
-  const response = await fetch(`${API_BASE}/v1/files?${query.toString()}`, {
+  const response = await fetch(`${API_BASE}/api/v1/files?${query.toString()}`, {
     method: "POST",
     headers: workspaceHeaders({
       "Content-Type": file.type || "application/octet-stream"
@@ -35,7 +35,7 @@ export async function uploadWorkspaceFile(file: Blob, name: string): Promise<Wor
 }
 
 export async function deleteWorkspaceFile(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/v1/files/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${API_BASE}/api/v1/files/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: workspaceHeaders()
   });
@@ -44,7 +44,7 @@ export async function deleteWorkspaceFile(id: string): Promise<void> {
 
 export async function loadWorkspaceText(file: WorkspaceFile): Promise<string> {
   if (file.kind !== "text") throw new Error("Only text files can be loaded as text.");
-  const response = await fetch(`${API_BASE}/v1/files/${encodeURIComponent(file.id)}/content`, {
+  const response = await fetch(`${API_BASE}/api/v1/files/${encodeURIComponent(file.id)}/content`, {
     headers: workspaceHeaders()
   });
   if (!response.ok) throw new Error(await responseError(response));

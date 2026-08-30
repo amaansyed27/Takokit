@@ -175,14 +175,14 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
             consent,
             consent_note,
         } => client.post(
-            "/v1/voices/rvc",
+            "/api/v1/voices/rvc",
             &CreateRvcVoiceRequest {
                 name: name.clone(),
                 consent_affirmed: *consent,
                 consent_note: consent_note.clone(),
             },
         ),
-        RvcVoiceCommand::List => client.get("/v1/voices/rvc"),
+        RvcVoiceCommand::List => client.get("/api/v1/voices/rvc"),
         RvcVoiceCommand::Show { voice } => client.get(&rvc_path(voice, "")),
         RvcVoiceCommand::Samples { voice, command } => match command {
             RvcSampleCommand::Add { paths } => client.post(
@@ -202,7 +202,7 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
         RvcVoiceCommand::Inspect { voice } => {
             client.post(&rvc_path(voice, "/dataset/inspect"), &json!({}))
         }
-        RvcVoiceCommand::Presets => client.get("/v1/voices/rvc/presets"),
+        RvcVoiceCommand::Presets => client.get("/api/v1/voices/rvc/presets"),
         RvcVoiceCommand::Preflight { voice, training } => {
             client.post(&rvc_path(voice, "/preflight"), &training.config()?)
         }
@@ -253,7 +253,7 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
             consent,
             consent_note,
         } => client.post(
-            "/v1/voices/rvc/import",
+            "/api/v1/voices/rvc/import",
             &ImportRvcVoiceRequest {
                 checkpoint: checkpoint.clone(),
                 index: index.clone(),
@@ -276,7 +276,7 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
             }),
         ),
         RvcVoiceCommand::Verify { package } => client.post(
-            "/v1/voices/rvc/package/verify",
+            "/api/v1/voices/rvc/package/verify",
             &VerifyRvcPackageRequest {
                 package: package.clone(),
             },
@@ -287,7 +287,7 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
             consent,
             consent_note,
         } => client.post(
-            "/v1/voices/rvc/package/import",
+            "/api/v1/voices/rvc/package/import",
             &ImportRvcPackageRequest {
                 package: package.clone(),
                 name: name.clone(),
@@ -303,7 +303,7 @@ pub(crate) fn run_daemon(client: &Client, command: &RvcVoiceCommand) -> anyhow::
 
 fn rvc_path(voice: &str, suffix: &str) -> String {
     let encoded = utf8_percent_encode(voice, NON_ALPHANUMERIC).to_string();
-    format!("/v1/voices/rvc/{encoded}{suffix}")
+    format!("/api/v1/voices/rvc/{encoded}{suffix}")
 }
 
 fn wrap<T: serde::Serialize>(kind: &str, data: T) -> Value {
@@ -360,7 +360,7 @@ mod tests {
         let path = rvc_path("Voice ü / demo", "/checkpoints");
         assert_eq!(
             path,
-            "/v1/voices/rvc/Voice%20%C3%BC%20%2F%20demo/checkpoints"
+            "/api/v1/voices/rvc/Voice%20%C3%BC%20%2F%20demo/checkpoints"
         );
     }
 

@@ -9,16 +9,16 @@ type PickerResponse = {
 export type RvcArtifactKind = "checkpoint" | "index" | "package";
 
 export async function pickAudioFile(): Promise<string | null> {
-  return pickPath("/v1/system/picker/audio", "open audio picker");
+  return pickPath("/api/v1/system/picker/audio", "open audio picker");
 }
 
 export async function pickFolder(): Promise<string | null> {
-  return pickPath("/v1/system/picker/folder", "open folder picker");
+  return pickPath("/api/v1/system/picker/folder", "open folder picker");
 }
 
 export async function pickRvcArtifact(kind: RvcArtifactKind): Promise<string | null> {
   const query = new URLSearchParams({ kind });
-  return pickPath(`/v1/system/picker/rvc?${query.toString()}`, `open RVC ${kind} picker`);
+  return pickPath(`/api/v1/system/picker/rvc?${query.toString()}`, `open RVC ${kind} picker`);
 }
 
 async function pickPath(path: string, operation: string): Promise<string | null> {

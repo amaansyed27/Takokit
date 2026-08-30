@@ -232,6 +232,10 @@ fn start_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Da
     let mut command = Command::new(&executable);
     command
         .arg("serve")
+        .arg("--host")
+        .arg(&config.host)
+        .arg("--port")
+        .arg(config.port.to_string())
         .arg("--daemon-child")
         .arg("--instance-id")
         .arg(instance_id.to_string())
@@ -334,8 +338,11 @@ fn stop_locked(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<boo
         cleanup_proven_stale(store, config)?;
         return Ok(false);
     };
-    let response = ureq::post(&format!("{}/v1/daemon/shutdown", config.local_base_url()))
-        .send_json(serde_json::json!({"instance_id": info.instance_id}));
+    let response = ureq::post(&format!(
+        "{}/api/v1/daemon/shutdown",
+        config.local_base_url()
+    ))
+    .send_json(serde_json::json!({"instance_id": info.instance_id}));
     if response.is_err() {
         return Err(anyhow!(
             "managed daemon refused graceful shutdown; ownership was not revoked"
@@ -391,12 +398,15 @@ fn verified_runtime(
 }
 
 fn remote_identity(config: &RuntimeConfig) -> anyhow::Result<DaemonBuildIdentity> {
-    ureq::get(&format!("{}/v1/daemon/identity", config.local_base_url()))
-        .timeout(Duration::from_millis(300))
-        .call()
-        .map_err(|error| anyhow!("read daemon identity: {error}"))?
-        .into_json()
-        .map_err(Into::into)
+    ureq::get(&format!(
+        "{}/api/v1/daemon/identity",
+        config.local_base_url()
+    ))
+    .timeout(Duration::from_millis(300))
+    .call()
+    .map_err(|error| anyhow!("read daemon identity: {error}"))?
+    .into_json()
+    .map_err(Into::into)
 }
 
 fn wait_for_verified(

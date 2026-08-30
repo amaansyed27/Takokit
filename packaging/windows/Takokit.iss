@@ -1,5 +1,5 @@
 #define MyAppName "Takokit"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "Dawnlight Labs"
 
 #ifndef SourceRoot
@@ -46,14 +46,21 @@ Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 [Icons]
 Name: "{group}\Takokit"; Filename: "{app}\bin\tako.exe"; Parameters: "gui --workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open the Takokit local web GUI"
 Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
+Name: "{group}\Takokit Tray"; Filename: "{app}\bin\takokit-tray.exe"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Start the Takokit server controller"
+
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "TakokitTray"; Flags: uninsdeletevalue dontcreatekey
+
+[Run]
+Filename: "{app}\bin\takokit-tray.exe"; Description: "Start Takokit tray controller"; Flags: nowait postinstall skipifsilent
 
 [Code]
 const
   WM_SETTINGCHANGE = $001A;
   SMTO_ABORTIFHUNG = $0002;
 
-function SendMessageTimeout(hWnd: HWND; Msg: UINT; wParam: WPARAM;
-  lParam: string; fuFlags, uTimeout: UINT; var lpdwResult: DWORD): LRESULT;
+function SendMessageTimeout(hWnd: HWND; Msg: UINT; wParam: LongWord;
+  lParam: string; fuFlags, uTimeout: UINT; var lpdwResult: DWORD): LongInt;
   external 'SendMessageTimeoutW@user32.dll stdcall';
 
 function TrimTrailingSlash(Value: string): string;
@@ -161,8 +168,12 @@ end;
 procedure StopOwnedTakokitDaemon;
 var
   TakoExe: string;
+  TrayExe: string;
   ResultCode: Integer;
 begin
+  TrayExe := ExpandConstant('{app}\bin\takokit-tray.exe');
+  if FileExists(TrayExe) then
+    Exec(TrayExe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   TakoExe := ExpandConstant('{app}\bin\tako.exe');
   if FileExists(TakoExe) then
   begin

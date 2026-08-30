@@ -69,7 +69,7 @@ pub(super) fn refuse_active_runtime_operations(
     store: &LocalStore,
     config: &RuntimeConfig,
 ) -> anyhow::Result<()> {
-    if let Ok(response) = ureq::get(&format!("{}/v1/ps", config.local_base_url()))
+    if let Ok(response) = ureq::get(&format!("{}/api/v1/ps", config.local_base_url()))
         .timeout(Duration::from_millis(500))
         .call()
     {

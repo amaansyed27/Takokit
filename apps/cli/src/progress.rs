@@ -51,7 +51,7 @@ impl Activity {
             let mut previous_bytes = 0_u64;
             let mut previous_sample = Instant::now();
             let mut previous_stage = String::new();
-            let progress_path = format!("/v1/models/{model_id}/progress");
+            let progress_path = format!("/api/v1/models/{model_id}/progress");
 
             while worker_running.load(Ordering::Relaxed) {
                 if last_redraw.elapsed() >= REDRAW_INTERVAL {

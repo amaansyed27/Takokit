@@ -165,19 +165,19 @@ export type PackageVerification = {
 type Envelope<T> = { kind: string; data: T };
 
 export async function listRvcVoices(): Promise<RvcProject[]> {
-  return (await request<Envelope<RvcProject[]>>("/v1/voices/rvc")).data;
+  return (await request<Envelope<RvcProject[]>>("/api/v1/voices/rvc")).data;
 }
 export async function getRvcVoice(voice: string): Promise<RvcVoiceDetail> {
   return (await request<Envelope<RvcVoiceDetail>>(pathFor(voice))).data;
 }
 export async function createRvcVoice(name: string, consentNote?: string): Promise<RvcProject> {
-  return (await request<Envelope<RvcProject>>("/v1/voices/rvc", {
+  return (await request<Envelope<RvcProject>>("/api/v1/voices/rvc", {
     method: "POST",
     body: JSON.stringify({ name, consent_affirmed: true, consent_note: consentNote })
   })).data;
 }
 export async function importRvcVoice(checkpoint: string, index: string | undefined, name: string): Promise<RvcProject> {
-  return (await request<Envelope<RvcProject>>("/v1/voices/rvc/import", {
+  return (await request<Envelope<RvcProject>>("/api/v1/voices/rvc/import", {
     method: "POST",
     body: JSON.stringify({ checkpoint, index, name, consent_affirmed: true, consent_note: "Permission acknowledged in Voice Studio." })
   })).data;
@@ -202,7 +202,7 @@ export async function clearRvcPreparedDataset(voice: string): Promise<void> {
   await request(`${pathFor(voice)}/dataset/prepared`, { method: "DELETE" });
 }
 export async function getRvcPresets(): Promise<RvcTrainingPreset[]> {
-  return (await request<Envelope<RvcTrainingPreset[]>>("/v1/voices/rvc/presets")).data;
+  return (await request<Envelope<RvcTrainingPreset[]>>("/api/v1/voices/rvc/presets")).data;
 }
 export async function preflightRvc(voice: string, config: RvcTrainingConfig): Promise<RvcPreflight> {
   return (await request<Envelope<RvcPreflight>>(`${pathFor(voice)}/preflight`, { method: "POST", body: JSON.stringify(config) })).data;
@@ -246,12 +246,12 @@ export async function exportRvcVoice(voice: string, output: string, sign: boolea
   })).data.path;
 }
 export async function verifyRvcPackage(packagePath: string): Promise<PackageVerification> {
-  return (await request<Envelope<PackageVerification>>("/v1/voices/rvc/package/verify", {
+  return (await request<Envelope<PackageVerification>>("/api/v1/voices/rvc/package/verify", {
     method: "POST", body: JSON.stringify({ package: packagePath })
   })).data;
 }
 export async function importRvcPackage(packagePath: string, name?: string): Promise<RvcProject> {
-  return (await request<Envelope<RvcProject>>("/v1/voices/rvc/package/import", {
+  return (await request<Envelope<RvcProject>>("/api/v1/voices/rvc/package/import", {
     method: "POST", body: JSON.stringify({ package: packagePath, name, consent_affirmed: true, consent_note: "Permission acknowledged in Voice Studio." })
   })).data;
 }
@@ -260,7 +260,7 @@ export async function removeRvcVoice(voice: string, dryRun = false): Promise<Rec
 }
 
 function pathFor(voice: string): string {
-  return `/v1/voices/rvc/${encodeURIComponent(voice)}`;
+  return `/api/v1/voices/rvc/${encodeURIComponent(voice)}`;
 }
 
 async function request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {

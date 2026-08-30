@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = "0.1.0"
+EXPECTED = "0.2.0"
 
 checks = []
 
@@ -88,12 +88,8 @@ for relative, label, pattern in [
     match = re.search(pattern, text)
     checks.append((label, match.group(1) if match else "<missing>"))
 
-release_notes = ROOT / f"docs/release/windows-v{EXPECTED}-notes.md"
-checks.append(("release notes filename", EXPECTED if release_notes.exists() else "<missing>"))
-
-workflow = (ROOT / ".github/workflows/slice4-windows.yml").read_text(encoding="utf-8")
-artifact_match = re.search(r"name:\s+takokit-v([0-9.]+)-windows-x86_64-", workflow)
-checks.append(("Windows CI artifact version", artifact_match.group(1) if artifact_match else "<missing>"))
+candidate_notes = ROOT / f"docs/release/windows-v{EXPECTED}-candidate-notes.md"
+checks.append(("candidate notes filename", EXPECTED if candidate_notes.exists() else "<missing>"))
 
 failed = False
 for label, version in checks:

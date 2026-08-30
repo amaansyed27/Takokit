@@ -16,7 +16,7 @@ async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/runners/pull")
+                .uri("/api/v1/runners/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"runner":"takokit-transformers-audio"}"#))
                 .unwrap(),
@@ -29,7 +29,7 @@ async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/runners/takokit-transformers-audio")
+                .uri("/api/v1/runners/takokit-transformers-audio")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -48,7 +48,7 @@ async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/runners/install")
+                .uri("/api/v1/runners/install")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"runner":"takokit-transformers-audio"}"#))
                 .unwrap(),
@@ -61,7 +61,7 @@ async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/runners/takokit-transformers-audio")
+                .uri("/api/v1/runners/takokit-transformers-audio")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -78,7 +78,7 @@ async fn runner_lifecycle_routes_install_show_and_remove_runner_contract() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/runners/takokit-transformers-audio")
+                .uri("/api/v1/runners/takokit-transformers-audio")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -97,7 +97,7 @@ async fn library_routes_return_curated_model_and_runner_manifests() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/library/models")
+                .uri("/api/v1/library/models")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -117,7 +117,7 @@ async fn library_routes_return_curated_model_and_runner_manifests() {
     let runners_response = app
         .oneshot(
             Request::builder()
-                .uri("/v1/library/runners")
+                .uri("/api/v1/library/runners")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -133,7 +133,7 @@ async fn model_plan_route_returns_honest_state_for_metadata_only_model() {
     let response = server_router(state)
         .oneshot(
             Request::builder()
-                .uri("/v1/models/qwen3-tts/plan")
+                .uri("/api/v1/models/qwen3-tts/plan")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -164,7 +164,7 @@ async fn diagnostics_routes_return_doctor_runner_doctor_and_launch_suite() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/doctor")
+                .uri("/api/v1/doctor")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -184,7 +184,7 @@ async fn diagnostics_routes_return_doctor_runner_doctor_and_launch_suite() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/runners/takokit-whispercpp/doctor")
+                .uri("/api/v1/runners/takokit-whispercpp/doctor")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -199,7 +199,7 @@ async fn diagnostics_routes_return_doctor_runner_doctor_and_launch_suite() {
     let suite = app
         .oneshot(
             Request::builder()
-                .uri("/v1/test/launch")
+                .uri("/api/v1/test/launch")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -222,7 +222,7 @@ async fn models_route_includes_canonical_plan_summary_fields() {
     let response = server_router(state)
         .oneshot(
             Request::builder()
-                .uri("/v1/models")
+                .uri("/api/v1/models")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -267,7 +267,7 @@ async fn pull_model_route_supports_metadata_only_option_for_artifact_manifest() 
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     r#"{"model":"piper-lessac","metadata_only":true}"#,
@@ -297,7 +297,7 @@ async fn transcription_route_returns_unsupported_capability_error() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                 .unwrap(),
@@ -310,7 +310,7 @@ async fn transcription_route_returns_unsupported_capability_error() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/audio/transcriptions")
+                .uri("/api/v1/audio/transcriptions")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","file_path":"audio.wav"}"#))
                 .unwrap(),
@@ -340,7 +340,7 @@ async fn transcription_route_reports_metadata_only_whisper_artifact_before_execu
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     r#"{"model":"whisper-base","metadata_only":true}"#,
@@ -356,7 +356,7 @@ async fn transcription_route_reports_metadata_only_whisper_artifact_before_execu
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/runners/pull")
+                .uri("/api/v1/runners/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"runner":"takokit-whispercpp"}"#))
                 .unwrap(),
@@ -369,7 +369,7 @@ async fn transcription_route_reports_metadata_only_whisper_artifact_before_execu
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/audio/transcriptions")
+                .uri("/api/v1/audio/transcriptions")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"model":"whisper-base","file_path":"{}"}}"#,
@@ -407,7 +407,7 @@ async fn installed_models_route_excludes_catalog_and_metadata_only_entries() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/models/installed")
+                .uri("/api/v1/models/installed")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -424,7 +424,7 @@ async fn installed_models_route_excludes_catalog_and_metadata_only_entries() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     r#"{"model":"piper-lessac","metadata_only":true}"#,
@@ -438,7 +438,7 @@ async fn installed_models_route_excludes_catalog_and_metadata_only_entries() {
     let listed = app
         .oneshot(
             Request::builder()
-                .uri("/v1/models/installed")
+                .uri("/api/v1/models/installed")
                 .body(Body::empty())
                 .unwrap(),
         )

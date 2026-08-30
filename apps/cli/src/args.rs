@@ -56,12 +56,23 @@ pub(crate) struct Cli {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
     Serve {
+        /// Address to bind. Defaults to TAKOKIT_HOST or 127.0.0.1.
+        #[arg(long)]
+        host: Option<String>,
+        /// Port to bind. Defaults to TAKOKIT_PORT or 5050.
+        #[arg(long)]
+        port: Option<u16>,
         #[arg(long, hide = true)]
         daemon_child: bool,
         #[arg(long, hide = true)]
         instance_id: Option<Uuid>,
     },
     Daemon {
+        #[command(subcommand)]
+        command: DaemonCommand,
+    },
+    /// Manage the background Takokit server. `daemon` remains an alias.
+    Server {
         #[command(subcommand)]
         command: DaemonCommand,
     },

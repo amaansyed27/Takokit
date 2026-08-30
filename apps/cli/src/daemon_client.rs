@@ -17,7 +17,7 @@ pub struct Client {
 impl Client {
     pub fn ensure(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<Self> {
         let info = crate::daemon::ensure_fresh_running(store, config)?;
-        let url = format!("{}/v1/daemon/identity", config.local_base_url());
+        let url = format!("{}/api/v1/daemon/identity", config.local_base_url());
         let response: DaemonBuildIdentity = ureq::get(&url)
             .timeout(Duration::from_secs(2))
             .call()

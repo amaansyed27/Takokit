@@ -27,15 +27,15 @@ export type UpdateCheck = {
 };
 
 export async function getUpdateStatus(): Promise<UpdateStatus> {
-  return request<UpdateStatus>("/v1/system/update");
+  return request<UpdateStatus>("/api/v1/system/update");
 }
 
 export async function checkForUpdates(): Promise<UpdateCheck> {
-  return request<UpdateCheck>("/v1/system/update/check", { method: "POST" });
+  return request<UpdateCheck>("/api/v1/system/update/check", { method: "POST" });
 }
 
 export async function applyUpdate(): Promise<{ accepted: boolean; message: string }> {
-  return request<{ accepted: boolean; message: string }>("/v1/system/update/apply", {
+  return request<{ accepted: boolean; message: string }>("/api/v1/system/update/apply", {
     method: "POST"
   });
 }
@@ -45,7 +45,7 @@ export async function configureUpdates(settings: {
   automatic_checks?: boolean;
   automatic_download?: boolean;
 }): Promise<UpdateStatus> {
-  return request<UpdateStatus>("/v1/system/update/settings", {
+  return request<UpdateStatus>("/api/v1/system/update/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings)

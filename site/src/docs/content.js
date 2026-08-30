@@ -26,9 +26,14 @@ export const DOC_GROUPS = [
   {
     title: "Developers",
     pages: [
-      ["local-api", "Local API"],
-      ["python-http", "Python HTTP examples"],
-      ["javascript-http", "JavaScript HTTP examples"],
+      ["local-api", "API introduction"],
+      ["openai-models", "Models"],
+      ["openai-speech", "Text to speech"],
+      ["openai-transcription", "Transcription"],
+      ["openai-sdk", "OpenAI SDK examples"],
+      ["api-security", "Authentication and network"],
+      ["takokit-api", "Takokit API"],
+      ["api-errors", "Errors"],
       ["model-references", "Model references and tags"],
       ["registry-api", "Registry API"],
     ],

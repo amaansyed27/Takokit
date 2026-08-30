@@ -14,7 +14,7 @@ export type CreateVoiceProfileInput = {
 export async function createVoiceProfile(
   input: CreateVoiceProfileInput
 ): Promise<VoiceProfile> {
-  const response = await fetch(`${API_BASE}/v1/voices/clone`, {
+  const response = await fetch(`${API_BASE}/api/v1/voices/clone`, {
     method: "POST",
     headers: workspaceHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(input)
@@ -25,7 +25,7 @@ export async function createVoiceProfile(
 }
 
 export async function removeVoiceProfile(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/v1/voices/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${API_BASE}/api/v1/voices/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: workspaceHeaders()
   });

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.0",
+    [string]$Version = "0.2.0",
     [string]$OutputRoot,
     [switch]$SkipBuild,
     [switch]$SkipInstaller,
@@ -18,6 +18,10 @@ if (-not $OutputRoot) {
 }
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 Set-Location $RepoRoot
+
+if (Test-Path -LiteralPath (Join-Path $RepoRoot 'apps\desktop')) {
+    throw 'Release gate: apps\desktop must not exist; Takokit GUI is browser-served and takokit-tray.exe is controller-only.'
+}
 
 function Invoke-Checked {
     param([Parameter(Mandatory)][string]$FilePath, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
@@ -76,6 +80,8 @@ function Find-Iscc {
     $command = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
     $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
         (Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe'),
         (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 7\ISCC.exe'),
         (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
@@ -87,8 +93,8 @@ function Find-Iscc {
     throw 'Inno Setup compiler (ISCC.exe) was not found. Install pinned Inno Setup before building the installer.'
 }
 
-if ($Version -ne '0.1.0') {
-    throw "The Windows distribution version is locked to 0.1.0; got $Version"
+if ($Version -ne '0.2.0') {
+    throw "The Windows distribution candidate version is locked to 0.2.0; got $Version"
 }
 Invoke-Checked python 'scripts/check_release_version.py'
 
@@ -132,7 +138,7 @@ $env:TAKOKIT_BUILD_ID = $BuildId
 $env:SOURCE_DATE_EPOCH = [DateTimeOffset]$CommitTime | ForEach-Object { $_.ToUnixTimeSeconds().ToString() }
 
 if (-not $SkipBuild) {
-    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater'
+    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater' '--bin' 'takokit-tray'
     Invoke-Checked cargo 'build' '--release' '--locked' '-p' 'takokit-release' '--bin' 'takokit-release-tool'
     Push-Location (Join-Path $RepoRoot 'apps\gui')
     try {
@@ -147,6 +153,7 @@ $RequiredFiles = @(
     'target\release\tako.exe',
     'target\release\takokit.exe',
     'target\release\takokit-updater.exe',
+    'target\release\takokit-tray.exe',
     'target\release\takokit-release-tool.exe',
     'apps\gui\dist\index.html',
     'registry\index.json',
@@ -172,6 +179,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $BaseTree 'resources\icons'
 Copy-Item 'target\release\tako.exe' (Join-Path $BaseTree 'bin\tako.exe')
 Copy-Item 'target\release\takokit.exe' (Join-Path $BaseTree 'bin\takokit.exe')
 Copy-Item 'target\release\takokit-updater.exe' (Join-Path $BaseTree 'bin\takokit-updater.exe')
+Copy-Item 'target\release\takokit-tray.exe' (Join-Path $BaseTree 'bin\takokit-tray.exe')
 Copy-DirectoryContents (Join-Path $RepoRoot 'apps\gui\dist') (Join-Path $BaseTree 'resources\gui')
 Copy-DirectoryContents (Join-Path $RepoRoot 'registry') (Join-Path $BaseTree 'resources\registry')
 Copy-Item 'assets\favicon\favicon.ico' (Join-Path $BaseTree 'resources\icons\takokit.ico')
@@ -307,8 +315,8 @@ if ($HasProductionSigningKey) {
     Invoke-Checked $ReleaseTool 'verify' $ManifestPath $SignaturePath '--allow-test'
 }
 
-$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.1.0-notes.md'
-$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.1.0.md'
+$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.2.0-candidate-notes.md'
+$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.2.0-CANDIDATE.md'
 if (-not (Test-Path -LiteralPath $ReleaseNotesSource)) {
     throw "Release notes source is missing: $ReleaseNotesSource"
 }

@@ -54,7 +54,7 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/v1/ps")
+                .uri("/api/v1/ps")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -73,7 +73,7 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/daemon/shutdown")
+                .uri("/api/v1/daemon/shutdown")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"instance_id":"{}"}}"#,
@@ -94,7 +94,7 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/daemon/shutdown")
+                .uri("/api/v1/daemon/shutdown")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"instance_id":"{}"}}"#,
@@ -111,7 +111,7 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
     let ps = app
         .oneshot(
             Request::builder()
-                .uri("/v1/ps")
+                .uri("/api/v1/ps")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -136,7 +136,7 @@ async fn capabilities_route_returns_all_voice_runtime_surfaces() {
     let response = server_router(state)
         .oneshot(
             Request::builder()
-                .uri("/v1/capabilities")
+                .uri("/api/v1/capabilities")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -160,7 +160,7 @@ async fn adapters_route_is_available_without_claiming_adapter_readiness() {
     let response = server_router(state)
         .oneshot(
             Request::builder()
-                .uri("/v1/adapters")
+                .uri("/api/v1/adapters")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -181,7 +181,7 @@ async fn speech_route_returns_model_not_installed_before_runner_resolution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/audio/speech")
+                .uri("/api/v1/audio/speech")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","input":"Hello"}"#))
                 .unwrap(),
@@ -209,7 +209,7 @@ async fn metadata_only_pull_and_runner_contract_are_offline_before_speech() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                 .unwrap(),
@@ -223,7 +223,7 @@ async fn metadata_only_pull_and_runner_contract_are_offline_before_speech() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/runners/pull")
+                .uri("/api/v1/runners/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
                 .unwrap(),
@@ -236,7 +236,7 @@ async fn metadata_only_pull_and_runner_contract_are_offline_before_speech() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/audio/speech")
+                .uri("/api/v1/audio/speech")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","input":"Hello"}"#))
                 .unwrap(),
@@ -262,7 +262,7 @@ async fn speech_route_requires_kokoro_artifacts_before_execution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/models/pull")
+                .uri("/api/v1/models/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","metadata_only":true}"#))
                 .unwrap(),
@@ -276,7 +276,7 @@ async fn speech_route_requires_kokoro_artifacts_before_execution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/runners/pull")
+                .uri("/api/v1/runners/pull")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"runner":"takokit-onnx"}"#))
                 .unwrap(),
@@ -289,7 +289,7 @@ async fn speech_route_requires_kokoro_artifacts_before_execution() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/audio/speech")
+                .uri("/api/v1/audio/speech")
                 .header("content-type", "application/json")
                 .body(Body::from(r#"{"model":"kokoro","input":"Hello"}"#))
                 .unwrap(),
