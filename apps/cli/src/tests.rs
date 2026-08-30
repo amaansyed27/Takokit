@@ -442,13 +442,11 @@ fn runtime_resolution_errors_include_code_prefix() {
         message: "ONNX runner contract resolved, but real ONNX execution is not implemented yet."
             .to_string(),
     });
-
     assert_eq!(
         error.to_string(),
         "inference_not_implemented: ONNX runner contract resolved, but real ONNX execution is not implemented yet."
     );
 }
-
 #[test]
 fn cli_parses_registry_sync_show_and_tagged_pull() {
     let sync = Cli::try_parse_from(["takokit", "library", "sync"]).expect("registry sync");
@@ -478,7 +476,6 @@ fn cli_parses_registry_sync_show_and_tagged_pull() {
             if model == "whisper:small"
     ));
 }
-
 #[test]
 fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
     let pull = Cli::try_parse_from(["takokit", "pull", "xtts-v2", "--accept-license", "CPML"])
@@ -488,7 +485,6 @@ fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
         Some(Command::Pull(PullArgs { model, accept_license: Some(license), .. }))
             if model == "xtts-v2" && license == "CPML"
     ));
-
     let revoke = Cli::try_parse_from([
         "takokit", "licenses", "revoke", "CPML", "--model", "xtts-v2",
     ])
@@ -500,13 +496,4 @@ fn cli_parses_explicit_license_acceptance_and_receipt_commands() {
         }) if license == "CPML" && model == "xtts-v2"
     ));
 }
-
-#[test]
-fn cli_parses_model_removal_dry_run() {
-    let cli = Cli::try_parse_from(["takokit", "rm", "whisper:tiny", "--dry-run"])
-        .expect("model removal dry-run");
-    assert!(matches!(
-        cli.command,
-        Some(Command::Rm(RmArgs { model, dry_run: true })) if model == "whisper:tiny"
-    ));
-}
+mod parser_tail;

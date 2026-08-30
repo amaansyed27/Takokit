@@ -36,6 +36,7 @@ mod daemon_commands;
 mod local_setup;
 mod output;
 mod rvc_voice_command;
+mod surface;
 mod test_commands;
 mod voice_command;
 
@@ -47,6 +48,7 @@ use local_setup::*;
 use output::*;
 use session_commands::*;
 use storage_command::run_storage_command;
+use surface::{command_uses_workspace, starts_new_session, surface_title, validate_server_binding};
 use test_commands::*;
 use workspace::CliWorkspace;
 
@@ -476,74 +478,6 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-fn validate_server_binding(config: &RuntimeConfig) -> anyhow::Result<()> {
-    config
-        .host
-        .parse::<std::net::IpAddr>()
-        .map_err(|_| anyhow::anyhow!("invalid --host {}; use an IP address", config.host))?;
-    let loopback = config
-        .host
-        .parse::<std::net::IpAddr>()
-        .is_ok_and(|address| address.is_loopback());
-    if !loopback
-        && std::env::var("TAKOKIT_API_TOKEN")
-            .ok()
-            .is_none_or(|token| token.trim().len() < 24)
-    {
-        return Err(anyhow::anyhow!(
-            "non-loopback binding requires TAKOKIT_API_TOKEN with at least 24 characters"
-        ));
-    }
-    Ok(())
-}
-
-fn command_uses_workspace(command: &Option<Command>) -> bool {
-    matches!(
-        command,
-        None | Some(Command::Gui)
-            | Some(Command::Speak(_))
-            | Some(Command::Run(_))
-            | Some(Command::Transcribe { .. })
-            | Some(Command::Clone(_))
-            | Some(Command::Voice {
-                command: VoiceCommand::Add { .. }
-            })
-            | Some(Command::Voice {
-                command: VoiceCommand::Rvc {
-                    command: RvcVoiceCommand::Test { .. }
-                }
-            })
-            | Some(Command::Convert(_))
-            | Some(Command::Train(_))
-    )
-}
-
-fn starts_new_session(command: &Option<Command>) -> bool {
-    matches!(command, None | Some(Command::Gui))
-}
-
-fn surface_title(command: &Option<Command>) -> &'static str {
-    match command {
-        None => "Takokit TUI",
-        Some(Command::Gui) => "Takokit GUI",
-        Some(Command::Speak(_)) => "CLI speech",
-        Some(Command::Transcribe { .. }) => "CLI transcription",
-        Some(Command::Clone(_)) => "CLI voice cloning",
-        Some(Command::Voice {
-            command: VoiceCommand::Add { .. },
-        }) => "CLI voice profile",
-        Some(Command::Voice {
-            command:
-                VoiceCommand::Rvc {
-                    command: RvcVoiceCommand::Test { .. },
-                },
-        }) => "CLI RVC voice test",
-        Some(Command::Convert(_)) => "CLI voice conversion",
-        Some(Command::Train(_)) => "CLI voice training",
-        _ => "Takokit CLI",
-    }
 }
 
 #[cfg(test)]
