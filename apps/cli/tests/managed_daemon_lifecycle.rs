@@ -9,7 +9,7 @@ fn free_port() -> u16 {
 }
 
 fn command(home: &std::path::Path, port: u16, args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_takokit"))
+    Command::new(env!("CARGO_BIN_EXE_takokit-server"))
         .args(args)
         .env("TAKOKIT_HOME", home)
         .env("TAKOKIT_PORT", port.to_string())
@@ -19,7 +19,7 @@ fn command(home: &std::path::Path, port: u16, args: &[&str]) -> std::process::Ou
 }
 
 fn start(home: &std::path::Path, port: u16) -> std::process::ExitStatus {
-    Command::new(env!("CARGO_BIN_EXE_takokit"))
+    Command::new(env!("CARGO_BIN_EXE_takokit-server"))
         .args(["daemon", "start"])
         .env("TAKOKIT_HOME", home)
         .env("TAKOKIT_PORT", port.to_string())

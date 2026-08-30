@@ -2,7 +2,7 @@ use std::process::Command;
 
 #[test]
 fn both_cli_binaries_expose_the_same_nonempty_build_identifier() {
-    let takokit = build_id(env!("CARGO_BIN_EXE_takokit"));
+    let takokit = build_id(env!("CARGO_BIN_EXE_takokit-server"));
     let tako = build_id(env!("CARGO_BIN_EXE_tako"));
     assert!(!takokit.is_empty(), "takokit build identifier is empty");
     assert_eq!(
