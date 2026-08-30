@@ -35,6 +35,7 @@ pub(super) struct Args {
     pub(super) parent_pid: u32,
     pub(super) install_root: PathBuf,
     pub(super) bundle: PathBuf,
+    pub(super) installer: PathBuf,
     pub(super) expected_version: String,
     pub(super) journal: PathBuf,
     pub(super) restart_daemon: bool,
@@ -45,6 +46,7 @@ impl Args {
         let mut parent_pid = None;
         let mut install_root = None;
         let mut bundle = None;
+        let mut installer = None;
         let mut expected_version = None;
         let mut journal = None;
         let mut restart_daemon = false;
@@ -57,6 +59,7 @@ impl Args {
                 "--parent-pid" => parent_pid = Some(value.parse()?),
                 "--install-root" => install_root = Some(PathBuf::from(value)),
                 "--bundle" => bundle = Some(PathBuf::from(value)),
+                "--installer" => installer = Some(PathBuf::from(value)),
                 "--expected-version" => expected_version = Some(value),
                 "--journal" => journal = Some(PathBuf::from(value)),
                 "--restart-daemon" => restart_daemon = parse_bool(&value)?,
@@ -67,6 +70,7 @@ impl Args {
             parent_pid: parent_pid.ok_or("missing --parent-pid")?,
             install_root: install_root.ok_or("missing --install-root")?,
             bundle: bundle.ok_or("missing --bundle")?,
+            installer: installer.ok_or("missing --installer")?,
             expected_version: expected_version.ok_or("missing --expected-version")?,
             journal: journal.ok_or("missing --journal")?,
             restart_daemon,

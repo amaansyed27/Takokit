@@ -64,6 +64,7 @@ struct AutomaticCheckReport {
 struct VerifiedUpdate {
     manifest: ReleaseManifest,
     artifact: Option<ReleaseArtifact>,
+    installer: Option<ReleaseArtifact>,
     manifest_source: String,
 }
 
@@ -263,9 +264,17 @@ fn check_unrecorded(
                 .ok_or_else(|| anyhow::anyhow!("signed manifest has no update_bundle artifact"))?,
         ),
     };
+    let installer = artifact.as_ref().and_then(|_| {
+        manifest
+            .artifacts
+            .iter()
+            .find(|candidate| candidate.role == "installer")
+            .cloned()
+    });
     Ok(VerifiedUpdate {
         manifest,
         artifact,
+        installer,
         manifest_source,
     })
 }
@@ -407,6 +416,11 @@ fn apply(
         )
     })?;
     let staged_bundle = ensure_staged_artifact(store, &verified, artifact)?;
+    let installer = verified
+        .installer
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("signed manifest has no installer artifact"))?;
+    let staged_installer = ensure_staged_artifact(store, &verified, installer)?;
     refuse_active_runtime_operations(store, config)?;
 
     let daemon_was_running = daemon::status(store, config)?.is_some();
@@ -434,6 +448,8 @@ fn apply(
         .arg(&install_root)
         .arg("--bundle")
         .arg(&staged_bundle)
+        .arg("--installer")
+        .arg(&staged_installer)
         .arg("--expected-version")
         .arg(&verified.manifest.version)
         .arg("--journal")

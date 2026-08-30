@@ -96,6 +96,28 @@ where
         );
     }
 
+    if let Err(error) = preserve_installer_maintenance_files(backup, &args.install_root) {
+        return rollback_after_replacement(
+            args,
+            parent,
+            backup,
+            nonce,
+            &format!("Could not preserve installer maintenance files: {error}"),
+        );
+    }
+
+    if args.installer.is_file() {
+        if let Err(error) = refresh_installer_registration(&args.installer, &args.install_root) {
+            return rollback_after_replacement(
+                args,
+                parent,
+                backup,
+                nonce,
+                &format!("Installer registration refresh failed: {error}"),
+            );
+        }
+    }
+
     if failpoint == Some("after_replace") {
         return rollback_after_replacement(
             args,
@@ -130,6 +152,35 @@ where
             &format!("Post-update verification failed: {error}"),
         ),
     }
+}
+
+fn preserve_installer_maintenance_files(backup: &Path, install_root: &Path) -> io::Result<()> {
+    for name in ["unins000.exe", "unins000.dat"] {
+        let source = backup.join(name);
+        if source.is_file() {
+            fs::copy(source, install_root.join(name))?;
+        }
+    }
+    Ok(())
+}
+
+fn refresh_installer_registration(
+    installer: &Path,
+    install_root: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let status = std::process::Command::new(installer)
+        .args([
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/CURRENTUSER",
+        ])
+        .arg(format!("/DIR={}", install_root.display()))
+        .status()?;
+    if !status.success() {
+        return Err(format!("{} exited with {status}", installer.display()).into());
+    }
+    Ok(())
 }
 
 fn rollback_before_replacement(
@@ -191,6 +242,7 @@ mod tests {
             parent_pid: 0,
             install_root: root.join("Takokit"),
             bundle: root.join("update.zip"),
+            installer: root.join("installer.exe"),
             expected_version: "0.0.2".to_string(),
             journal: root.join("update-journal.json"),
             restart_daemon: false,
@@ -259,5 +311,39 @@ mod tests {
             .is_file());
         let journal: Journal = serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
         assert_eq!(journal.state, "rolled_back");
+    }
+
+    #[test]
+    fn successful_update_preserves_installer_uninstaller() {
+        let temp = tempfile::tempdir().unwrap();
+        let args = fixture_args(temp.path());
+        let replacement = temp.path().join("Takokit.update.fixture");
+        let backup = temp.path().join("Takokit.rollback.fixture");
+        fs::create_dir_all(&args.install_root).unwrap();
+        fs::create_dir_all(&replacement).unwrap();
+        fs::write(args.install_root.join("unins000.exe"), b"uninstaller").unwrap();
+        fs::write(args.install_root.join("unins000.dat"), b"metadata").unwrap();
+        fs::write(replacement.join("replacement.txt"), b"replacement").unwrap();
+
+        replace_installation(
+            &args,
+            temp.path(),
+            &replacement,
+            &backup,
+            "fixture",
+            None,
+            |_| Ok(()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read(args.install_root.join("unins000.exe")).unwrap(),
+            b"uninstaller"
+        );
+        assert_eq!(
+            fs::read(args.install_root.join("unins000.dat")).unwrap(),
+            b"metadata"
+        );
+        assert!(!backup.exists());
     }
 }
