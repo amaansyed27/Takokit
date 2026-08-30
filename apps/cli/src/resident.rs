@@ -1,7 +1,6 @@
 //! Native Windows resident application hosted by the normal `tako.exe` binary.
 
 use crate::daemon;
-use serde::Deserialize;
 use std::{
     ffi::OsStr,
     io::Write,
@@ -13,8 +12,13 @@ use std::{
     thread,
     time::Duration,
 };
+
+mod startup;
+mod update;
+use startup::*;
 use takokit_core::RuntimeConfig;
 use takokit_store::LocalStore;
+use update::*;
 use uuid::Uuid;
 use windows_sys::Win32::{
     Foundation::{
@@ -55,9 +59,6 @@ const ID_STARTUP: usize = 105;
 const ID_ABOUT: usize = 106;
 const ID_QUIT: usize = 107;
 const ID_INSTALL_UPDATE: usize = 108;
-const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-const RUN_VALUE: &str = "Takokit";
-const LEGACY_RUN_VALUE: &str = "TakokitTray";
 
 #[derive(Default)]
 struct ResidentState {
@@ -405,141 +406,6 @@ fn copy_api_url() {
     }
 }
 
-fn startup_enabled() -> bool {
-    hidden_command("reg.exe")
-        .args(["query", RUN_KEY, "/v", RUN_VALUE])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-fn set_startup(enabled: bool) {
-    if enabled {
-        if let Ok(exe) = std::env::current_exe() {
-            let value = format!("\"{}\" --resident", exe.display());
-            let _ = hidden_command("reg.exe")
-                .args([
-                    "add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &value, "/f",
-                ])
-                .status();
-            let _ = hidden_command("reg.exe")
-                .args(["delete", RUN_KEY, "/v", LEGACY_RUN_VALUE, "/f"])
-                .status();
-        }
-    } else {
-        let _ = hidden_command("reg.exe")
-            .args(["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
-            .status();
-        let _ = hidden_command("reg.exe")
-            .args(["delete", RUN_KEY, "/v", LEGACY_RUN_VALUE, "/f"])
-            .status();
-    }
-}
-
-#[derive(Deserialize)]
-struct AutomaticCheckReport {
-    available_version: Option<String>,
-}
-
-fn check_update_async(hwnd: HWND, automatic: bool) {
-    {
-        let mut state = STATE.get().unwrap().lock().unwrap();
-        if state.update_check_running {
-            return;
-        }
-        state.update_check_running = true;
-    }
-    let hwnd = hwnd as isize;
-    thread::spawn(move || {
-        let args = if automatic {
-            vec!["--output", "json", "update", "auto-check"]
-        } else {
-            vec!["--output", "json", "update", "check"]
-        };
-        let output = std::env::current_exe()
-            .ok()
-            .and_then(|exe| hidden_command(exe).args(args).output().ok());
-        let successful = output.as_ref().is_some_and(|value| value.status.success());
-        let version = output
-            .filter(|value| value.status.success())
-            .and_then(|value| parse_update_version(&value.stdout, automatic));
-        let mut state = STATE.get().unwrap().lock().unwrap();
-        let newly_available = version.is_some() && version != state.update_version;
-        state.update_version = version;
-        state.update_check_running = false;
-        state.last_update_check_failed = !successful;
-        drop(state);
-        unsafe {
-            PostMessageW(
-                hwnd as HWND,
-                if newly_available {
-                    UPDATE_READY
-                } else if !automatic {
-                    UPDATE_CHECKED
-                } else {
-                    STATE_CHANGED
-                },
-                0,
-                0,
-            )
-        };
-    });
-}
-
-unsafe fn show_update_check_result(hwnd: HWND) {
-    let state = STATE.get().unwrap().lock().unwrap();
-    let message = if state.last_update_check_failed {
-        "Takokit could not check for updates. Try again when the network is available."
-    } else {
-        "Takokit is up to date."
-    };
-    MessageBoxW(
-        hwnd,
-        wide(message).as_ptr(),
-        wide("Takokit Updates").as_ptr(),
-        MB_OK | MB_ICONINFORMATION,
-    );
-}
-
-fn parse_update_version(output: &[u8], automatic: bool) -> Option<String> {
-    if automatic {
-        return serde_json::from_slice::<AutomaticCheckReport>(output)
-            .ok()
-            .and_then(|report| report.available_version);
-    }
-    let value: serde_json::Value = serde_json::from_slice(output).ok()?;
-    value
-        .get("available")
-        .and_then(|available| available.as_bool())
-        .unwrap_or(false)
-        .then(|| value.get("offered_version")?.as_str().map(str::to_owned))
-        .flatten()
-}
-
-fn apply_update_async() {
-    thread::spawn(|| {
-        if let Ok(exe) = std::env::current_exe() {
-            let _ = hidden_command(exe).args(["update", "apply"]).spawn();
-        }
-    });
-}
-
-unsafe fn show_update_notification(hwnd: HWND) {
-    let Some(version) = STATE.get().unwrap().lock().unwrap().update_version.clone() else {
-        return;
-    };
-    let mut data = notification_data(hwnd);
-    data.uFlags = NIF_INFO;
-    copy_wide(&mut data.szInfoTitle, "Takokit update available");
-    copy_wide(
-        &mut data.szInfo,
-        &format!("Takokit v{version} is ready to install. Click to install the signed update."),
-    );
-    data.dwInfoFlags = 1;
-    Shell_NotifyIconW(NIM_MODIFY, &data);
-}
-
 fn add_icon(hwnd: HWND) -> anyhow::Result<()> {
     let mut data = notification_data(hwnd);
     data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
@@ -625,43 +491,4 @@ fn copy_wide<const N: usize>(target: &mut [u16; N], value: &str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn installed_icon_path_is_canonical() {
-        assert!(
-            icon_path().ends_with("resources\\icons\\takokit.ico")
-                || icon_path().ends_with("assets\\favicon\\favicon.ico")
-        );
-    }
-    #[test]
-    fn configured_api_url_is_copied() {
-        let (_, config) = store_and_config();
-        assert!(format!("{}/v1", config.local_base_url()).ends_with("/v1"));
-    }
-
-    #[test]
-    fn quit_stops_only_the_instance_started_by_resident_mode() {
-        let owned = Uuid::new_v4();
-        assert!(should_stop_owned(Some(owned), Some(owned)));
-        assert!(!should_stop_owned(Some(Uuid::new_v4()), Some(owned)));
-        assert!(!should_stop_owned(Some(owned), None));
-        assert!(!should_stop_owned(None, Some(owned)));
-    }
-
-    #[test]
-    fn update_available_state_uses_existing_updater_reports() {
-        assert_eq!(
-            parse_update_version(br#"{"available":true,"offered_version":"0.3.0"}"#, false),
-            Some("0.3.0".into())
-        );
-        assert_eq!(
-            parse_update_version(br#"{"checked":true,"available_version":"0.3.0"}"#, true),
-            Some("0.3.0".into())
-        );
-        assert_eq!(
-            parse_update_version(br#"{"available":false,"offered_version":"0.2.0"}"#, false),
-            None
-        );
-    }
-}
+mod tests;
