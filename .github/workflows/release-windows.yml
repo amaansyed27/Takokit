@@ -3,7 +3,7 @@ name: Publish Windows Release
 on:
   push:
     tags:
-      - v0.1.0
+      - v0.2.0
 
 permissions:
   contents: write
@@ -36,7 +36,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          if ('${{ github.ref_name }}' -ne 'v0.1.0') { throw 'Only v0.1.0 is supported by this release workflow.' }
+          if ('${{ github.ref_name }}' -ne 'v0.2.0') { throw 'Only v0.2.0 is supported by this release workflow.' }
           git fetch origin main
           git merge-base --is-ancestor HEAD origin/main
           if ($LASTEXITCODE -ne 0) { throw 'The release tag commit is not contained in origin/main.' }
@@ -45,7 +45,7 @@ jobs:
       - name: Download accepted Windows artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: takokit-v0.1.0-windows-x86_64-${{ github.sha }}
+          name: takokit-v0.2.0-windows-x86_64-${{ github.sha }}
           path: release-assets
 
       - name: Require canonical production release assets
@@ -53,13 +53,13 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $required = @(
-            'Takokit-v0.1.0-windows-x86_64-installer.exe',
-            'Takokit-v0.1.0-windows-x86_64.zip',
-            'Takokit-v0.1.0-windows-x86_64-update.zip',
+            'Takokit-v0.2.0-windows-x86_64-installer.exe',
+            'Takokit-v0.2.0-windows-x86_64.zip',
+            'Takokit-v0.2.0-windows-x86_64-update.zip',
             'SHA256SUMS.txt',
             'release-manifest.json',
             'release-manifest.sig',
-            'RELEASE_NOTES-v0.1.0.md',
+            'RELEASE_NOTES-v0.2.0.md',
             'build-provenance.json',
             'authenticode-status.json'
           )
@@ -69,14 +69,14 @@ jobs:
             }
           }
           $manifest = Get-Content -LiteralPath 'release-assets/release-manifest.json' -Raw | ConvertFrom-Json
-          if ($manifest.version -ne '0.1.0' -or $manifest.channel -ne 'stable' -or $manifest.test_fixture -ne $false) {
-            throw 'Release manifest is not the stable Takokit v0.1.0 manifest.'
+          if ($manifest.version -ne '0.2.0' -or $manifest.channel -ne 'stable' -or $manifest.test_fixture -ne $false) {
+            throw 'Release manifest is not the stable Takokit v0.2.0 manifest.'
           }
           if ($manifest.signing_key_id -ne 'takokit-release-v1') {
             throw "Unexpected production signing identity: $($manifest.signing_key_id)"
           }
 
-      - name: Publish Takokit v0.1.0
+      - name: Publish Takokit v0.2.0
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,14 +85,14 @@ jobs:
           gh release create '${{ github.ref_name }}' `
             --repo '${{ github.repository }}' `
             --verify-tag `
-            --title 'Takokit v0.1.0' `
-            --notes-file 'release-assets/RELEASE_NOTES-v0.1.0.md' `
-            'release-assets/Takokit-v0.1.0-windows-x86_64-installer.exe' `
-            'release-assets/Takokit-v0.1.0-windows-x86_64.zip' `
-            'release-assets/Takokit-v0.1.0-windows-x86_64-update.zip' `
+            --title 'Takokit v0.2.0' `
+            --notes-file 'release-assets/RELEASE_NOTES-v0.2.0.md' `
+            'release-assets/Takokit-v0.2.0-windows-x86_64-installer.exe' `
+            'release-assets/Takokit-v0.2.0-windows-x86_64.zip' `
+            'release-assets/Takokit-v0.2.0-windows-x86_64-update.zip' `
             'release-assets/SHA256SUMS.txt' `
             'release-assets/release-manifest.json' `
             'release-assets/release-manifest.sig' `
-            'release-assets/RELEASE_NOTES-v0.1.0.md' `
+            'release-assets/RELEASE_NOTES-v0.2.0.md' `
             'release-assets/build-provenance.json' `
             'release-assets/authenticode-status.json'

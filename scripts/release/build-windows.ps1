@@ -315,8 +315,8 @@ if ($HasProductionSigningKey) {
     Invoke-Checked $ReleaseTool 'verify' $ManifestPath $SignaturePath '--allow-test'
 }
 
-$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.2.0-candidate-notes.md'
-$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.2.0-CANDIDATE.md'
+$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.2.0-release-notes.md'
+$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.2.0.md'
 if (-not (Test-Path -LiteralPath $ReleaseNotesSource)) {
     throw "Release notes source is missing: $ReleaseNotesSource"
 }
