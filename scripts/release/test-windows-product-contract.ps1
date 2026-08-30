@@ -246,7 +246,8 @@ try {
     $PortableTako = Join-Path $PortableRoot 'bin\tako.exe'
     foreach ($relative in @(
         'bin\tako.exe',
-        'bin\takokit.exe',
+        'bin\Takokit.exe',
+        'bin\takokit-server.exe',
         'bin\takokit-updater.exe',
         'resources\gui\index.html',
         'resources\registry\index.json',
@@ -260,7 +261,6 @@ try {
         Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Packaged product resource is missing: $relative"
     }
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $PortableRoot 'bin\takokit-tray.exe'))) 'Portable package ships the removed takokit-tray.exe.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $PortableRoot 'Takokit.exe'))) 'Portable package still contains the removed native desktop wrapper.'
     $Report.packaged_product = $true
     $Report.rvc_resources_packaged = $true
 
@@ -328,7 +328,8 @@ try {
     $InstalledTako = Join-Path $InstalledBin 'tako.exe'
     foreach ($relative in @(
         'bin\tako.exe',
-        'bin\takokit.exe',
+        'bin\Takokit.exe',
+        'bin\takokit-server.exe',
         'bin\takokit-updater.exe',
         'resources\gui\index.html',
         'resources\registry\index.json'
@@ -336,7 +337,6 @@ try {
         Assert-True (Test-Path -LiteralPath (Join-Path $InstallRoot $relative) -PathType Leaf) "Contract install is missing $relative."
     }
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'bin\takokit-tray.exe'))) 'Contract install ships the removed takokit-tray.exe.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'Takokit.exe'))) 'Contract install still contains the removed native desktop wrapper.'
     Assert-True ((Get-PathEntryCount (Get-UserPath) $InstalledBin) -eq 1) 'Contract install did not register exactly one owned PATH entry.'
     Assert-True (Test-Path -LiteralPath $GuiShortcutPath -PathType Leaf) 'Contract install is missing GUI Start Menu shortcut.'
     Assert-True (Test-Path -LiteralPath $TuiShortcutPath -PathType Leaf) 'Contract install is missing TUI Start Menu shortcut.'
@@ -345,17 +345,16 @@ try {
     $Shell = New-Object -ComObject WScript.Shell
     $GuiShortcut = $Shell.CreateShortcut($GuiShortcutPath)
     $TuiShortcut = $Shell.CreateShortcut($TuiShortcutPath)
-    $ExpectedGuiTarget = $InstalledTako
+    $ExpectedGuiTarget = Join-Path $InstalledBin 'Takokit.exe'
     $ExpectedTuiTarget = $InstalledTako
     $ExpectedDocuments = [Environment]::GetFolderPath('MyDocuments')
     $ExpectedWorkspace = Join-Path $ExpectedDocuments 'Takokit'
-    Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedGuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'GUI shortcut does not target the packaged CLI executable.'
-    Assert-True ($GuiShortcut.Arguments -match '(^|\s)--resident(\s|$)') 'Primary Takokit shortcut does not invoke integrated resident mode.'
-    Assert-True ($GuiShortcut.Arguments -notmatch '(^|\s)gui(\s|$)') 'Primary Takokit shortcut still opens the browser GUI directly.'
+    Assert-True ([string]::Equals($GuiShortcut.TargetPath, $ExpectedGuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'Primary shortcut does not target the packaged Takokit Windows application.'
+    Assert-True ([string]::IsNullOrWhiteSpace($GuiShortcut.Arguments)) 'Primary shortcut unexpectedly passes internal arguments.'
     Assert-True ([string]::Equals($TuiShortcut.TargetPath, $ExpectedTuiTarget, [StringComparison]::OrdinalIgnoreCase)) 'TUI shortcut target is not the packaged CLI executable.'
     Assert-True ($TuiShortcut.Arguments -match '--workspace') 'TUI shortcut has no deliberate workspace argument.'
     Assert-True ($TuiShortcut.Arguments.Contains($ExpectedWorkspace)) "TUI shortcut workspace is not the safe Documents/Takokit path: $($TuiShortcut.Arguments)"
-    & (Join-Path $PSScriptRoot 'test-windows-resident.ps1') -TakoExe $InstalledTako -OutputRoot (Join-Path $OutputRoot 'resident-product-contract') -Port 5167 -AssertNoSibling
+    & (Join-Path $PSScriptRoot 'test-windows-resident.ps1') -TakoExe $InstalledTako -ApplicationExe $ExpectedGuiTarget -OutputRoot (Join-Path $OutputRoot 'resident-product-contract') -Port 5167 -AssertNoLegacyTray
     Assert-True ($LASTEXITCODE -eq 0) 'Installed resident Takokit acceptance failed.'
 
     $GuiWorkingDir = $GuiShortcut.WorkingDirectory
@@ -371,7 +370,7 @@ try {
         Assert-True (-not (Test-Path -LiteralPath $unsafe)) "Unsafe .tako precondition failed: $unsafe already exists."
     }
 
-    $guiOutput = Invoke-TakoGui -TakoExe $ExpectedGuiTarget -Workspace $ExpectedWorkspace -WorkingDirectory $GuiWorkingDir
+    $guiOutput = Invoke-TakoGui -TakoExe $InstalledTako -Workspace $ExpectedWorkspace -WorkingDirectory $GuiWorkingDir
     $daemon = Wait-ManagedDaemon -TakokitHome $DefaultHome
     $guiUrl = Assert-GuiServed -HostName ([string]$daemon.host) -Port ([int]$daemon.port)
     Assert-True ($guiOutput.Contains($guiUrl)) 'Installed tako gui output did not contain the served GUI URL.'

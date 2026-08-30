@@ -10,9 +10,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     let started = Instant::now();
-    let show_timing = !std::env::args_os().any(|argument| {
-        argument == OsStr::new("--daemon-child") || argument == OsStr::new("--resident")
-    });
+    let show_timing = !std::env::args_os().any(|argument| argument == OsStr::new("--daemon-child"));
     let result = takokit_cli::run().await;
 
     if show_timing {

@@ -20,7 +20,7 @@ $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 Set-Location $RepoRoot
 
 if (Test-Path -LiteralPath (Join-Path $RepoRoot 'apps\desktop')) {
-    throw 'Release gate: apps\desktop must not exist; Takokit GUI is browser-served and resident mode is integrated into tako.exe.'
+    throw 'Release gate: apps\desktop must not exist; Takokit GUI remains browser-served and the native application is only its resident controller.'
 }
 
 function Invoke-Checked {
@@ -138,7 +138,7 @@ $env:TAKOKIT_BUILD_ID = $BuildId
 $env:SOURCE_DATE_EPOCH = [DateTimeOffset]$CommitTime | ForEach-Object { $_.ToUnixTimeSeconds().ToString() }
 
 if (-not $SkipBuild) {
-    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'takokit' '--bin' 'takokit-updater'
+    Invoke-Checked cargo 'build' '--release' '--locked' '--bin' 'tako' '--bin' 'Takokit' '--bin' 'takokit-server' '--bin' 'takokit-updater'
     Invoke-Checked cargo 'build' '--release' '--locked' '-p' 'takokit-release' '--bin' 'takokit-release-tool'
     Push-Location (Join-Path $RepoRoot 'apps\gui')
     try {
@@ -151,7 +151,8 @@ if (-not $SkipBuild) {
 
 $RequiredFiles = @(
     'target\release\tako.exe',
-    'target\release\takokit.exe',
+    'target\release\Takokit.exe',
+    'target\release\takokit-server.exe',
     'target\release\takokit-updater.exe',
     'target\release\takokit-release-tool.exe',
     'apps\gui\dist\index.html',
@@ -176,7 +177,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $BaseTree 'resources\licens
 New-Item -ItemType Directory -Force -Path (Join-Path $BaseTree 'resources\icons') | Out-Null
 
 Copy-Item 'target\release\tako.exe' (Join-Path $BaseTree 'bin\tako.exe')
-Copy-Item 'target\release\takokit.exe' (Join-Path $BaseTree 'bin\takokit.exe')
+Copy-Item 'target\release\Takokit.exe' (Join-Path $BaseTree 'bin\Takokit.exe')
+Copy-Item 'target\release\takokit-server.exe' (Join-Path $BaseTree 'bin\takokit-server.exe')
 Copy-Item 'target\release\takokit-updater.exe' (Join-Path $BaseTree 'bin\takokit-updater.exe')
 Copy-DirectoryContents (Join-Path $RepoRoot 'apps\gui\dist') (Join-Path $BaseTree 'resources\gui')
 Copy-DirectoryContents (Join-Path $RepoRoot 'registry') (Join-Path $BaseTree 'resources\registry')

@@ -21,7 +21,7 @@ pub(super) fn check_update_async(hwnd: HWND, automatic: bool) {
         } else {
             vec!["--output", "json", "update", "check"]
         };
-        let output = std::env::current_exe()
+        let output = tako_executable()
             .ok()
             .and_then(|exe| hidden_command(exe).args(args).output().ok());
         let successful = output.as_ref().is_some_and(|value| value.status.success());
@@ -83,7 +83,7 @@ pub(super) fn parse_update_version(output: &[u8], automatic: bool) -> Option<Str
 
 pub(super) fn apply_update_async() {
     thread::spawn(|| {
-        if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = tako_executable() {
             let _ = hidden_command(exe).args(["update", "apply"]).spawn();
         }
     });

@@ -12,7 +12,8 @@ use zip::ZipArchive;
 const TEST_FAILPOINT_ENV: &str = "TAKOKIT_UPDATER_TEST_FAILPOINT";
 const REQUIRED_REPLACEMENT_FILES: &[&str] = &[
     "bin/tako.exe",
-    "bin/takokit.exe",
+    "bin/Takokit.exe",
+    "bin/takokit-server.exe",
     "bin/takokit-updater.exe",
     "distribution.json",
     "resources/registry/index.json",
@@ -332,9 +333,9 @@ mod tests {
     fn replacement_validation_still_requires_real_daemon_binary() {
         let temp = tempfile::tempdir().unwrap();
         write_replacement_fixture(temp.path());
-        fs::remove_file(temp.path().join("bin/takokit.exe")).unwrap();
+        fs::remove_file(temp.path().join("bin/takokit-server.exe")).unwrap();
 
         let error = validate_replacement(temp.path()).unwrap_err().to_string();
-        assert!(error.contains("bin/takokit.exe"));
+        assert!(error.contains("bin/takokit-server.exe"));
     }
 }

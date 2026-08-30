@@ -74,9 +74,9 @@ fn alias_prefers_sibling_canonical_daemon_binary() {
         .path()
         .join(if cfg!(windows) { "tako.exe" } else { "tako" });
     let canonical = temp.path().join(if cfg!(windows) {
-        "takokit.exe"
+        "takokit-server.exe"
     } else {
-        "takokit"
+        "takokit-server"
     });
     fs::write(&alias, b"").unwrap();
     fs::write(&canonical, b"").unwrap();
@@ -99,9 +99,9 @@ fn alias_falls_back_to_itself_when_canonical_binary_is_missing() {
 fn canonical_binary_keeps_itself_as_daemon_executable() {
     let temp = tempfile::tempdir().unwrap();
     let canonical = temp.path().join(if cfg!(windows) {
-        "takokit.exe"
+        "takokit-server.exe"
     } else {
-        "takokit"
+        "takokit-server"
     });
     fs::write(&canonical, b"").unwrap();
 

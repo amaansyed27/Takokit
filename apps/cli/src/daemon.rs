@@ -17,6 +17,7 @@ use tokio::sync::oneshot;
 use uuid::Uuid;
 
 mod runtime;
+mod server_control;
 pub(crate) use runtime::build_freshness;
 pub use runtime::write_atomic;
 use runtime::{
@@ -25,6 +26,7 @@ use runtime::{
 };
 #[cfg(test)]
 use runtime::{preferred_daemon_executable, takokit_health_responds};
+pub(crate) use server_control::*;
 
 const IDENTITY_WAIT: Duration = Duration::from_secs(5);
 const IDENTITY_POLL: Duration = Duration::from_millis(100);
@@ -130,6 +132,7 @@ pub struct DaemonInfo {
     #[serde(default)]
     pub build_id: String,
 }
+
 impl DaemonInfo {
     fn identity(&self) -> DaemonIdentity {
         DaemonIdentity {

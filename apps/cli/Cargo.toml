@@ -7,12 +7,16 @@ repository.workspace = true
 authors.workspace = true
 
 [[bin]]
-name = "takokit"
+name = "takokit-server"
 path = "src/main.rs"
 
 [[bin]]
 name = "tako"
 path = "src/bin/tako.rs"
+
+[[bin]]
+name = "Takokit"
+path = "src/bin/takokit-app.rs"
 
 [[bin]]
 name = "takokit-updater"

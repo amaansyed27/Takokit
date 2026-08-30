@@ -30,7 +30,7 @@ use takokit_package::{
     resolve_execution_plan, runner_runtime_layout, InstallModelOptions, InstalledRegistry,
     ModelPlan, PackageError, PackageRegistry, RemoveModelOptions, RunnerManifest,
 };
-use takokit_server::{run_server, AppState};
+use takokit_server::AppState;
 use takokit_store::{LocalStore, VoiceProfileStore};
 
 mod args;
@@ -50,12 +50,23 @@ use local_setup::*;
 use output::*;
 use session_commands::*;
 use storage_command::run_storage_command;
-use surface::{command_uses_workspace, starts_new_session, surface_title, validate_server_binding};
+use surface::{command_uses_workspace, starts_new_session, surface_title};
 use test_commands::*;
 use workspace::CliWorkspace;
 
 fn cli_storage_root() -> PathBuf {
     LocalStore::default_root()
+}
+
+#[cfg(windows)]
+pub fn run_resident_application(explicit_launch: bool) -> anyhow::Result<()> {
+    distribution::configure_installed_resources();
+    resident::run(explicit_launch)
+}
+
+#[cfg(windows)]
+pub fn show_resident_startup_error(message: &str) {
+    resident::show_startup_error(message);
 }
 
 pub async fn run() -> anyhow::Result<()> {
@@ -65,23 +76,12 @@ pub async fn run() -> anyhow::Result<()> {
     distribution::configure_installed_resources();
 
     let Cli {
-        resident,
-        resident_quit: _,
-        resident_action: _,
         direct,
         output,
         workspace: workspace_arg,
         session: session_arg,
         command,
     } = Cli::parse();
-    #[cfg(windows)]
-    if resident {
-        return resident::run();
-    }
-    #[cfg(not(windows))]
-    if resident {
-        anyhow::bail!("Takokit resident mode is available on Windows only");
-    }
     if let Some(output) = output {
         set_json_output(matches!(output, OutputFormat::Json));
     }
@@ -124,6 +124,9 @@ pub async fn run() -> anyhow::Result<()> {
 
     match command {
         None => {
+            #[cfg(windows)]
+            resident::ensure_running(false)?;
+            let _ = daemon::ensure_running(&store, &config)?;
             tui::run_launcher(
                 &config,
                 &store,
@@ -149,27 +152,19 @@ pub async fn run() -> anyhow::Result<()> {
                 )
                 .await?;
             } else {
-                validate_server_binding(&config)?;
-                println!("Takokit {}", env!("CARGO_PKG_VERSION"));
-                println!("Server listening on {}", config.local_base_url());
-                println!("OpenAI API: {}/v1", config.local_base_url());
-                println!("Takokit API: {}/api/v1", config.local_base_url());
-                println!("GUI: {}/gui", config.local_base_url());
-                println!();
-                println!("Ctrl+C to stop");
-                run_server(AppState::new_with_build_id(
-                    config,
-                    store,
-                    daemon::current_build_id(),
-                ))
-                .await?;
+                run_foreground_server(store, config).await?;
             }
         }
+        Some(Command::Start) => start_server(&store, &config)?,
+        Some(Command::Stop) => stop_server(&store, &config)?,
         Some(Command::Daemon { command }) => match command {
             DaemonCommand::Start => print_serializable(&daemon::start(&store, &config)?)?,
-            DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
+            DaemonCommand::Stop => println!(
+                "stopped: {}",
+                daemon::stop_verified_server(&store, &config)?
+            ),
             DaemonCommand::Restart => {
-                let _ = daemon::stop(&store, &config)?;
+                let _ = daemon::stop_verified_server(&store, &config)?;
                 print_serializable(&daemon::start(&store, &config)?)?;
             }
             DaemonCommand::Status => match daemon::status(&store, &config)? {
@@ -180,9 +175,12 @@ pub async fn run() -> anyhow::Result<()> {
         },
         Some(Command::Server { command }) => match command {
             DaemonCommand::Start => print_serializable(&daemon::start(&store, &config)?)?,
-            DaemonCommand::Stop => println!("stopped: {}", daemon::stop(&store, &config)?),
+            DaemonCommand::Stop => println!(
+                "stopped: {}",
+                daemon::stop_verified_server(&store, &config)?
+            ),
             DaemonCommand::Restart => {
-                let _ = daemon::stop(&store, &config)?;
+                let _ = daemon::stop_verified_server(&store, &config)?;
                 print_serializable(&daemon::start(&store, &config)?)?;
             }
             DaemonCommand::Status => match daemon::status(&store, &config)? {
@@ -192,6 +190,8 @@ pub async fn run() -> anyhow::Result<()> {
             DaemonCommand::Logs => println!("{}", daemon::logs(&store).display()),
         },
         Some(Command::Gui) => {
+            #[cfg(windows)]
+            resident::ensure_running(false)?;
             gui::open_gui(&store, &config, workspace.as_ref().expect("GUI workspace")).await?
         }
         Some(Command::Doctor(args)) => {

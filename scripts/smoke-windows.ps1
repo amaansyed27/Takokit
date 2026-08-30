@@ -14,7 +14,7 @@ try {
     }
     cargo build --release
     if ($LASTEXITCODE -ne 0) { throw "cargo build --release failed" }
-    $takokit = Join-Path $repo 'target\release\takokit.exe'
+    $takokit = Join-Path $repo 'target\release\takokit-server.exe'
     & $takokit doctor
     if ($LASTEXITCODE -ne 0) { throw "takokit doctor failed" }
     if ($Full) {

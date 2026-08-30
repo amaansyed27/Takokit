@@ -62,10 +62,18 @@ impl AppState {
             executions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-    pub fn managed(mut self, identity: DaemonIdentity, shutdown: oneshot::Sender<()>) -> Self {
+    pub fn with_shutdown(
+        mut self,
+        identity: DaemonIdentity,
+        shutdown: oneshot::Sender<()>,
+    ) -> Self {
         self.daemon_identity = identity;
         self.shutdown = Arc::new(Mutex::new(Some(shutdown)));
         self
+    }
+
+    pub fn managed(self, identity: DaemonIdentity, shutdown: oneshot::Sender<()>) -> Self {
+        self.with_shutdown(identity, shutdown)
     }
     /// Test-only callers can supply a fixture package registry and installed
     /// registry, keeping route tests entirely local and deterministic.

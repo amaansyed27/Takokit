@@ -64,7 +64,7 @@ $Processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         $Name = [string]$_.Name
         $CommandLine = [string]$_.CommandLine
         $ExecutablePath = [string]$_.ExecutablePath
-        $IsTakokitBinary = $Name -in @("tako.exe", "takokit.exe")
+        $IsTakokitBinary = $Name -in @("tako.exe", "Takokit.exe", "takokit-server.exe", "takokit.exe")
         $IsManagedChild = $Name -in @("python.exe", "pythonw.exe", "uv.exe") -and
             ($RootHints | Where-Object {
                 ($CommandLine -and $CommandLine.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0) -or

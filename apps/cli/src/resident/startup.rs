@@ -16,7 +16,7 @@ pub(super) fn startup_enabled() -> bool {
 pub(super) fn set_startup(enabled: bool) {
     if enabled {
         if let Ok(exe) = std::env::current_exe() {
-            let value = format!("\"{}\" --resident", exe.display());
+            let value = format!("\"{}\" --background", exe.display());
             let _ = hidden_command("reg.exe")
                 .args([
                     "add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &value, "/f",

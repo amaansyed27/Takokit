@@ -127,6 +127,39 @@ async fn managed_shutdown_requires_matching_identity_and_ps_tracks_execution() {
 }
 
 #[tokio::test]
+async fn verified_foreground_server_accepts_its_matching_shutdown_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let config = RuntimeConfig::local(root.path().to_path_buf());
+    let instance_id = Uuid::new_v4();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let mut identity =
+        AppState::new(config.clone(), LocalStore::new(root.path().to_path_buf())).daemon_identity;
+    identity.instance_id = Some(instance_id);
+    let app = server_router(
+        AppState::new(config, LocalStore::new(root.path().to_path_buf()))
+            .with_shutdown(identity, shutdown_tx),
+    );
+
+    let accepted = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/daemon/shutdown")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"instance_id":"{}"}}"#,
+                    instance_id
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(accepted.status(), StatusCode::ACCEPTED);
+    assert!(shutdown_rx.await.is_ok());
+}
+
+#[tokio::test]
 async fn capabilities_route_returns_all_voice_runtime_surfaces() {
     let root = std::env::temp_dir().join("takokit-server-capabilities-test");
     let state = AppState::new(

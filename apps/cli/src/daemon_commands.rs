@@ -6,6 +6,52 @@ use super::*;
 mod progress;
 use progress::Activity;
 
+pub(crate) async fn run_foreground_server(
+    store: LocalStore,
+    config: RuntimeConfig,
+) -> anyhow::Result<()> {
+    surface::validate_server_binding(&config)?;
+    match daemon::inspect_server(&store, &config)? {
+        daemon::ServerInspection::Verified(identity) => {
+            println!(
+                "Takokit server is already running at {}",
+                config.local_base_url()
+            );
+            println!("Process: {} ({:?})", identity.pid, identity.mode);
+            println!("Stop it with: tako stop");
+            println!("Inspect it with: tako server status");
+            return Ok(());
+        }
+        daemon::ServerInspection::ForeignPort => anyhow::bail!(
+            "port {} is already in use by another application; Takokit did not stop or replace it",
+            config.port
+        ),
+        daemon::ServerInspection::Stopped => {}
+    }
+    println!("Takokit {}", env!("CARGO_PKG_VERSION"));
+    println!("Server listening on {}", config.local_base_url());
+    println!("OpenAI API: {}/v1", config.local_base_url());
+    println!("Takokit API: {}/api/v1", config.local_base_url());
+    println!("GUI: {}/gui", config.local_base_url());
+    println!("\nCtrl+C to stop");
+    daemon::run_foreground(store, config).await
+}
+
+pub(crate) fn start_server(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
+    let _ = daemon::ensure_running(store, config)?;
+    println!("Takokit server started at {}", config.local_base_url());
+    Ok(())
+}
+
+pub(crate) fn stop_server(store: &LocalStore, config: &RuntimeConfig) -> anyhow::Result<()> {
+    if daemon::stop_verified_server(store, config)? {
+        println!("Takokit server stopped.");
+    } else {
+        println!("Takokit server is not running.");
+    }
+    Ok(())
+}
+
 pub(crate) fn normalize_adapter_id(adapter: &str) -> String {
     adapter.trim().replace('-', "_")
 }

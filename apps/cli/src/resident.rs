@@ -1,4 +1,4 @@
-//! Native Windows resident application hosted by the normal `tako.exe` binary.
+//! Native Windows resident lifecycle hosted by the GUI-subsystem `Takokit.exe`.
 
 use crate::daemon;
 use std::{
@@ -13,13 +13,15 @@ use std::{
     time::Duration,
 };
 
+mod application;
 mod startup;
 mod update;
+use application::tako_executable;
+pub(crate) use application::{ensure_running, show_startup_error};
 use startup::*;
 use takokit_core::RuntimeConfig;
 use takokit_store::LocalStore;
 use update::*;
-use uuid::Uuid;
 use windows_sys::Win32::{
     Foundation::{
         CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HWND, LPARAM, LRESULT, POINT, WPARAM,
@@ -33,12 +35,13 @@ use windows_sys::Win32::{
         WindowsAndMessaging::{
             AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
             DispatchMessageW, FindWindowW, GetCursorPos, GetMessageW, GetSystemMetrics, LoadImageW,
-            MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SetForegroundWindow,
-            SetTimer, TrackPopupMenu, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
-            HMENU, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MB_ICONINFORMATION, MB_OK,
-            MF_CHECKED, MF_DISABLED, MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SM_CXSMICON,
-            SM_CYSMICON, TPM_BOTTOMALIGN, TPM_LEFTALIGN, WM_APP, WM_CLOSE, WM_COMMAND, WM_DESTROY,
-            WM_LBUTTONDBLCLK, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+            MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+            SetForegroundWindow, SetTimer, TrackPopupMenu, TranslateMessage, CS_HREDRAW,
+            CS_VREDRAW, CW_USEDEFAULT, HMENU, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE,
+            MB_ICONINFORMATION, MB_OK, MF_CHECKED, MF_DISABLED, MF_GRAYED, MF_SEPARATOR, MF_STRING,
+            MSG, SM_CXSMICON, SM_CYSMICON, TPM_BOTTOMALIGN, TPM_LEFTALIGN, WM_APP, WM_CLOSE,
+            WM_COMMAND, WM_DESTROY, WM_LBUTTONDBLCLK, WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
+            WS_OVERLAPPED,
         },
     },
 };
@@ -62,20 +65,20 @@ const ID_INSTALL_UPDATE: usize = 108;
 
 #[derive(Default)]
 struct ResidentState {
-    owned_instance: Option<Uuid>,
     update_version: Option<String>,
     update_check_running: bool,
     last_update_check_failed: bool,
 }
 
 static STATE: OnceLock<Mutex<ResidentState>> = OnceLock::new();
+static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();
 
-pub(crate) fn run() -> anyhow::Result<()> {
+pub(crate) fn run(explicit_launch: bool) -> anyhow::Result<()> {
     let class_name = wide("TakokitResidentWindow");
     let arguments = std::env::args().collect::<Vec<_>>();
     if let Some(action) = arguments
         .windows(2)
-        .find(|pair| pair[0] == "--resident-action")
+        .find(|pair| pair[0] == "--action")
         .map(|pair| pair[1].as_str())
     {
         let hwnd = unsafe { FindWindowW(class_name.as_ptr(), null()) };
@@ -91,13 +94,18 @@ pub(crate) fn run() -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    if arguments
-        .iter()
-        .any(|argument| argument == "--resident-quit")
-    {
+    if arguments.iter().any(|argument| argument == "--quit") {
         let hwnd = unsafe { FindWindowW(class_name.as_ptr(), null()) };
         if !hwnd.is_null() {
             unsafe { PostMessageW(hwnd, WM_CLOSE, 0, 0) };
+        }
+        return Ok(());
+    }
+
+    let existing = unsafe { FindWindowW(class_name.as_ptr(), null()) };
+    if !existing.is_null() {
+        if explicit_launch {
+            unsafe { PostMessageW(existing, WM_COMMAND, ID_OPEN_GUI, 0) };
         }
         return Ok(());
     }
@@ -114,6 +122,8 @@ pub(crate) fn run() -> anyhow::Result<()> {
     }
 
     let instance = unsafe { GetModuleHandleW(null()) };
+    TASKBAR_CREATED
+        .get_or_init(|| unsafe { RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()) });
     let class = WNDCLASSW {
         style: CS_HREDRAW | CS_VREDRAW,
         lpfnWndProc: Some(window_proc),
@@ -146,7 +156,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
 
     add_icon(hwnd)?;
     unsafe { SetTimer(hwnd, TIMER_UPDATE, UPDATE_INTERVAL_MS, None) };
-    ensure_server_async(hwnd, false);
+    ensure_server_async(hwnd, explicit_launch);
     check_update_async(hwnd, true);
 
     let mut message: MSG = unsafe { std::mem::zeroed() };
@@ -172,11 +182,7 @@ fn ensure_server_async(hwnd: HWND, open_gui: bool) {
     let hwnd = hwnd as isize;
     thread::spawn(move || {
         let (store, config) = store_and_config();
-        let before = daemon::status(&store, &config).ok().flatten();
-        if let Ok(info) = daemon::ensure_running(&store, &config) {
-            if before.as_ref().map(|value| value.instance_id) != Some(info.instance_id) {
-                STATE.get().unwrap().lock().unwrap().owned_instance = Some(info.instance_id);
-            }
+        if daemon::ensure_running(&store, &config).is_ok() {
             if open_gui {
                 let _ = open::that(config.gui_url());
             }
@@ -185,28 +191,17 @@ fn ensure_server_async(hwnd: HWND, open_gui: bool) {
     });
 }
 
-fn stop_server_async(hwnd: HWND, only_if_owned: bool, exit_after: bool) {
+fn stop_server_async(hwnd: HWND, exit_after: bool) {
     let hwnd = hwnd as isize;
     thread::spawn(move || {
         let (store, config) = store_and_config();
-        let owned = STATE.get().unwrap().lock().unwrap().owned_instance;
-        let current = daemon::status(&store, &config).ok().flatten();
-        let may_stop = !only_if_owned
-            || should_stop_owned(current.as_ref().map(|info| info.instance_id), owned);
-        if may_stop {
-            let _ = daemon::stop(&store, &config);
-        }
+        let _ = daemon::stop_verified_server(&store, &config);
         if exit_after {
             unsafe { PostMessageW(hwnd as HWND, WM_CLOSE, 1, 0) };
         } else {
-            STATE.get().unwrap().lock().unwrap().owned_instance = None;
             unsafe { PostMessageW(hwnd as HWND, STATE_CHANGED, 0, 0) };
         }
     });
-}
-
-fn should_stop_owned(current: Option<Uuid>, owned: Option<Uuid>) -> bool {
-    current.is_some() && current == owned
 }
 
 unsafe extern "system" fn window_proc(
@@ -215,6 +210,10 @@ unsafe extern "system" fn window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    if TASKBAR_CREATED.get().copied() == Some(message) {
+        let _ = add_icon(hwnd);
+        return 0;
+    }
     match message {
         TRAY_MESSAGE if lparam as u32 == WM_RBUTTONUP => {
             show_menu(hwnd);
@@ -251,7 +250,7 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_CLOSE => {
-            stop_server_async(hwnd, true, true);
+            stop_server_async(hwnd, true);
             0
         }
         WM_DESTROY => {
@@ -335,14 +334,14 @@ unsafe fn handle_command(hwnd: HWND, command: usize) {
         ID_OPEN_GUI => ensure_server_async(hwnd, true),
         ID_COPY_API => copy_api_url(),
         ID_START => ensure_server_async(hwnd, false),
-        ID_STOP => stop_server_async(hwnd, false, false),
+        ID_STOP => stop_server_async(hwnd, false),
         ID_CHECK_UPDATE => check_update_async(hwnd, false),
         ID_INSTALL_UPDATE => apply_update_async(),
         ID_STARTUP => set_startup(!startup_enabled()),
         ID_ABOUT => {
             MessageBoxW(hwnd, wide(concat!("Takokit ", env!("CARGO_PKG_VERSION"), "\nLocal voice AI runtime\n\nGUI: browser-based\nAPI: OpenAI-compatible audio + Takokit native")).as_ptr(), wide("About Takokit").as_ptr(), MB_OK | MB_ICONINFORMATION);
         }
-        ID_QUIT => stop_server_async(hwnd, true, true),
+        ID_QUIT => stop_server_async(hwnd, true),
         _ => {}
     }
 }

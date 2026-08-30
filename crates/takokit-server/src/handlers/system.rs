@@ -25,11 +25,9 @@ pub async fn daemon_shutdown(
     State(state): State<AppState>,
     Json(request): Json<DaemonShutdownRequest>,
 ) -> Result<StatusCode, ApiError> {
-    if state.daemon_identity.mode != DaemonMode::Managed
-        || state.daemon_identity.instance_id != Some(request.instance_id)
-    {
+    if state.daemon_identity.instance_id != Some(request.instance_id) {
         return Err(ApiError(TakokitError::InvalidRequest(
-            "managed daemon identity does not match".to_string(),
+            "Takokit server identity does not match".to_string(),
         )));
     }
     if let Some(sender) = state.shutdown.lock().await.take() {

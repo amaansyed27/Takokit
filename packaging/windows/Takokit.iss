@@ -47,9 +47,10 @@ Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [InstallDelete]
 Type: files; Name: "{app}\bin\takokit-tray.exe"
+Type: files; Name: "{app}\bin\takokit.exe"
 
 [Icons]
-Name: "{group}\Takokit"; Filename: "{app}\bin\tako.exe"; Parameters: "--resident"; WorkingDir: "{app}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Run the Takokit local voice runtime"; Flags: runminimized
+Name: "{group}\Takokit"; Filename: "{app}\bin\Takokit.exe"; WorkingDir: "{app}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open Takokit"
 Name: "{group}\Takokit (TUI)"; Filename: "{app}\bin\tako.exe"; Parameters: "--workspace ""{userdocs}\Takokit"""; WorkingDir: "{userdocs}"; IconFilename: "{app}\resources\icons\takokit.ico"; Comment: "Open Takokit in a terminal"; Flags: createonlyiffileexists
 
 [Registry]
@@ -57,7 +58,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "TakokitTray"; Flags: uninsdeletevalue dontcreatekey
 
 [Run]
-Filename: "{app}\bin\tako.exe"; Parameters: "--resident"; Description: "Start Takokit"; Flags: nowait postinstall skipifsilent runhidden
+Filename: "{app}\bin\Takokit.exe"; Description: "Start Takokit"; Flags: nowait postinstall skipifsilent
 
 [Code]
 const
@@ -175,11 +176,15 @@ var
   TakoExe: string;
   ResidentExe: string;
   LegacyTrayExe: string;
+  ApplicationExe: string;
   ResultCode: Integer;
 begin
   LegacyTrayExe := ExpandConstant('{app}\bin\takokit-tray.exe');
   if FileExists(LegacyTrayExe) then
     Exec(LegacyTrayExe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  ApplicationExe := ExpandConstant('{app}\bin\Takokit.exe');
+  if FileExists(ApplicationExe) then
+    Exec(ApplicationExe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   ResidentExe := ExpandConstant('{app}\bin\tako.exe');
   if FileExists(ResidentExe) then
     Exec(ResidentExe, '--resident --resident-quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);

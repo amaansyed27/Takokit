@@ -342,7 +342,14 @@ pub async fn run_server_with_listener(
     if let Some(shutdown) = shutdown {
         server
             .with_graceful_shutdown(async {
-                let _ = shutdown.await;
+                tokio::select! {
+                    _ = shutdown => {}
+                    result = tokio::signal::ctrl_c() => {
+                        if let Err(error) = result {
+                            tracing::warn!(%error, "could not install Ctrl+C handler");
+                        }
+                    }
+                }
             })
             .await?;
     } else {

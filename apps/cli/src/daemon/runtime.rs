@@ -99,11 +99,14 @@ pub(super) fn managed_daemon_executable() -> anyhow::Result<PathBuf> {
 }
 
 pub(super) fn preferred_daemon_executable(current: &Path) -> PathBuf {
-    if current.file_stem().and_then(|name| name.to_str()) != Some("tako") {
+    let Some(stem) = current.file_stem().and_then(|name| name.to_str()) else {
+        return current.to_path_buf();
+    };
+    if !stem.eq_ignore_ascii_case("tako") && !stem.eq_ignore_ascii_case("Takokit") {
         return current.to_path_buf();
     }
     let mut canonical = current.to_path_buf();
-    canonical.set_file_name("takokit");
+    canonical.set_file_name("takokit-server");
     if let Some(extension) = current.extension() {
         canonical.set_extension(extension);
     }
