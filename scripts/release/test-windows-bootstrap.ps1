@@ -25,7 +25,8 @@ Assert-BootstrapTest (-not (Test-Path -LiteralPath $UninstallKey)) 'Bootstrap ac
 $OriginalTemp = $env:TEMP
 $OriginalTmp = $env:TMP
 $OriginalUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-$TempRoot = Join-Path $env:RUNNER_TEMP ("Takokit bootstrap acceptance ü " + [Guid]::NewGuid().ToString('N'))
+$BootstrapTemp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$TempRoot = Join-Path $BootstrapTemp ("Takokit bootstrap acceptance ü " + [Guid]::NewGuid().ToString('N'))
 $FixtureRoot = Join-Path $TempRoot 'Fixture Server'
 $UnicodeTemp = Join-Path $TempRoot 'Temporary Files ü'
 $InstallRoot = Join-Path $TempRoot 'Installed Takokit ü'
