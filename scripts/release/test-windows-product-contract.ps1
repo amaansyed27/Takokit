@@ -305,11 +305,9 @@ try {
     foreach ($unsafe in $PortableUnsafeTakoPaths) {
         Assert-True (-not (Test-Path -LiteralPath $unsafe)) "Portable GUI launch created unsafe workspace state: $unsafe"
     }
-    $portableStop = & $PortableTako daemon stop 2>&1 | Out-String
-    Assert-True ($LASTEXITCODE -eq 0) "Portable daemon stop failed: $portableStop"
-    Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -ExpectedExecutable ([string]$portableDaemon.executable) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
     $portableQuit = Start-Process -FilePath $PortableApplication -ArgumentList @('--quit') -PassThru -WindowStyle Hidden
     Assert-True ($portableQuit.WaitForExit(5000)) 'Portable resident quit request did not return.'
+    Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -ExpectedExecutable ([string]$portableDaemon.executable) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
     $Report.portable_gui_served = $true
 
     Set-Location $OriginalLocation
