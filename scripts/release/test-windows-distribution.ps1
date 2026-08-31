@@ -97,6 +97,24 @@ function Assert-True {
     if (-not $Condition) { throw $Message }
 }
 
+function Wait-ProductProcessesExit {
+    param([Parameter(Mandatory)][string]$InstallBin, [int]$TimeoutSeconds = 15)
+
+    $resolvedBin = [IO.Path]::GetFullPath($InstallBin).TrimEnd('\') + '\'
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $running = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_.ExecutablePath) -and
+            [IO.Path]::GetFullPath($_.ExecutablePath).StartsWith($resolvedBin, [StringComparison]::OrdinalIgnoreCase)
+        })
+        if ($running.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    $details = ($running | ForEach-Object { "pid=$($_.ProcessId) path=$($_.ExecutablePath)" }) -join '; '
+    throw "Installed Takokit processes did not exit before reinstall: $details"
+}
+
 function Get-TakoVersion {
     param([string]$TakoExe)
     $output = & $TakoExe version 2>&1 | Out-String
@@ -391,6 +409,7 @@ try {
 
     & (Join-Path $PSScriptRoot 'test-windows-resident.ps1') -TakoExe $ExpectedTako -ApplicationExe $ExpectedApplication -OutputRoot (Join-Path $OutputRoot 'resident-installer-acceptance') -Port 5167 -AssertNoLegacyTray
     Assert-True ($LASTEXITCODE -eq 0) 'Installed resident Takokit acceptance failed.'
+    Wait-ProductProcessesExit -InstallBin $InstalledBin
 
     # Reinstall/repair must not duplicate the PATH entry.
     $ReinstallLog = Join-Path $OutputRoot 'installer-acceptance-reinstall.log'

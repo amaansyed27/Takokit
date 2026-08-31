@@ -1,4 +1,6 @@
 /target/
+__pycache__/
+*.pyc
 /dist/
 /apps/gui/node_modules/
 /apps/gui/dist/

@@ -197,7 +197,7 @@ pub(super) fn validate_source_location(source: &str) -> anyhow::Result<()> {
 pub(super) fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8>> {
     validate_source_location(source)?;
     if is_remote_source(source) {
-        let response = ureq::get(source).timeout(Duration::from_secs(30)).call()?;
+        let response = ureq::get(source).timeout(Duration::from_secs(5)).call()?;
         let reader = response.into_reader();
         let mut bytes = Vec::new();
         let limit = maximum.saturating_add(1) as u64;
