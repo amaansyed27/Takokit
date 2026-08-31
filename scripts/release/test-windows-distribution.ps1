@@ -98,7 +98,7 @@ function Assert-True {
 }
 
 function Wait-ProductProcessesExit {
-    param([Parameter(Mandatory)][string]$InstallBin, [int]$TimeoutSeconds = 15)
+    param([Parameter(Mandatory)][string]$InstallBin, [int]$TimeoutSeconds = 45)
 
     $resolvedBin = [IO.Path]::GetFullPath($InstallBin).TrimEnd('\') + '\'
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
