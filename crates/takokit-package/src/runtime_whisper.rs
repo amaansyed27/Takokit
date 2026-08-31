@@ -6,6 +6,7 @@ use crate::{
     },
     *,
 };
+use std::path::Path;
 const WHISPERCPP_WIN_X64_URL: &str =
     "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip";
 const WHISPERCPP_WIN_X64_SHA256: &str =
@@ -22,12 +23,28 @@ pub(crate) fn install_whispercpp_runtime(
     std::fs::create_dir_all(&downloads_dir)?;
 
     if !(cfg!(target_os = "windows") && cfg!(target_arch = "x86_64")) {
+        let bundled =
+            bundled_unix_runtime().ok_or_else(|| PackageError::ArtifactInstallFailed {
+                artifact: "whisper.cpp bundled runtime".to_string(),
+                reason: "installed distribution does not contain the native whisper.cpp runtime"
+                    .to_string(),
+            })?;
+        copy_runtime_tree(&bundled, &runtime_dir)?;
+        let binary =
+            find_file_named(&runtime_dir, executable_name("whisper-cli")).ok_or_else(|| {
+                PackageError::ArtifactInstallFailed {
+                    artifact: "whisper.cpp bundled runtime".to_string(),
+                    reason: "bundled runtime did not contain whisper-cli".to_string(),
+                }
+            })?;
+        make_executable(&binary)?;
         return installed_registry.install_runner_runtime(
             manifest,
-            RunnerLifecycleState::RuntimeInstalled,
+            RunnerLifecycleState::Ready,
             format!(
-                "whisper.cpp runtime directory initialized at {}. Automatic binary installation is currently implemented for Windows x64 only.",
-                layout.root.display()
+                "Bundled whisper.cpp v1.9.1 runtime installed at {}. Executable: {}",
+                runtime_dir.display(),
+                binary.display()
             ),
         );
     }
@@ -68,4 +85,53 @@ pub(crate) fn install_whispercpp_runtime(
             binary.display()
         ),
     )
+}
+
+fn bundled_unix_runtime() -> Option<std::path::PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let root = executable.parent()?.parent()?;
+    let candidate = root
+        .join("resources")
+        .join("runners")
+        .join("whispercpp-runtime");
+    candidate.is_dir().then_some(candidate)
+}
+
+fn copy_runtime_tree(source: &Path, destination: &Path) -> PackageResult<()> {
+    std::fs::create_dir_all(destination)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: "whisper.cpp bundled runtime".to_string(),
+                reason: format!(
+                    "bundled runtime contains a symlink: {}",
+                    source_path.display()
+                ),
+            });
+        }
+        if file_type.is_dir() {
+            copy_runtime_tree(&source_path, &destination_path)?;
+        } else if file_type.is_file() {
+            std::fs::copy(&source_path, &destination_path)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn make_executable(path: &Path) -> PackageResult<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut permissions = std::fs::metadata(path)?.permissions();
+    permissions.set_mode(permissions.mode() | 0o755);
+    std::fs::set_permissions(path, permissions)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) -> PackageResult<()> {
+    Ok(())
 }

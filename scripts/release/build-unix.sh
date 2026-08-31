@@ -53,6 +53,11 @@ fi
 for required in target/release/tako target/release/Takokit target/release/takokit-server target/release/takokit-updater target/release/takokit-release-tool apps/gui/dist/index.html registry/index.json LICENSE; do
   [ -f "$required" ] || { echo "missing release input: $required" >&2; exit 1; }
 done
+[ -n "${TAKOKIT_WHISPERCPP_BUNDLE:-}" ] && [ -d "$TAKOKIT_WHISPERCPP_BUNDLE" ] || {
+  echo "TAKOKIT_WHISPERCPP_BUNDLE must name the pinned native whisper.cpp runtime directory" >&2
+  exit 1
+}
+[ -x "$TAKOKIT_WHISPERCPP_BUNDLE/whisper-cli" ] || { echo "whisper.cpp bundle has no executable whisper-cli" >&2; exit 1; }
 
 rm -rf -- "$OUTPUT_ROOT"
 mkdir -p "$OUTPUT_ROOT"
@@ -67,6 +72,7 @@ install -m 0755 target/release/takokit-updater "$BASE/bin/takokit-updater"
 cp -R apps/gui/dist "$BASE/resources/gui"
 cp -R registry "$BASE/resources/registry"
 cp -R runners "$BASE/resources/runners"
+cp -RL "$TAKOKIT_WHISPERCPP_BUNDLE" "$BASE/resources/runners/whispercpp-runtime"
 install -m 0644 assets/transparent-png/512.png "$BASE/resources/icons/takokit.png"
 install -m 0644 LICENSE "$BASE/resources/licenses/LICENSE.txt"
 python3 scripts/release/generate_dependency_notices.py --output "$BASE/resources/licenses/THIRD_PARTY_NOTICES.md"

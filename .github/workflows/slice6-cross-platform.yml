@@ -105,6 +105,32 @@ jobs:
           npm test
           npm run build
 
+      - name: Provision pinned native whisper.cpp runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/takokit-whispercpp-v1.9.1"
+          rm -rf "$root"
+          mkdir -p "$root"
+          if [ '${{ matrix.platform }}' = linux ]; then
+            archive="$RUNNER_TEMP/whisper-bin-ubuntu-x64.tar.gz"
+            curl -fsSL 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-ubuntu-x64.tar.gz' -o "$archive"
+            echo 'f3bf3b4369a99b54665b0f19b88483b30de27f25963b0414235dea03198515c5  '"$archive" | sha256sum --check
+            tar -xzf "$archive" --strip-components=1 -C "$root"
+          else
+            archive="$RUNNER_TEMP/whisper.cpp-v1.9.1.tar.gz"
+            source="$RUNNER_TEMP/whisper.cpp-1.9.1"
+            curl -fsSL 'https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.1.tar.gz' -o "$archive"
+            echo '147267177eef7b22ec3d2476dd514d1b12e160e176230b740e3d1bd600118447  '"$archive" | shasum -a 256 --check
+            tar -xzf "$archive" -C "$RUNNER_TEMP"
+            cmake -S "$source" -B "$source/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
+            cmake --build "$source/build" --config Release --target whisper-cli --parallel 3
+            install -m 0755 "$source/build/bin/whisper-cli" "$root/whisper-cli"
+            install -m 0644 "$source/LICENSE" "$root/LICENSE"
+          fi
+          test -x "$root/whisper-cli"
+          echo "TAKOKIT_WHISPERCPP_BUNDLE=$root" >> "$GITHUB_ENV"
+
       - name: Build exact-commit Unix candidate
         shell: bash
         run: scripts/release/build-unix.sh --output 'dist/${{ matrix.platform }}-${{ matrix.architecture }}'
