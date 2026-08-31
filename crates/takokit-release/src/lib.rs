@@ -314,6 +314,7 @@ pub fn safe_artifact_name(name: &str) -> bool {
 fn normalize_arch(value: &str) -> &str {
     match value {
         "amd64" | "x64" => "x86_64",
+        "aarch64" => "arm64",
         other => other,
     }
 }
@@ -378,6 +379,12 @@ mod tests {
     #[test]
     fn update_validation_rejects_downgrade() {
         assert!(validate_manifest(&fixture("0.0.0"), "0.0.1", "stable", true).is_err());
+    }
+
+    #[test]
+    fn release_architecture_aliases_are_canonical() {
+        assert_eq!(normalize_arch("amd64"), "x86_64");
+        assert_eq!(normalize_arch("aarch64"), "arm64");
     }
 
     #[test]
