@@ -331,18 +331,11 @@ pub(super) fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>
 }
 
 #[cfg(unix)]
-pub(super) fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>> {
-    if pid == 0 {
-        return Ok(());
-    }
-    for _ in 0..300 {
-        let alive = unsafe { libc::kill(pid as libc::pid_t, 0) } == 0;
-        if !alive {
-            return Ok(());
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    Err(format!("parent process {pid} did not exit within 30 seconds").into())
+pub(super) fn wait_for_parent(_pid: u32) -> Result<(), Box<dyn std::error::Error>> {
+    // Unix permits an executing binary to be renamed or unlinked. Waiting with
+    // kill(pid, 0) is both unnecessary and unreliable because an exited orphan
+    // can remain visible as a zombie until its reaper collects it.
+    Ok(())
 }
 
 #[cfg(test)]

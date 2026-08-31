@@ -16,9 +16,17 @@ from pathlib import Path
 
 import espeakng_loader
 
-# espeakng-loader's macOS wheel can retain its CI build-time data path. Force
-# phonemizer to the data and library shipped inside the installed wheel before
-# kokoro_onnx imports its tokenizer.
+# The macOS espeakng-loader wheel can retain its CI build-time data path. The
+# Takokit package installs a pinned native prefix beside this adapter. Override
+# the loader accessors before kokoro_onnx imports its tokenizer so both Kokoro
+# and phonemizer receive the relocatable Takokit-owned paths.
+bundled_espeak = Path(__file__).resolve().parent.parent / "runtime" / "espeakng"
+bundled_data = bundled_espeak / "share" / "espeak-ng-data"
+bundled_library = bundled_espeak / "lib" / "libespeak-ng.dylib"
+if bundled_data.is_dir() and bundled_library.is_file():
+    espeakng_loader.get_data_path = lambda: str(bundled_data)
+    espeakng_loader.get_library_path = lambda: str(bundled_library)
+
 os.environ["PHONEMIZER_ESPEAK_DATA_PATH"] = espeakng_loader.get_data_path()
 os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = espeakng_loader.get_library_path()
 

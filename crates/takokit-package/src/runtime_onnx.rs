@@ -79,6 +79,16 @@ pub(crate) fn install_onnx_runtime(
             KOKORO_ONNX_PACKAGE.into(),
         ],
     )?;
+    if cfg!(target_os = "macos") {
+        let bundled =
+            bundled_espeak_runtime().ok_or_else(|| PackageError::ArtifactInstallFailed {
+                artifact: "eSpeak NG bundled runtime".to_string(),
+                reason:
+                    "installed distribution does not contain the pinned native eSpeak NG runtime"
+                        .to_string(),
+            })?;
+        copy_runtime_tree(&bundled, &runtime_dir.join("espeakng"))?;
+    }
     // phonemizer-fork 3.3.2 does not declare espeak_Initialize's ctypes ABI.
     // On Apple Silicon that can pass a null/invalid data pointer, causing the
     // wheel to fall back to its leaked CI build path. Patch only the pinned,
@@ -101,4 +111,39 @@ pub(crate) fn install_onnx_runtime(
             log_path.display()
         ),
     )
+}
+
+fn bundled_espeak_runtime() -> Option<std::path::PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let root = executable.parent()?.parent()?;
+    let candidate = root
+        .join("resources")
+        .join("runners")
+        .join("espeakng-runtime");
+    candidate.is_dir().then_some(candidate)
+}
+
+fn copy_runtime_tree(source: &Path, destination: &Path) -> PackageResult<()> {
+    std::fs::create_dir_all(destination)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: "eSpeak NG bundled runtime".to_string(),
+                reason: format!(
+                    "bundled runtime contains a symlink: {}",
+                    source_path.display()
+                ),
+            });
+        }
+        if file_type.is_dir() {
+            copy_runtime_tree(&source_path, &destination_path)?;
+        } else if file_type.is_file() {
+            std::fs::copy(&source_path, &destination_path)?;
+        }
+    }
+    Ok(())
 }

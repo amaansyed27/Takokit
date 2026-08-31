@@ -131,6 +131,37 @@ jobs:
           test -x "$root/whisper-cli"
           echo "TAKOKIT_WHISPERCPP_BUNDLE=$root" >> "$GITHUB_ENV"
 
+      - name: Provision pinned native eSpeak NG runtime
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/espeak-ng-1.52.0.tar.gz"
+          source="$RUNNER_TEMP/espeak-ng-1.52.0"
+          root="$RUNNER_TEMP/takokit-espeak-ng-1.52.0"
+          curl -fsSL 'https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz' -o "$archive"
+          echo 'bb4338102ff3b49a81423da8a1a158b420124b055b60fa76cfb4b18677130a23  '"$archive" | shasum -a 256 --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          cmake -S "$source" -B "$source/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$root" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_TESTING=OFF \
+            -DUSE_LIBPCAUDIO=OFF \
+            -DUSE_MBROLA=OFF \
+            -DUSE_LIBSONIC=OFF
+          cmake --build "$source/build" --config Release --parallel 3
+          cmake --install "$source/build" --config Release
+          install -m 0644 "$source/COPYING" "$source/COPYING.APACHE" "$source/COPYING.BSD2" "$source/COPYING.UCD" "$root/"
+          printf '%s\n' \
+            'eSpeak NG 1.52.0' \
+            'Source: https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz' \
+            'SHA-256: bb4338102ff3b49a81423da8a1a158b420124b055b60fa76cfb4b18677130a23' \
+            > "$root/SOURCE.txt"
+          test -f "$root/lib/libespeak-ng.dylib"
+          test -f "$root/share/espeak-ng-data/phontab"
+          echo "TAKOKIT_ESPEAKNG_BUNDLE=$root" >> "$GITHUB_ENV"
+
       - name: Build exact-commit Unix candidate
         shell: bash
         run: scripts/release/build-unix.sh --output 'dist/${{ matrix.platform }}-${{ matrix.architecture }}'

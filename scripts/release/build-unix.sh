@@ -58,6 +58,14 @@ done
   exit 1
 }
 [ -x "$TAKOKIT_WHISPERCPP_BUNDLE/whisper-cli" ] || { echo "whisper.cpp bundle has no executable whisper-cli" >&2; exit 1; }
+if [ "$PLATFORM" = macos ]; then
+  [ -n "${TAKOKIT_ESPEAKNG_BUNDLE:-}" ] && [ -d "$TAKOKIT_ESPEAKNG_BUNDLE" ] || {
+    echo "TAKOKIT_ESPEAKNG_BUNDLE must name the pinned native eSpeak NG runtime directory" >&2
+    exit 1
+  }
+  [ -f "$TAKOKIT_ESPEAKNG_BUNDLE/lib/libespeak-ng.dylib" ] || { echo "eSpeak NG bundle has no libespeak-ng.dylib" >&2; exit 1; }
+  [ -f "$TAKOKIT_ESPEAKNG_BUNDLE/share/espeak-ng-data/phontab" ] || { echo "eSpeak NG bundle has no compiled phontab" >&2; exit 1; }
+fi
 
 rm -rf -- "$OUTPUT_ROOT"
 mkdir -p "$OUTPUT_ROOT"
@@ -73,6 +81,9 @@ cp -R apps/gui/dist "$BASE/resources/gui"
 cp -R registry "$BASE/resources/registry"
 cp -R runners "$BASE/resources/runners"
 cp -RL "$TAKOKIT_WHISPERCPP_BUNDLE" "$BASE/resources/runners/whispercpp-runtime"
+if [ "$PLATFORM" = macos ]; then
+  cp -RL "$TAKOKIT_ESPEAKNG_BUNDLE" "$BASE/resources/runners/espeakng-runtime"
+fi
 install -m 0644 assets/transparent-png/512.png "$BASE/resources/icons/takokit.png"
 install -m 0644 LICENSE "$BASE/resources/licenses/LICENSE.txt"
 python3 scripts/release/generate_dependency_notices.py --output "$BASE/resources/licenses/THIRD_PARTY_NOTICES.md"
