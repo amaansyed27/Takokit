@@ -132,6 +132,8 @@ NEW_ROOT="${INSTALL_ROOT}.new.$$"
 BACKUP_ROOT="${INSTALL_ROOT}.rollback.$$"
 rm -rf -- "$NEW_ROOT" "$BACKUP_ROOT"
 mv -- "$PACKAGE_ROOT" "$NEW_ROOT"
+sed 's/"mode": "portable"/"mode": "installed"/' "$NEW_ROOT/distribution.json" > "$TMP_ROOT/distribution.json"
+mv -- "$TMP_ROOT/distribution.json" "$NEW_ROOT/distribution.json"
 if [ -e "$INSTALL_ROOT" ]; then mv -- "$INSTALL_ROOT" "$BACKUP_ROOT"; fi
 if [ "${TAKOKIT_INSTALL_TEST_FAILPOINT:-}" = after_backup ]; then
   fail "test failpoint after backing up the existing installation"

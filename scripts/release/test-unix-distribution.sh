@@ -69,9 +69,10 @@ curl -fsS http://127.0.0.1:5050/gui/ >/dev/null
 
 if [ "${TAKOKIT_REAL_MODEL_SMOKE:-0}" = 1 ]; then
   "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct pull kokoro
-  "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct test kokoro --suite launch --run
+  "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct samples create
+  test -s "$HOME/.takokit/samples/hello.wav"
   "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct pull whisper-tiny
-  "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct test whisper-tiny --suite launch --run
+  "$TAKOKIT_INSTALL_ROOT/bin/tako" --direct test whisper-tiny --file "$HOME/.takokit/samples/hello.wav" --run
 fi
 
 if [ -n "$FIXTURE_ROOT" ]; then
