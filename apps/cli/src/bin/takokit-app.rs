@@ -9,6 +9,16 @@ fn main() {
 }
 
 #[cfg(not(windows))]
-fn main() {
-    eprintln!("The Takokit resident application is available on Windows only.");
+#[tokio::main]
+async fn main() {
+    let mut command = std::process::Command::new(
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|parent| parent.join("tako")))
+            .unwrap_or_else(|| "tako".into()),
+    );
+    command.arg("gui");
+    if let Err(error) = command.spawn() {
+        eprintln!("Takokit could not launch the local browser GUI: {error}");
+    }
 }

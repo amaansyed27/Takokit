@@ -1,0 +1,79 @@
+name: Publish Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - v0.3.0
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-multiplatform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  accept:
+    uses: ./.github/workflows/slice6-cross-platform.yml
+    with:
+      production_release: true
+    secrets:
+      TAKOKIT_RELEASE_SIGNING_KEY_HEX: ${{ secrets.TAKOKIT_RELEASE_SIGNING_KEY_HEX }}
+      TAKOKIT_RELEASE_PUBLIC_KEY_HEX: ${{ secrets.TAKOKIT_RELEASE_PUBLIC_KEY_HEX }}
+
+  publish:
+    name: Publish one deliberate v0.3.0 release
+    needs: accept
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact accepted tag on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ github.ref_name }}' = v0.3.0
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main
+          python3 scripts/check_release_version.py
+
+      - name: Download accepted complete candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: takokit-v0.3.0-cross-platform-candidate-${{ github.sha }}
+          path: release-assets
+
+      - name: Require production multi-platform trust and exact source
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          root=pathlib.Path('release-assets')
+          index=json.loads((root/'release-index.json').read_text())
+          assert index['version']=='0.3.0'
+          assert index['commit_sha']==os.environ['EXPECTED_SHA']
+          assert index['channel']=='stable'
+          assert index['test_fixture'] is False
+          assert index['signing_key_id']=='takokit-release-v1'
+          assert set(index['platforms'])=={'windows-x86_64','linux-x86_64','macos-arm64'}
+          for name in ['Takokit-v0.3.0-windows-x86_64-installer.exe','Takokit-v0.3.0-windows-x86_64.zip','Takokit-v0.3.0-windows-x86_64-update.zip','Takokit-v0.3.0-linux-x86_64.tar.gz','Takokit-v0.3.0-macos-arm64.tar.gz','release-manifest.json','release-index.sig','SHA256SUMS.txt']:
+            assert (root/name).is_file(), name
+          PY
+
+      - name: Publish Takokit v0.3.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: >-
+          gh release create '${{ github.ref_name }}'
+          --repo '${{ github.repository }}'
+          --verify-tag
+          --title 'Takokit v0.3.0'
+          --notes-file 'release-assets/RELEASE_NOTES-v0.3.0.md'
+          release-assets/*

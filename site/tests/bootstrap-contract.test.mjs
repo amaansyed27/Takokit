@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 const scriptUrl = new URL("../public/install.ps1", import.meta.url);
+const unixScriptUrl = new URL("../../scripts/install.sh", import.meta.url);
 
 test("PowerShell bootstrap uses release metadata and the canonical installer", async () => {
   const script = await readFile(scriptUrl, "utf8");
@@ -15,6 +16,21 @@ test("PowerShell bootstrap uses release metadata and the canonical installer", a
   assert.match(script, /\/VERYSILENT/);
   assert.match(script, /Confirm-InstalledTakokit/);
   assert.match(script, /tako gui/);
+});
+
+test("Unix bootstrap verifies metadata, checksum, archive safety, and installed binary", async () => {
+  const script = await readFile(unixScriptUrl, "utf8");
+  assert.match(script, /^#!\/bin\/sh\nset -eu/m);
+  assert.match(script, /v1\/releases\/stable\/\$\{PLATFORM\}-\$\{ARCH\}\.json/);
+  assert.match(script, /takokit-release-v1/);
+  assert.match(script, /artifact checksum mismatch/);
+  assert.match(script, /archive contains an unsafe path/);
+  assert.match(script, /symbolic or hard link/);
+  assert.match(script, /verified package version mismatch/);
+  assert.match(script, /TAKOKIT_INSTALL_TEST_FAILPOINT/);
+  for (const forbidden of ["git clone", "cargo build", "npm ci", "eval "]) {
+    assert.ok(!script.includes(forbidden), `Unix bootstrap must not contain ${forbidden}`);
+  }
 });
 
 test("PowerShell bootstrap contains no source-build or CI artifact dependency", async () => {

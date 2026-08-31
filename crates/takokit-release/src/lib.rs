@@ -68,6 +68,27 @@ pub struct ReleaseArtifact {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseIndex {
+    pub schema_version: u32,
+    pub product: String,
+    pub version: String,
+    pub channel: String,
+    pub commit_sha: String,
+    pub signing_key_id: String,
+    #[serde(default)]
+    pub test_fixture: bool,
+    pub platforms: BTreeMap<String, PlatformManifestReference>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlatformManifestReference {
+    pub os: String,
+    pub architecture: String,
+    pub manifest: String,
+    pub signature: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SignatureEnvelope {
     pub algorithm: String,
     pub key_id: String,
@@ -201,7 +222,7 @@ pub fn validate_manifest(
             manifest.product
         )));
     }
-    if manifest.os != "windows" {
+    if normalize_os(&manifest.os) != normalize_os(std::env::consts::OS) {
         return Err(ReleaseError::Rejected(format!(
             "wrong operating system {}",
             manifest.os
@@ -293,6 +314,13 @@ pub fn safe_artifact_name(name: &str) -> bool {
 fn normalize_arch(value: &str) -> &str {
     match value {
         "amd64" | "x64" => "x86_64",
+        other => other,
+    }
+}
+
+fn normalize_os(value: &str) -> &str {
+    match value {
+        "darwin" | "osx" => "macos",
         other => other,
     }
 }

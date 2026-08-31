@@ -706,6 +706,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "filetime"
+version = "0.2.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+dependencies = [
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2249,19 +2259,21 @@ dependencies = [
 
 [[package]]
 name = "takokit-audio"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
  "crossterm",
+ "flate2",
  "fs2",
+ "libc",
  "open",
  "percent-encoding",
  "ratatui",
@@ -2275,6 +2287,7 @@ dependencies = [
  "takokit-release",
  "takokit-server",
  "takokit-store",
+ "tar",
  "tempfile",
  "tokio",
  "tracing-subscriber",
@@ -2287,7 +2300,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2297,7 +2310,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-models"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -2318,7 +2331,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-package"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "fs2",
@@ -2335,7 +2348,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-release"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2348,14 +2361,14 @@ dependencies = [
 
 [[package]]
 name = "takokit-safety"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "takokit-core",
 ]
 
 [[package]]
 name = "takokit-server"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2377,7 +2390,7 @@ dependencies = [
 
 [[package]]
 name = "takokit-store"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "fs2",
@@ -2387,6 +2400,17 @@ dependencies = [
  "takokit-core",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
 ]
 
 [[package]]
@@ -3284,6 +3308,16 @@ name = "writeable"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
+
+[[package]]
+name = "xattr"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
+dependencies = [
+ "libc",
+ "rustix",
+]
 
 [[package]]
 name = "yoke"

@@ -10,15 +10,19 @@ use std::{
 use zip::ZipArchive;
 
 const TEST_FAILPOINT_ENV: &str = "TAKOKIT_UPDATER_TEST_FAILPOINT";
-const REQUIRED_REPLACEMENT_FILES: &[&str] = &[
-    "bin/tako.exe",
-    "bin/Takokit.exe",
-    "bin/takokit-server.exe",
-    "bin/takokit-updater.exe",
-    "distribution.json",
-    "resources/registry/index.json",
-    "resources/gui/index.html",
-];
+
+fn required_replacement_files() -> Vec<String> {
+    let suffix = std::env::consts::EXE_SUFFIX;
+    vec![
+        format!("bin/tako{suffix}"),
+        format!("bin/Takokit{suffix}"),
+        format!("bin/takokit-server{suffix}"),
+        format!("bin/takokit-updater{suffix}"),
+        "distribution.json".into(),
+        "resources/registry/index.json".into(),
+        "resources/gui/index.html".into(),
+    ]
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(super) struct Journal {
@@ -36,7 +40,7 @@ pub(super) struct Args {
     pub(super) parent_pid: u32,
     pub(super) install_root: PathBuf,
     pub(super) bundle: PathBuf,
-    pub(super) installer: PathBuf,
+    pub(super) installer: Option<PathBuf>,
     pub(super) expected_version: String,
     pub(super) journal: PathBuf,
     pub(super) restart_daemon: bool,
@@ -71,7 +75,7 @@ impl Args {
             parent_pid: parent_pid.ok_or("missing --parent-pid")?,
             install_root: install_root.ok_or("missing --install-root")?,
             bundle: bundle.ok_or("missing --bundle")?,
-            installer: installer.ok_or("missing --installer")?,
+            installer,
             expected_version: expected_version.ok_or("missing --expected-version")?,
             journal: journal.ok_or("missing --journal")?,
             restart_daemon,
@@ -110,15 +114,15 @@ pub(super) fn validate_install_root(root: &Path) -> Result<(), Box<dyn std::erro
         );
     }
     let canonical = fs::canonicalize(root)?;
-    if canonical.parent().is_none() || canonical == Path::new(r"C:\") {
+    if canonical.parent().is_none() {
         return Err("unsafe installation root".into());
     }
     Ok(())
 }
 
 pub(super) fn validate_replacement(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    for required in REQUIRED_REPLACEMENT_FILES {
-        if !root.join(required).is_file() {
+    for required in required_replacement_files() {
+        if !root.join(&required).is_file() {
             return Err(format!("update bundle is missing required file {required}").into());
         }
     }
@@ -129,22 +133,34 @@ pub(super) fn extract_bundle(
     bundle: &Path,
     destination: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if bundle.extension().and_then(|value| value.to_str()) == Some("zip") {
+        return extract_zip(bundle, destination);
+    }
+    extract_tar_gz(bundle, destination)
+}
+
+fn validate_archive_path(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    if path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(format!("archive contains unsafe path {}", path.display()).into());
+    }
+    Ok(())
+}
+
+fn extract_zip(bundle: &Path, destination: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(destination)?;
     let file = File::open(bundle)?;
     let mut archive = ZipArchive::new(file)?;
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index)?;
         let relative = Path::new(entry.name());
-        if relative.is_absolute()
-            || relative.components().any(|component| {
-                matches!(
-                    component,
-                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
-                )
-            })
-        {
-            return Err(format!("update ZIP contains unsafe path {}", entry.name()).into());
-        }
+        validate_archive_path(relative)?;
         let output = destination.join(relative);
         if entry.is_dir() {
             fs::create_dir_all(&output)?;
@@ -159,11 +175,37 @@ pub(super) fn extract_bundle(
     Ok(())
 }
 
+fn extract_tar_gz(bundle: &Path, destination: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    use flate2::read::GzDecoder;
+    fs::create_dir_all(destination)?;
+    let decoder = GzDecoder::new(File::open(bundle)?);
+    let mut archive = tar::Archive::new(decoder);
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        validate_archive_path(&path)?;
+        let kind = entry.header().entry_type();
+        if kind.is_symlink() || kind.is_hard_link() {
+            return Err(format!("update archive contains unsafe link {}", path.display()).into());
+        }
+        if !entry.unpack_in(destination)? {
+            return Err(format!(
+                "update archive entry escaped destination: {}",
+                path.display()
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn verify_install(
     root: &Path,
     expected_version: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let tako = root.join("bin").join("tako.exe");
+    let tako = root
+        .join("bin")
+        .join(format!("tako{}", std::env::consts::EXE_SUFFIX));
     let output = Command::new(&tako).arg("version").output()?;
     if !output.status.success() {
         return Err(format!("{} version exited with {}", tako.display(), output.status).into());
@@ -190,7 +232,9 @@ pub(super) fn restart_daemon_if_requested(args: &Args) -> Result<(), Box<dyn std
 }
 
 pub(super) fn restart_daemon(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let tako = root.join("bin").join("tako.exe");
+    let tako = root
+        .join("bin")
+        .join(format!("tako{}", std::env::consts::EXE_SUFFIX));
     let mut command = Command::new(&tako);
     command.args(["daemon", "start"]);
     #[cfg(windows)]
@@ -286,9 +330,19 @@ pub(super) fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>
     }
 }
 
-#[cfg(not(windows))]
-pub(super) fn wait_for_parent(_pid: u32) -> Result<(), Box<dyn std::error::Error>> {
-    Ok(())
+#[cfg(unix)]
+pub(super) fn wait_for_parent(pid: u32) -> Result<(), Box<dyn std::error::Error>> {
+    if pid == 0 {
+        return Ok(());
+    }
+    for _ in 0..300 {
+        let alive = unsafe { libc::kill(pid as libc::pid_t, 0) } == 0;
+        if !alive {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Err(format!("parent process {pid} did not exit within 30 seconds").into())
 }
 
 #[cfg(test)]
@@ -296,7 +350,7 @@ mod tests {
     use super::*;
 
     fn write_replacement_fixture(root: &Path) {
-        for required in REQUIRED_REPLACEMENT_FILES {
+        for required in required_replacement_files() {
             let path = root.join(required);
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).unwrap();
@@ -311,6 +365,67 @@ mod tests {
         assert!(path
             .components()
             .any(|component| matches!(component, Component::ParentDir)));
+    }
+
+    #[test]
+    fn archive_path_validation_rejects_absolute_and_parent_paths() {
+        assert!(validate_archive_path(Path::new("../evil")).is_err());
+        assert!(validate_archive_path(Path::new("/absolute/evil")).is_err());
+        assert!(validate_archive_path(Path::new("safe/bin/tako")).is_ok());
+    }
+
+    #[test]
+    fn tar_extraction_rejects_symbolic_links() {
+        use flate2::{write::GzEncoder, Compression};
+        let temp = tempfile::tempdir().unwrap();
+        let archive_path = temp.path().join("update.tar.gz");
+        let file = File::create(&archive_path).unwrap();
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut archive = tar::Builder::new(encoder);
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        archive
+            .append_link(&mut header, "bin/tako", "/tmp/foreign")
+            .unwrap();
+        archive.into_inner().unwrap().finish().unwrap();
+
+        let error = extract_bundle(&archive_path, &temp.path().join("out"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unsafe link"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tar_extraction_preserves_executable_mode() {
+        use flate2::{write::GzEncoder, Compression};
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().unwrap();
+        let archive_path = temp.path().join("update.tar.gz");
+        let encoder = GzEncoder::new(File::create(&archive_path).unwrap(), Compression::default());
+        let mut archive = tar::Builder::new(encoder);
+        let payload = b"#!/bin/sh\n";
+        let mut header = tar::Header::new_gnu();
+        header.set_size(payload.len() as u64);
+        header.set_mode(0o755);
+        header.set_cksum();
+        archive
+            .append_data(&mut header, "bin/tako", &payload[..])
+            .unwrap();
+        archive.into_inner().unwrap().finish().unwrap();
+        let destination = temp.path().join("out");
+        extract_bundle(&archive_path, &destination).unwrap();
+        assert_eq!(
+            fs::metadata(destination.join("bin/tako"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o111,
+            0o111
+        );
     }
 
     #[test]
@@ -333,9 +448,10 @@ mod tests {
     fn replacement_validation_still_requires_real_daemon_binary() {
         let temp = tempfile::tempdir().unwrap();
         write_replacement_fixture(temp.path());
-        fs::remove_file(temp.path().join("bin/takokit-server.exe")).unwrap();
+        let daemon = format!("bin/takokit-server{}", std::env::consts::EXE_SUFFIX);
+        fs::remove_file(temp.path().join(&daemon)).unwrap();
 
         let error = validate_replacement(temp.path()).unwrap_err().to_string();
-        assert!(error.contains("bin/takokit-server.exe"));
+        assert!(error.contains(&daemon));
     }
 }

@@ -7,8 +7,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
-$Version = '0.2.0'
-$FixtureVersion = '0.2.1'
+$Version = '0.3.0'
+$FixtureVersion = '0.3.1'
 
 function Invoke-Checked {
     param(

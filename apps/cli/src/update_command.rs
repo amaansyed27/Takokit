@@ -416,11 +416,14 @@ fn apply(
         )
     })?;
     let staged_bundle = ensure_staged_artifact(store, &verified, artifact)?;
-    let installer = verified
+    let staged_installer = verified
         .installer
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("signed manifest has no installer artifact"))?;
-    let staged_installer = ensure_staged_artifact(store, &verified, installer)?;
+        .map(|installer| ensure_staged_artifact(store, &verified, installer))
+        .transpose()?;
+    if cfg!(windows) && staged_installer.is_none() {
+        anyhow::bail!("signed Windows manifest has no installer artifact");
+    }
     refuse_active_runtime_operations(store, config)?;
 
     let daemon_was_running = daemon::status(store, config)?.is_some();
@@ -434,11 +437,13 @@ fn apply(
     let helper = distribution::updater_executable()
         .ok_or_else(|| anyhow::anyhow!("installed updater helper is missing"))?;
     let temporary_helper = std::env::temp_dir().join(format!(
-        "TakokitUpdater-{}-{}.exe",
+        "TakokitUpdater-{}-{}{}",
         std::process::id(),
-        now()
+        now(),
+        std::env::consts::EXE_SUFFIX,
     ));
     fs::copy(&helper, &temporary_helper)?;
+    distribution::make_executable(&temporary_helper)?;
     let journal = update_journal_path(store);
     let mut command = ProcessCommand::new(&temporary_helper);
     command
@@ -448,12 +453,13 @@ fn apply(
         .arg(&install_root)
         .arg("--bundle")
         .arg(&staged_bundle)
-        .arg("--installer")
-        .arg(&staged_installer)
         .arg("--expected-version")
         .arg(&verified.manifest.version)
         .arg("--journal")
         .arg(&journal);
+    if let Some(installer) = staged_installer.as_ref() {
+        command.arg("--installer").arg(installer);
+    }
     if daemon_was_running {
         command.arg("--restart-daemon").arg("true");
     }

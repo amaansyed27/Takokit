@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = "0.2.0"
+EXPECTED = "0.3.0"
 
 checks = []
 
@@ -88,7 +88,7 @@ for relative, label, pattern in [
     match = re.search(pattern, text)
     checks.append((label, match.group(1) if match else "<missing>"))
 
-candidate_notes = ROOT / f"docs/release/windows-v{EXPECTED}-candidate-notes.md"
+candidate_notes = ROOT / f"docs/release/v{EXPECTED}-candidate-notes.md"
 checks.append(("candidate notes filename", EXPECTED if candidate_notes.exists() else "<missing>"))
 
 failed = False

@@ -8,6 +8,7 @@ on:
       - main
       - slice/interactive-stabilization
       - slice/advanced-rvc-cloning
+      - slice/linux-macos-distribution
 
 permissions:
   contents: read
@@ -50,6 +51,7 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+          - macos-14
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -68,8 +70,8 @@ jobs:
       - name: Check API namespace and OpenAPI contract
         run: python scripts/check_api_contract.py
 
-      - name: Check workspace (Linux)
-        if: runner.os == 'Linux'
+      - name: Check workspace (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -o pipefail
@@ -92,8 +94,8 @@ jobs:
             cargo-check-windows.log
           if-no-files-found: ignore
 
-      - name: Test workspace (Linux)
-        if: runner.os == 'Linux'
+      - name: Test workspace (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -o pipefail

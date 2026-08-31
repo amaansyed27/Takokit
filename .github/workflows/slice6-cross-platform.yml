@@ -1,0 +1,219 @@
+name: Slice 6 Cross-Platform Distribution
+
+on:
+  workflow_call:
+    inputs:
+      production_release:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      TAKOKIT_RELEASE_SIGNING_KEY_HEX:
+        required: false
+      TAKOKIT_RELEASE_PUBLIC_KEY_HEX:
+        required: false
+  workflow_dispatch:
+  push:
+    branches:
+      - slice/linux-macos-distribution
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slice6-distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x86_64 regression
+    uses: ./.github/workflows/slice4-windows.yml
+    with:
+      production_release: ${{ inputs.production_release || false }}
+    secrets:
+      TAKOKIT_RELEASE_SIGNING_KEY_HEX: ${{ secrets.TAKOKIT_RELEASE_SIGNING_KEY_HEX }}
+      TAKOKIT_RELEASE_PUBLIC_KEY_HEX: ${{ secrets.TAKOKIT_RELEASE_PUBLIC_KEY_HEX }}
+
+  unix:
+    name: ${{ matrix.platform }} ${{ matrix.architecture }} package acceptance
+    runs-on: ${{ matrix.runner }}
+    env:
+      RUSTFLAGS: -D warnings
+      TAKOKIT_BUILD_ID: slice6-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.sha }}
+      TAKOKIT_RELEASE_SIGNING_KEY_HEX: ${{ inputs.production_release && secrets.TAKOKIT_RELEASE_SIGNING_KEY_HEX || '' }}
+      TAKOKIT_RELEASE_PUBLIC_KEY_HEX: ${{ inputs.production_release && secrets.TAKOKIT_RELEASE_PUBLIC_KEY_HEX || '' }}
+      TAKOKIT_REAL_MODEL_SMOKE: '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            architecture: x86_64
+            runner: ubuntu-latest
+          - platform: macos
+            architecture: arm64
+            runner: macos-14
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache Rust build data
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/gui/package-lock.json
+
+      - name: Require expected native target
+        shell: bash
+        run: |
+          set -eu
+          case "$(uname -s)-$(uname -m)" in
+            Linux-x86_64) test '${{ matrix.platform }}-${{ matrix.architecture }}' = linux-x86_64 ;;
+            Darwin-arm64) test '${{ matrix.platform }}-${{ matrix.architecture }}' = macos-arm64 ;;
+            *) echo "unexpected runner target: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+          esac
+
+      - name: Validate version, formatting, and locked workspace
+        shell: bash
+        run: |
+          python3 scripts/check_release_version.py
+          python3 scripts/audit_file_sizes.py
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --locked
+          cargo test --workspace --locked
+
+      - name: Test and build site release contracts
+        working-directory: site
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Build exact-commit Unix candidate
+        shell: bash
+        run: scripts/release/build-unix.sh --output 'dist/${{ matrix.platform }}-${{ matrix.architecture }}'
+
+      - name: Exercise install.sh security fixtures
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: scripts/release/test-install-sh-security.sh
+
+      - name: Build signed newer-platform updater fixture
+        shell: bash
+        run: scripts/release/build-unix-update-fixture.sh '${{ matrix.platform }}' '${{ matrix.architecture }}' 'dist/${{ matrix.platform }}-${{ matrix.architecture }}'
+
+      - name: Exercise installed and portable product
+        shell: bash
+        run: >-
+          scripts/release/test-unix-distribution.sh
+          'dist/${{ matrix.platform }}-${{ matrix.architecture }}/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz'
+          '${{ matrix.platform }}'
+          '${{ matrix.architecture }}'
+          '0.3.0'
+          'dist/${{ matrix.platform }}-${{ matrix.architecture }}/test-update'
+
+      - name: Verify packaged manifest and archive contract
+        shell: bash
+        run: |
+          set -eu
+          ROOT='dist/${{ matrix.platform }}-${{ matrix.architecture }}'
+          if [ '${{ inputs.production_release || false }}' = true ]; then
+            target/release/takokit-release-tool verify "$ROOT/release-manifest-${{ matrix.platform }}-${{ matrix.architecture }}.json" "$ROOT/release-manifest-${{ matrix.platform }}-${{ matrix.architecture }}.sig"
+          else
+            target/release/takokit-release-tool verify "$ROOT/release-manifest-${{ matrix.platform }}-${{ matrix.architecture }}.json" "$ROOT/release-manifest-${{ matrix.platform }}-${{ matrix.architecture }}.sig" --allow-test
+          fi
+          tar -tzf "$ROOT/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz" | grep 'resources/gui/index.html' >/dev/null
+          tar -tzf "$ROOT/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz" | grep 'resources/registry/index.json' >/dev/null
+
+      - name: Upload platform candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.sha }}
+          path: dist/${{ matrix.platform }}-${{ matrix.architecture }}/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  candidate:
+    name: Assemble exact-commit candidate set
+    needs: [windows, unix]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download accepted platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: takokit-v0.3.0-*-${{ github.sha }}
+          path: accepted
+
+      - name: Assemble signed multi-platform index
+        shell: bash
+        env:
+          TAKOKIT_RELEASE_SIGNING_KEY_HEX: ${{ inputs.production_release && secrets.TAKOKIT_RELEASE_SIGNING_KEY_HEX || '' }}
+          TAKOKIT_RELEASE_PUBLIC_KEY_HEX: ${{ inputs.production_release && secrets.TAKOKIT_RELEASE_PUBLIC_KEY_HEX || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate
+          find accepted -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.tar.gz' -o -name '*.json' -o -name '*.sig' -o -name '*.txt' -o -name '*.md' \) -exec cp {} candidate/ \;
+          cp candidate/release-manifest.json candidate/release-manifest-windows-x86_64.json
+          cp candidate/release-manifest.sig candidate/release-manifest-windows-x86_64.sig
+          python3 scripts/release/build-release-index.py \
+            --input candidate/release-manifest-windows-x86_64.json \
+            --input candidate/release-manifest-linux-x86_64.json \
+            --input candidate/release-manifest-macos-arm64.json \
+            --output candidate/release-index.json
+          if [ '${{ inputs.production_release || false }}' = true ]; then
+            cargo run --locked -p takokit-release --bin takokit-release-tool -- sign candidate/release-index.json candidate/release-index.sig
+            cargo run --locked -p takokit-release --bin takokit-release-tool -- verify candidate/release-index.json candidate/release-index.sig
+          else
+            cargo run --locked -p takokit-release --bin takokit-release-tool -- sign candidate/release-index.json candidate/release-index.sig --test
+            cargo run --locked -p takokit-release --bin takokit-release-tool -- verify candidate/release-index.json candidate/release-index.sig --allow-test
+          fi
+          python3 - <<'PY'
+          import hashlib,pathlib
+          root=pathlib.Path('candidate')
+          files=sorted(p for p in root.iterdir() if p.is_file() and p.name != 'SHA256SUMS.txt')
+          (root/'SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files),encoding='utf-8')
+          PY
+
+      - name: Require exact source and platform set
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_TEST_FIXTURE: ${{ inputs.production_release && 'false' || 'true' }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          root=pathlib.Path('candidate')
+          index=json.loads((root/'release-index.json').read_text())
+          assert index['version']=='0.3.0'
+          assert index['commit_sha']==os.environ['EXPECTED_SHA']
+          assert set(index['platforms'])=={'windows-x86_64','linux-x86_64','macos-arm64'}
+          assert index['test_fixture'] is (os.environ['EXPECTED_TEST_FIXTURE']=='true')
+          PY
+
+      - name: Upload complete Slice 6 candidate set
+        uses: actions/upload-artifact@v4
+        with:
+          name: takokit-v0.3.0-cross-platform-candidate-${{ github.sha }}
+          path: candidate/**
+          if-no-files-found: error
+          retention-days: 14

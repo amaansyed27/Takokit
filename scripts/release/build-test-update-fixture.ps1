@@ -12,8 +12,8 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $BaseInstalledTree = [System.IO.Path]::GetFullPath($BaseInstalledTree)
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $ReleaseTool = [System.IO.Path]::GetFullPath($ReleaseTool)
-$BaseVersion = '0.2.0'
-$FixtureVersion = '0.2.1'
+$BaseVersion = '0.3.0'
+$FixtureVersion = '0.3.1'
 $FixtureBuildId = "test-update-v$FixtureVersion-$CommitSha"
 
 function Invoke-Checked {
@@ -111,12 +111,12 @@ try {
     $CargoText = Get-Content -LiteralPath $CargoToml -Raw
     $UpdatedCargoText = [regex]::Replace(
         $CargoText,
-        '(?m)^version\s*=\s*"0\.2\.0"\s*$',
-        'version = "0.2.1"',
+        '(?m)^version\s*=\s*"0\.3\.0"\s*$',
+        'version = "0.3.1"',
         1
     )
     if ($UpdatedCargoText -eq $CargoText) {
-        throw 'Could not rewrite isolated fixture workspace version from 0.2.0 to 0.2.1.'
+        throw 'Could not rewrite isolated fixture workspace version from 0.3.0 to 0.3.1.'
     }
     Write-Utf8NoBom $CargoToml $UpdatedCargoText
 

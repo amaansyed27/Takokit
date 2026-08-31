@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   projectStableWindowsRelease,
+  projectStableUnixRelease,
   resolveStableWindowsRelease,
   StableReleaseUnavailableError,
 } from "../api/_release.js";
@@ -62,6 +63,47 @@ test("stable Windows release projection selects the canonical installer", () => 
   assert.equal(projected.architecture, "x86_64");
   assert.equal(projected.test_fixture, false);
   assert.equal(projected.installer.sha256, installerHash);
+});
+
+test("stable Unix projection selects only the requested portable artifact", () => {
+  const manifest = {
+    ...stableManifest(),
+    version: "0.3.0",
+    os: "linux",
+    architecture: "x86_64",
+    artifacts: [{
+      role: "portable",
+      name: "Takokit-v0.3.0-linux-x86_64.tar.gz",
+      sha256: installerHash,
+      size: 456,
+    }],
+  };
+  const projected = projectStableUnixRelease(
+    manifest,
+    "linux",
+    "x86_64",
+    "https://example.test/release-manifest-linux-x86_64.json",
+  );
+  assert.equal(projected.artifact_name, "Takokit-v0.3.0-linux-x86_64.tar.gz");
+  assert.equal(projected.artifact_sha256, installerHash);
+});
+
+test("stable Unix projection rejects target drift and test signing", () => {
+  const manifest = {
+    ...stableManifest(),
+    version: "0.3.0",
+    os: "macos",
+    architecture: "arm64",
+    artifacts: [{ role: "portable", name: "Takokit-v0.3.0-macos-arm64.tar.gz", sha256: installerHash }],
+  };
+  assert.throws(
+    () => projectStableUnixRelease(manifest, "linux", "x86_64", "https://example.test/manifest.json"),
+    /does not match/,
+  );
+  assert.throws(
+    () => projectStableUnixRelease({ ...manifest, test_fixture: true, channel: "test" }, "macos", "arm64", "https://example.test/manifest.json"),
+    /production stable/,
+  );
 });
 
 test("stable projection rejects test fixture signing identity", () => {

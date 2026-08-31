@@ -27,6 +27,8 @@ anyhow.workspace = true
 clap.workspace = true
 crossterm.workspace = true
 fs2.workspace = true
+flate2.workspace = true
+libc.workspace = true
 open.workspace = true
 percent-encoding.workspace = true
 ratatui.workspace = true
@@ -39,6 +41,7 @@ takokit-release = { path = "../../crates/takokit-release" }
 takokit-server = { path = "../../crates/takokit-server" }
 takokit-store = { path = "../../crates/takokit-store" }
 tokio.workspace = true
+tar.workspace = true
 tracing-subscriber.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

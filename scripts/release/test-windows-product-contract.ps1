@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
-$Version = '0.2.0'
+$Version = '0.3.0'
 $AppId = '{C5EC7671-2A42-43A6-9ED4-BC9FE091BC91}'
 $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\${AppId}_is1"
 

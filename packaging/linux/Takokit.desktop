@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Takokit
+Comment=Local voice AI runtime
+Exec=@TAKOKIT_EXEC@ gui
+Icon=takokit
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+StartupNotify=true

@@ -13,7 +13,7 @@ CLI, TUI, GUI and API share the same registry, installed records, runners, voice
 
 ## Release status
 
-The current stable Windows release is `v0.1.0`. Takokit `v0.2.0` is in development with a first-class local audio API, server UX, and Windows tray controller. The bundled registry currently publishes **24 model families and 31 immutable releases** across:
+The current public stable release is Takokit `v0.2.0` for Windows x86_64. Takokit `v0.3.0` is the in-review multi-platform distribution candidate for Windows x86_64, Linux x86_64, and macOS arm64. The bundled registry currently publishes **24 model families and 31 immutable releases** across:
 
 - local TTS,
 - speech-to-text,

@@ -6,9 +6,6 @@ use support::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse()?;
-    if !cfg!(windows) {
-        return Err("takokit-updater is Windows-only in Slice 4".into());
-    }
     wait_for_parent(args.parent_pid)?;
     validate_install_root(&args.install_root)?;
 
@@ -106,8 +103,8 @@ where
         );
     }
 
-    if args.installer.is_file() {
-        if let Err(error) = refresh_installer_registration(&args.installer, &args.install_root) {
+    if let Some(installer) = args.installer.as_ref().filter(|path| path.is_file()) {
+        if let Err(error) = refresh_installer_registration(installer, &args.install_root) {
             return rollback_after_replacement(
                 args,
                 parent,
@@ -155,6 +152,9 @@ where
 }
 
 fn preserve_installer_maintenance_files(backup: &Path, install_root: &Path) -> io::Result<()> {
+    if !cfg!(windows) {
+        return Ok(());
+    }
     for name in ["unins000.exe", "unins000.dat"] {
         let source = backup.join(name);
         if source.is_file() {
@@ -168,6 +168,9 @@ fn refresh_installer_registration(
     installer: &Path,
     install_root: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if !cfg!(windows) {
+        return Ok(());
+    }
     let status = std::process::Command::new(installer)
         .args([
             "/VERYSILENT",
@@ -242,7 +245,7 @@ mod tests {
             parent_pid: 0,
             install_root: root.join("Takokit"),
             bundle: root.join("update.zip"),
-            installer: root.join("installer.exe"),
+            installer: Some(root.join("installer.exe")),
             expected_version: "0.0.2".to_string(),
             journal: root.join("update-journal.json"),
             restart_daemon: false,

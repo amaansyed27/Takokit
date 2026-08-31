@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.2.0",
+    [string]$Version = "0.3.0",
     [string]$OutputRoot,
     [switch]$SkipBuild,
     [switch]$SkipInstaller,
@@ -93,8 +93,8 @@ function Find-Iscc {
     throw 'Inno Setup compiler (ISCC.exe) was not found. Install pinned Inno Setup before building the installer.'
 }
 
-if ($Version -ne '0.2.0') {
-    throw "The Windows distribution candidate version is locked to 0.2.0; got $Version"
+if ($Version -ne '0.3.0') {
+    throw "The multi-platform distribution candidate version is locked to 0.3.0; got $Version"
 }
 Invoke-Checked python 'scripts/check_release_version.py'
 
@@ -315,8 +315,8 @@ if ($HasProductionSigningKey) {
     Invoke-Checked $ReleaseTool 'verify' $ManifestPath $SignaturePath '--allow-test'
 }
 
-$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\windows-v0.2.0-release-notes.md'
-$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.2.0.md'
+$ReleaseNotesSource = Join-Path $RepoRoot 'docs\release\v0.3.0-candidate-notes.md'
+$ReleaseNotes = Join-Path $OutputRoot 'RELEASE_NOTES-v0.3.0.md'
 if (-not (Test-Path -LiteralPath $ReleaseNotesSource)) {
     throw "Release notes source is missing: $ReleaseNotesSource"
 }

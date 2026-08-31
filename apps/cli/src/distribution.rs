@@ -34,8 +34,22 @@ pub(crate) fn application_root() -> Option<PathBuf> {
 }
 
 pub(crate) fn updater_executable() -> Option<PathBuf> {
-    let candidate = application_root()?.join("bin").join("takokit-updater.exe");
+    let candidate = application_root()?
+        .join("bin")
+        .join(format!("takokit-updater{}", std::env::consts::EXE_SUFFIX));
     candidate.is_file().then_some(candidate)
+}
+
+pub(crate) fn make_executable(_path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let path = _path;
+        let mut permissions = std::fs::metadata(path)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(path, permissions)?;
+    }
+    Ok(())
 }
 
 fn distribution_metadata_at(root: &Path) -> Option<DistributionMetadata> {

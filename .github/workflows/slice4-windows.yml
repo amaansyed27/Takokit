@@ -1,4 +1,4 @@
-name: Slice 4 Windows Distribution
+name: Windows Distribution
 
 on:
   workflow_call:
@@ -192,6 +192,12 @@ jobs:
             throw
           }
 
+      - name: Prove public v0.2.0 can update to the v0.3.0 candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./scripts/release/test-windows-v020-upgrade.ps1 -OutputRoot 'dist/windows-ci'
+
       - name: Run PowerShell bootstrap acceptance
         shell: pwsh
         run: |
@@ -216,7 +222,8 @@ jobs:
           foreach ($reportPath in @(
             'dist/windows-ci/acceptance-report.json',
             'dist/windows-ci/product-contract-report.json',
-            'dist/windows-ci/bootstrap-acceptance-report.json'
+            'dist/windows-ci/bootstrap-acceptance-report.json',
+            'dist/windows-ci/v020-upgrade-report.json'
           )) {
             if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
               throw "Windows acceptance report was not produced: $reportPath"
@@ -254,7 +261,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: takokit-v0.2.0-windows-x86_64-${{ github.sha }}
+          name: takokit-v0.3.0-windows-x86_64-${{ github.sha }}
           path: |
             dist/windows-ci/*.exe
             dist/windows-ci/*.zip
