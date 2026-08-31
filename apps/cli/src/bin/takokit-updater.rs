@@ -316,6 +316,7 @@ mod tests {
         assert_eq!(journal.state, "rolled_back");
     }
 
+    #[cfg(windows)]
     #[test]
     fn successful_update_preserves_installer_uninstaller() {
         let temp = tempfile::tempdir().unwrap();
