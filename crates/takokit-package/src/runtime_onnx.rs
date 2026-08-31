@@ -8,6 +8,25 @@ use crate::{
 use std::path::Path;
 const KOKORO_ONNX_PACKAGE: &str = "kokoro-onnx==0.5.0";
 const KOKORO_ONNX_ADAPTER: &str = include_str!("../../../runners/onnx/kokoro_adapter.py");
+const PHONEMIZER_ESPEAK_ABI_PATCH: &str = r#"
+from pathlib import Path
+from phonemizer.backend.espeak import api
+path = Path(api.__file__)
+source = path.read_text(encoding="utf-8")
+marker = "self._library.espeak_Initialize.argtypes"
+if marker not in source:
+    needle = "        self._library = ctypes.cdll.LoadLibrary(str(espeak_copy))\n        try:\n"
+    replacement = (
+        "        self._library = ctypes.cdll.LoadLibrary(str(espeak_copy))\n"
+        "        self._library.espeak_Initialize.argtypes = "
+        "[ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_int]\n"
+        "        self._library.espeak_Initialize.restype = ctypes.c_int\n"
+        "        try:\n"
+    )
+    if source.count(needle) != 1:
+        raise SystemExit("pinned phonemizer espeak API shape changed")
+    path.write_text(source.replace(needle, replacement), encoding="utf-8")
+"#;
 
 pub(crate) fn install_onnx_runtime(
     installed_registry: &InstalledRegistry,
@@ -59,6 +78,15 @@ pub(crate) fn install_onnx_runtime(
             "--no-progress".into(),
             KOKORO_ONNX_PACKAGE.into(),
         ],
+    )?;
+    // phonemizer-fork 3.3.2 does not declare espeak_Initialize's ctypes ABI.
+    // On Apple Silicon that can pass a null/invalid data pointer, causing the
+    // wheel to fall back to its leaked CI build path. Patch only the pinned,
+    // Takokit-owned venv and fail installation if the upstream shape drifts.
+    run_logged_command(
+        &log_path,
+        &python,
+        &["-c".into(), PHONEMIZER_ESPEAK_ABI_PATCH.into()],
     )?;
     std::fs::write(adapters_dir.join("kokoro.py"), KOKORO_ONNX_ADAPTER)?;
 
