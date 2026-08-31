@@ -235,7 +235,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p candidate
-          find accepted -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.tar.gz' -o -name '*.json' -o -name '*.sig' -o -name '*.txt' -o -name '*.md' \) -exec cp {} candidate/ \;
+          # Each downloaded artifact is one directory below accepted/. Only
+          # assemble its release-root files: nested test-update fixtures are
+          # deliberately version 0.3.1 and must never overwrite v0.3.0 inputs.
+          find accepted -mindepth 2 -maxdepth 2 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.tar.gz' -o -name '*.json' -o -name '*.sig' -o -name '*.txt' -o -name '*.md' \) -exec cp {} candidate/ \;
           cp candidate/release-manifest.json candidate/release-manifest-windows-x86_64.json
           cp candidate/release-manifest.sig candidate/release-manifest-windows-x86_64.sig
           python3 scripts/release/build-release-index.py \
