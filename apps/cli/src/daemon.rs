@@ -280,6 +280,7 @@ pub async fn child(
     config: RuntimeConfig,
     instance_id: Uuid,
 ) -> anyhow::Result<()> {
+    crate::distribution::start_automatic_update_check();
     let lock = OpenOptions::new()
         .read(true)
         .write(true)

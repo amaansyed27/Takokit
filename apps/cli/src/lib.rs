@@ -61,6 +61,7 @@ fn cli_storage_root() -> PathBuf {
 #[cfg(windows)]
 pub fn run_resident_application(explicit_launch: bool) -> anyhow::Result<()> {
     distribution::configure_installed_resources();
+    distribution::start_automatic_update_check();
     resident::run(explicit_launch)
 }
 

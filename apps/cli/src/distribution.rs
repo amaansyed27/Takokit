@@ -17,7 +17,6 @@ pub(crate) fn configure_installed_resources() {
     if std::env::var_os("TAKOKIT_REGISTRY_DIR").is_none() && registry.join("index.json").is_file() {
         std::env::set_var("TAKOKIT_REGISTRY_DIR", registry);
     }
-    maybe_start_automatic_update_check();
 }
 
 pub(crate) fn distribution_metadata() -> Option<DistributionMetadata> {
@@ -58,13 +57,10 @@ fn distribution_metadata_at(root: &Path) -> Option<DistributionMetadata> {
     (metadata.product == takokit_release::PRODUCT).then_some(metadata)
 }
 
-fn maybe_start_automatic_update_check() {
-    if std::env::args().any(|argument| matches!(argument.as_str(), "update" | "serve")) {
-        return;
-    }
+pub(crate) fn start_automatic_update_check() {
     let store = LocalStore::new(LocalStore::default_root());
     if store.ensure_layout().is_ok() {
-        crate::update_command::maybe_spawn_automatic_check(&store);
+        crate::update_command::maybe_start_automatic_check(&store);
     }
 }
 

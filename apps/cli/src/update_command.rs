@@ -88,7 +88,7 @@ pub(crate) fn run_update_command(
     }
 }
 
-pub(crate) fn maybe_spawn_automatic_check(store: &LocalStore) {
+pub(crate) fn maybe_start_automatic_check(store: &LocalStore) {
     let Some(metadata) = distribution::distribution_metadata() else {
         return;
     };
@@ -108,21 +108,10 @@ pub(crate) fn maybe_spawn_automatic_check(store: &LocalStore) {
     if write_config(store, &settings).is_err() {
         return;
     }
-    let Ok(executable) = std::env::current_exe() else {
-        return;
-    };
-    let mut command = ProcessCommand::new(executable);
-    command.args(["--output", "json", "update", "auto-check"]);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000 | 0x0000_0008);
-    }
-    if let Err(error) = command.spawn() {
-        let mut settings = read_config(store, Some(&metadata));
-        settings.last_error = Some(format!("could not start automatic update check: {error}"));
-        let _ = write_config(store, &settings);
-    }
+    let store = store.clone();
+    std::thread::spawn(move || {
+        let _ = automatic_check(&store, false);
+    });
 }
 
 fn print_status(store: &LocalStore, json: bool) -> anyhow::Result<()> {
