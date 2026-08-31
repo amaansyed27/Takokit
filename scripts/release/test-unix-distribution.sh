@@ -79,7 +79,7 @@ if [ -n "$FIXTURE_ROOT" ]; then
   FIXTURE_MANIFEST="$FIXTURE_ROOT/release-manifest.json"
   FIXTURE_SIGNATURE="$FIXTURE_ROOT/release-manifest.sig"
   "$TAKOKIT_INSTALL_ROOT/bin/tako" update apply --manifest "$FIXTURE_MANIFEST" --signature "$FIXTURE_SIGNATURE" --allow-test >/dev/null
-  JOURNAL="$HOME/.takokit/runtime/updates/update-journal.json"
+  JOURNAL="$HOME/.takokit/runtime/update-journal.json"
   for _ in $(seq 1 600); do
     state=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("state",""))' "$JOURNAL" 2>/dev/null || true)
     [ "$state" = completed ] && break
