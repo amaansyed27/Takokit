@@ -1,7 +1,7 @@
 use std::{env, fs, path::PathBuf};
 use takokit_release::{
     parse_manifest, parse_signature, sign_test_fixture, sign_with_seed, verify_signature,
-    PRODUCTION_KEY_ID, TEST_KEY_ID,
+    ReleaseIndex, PRODUCTION_KEY_ID, TEST_KEY_ID,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,17 +12,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let signature = path(&mut args, "signature")?;
             let test = args.any(|arg| arg == "--test");
             let bytes = fs::read(&manifest)?;
-            let parsed = parse_manifest(&bytes)?;
+            let parsed = signing_metadata(&bytes)?;
             let envelope = if test {
-                if !parsed.test_fixture
-                    || parsed.channel != "test"
-                    || parsed.signing_key_id != TEST_KEY_ID
+                if !parsed.test_fixture || parsed.channel != "test" || parsed.key_id != TEST_KEY_ID
                 {
                     return Err("--test may sign only an explicitly marked test fixture".into());
                 }
                 sign_test_fixture(&bytes)?
             } else {
-                if parsed.test_fixture || parsed.signing_key_id != PRODUCTION_KEY_ID {
+                if parsed.test_fixture || parsed.key_id != PRODUCTION_KEY_ID {
                     return Err("production signing requires production manifest metadata".into());
                 }
                 let seed = env::var("TAKOKIT_RELEASE_SIGNING_KEY_HEX").map_err(|_| {
@@ -39,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let bytes = fs::read(manifest)?;
             let envelope = parse_signature(&fs::read(signature)?)?;
             verify_signature(&bytes, &envelope, allow_test)?;
-            let parsed = parse_manifest(&bytes)?;
+            let parsed = signing_metadata(&bytes)?;
             println!(
                 "verified {} {} with {}",
                 parsed.product, parsed.version, envelope.key_id
@@ -54,6 +52,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+struct SigningMetadata {
+    product: String,
+    version: String,
+    channel: String,
+    key_id: String,
+    test_fixture: bool,
+}
+
+fn signing_metadata(bytes: &[u8]) -> Result<SigningMetadata, Box<dyn std::error::Error>> {
+    let value: serde_json::Value = serde_json::from_slice(bytes)?;
+    if value.get("platforms").is_some() {
+        let index: ReleaseIndex = serde_json::from_value(value)?;
+        return Ok(SigningMetadata {
+            product: index.product,
+            version: index.version,
+            channel: index.channel,
+            key_id: index.signing_key_id,
+            test_fixture: index.test_fixture,
+        });
+    }
+    let manifest = parse_manifest(bytes)?;
+    Ok(SigningMetadata {
+        product: manifest.product,
+        version: manifest.version,
+        channel: manifest.channel,
+        key_id: manifest.signing_key_id,
+        test_fixture: manifest.test_fixture,
+    })
+}
+
 fn path(
     args: &mut impl Iterator<Item = String>,
     label: &str,
@@ -61,4 +89,29 @@ fn path(
     args.next()
         .map(PathBuf::from)
         .ok_or_else(|| format!("missing {label} path").into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn release_index_exposes_signing_metadata() {
+        let bytes = br#"{
+          "schema_version": 1,
+          "product": "Takokit",
+          "version": "0.3.0",
+          "channel": "test",
+          "commit_sha": "abc",
+          "signing_key_id": "takokit-test-fixture-v1",
+          "test_fixture": true,
+          "platforms": {}
+        }"#;
+        let metadata = signing_metadata(bytes).unwrap();
+        assert_eq!(metadata.product, "Takokit");
+        assert_eq!(metadata.version, "0.3.0");
+        assert_eq!(metadata.channel, "test");
+        assert_eq!(metadata.key_id, TEST_KEY_ID);
+        assert!(metadata.test_fixture);
+    }
 }
