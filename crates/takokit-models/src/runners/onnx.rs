@@ -198,8 +198,9 @@ pub fn speak_with_kokoro(
     let adapter_response: KokoroAdapterResponse =
         serde_json::from_slice(&output.stdout).map_err(|error| {
             TakokitError::Audio(format!(
-                "Kokoro adapter returned invalid JSON ({error}): {}",
-                String::from_utf8_lossy(&output.stdout).trim()
+                "Kokoro adapter returned invalid JSON ({error}): {}{}",
+                String::from_utf8_lossy(&output.stdout).trim(),
+                stderr_suffix(&output.stderr)
             ))
         })?;
     if !output.status.success() || !adapter_response.ok {
