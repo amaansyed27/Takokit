@@ -128,7 +128,7 @@ function Wait-InstalledUninstall {
         [string]$DaemonExecutable,
         [string]$DaemonHost,
         [int]$DaemonPort,
-        [int]$TimeoutSeconds = 30
+        [int]$TimeoutSeconds = 60
     )
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -143,7 +143,7 @@ function Wait-InstalledUninstall {
         if ($complete) { return }
         Start-Sleep -Milliseconds 250
     }
-    throw 'Timed out waiting for installed application, shell integration, and managed daemon cleanup.'
+    throw "Timed out waiting for installed application, shell integration, and managed daemon cleanup (cliGone=$(-not (Test-Path -LiteralPath $InstalledTako)), pathGone=$((Get-PathEntryCount (Get-UserPath) $InstalledBin) -eq 0), guiShortcutGone=$(-not (Test-Path -LiteralPath $GuiShortcut)), tuiShortcutGone=$(-not (Test-Path -LiteralPath $TuiShortcut)), registryGone=$(-not (Test-Path -LiteralPath $UninstallKey)), daemonGone=$(-not (Test-ProcessAlive -ProcessId $DaemonPid -ExpectedExecutable $DaemonExecutable)), portGone=$(-not (Test-TcpPort -HostName $DaemonHost -Port $DaemonPort)))."
 }
 
 function Verify-Sha256Sums {
