@@ -9,9 +9,18 @@ from __future__ import annotations
 
 import array
 import json
+import os
 import sys
 import wave
 from pathlib import Path
+
+import espeakng_loader
+
+# espeakng-loader's macOS wheel can retain its CI build-time data path. Force
+# phonemizer to the data and library shipped inside the installed wheel before
+# kokoro_onnx imports its tokenizer.
+os.environ["PHONEMIZER_ESPEAK_DATA_PATH"] = espeakng_loader.get_data_path()
+os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = espeakng_loader.get_library_path()
 
 from kokoro_onnx import Kokoro
 
