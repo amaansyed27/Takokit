@@ -3,6 +3,7 @@ param([Parameter(Mandatory)][string]$OutputRoot)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$global:LASTEXITCODE = 0
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $Manifest = Join-Path $OutputRoot 'release-manifest.json'
 $Signature = Join-Path $OutputRoot 'release-manifest.sig'
@@ -16,6 +17,7 @@ $TakokitHome = Join-Path $TempRoot 'home'
 $OldHome = $env:TAKOKIT_HOME
 
 function Get-Version([string]$Tako) {
+    $global:LASTEXITCODE = 0
     $line = (& $Tako version | Select-Object -First 1)
     if ($LASTEXITCODE -ne 0) { throw "$Tako version failed" }
     return $line.Trim()
@@ -40,6 +42,7 @@ try {
     Set-Content -LiteralPath (Join-Path $TakokitHome 'preserve.txt') -Value 'preserve' -NoNewline
     $oldTako = Join-Path $InstallRoot 'bin\tako.exe'
     if ((Get-Version $oldTako) -ne 'takokit 0.2.0') { throw 'Legacy fixture is not Takokit 0.2.0.' }
+    $global:LASTEXITCODE = 0
     & $oldTako update apply --manifest $Manifest --signature $Signature --allow-test
     if ($LASTEXITCODE -ne 0) { throw 'v0.2.0 updater rejected the v0.3.0 compatibility manifest.' }
     $journal = Join-Path $TakokitHome 'runtime\update-journal.json'

@@ -74,7 +74,9 @@ json_string() {
 }
 json_bool() {
   key=$1
-  tr -d '\r\n ' < "$METADATA" | sed -n "s/.*\"$key\":\(true\|false\).*/\1/p"
+  tr -d '\r\n ' < "$METADATA" | sed -n \
+    -e "s/.*\"$key\":\(true\).*/\1/p" \
+    -e "s/.*\"$key\":\(false\).*/\1/p"
 }
 VERSION="$(json_string version)"
 META_PLATFORM="$(json_string platform)"

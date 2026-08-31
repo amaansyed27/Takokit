@@ -74,6 +74,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/gui/package-lock.json
 
+      - name: Install pinned uv runtime bootstrap
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: 0.11.24
+
       - name: Require expected native target
         shell: bash
         run: |
@@ -115,13 +120,14 @@ jobs:
 
       - name: Exercise installed and portable product
         shell: bash
-        run: >-
-          scripts/release/test-unix-distribution.sh
-          'dist/${{ matrix.platform }}-${{ matrix.architecture }}/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz'
-          '${{ matrix.platform }}'
-          '${{ matrix.architecture }}'
-          '0.3.0'
-          'dist/${{ matrix.platform }}-${{ matrix.architecture }}/test-update'
+        run: |
+          export UV="$(command -v uv)"
+          scripts/release/test-unix-distribution.sh \
+            'dist/${{ matrix.platform }}-${{ matrix.architecture }}/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz' \
+            '${{ matrix.platform }}' \
+            '${{ matrix.architecture }}' \
+            '0.3.0' \
+            'dist/${{ matrix.platform }}-${{ matrix.architecture }}/test-update'
 
       - name: Verify packaged manifest and archive contract
         shell: bash
