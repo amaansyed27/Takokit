@@ -76,9 +76,11 @@ function Test-ProcessAlive {
     if ($null -eq $process) { return $false }
     if ([string]::IsNullOrWhiteSpace($ExpectedExecutable)) { return $true }
     if ([string]::IsNullOrWhiteSpace($process.ExecutablePath)) { return $false }
+    $actual = [IO.Path]::GetFullPath($process.ExecutablePath) -replace '^\\\\\?\\', ''
+    $expected = [IO.Path]::GetFullPath($ExpectedExecutable) -replace '^\\\\\?\\', ''
     return [string]::Equals(
-        [IO.Path]::GetFullPath($process.ExecutablePath),
-        [IO.Path]::GetFullPath($ExpectedExecutable),
+        $actual,
+        $expected,
         [StringComparison]::OrdinalIgnoreCase
     )
 }
