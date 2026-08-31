@@ -42,7 +42,7 @@ try {
     if ((Get-Version $oldTako) -ne 'takokit 0.2.0') { throw 'Legacy fixture is not Takokit 0.2.0.' }
     & $oldTako update apply --manifest $Manifest --signature $Signature --allow-test
     if ($LASTEXITCODE -ne 0) { throw 'v0.2.0 updater rejected the v0.3.0 compatibility manifest.' }
-    $journal = Join-Path $TakokitHome 'runtime\updates\update-journal.json'
+    $journal = Join-Path $TakokitHome 'runtime\update-journal.json'
     $deadline = (Get-Date).AddMinutes(3)
     do {
         Start-Sleep -Milliseconds 250
