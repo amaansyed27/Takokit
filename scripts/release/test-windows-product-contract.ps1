@@ -71,8 +71,16 @@ function Test-TcpPort {
 }
 
 function Test-ProcessAlive {
-    param([uint32]$ProcessId)
-    return $null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+    param([uint32]$ProcessId, [AllowNull()][string]$ExpectedExecutable)
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    if ($null -eq $process) { return $false }
+    if ([string]::IsNullOrWhiteSpace($ExpectedExecutable)) { return $true }
+    if ([string]::IsNullOrWhiteSpace($process.ExecutablePath)) { return $false }
+    return [string]::Equals(
+        [IO.Path]::GetFullPath($process.ExecutablePath),
+        [IO.Path]::GetFullPath($ExpectedExecutable),
+        [StringComparison]::OrdinalIgnoreCase
+    )
 }
 
 function Wait-ManagedDaemon {
@@ -83,7 +91,7 @@ function Wait-ManagedDaemon {
         if (Test-Path -LiteralPath $infoPath -PathType Leaf) {
             try {
                 $info = Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
-                if ((Test-ProcessAlive ([uint32]$info.pid)) -and
+                if ((Test-ProcessAlive -ProcessId ([uint32]$info.pid) -ExpectedExecutable ([string]$info.executable)) -and
                     (Test-TcpPort -HostName ([string]$info.host) -Port ([int]$info.port))) {
                     return $info
                 }
@@ -97,10 +105,10 @@ function Wait-ManagedDaemon {
 }
 
 function Wait-DaemonStopped {
-    param([uint32]$ProcessId, [string]$HostName, [int]$Port, [int]$TimeoutSeconds = 20)
+    param([uint32]$ProcessId, [string]$ExpectedExecutable, [string]$HostName, [int]$Port, [int]$TimeoutSeconds = 20)
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if ((-not (Test-ProcessAlive $ProcessId)) -and (-not (Test-TcpPort -HostName $HostName -Port $Port))) {
+        if ((-not (Test-ProcessAlive -ProcessId $ProcessId -ExpectedExecutable $ExpectedExecutable)) -and (-not (Test-TcpPort -HostName $HostName -Port $Port))) {
             return
         }
         Start-Sleep -Milliseconds 250
@@ -115,6 +123,7 @@ function Wait-InstalledUninstall {
         [string]$GuiShortcut,
         [string]$TuiShortcut,
         [uint32]$DaemonPid,
+        [string]$DaemonExecutable,
         [string]$DaemonHost,
         [int]$DaemonPort,
         [int]$TimeoutSeconds = 30
@@ -127,7 +136,7 @@ function Wait-InstalledUninstall {
             (-not (Test-Path -LiteralPath $GuiShortcut)) -and
             (-not (Test-Path -LiteralPath $TuiShortcut)) -and
             (-not (Test-Path -LiteralPath $UninstallKey)) -and
-            (-not (Test-ProcessAlive $DaemonPid)) -and
+            (-not (Test-ProcessAlive -ProcessId $DaemonPid -ExpectedExecutable $DaemonExecutable)) -and
             (-not (Test-TcpPort -HostName $DaemonHost -Port $DaemonPort))
         if ($complete) { return }
         Start-Sleep -Milliseconds 250
@@ -298,7 +307,7 @@ try {
     }
     $portableStop = & $PortableTako daemon stop 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "Portable daemon stop failed: $portableStop"
-    Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
+    Wait-DaemonStopped -ProcessId ([uint32]$portableDaemon.pid) -ExpectedExecutable ([string]$portableDaemon.executable) -HostName ([string]$portableDaemon.host) -Port ([int]$portableDaemon.port)
     $portableQuit = Start-Process -FilePath $PortableApplication -ArgumentList @('--quit') -PassThru -WindowStyle Hidden
     Assert-True ($portableQuit.WaitForExit(5000)) 'Portable resident quit request did not return.'
     $Report.portable_gui_served = $true
@@ -385,7 +394,7 @@ try {
     $Report.gui_safe_workspace = $true
     $Report.installed_daemon_owned = $true
 
-    Assert-True (Test-ProcessAlive ([uint32]$daemon.pid)) 'Managed daemon did not remain available after tako gui returned.'
+    Assert-True (Test-ProcessAlive -ProcessId ([uint32]$daemon.pid) -ExpectedExecutable ([string]$daemon.executable)) 'Managed daemon did not remain available after tako gui returned.'
     Assert-True (Test-TcpPort -HostName ([string]$daemon.host) -Port ([int]$daemon.port)) 'Managed daemon port was not available before uninstall.'
 
     $Uninstaller = Join-Path $InstallRoot 'unins000.exe'
@@ -400,10 +409,11 @@ try {
         -GuiShortcut $GuiShortcutPath `
         -TuiShortcut $TuiShortcutPath `
         -DaemonPid ([uint32]$daemon.pid) `
+        -DaemonExecutable ([string]$daemon.executable) `
         -DaemonHost ([string]$daemon.host) `
         -DaemonPort ([int]$daemon.port)
 
-    Assert-True (-not (Test-ProcessAlive ([uint32]$daemon.pid))) 'Uninstall left the owned daemon process running.'
+    Assert-True (-not (Test-ProcessAlive -ProcessId ([uint32]$daemon.pid) -ExpectedExecutable ([string]$daemon.executable))) 'Uninstall left the owned daemon process running.'
     Assert-True (-not (Test-TcpPort -HostName ([string]$daemon.host) -Port ([int]$daemon.port))) 'Uninstall left the owned daemon port open.'
     Assert-True (Test-Path -LiteralPath $DefaultSentinel -PathType Leaf) 'Uninstall deleted default %USERPROFILE%\.takokit user data.'
     Assert-True (Test-Path -LiteralPath $WorkspaceSentinel -PathType Leaf) 'Uninstall deleted workspace .tako data.'
