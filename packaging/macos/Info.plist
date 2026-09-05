@@ -8,8 +8,9 @@
   <key>CFBundleVersion</key><string>@VERSION@</string>
   <key>CFBundleShortVersionString</key><string>@VERSION@</string>
   <key>CFBundleExecutable</key><string>Takokit</string>
-  <key>CFBundleIconFile</key><string>Takokit.png</string>
+  <key>CFBundleIconFile</key><string>Takokit.icns</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>

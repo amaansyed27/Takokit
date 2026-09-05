@@ -5,6 +5,7 @@ SITE_ORIGIN="${TAKOKIT_SITE_ORIGIN:-https://takokit.dawnlightlabs.com}"
 INSTALL_ROOT="${TAKOKIT_INSTALL_ROOT:-$HOME/.local/share/takokit}"
 BIN_DIR="${TAKOKIT_BIN_DIR:-$HOME/.local/bin}"
 APPLICATIONS_DIR="${TAKOKIT_APPLICATIONS_DIR:-$HOME/Applications}"
+APP_SUPPORT_DIR="${TAKOKIT_APP_SUPPORT_DIR:-$HOME/Library/Application Support/Takokit}"
 DESKTOP_DIR="${TAKOKIT_DESKTOP_DIR:-$HOME/.local/share/applications}"
 ICON_DIR="${TAKOKIT_ICON_DIR:-$HOME/.local/share/icons/hicolor/512x512/apps}"
 PATH_RC=
@@ -151,12 +152,18 @@ if [ "$PLATFORM" = linux ]; then
   printf '%s\n' 'X-Takokit-Owned=true' >> "$DESKTOP_DIR/com.dawnlightlabs.takokit.desktop"
   install -m 0644 "$INSTALL_ROOT/integrations/linux/takokit.png" "$ICON_DIR/takokit.png"
 else
-  mkdir -p "$APPLICATIONS_DIR"
+  APP_SOURCE="$INSTALL_ROOT/integrations/macos/Takokit.app"
+  [ -x "$APP_SOURCE/Contents/MacOS/Takokit" ] || fail "verified package is missing native Takokit.app"
+  mkdir -p "$APPLICATIONS_DIR" "$APP_SUPPORT_DIR"
   rm -rf -- "$APPLICATIONS_DIR/Takokit.app"
-  cp -R "$INSTALL_ROOT/integrations/macos/Takokit.app" "$APPLICATIONS_DIR/Takokit.app"
-  escaped=$(printf '%s' "$INSTALL_ROOT/bin/tako" | sed 's/[&|]/\\&/g')
-  sed "s|.*exec .*|exec \"$escaped\" gui|" "$APPLICATIONS_DIR/Takokit.app/Contents/MacOS/Takokit" > "$TMP_ROOT/macos-launcher"
-  install -m 0755 "$TMP_ROOT/macos-launcher" "$APPLICATIONS_DIR/Takokit.app/Contents/MacOS/Takokit"
+  cp -R "$APP_SOURCE" "$APPLICATIONS_DIR/Takokit.app"
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --verify --deep --strict "$APPLICATIONS_DIR/Takokit.app" || fail "installed Takokit.app failed code-signature verification"
+  fi
+  printf '%s\n' "$INSTALL_ROOT" > "$TMP_ROOT/install-root.txt"
+  mv -- "$TMP_ROOT/install-root.txt" "$APP_SUPPORT_DIR/install-root.txt"
+  printf '%s\n' "$APPLICATIONS_DIR/Takokit.app" > "$TMP_ROOT/application-path.txt"
+  mv -- "$TMP_ROOT/application-path.txt" "$APP_SUPPORT_DIR/application-path.txt"
 fi
 
 case ":$PATH:" in

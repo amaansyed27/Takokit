@@ -89,18 +89,17 @@ install -m 0644 LICENSE "$BASE/resources/licenses/LICENSE.txt"
 python3 scripts/release/generate_dependency_notices.py --output "$BASE/resources/licenses/THIRD_PARTY_NOTICES.md"
 install -m 0755 scripts/uninstall.sh "$BASE/uninstall.sh"
 
-mkdir -p "$BASE/integrations/linux" "$BASE/integrations/macos/Takokit.app/Contents/MacOS" "$BASE/integrations/macos/Takokit.app/Contents/Resources"
+mkdir -p "$BASE/integrations/linux"
 sed "s|@TAKOKIT_EXEC@|__TAKOKIT_EXEC__|g" packaging/linux/Takokit.desktop > "$BASE/integrations/linux/Takokit.desktop"
 install -m 0644 assets/transparent-png/512.png "$BASE/integrations/linux/takokit.png"
-sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$BASE/integrations/macos/Takokit.app/Contents/Info.plist"
-install -m 0755 packaging/macos/takokit-launcher.sh "$BASE/integrations/macos/Takokit.app/Contents/MacOS/Takokit"
-install -m 0644 assets/transparent-png/512.png "$BASE/integrations/macos/Takokit.app/Contents/Resources/Takokit.png"
+
 if [ "$PLATFORM" = macos ]; then
-  codesign --force --deep --sign - "$BASE/integrations/macos/Takokit.app"
-  codesign --verify --deep --strict "$BASE/integrations/macos/Takokit.app"
-  cat > "$OUTPUT_ROOT/apple-signing-status.json" <<EOF
-{"artifact":"Takokit.app","status":"ad-hoc signed","developer_id":false,"notarized":false}
-EOF
+  mkdir -p "$BASE/integrations/macos"
+  scripts/release/build-macos-app.sh \
+    "$BASE/integrations/macos/Takokit.app" \
+    "$VERSION" \
+    "$BUILD_ID" \
+    "$OUTPUT_ROOT/apple-signing-status.json"
 fi
 
 python3 - "$BASE/build-provenance.json" "$VERSION" "$COMMIT_SHA" "$BUILD_ID" "$BUILD_TIMESTAMP" "$PLATFORM" "$ARCH" <<'PY'

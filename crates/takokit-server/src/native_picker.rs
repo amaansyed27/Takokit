@@ -89,35 +89,72 @@ fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, St
 
 #[cfg(target_os = "macos")]
 fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
-    let initial = initial_dir.display().to_string().replace('"', "\\\"");
-    let target = if kind.is_folder() { "folder" } else { "file" };
-    let script =
-        format!("POSIX path of (choose {target} default location POSIX file \"{initial}\")");
-    let output = Command::new("osascript")
+    let initial = applescript_string(&initial_dir.display().to_string());
+    let chooser = if kind.is_folder() { "choose folder" } else { "choose file" };
+    let prompt = if kind.is_folder() {
+        "Choose a Takokit workspace"
+    } else {
+        "Choose a local file for Takokit"
+    };
+    // `osascript` is the narrow local bridge used by the loopback-only Takokit API.
+    // Activating System Events first makes the native chooser foreground reliably
+    // when the request originates from Safari/Chrome rather than a terminal.
+    let script = format!(
+        "tell application \"System Events\" to activate\n\
+         try\n\
+           set initialLocation to POSIX file \"{initial}\"\n\
+           set selectedItem to {chooser} with prompt \"{prompt}\" default location initialLocation\n\
+           return POSIX path of selectedItem\n\
+         on error number -128\n\
+           return \"\"\n\
+         end try"
+    );
+    let output = Command::new("/usr/bin/osascript")
         .args(["-e", &script])
         .output()
         .map_err(|error| format!("could not open the macOS path picker: {error}"))?;
     if !output.status.success() {
-        return Ok(None);
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "the macOS path picker failed".to_string()
+        } else {
+            format!("the macOS path picker failed: {stderr}")
+        });
     }
     selected_path_from_stdout(&output.stdout)
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
-    let mut command = Command::new("zenity");
-    command.arg("--file-selection");
+    let mut zenity = Command::new("zenity");
+    zenity.arg("--file-selection");
     if kind.is_folder() {
-        command.arg("--directory");
+        zenity.arg("--directory");
     }
-    command.arg(format!("--filename={}/", initial_dir.display()));
-    let output = command.output().map_err(|error| {
-        format!("no graphical path picker is available ({error}); enter a path instead")
-    })?;
-    if !output.status.success() {
-        return Ok(None);
+    zenity.arg(format!("--filename={}/", initial_dir.display()));
+    match zenity.output() {
+        Ok(output) => {
+            if !output.status.success() {
+                return Ok(None);
+            }
+            return selected_path_from_stdout(&output.stdout);
+        }
+        Err(zenity_error) => {
+            let mut kdialog = Command::new("kdialog");
+            if kind.is_folder() {
+                kdialog.arg("--getexistingdirectory").arg(initial_dir);
+            } else {
+                kdialog.arg("--getopenfilename").arg(initial_dir);
+            }
+            match kdialog.output() {
+                Ok(output) if output.status.success() => selected_path_from_stdout(&output.stdout),
+                Ok(_) => Ok(None),
+                Err(kdialog_error) => Err(format!(
+                    "no graphical path picker is available (zenity: {zenity_error}; kdialog: {kdialog_error}); enter an absolute path instead"
+                )),
+            }
+        }
     }
-    selected_path_from_stdout(&output.stdout)
 }
 
 fn selected_path_from_stdout(stdout: &[u8]) -> Result<Option<PathBuf>, String> {
@@ -127,8 +164,20 @@ fn selected_path_from_stdout(stdout: &[u8]) -> Result<Option<PathBuf>, String> {
     if value.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(PathBuf::from(value)))
+        let path = PathBuf::from(value);
+        if !path.is_absolute() {
+            return Err(format!(
+                "path picker returned a non-absolute path: {}",
+                path.display()
+            ));
+        }
+        Ok(Some(path))
     }
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn applescript_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 #[cfg(windows)]
@@ -146,11 +195,25 @@ mod tests {
     }
 
     #[test]
-    fn picker_output_preserves_unicode() {
-        assert_eq!(
-            selected_path_from_stdout("C:\\Voice Project ü\\sample.wav\r\n".as_bytes()).unwrap(),
-            Some(PathBuf::from("C:\\Voice Project ü\\sample.wav"))
-        );
+    fn picker_output_preserves_unicode_absolute_paths() {
+        let value = if cfg!(windows) {
+            "C:\\Voice Project ü\\sample.wav\r\n".to_string()
+        } else {
+            "/tmp/Voice Project ü/sample.wav\n".to_string()
+        };
+        let selected = selected_path_from_stdout(value.as_bytes()).unwrap().unwrap();
+        assert!(selected.is_absolute());
+        assert!(selected.to_string_lossy().contains("Voice Project ü"));
+    }
+
+    #[test]
+    fn relative_picker_output_is_rejected() {
+        assert!(selected_path_from_stdout(b"relative/folder\n").is_err());
+    }
+
+    #[test]
+    fn applescript_paths_escape_quotes_and_backslashes() {
+        assert_eq!(applescript_string("/tmp/a\\b\"c"), "/tmp/a\\\\b\\\"c");
     }
 
     #[test]

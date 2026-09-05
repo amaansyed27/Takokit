@@ -1,5 +1,5 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 use takokit_core::RuntimeConfig;
@@ -15,6 +15,12 @@ pub async fn open_gui(
     config: &RuntimeConfig,
     workspace: &CliWorkspace,
 ) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    if let Some(app) = macos_resident_app() {
+        launch_macos_resident(&app)?;
+        return Ok(());
+    }
+
     ensure_server(store, config).await?;
     wait_for_gui_ready_at(&config.gui_url(), GUI_READY_TIMEOUT, GUI_READY_POLL)?;
 
@@ -63,6 +69,56 @@ where
             false
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_resident_app() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("TAKOKIT_APP_PATH") {
+        let app = PathBuf::from(path);
+        if valid_macos_app(&app) {
+            return Some(app);
+        }
+    }
+
+    if let Some(home) = std::env::var_os("HOME") {
+        let receipt = PathBuf::from(&home)
+            .join("Library")
+            .join("Application Support")
+            .join("Takokit")
+            .join("application-path.txt");
+        if let Ok(value) = std::fs::read_to_string(receipt) {
+            let app = PathBuf::from(value.trim());
+            if valid_macos_app(&app) {
+                return Some(app);
+            }
+        }
+        let conventional = PathBuf::from(home).join("Applications").join("Takokit.app");
+        if valid_macos_app(&conventional) {
+            return Some(conventional);
+        }
+    }
+
+    distribution::application_root()
+        .map(|root| root.join("integrations").join("macos").join("Takokit.app"))
+        .filter(|app| valid_macos_app(app))
+}
+
+#[cfg(target_os = "macos")]
+fn valid_macos_app(path: &Path) -> bool {
+    path.join("Contents").join("Info.plist").is_file()
+        && path.join("Contents").join("MacOS").join("Takokit").is_file()
+}
+
+#[cfg(target_os = "macos")]
+fn launch_macos_resident(app: &Path) -> anyhow::Result<()> {
+    let status = std::process::Command::new("/usr/bin/open")
+        .arg(app)
+        .status()
+        .map_err(|error| anyhow::anyhow!("launch {}: {error}", app.display()))?;
+    if !status.success() {
+        anyhow::bail!("macOS could not launch {}", app.display());
+    }
+    Ok(())
 }
 
 pub fn gui_dist_path() -> PathBuf {
