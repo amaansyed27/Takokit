@@ -32,16 +32,15 @@ pub fn bootstrap_uv(takokit_root: &Path) -> PackageResult<PathBuf> {
     append_bootstrap_header(&log, &managed)?;
 
     if std::env::var_os("UV").is_some() {
-        let override_path = explicit_uv_override().ok_or_else(|| {
-            PackageError::ArtifactInstallFailed {
+        let override_path =
+            explicit_uv_override().ok_or_else(|| PackageError::ArtifactInstallFailed {
                 artifact: "uv bootstrap".to_string(),
                 reason: format!(
                     "UV must be an absolute path to an existing uv {} executable; see {}",
                     TAKOKIT_UV_VERSION,
                     log.display()
                 ),
-            }
-        })?;
+            })?;
         let valid = verify_uv_version(&override_path, &log)?;
         log_source(
             &log,
@@ -171,11 +170,9 @@ fn quarantine_invalid_managed_uv(managed: &Path, log: &Path) -> PackageResult<()
             quarantine.display()
         ),
     )?;
-    std::fs::rename(managed, &quarantine).map_err(|error| {
-        PackageError::ArtifactInstallFailed {
-            artifact: "uv bootstrap".to_string(),
-            reason: format!("could not quarantine invalid managed uv: {error}"),
-        }
+    std::fs::rename(managed, &quarantine).map_err(|error| PackageError::ArtifactInstallFailed {
+        artifact: "uv bootstrap".to_string(),
+        reason: format!("could not quarantine invalid managed uv: {error}"),
     })?;
     Ok(())
 }
