@@ -96,6 +96,12 @@ pub(crate) fn stop_verified_server(
         }
         ServerInspection::Verified(identity) => identity,
     };
+    if identity.mode == DaemonMode::Direct {
+        return Err(anyhow!(
+            "a developer-owned `tako serve` server is running on port {}; Takokit will not stop it. Stop it from the terminal that started it",
+            config.port
+        ));
+    }
     let instance_id = identity
         .instance_id
         .ok_or_else(|| anyhow!("verified Takokit server did not publish an instance id"))?;

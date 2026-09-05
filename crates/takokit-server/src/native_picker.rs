@@ -90,7 +90,11 @@ fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, St
 #[cfg(target_os = "macos")]
 fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, String> {
     let initial = applescript_string(&initial_dir.display().to_string());
-    let chooser = if kind.is_folder() { "choose folder" } else { "choose file" };
+    let chooser = if kind.is_folder() {
+        "choose folder"
+    } else {
+        "choose file"
+    };
     let prompt = if kind.is_folder() {
         "Choose a Takokit workspace"
     } else {
@@ -137,7 +141,7 @@ fn pick_path(initial_dir: &Path, kind: PickerKind) -> Result<Option<PathBuf>, St
             if !output.status.success() {
                 return Ok(None);
             }
-            return selected_path_from_stdout(&output.stdout);
+            selected_path_from_stdout(&output.stdout)
         }
         Err(zenity_error) => {
             let mut kdialog = Command::new("kdialog");
@@ -201,7 +205,9 @@ mod tests {
         } else {
             "/tmp/Voice Project ü/sample.wav\n".to_string()
         };
-        let selected = selected_path_from_stdout(value.as_bytes()).unwrap().unwrap();
+        let selected = selected_path_from_stdout(value.as_bytes())
+            .unwrap()
+            .unwrap();
         assert!(selected.is_absolute());
         assert!(selected.to_string_lossy().contains("Voice Project ü"));
     }

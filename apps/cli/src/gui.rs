@@ -92,21 +92,31 @@ fn macos_resident_app() -> Option<PathBuf> {
                 return Some(app);
             }
         }
-        let conventional = PathBuf::from(home).join("Applications").join("Takokit.app");
+        let conventional = PathBuf::from(home)
+            .join("Applications")
+            .join("Takokit.app");
         if valid_macos_app(&conventional) {
             return Some(conventional);
         }
     }
 
     distribution::application_root()
-        .map(|root| root.join("integrations").join("macos").join("Takokit.app"))
+        .map(|root| {
+            root.join("integrations")
+                .join("macos")
+                .join("Takokit.app")
+        })
         .filter(|app| valid_macos_app(app))
 }
 
 #[cfg(target_os = "macos")]
 fn valid_macos_app(path: &Path) -> bool {
     path.join("Contents").join("Info.plist").is_file()
-        && path.join("Contents").join("MacOS").join("Takokit").is_file()
+        && path
+            .join("Contents")
+            .join("MacOS")
+            .join("Takokit")
+            .is_file()
 }
 
 #[cfg(target_os = "macos")]
@@ -157,7 +167,12 @@ mod tests {
         });
 
         let url = format!("http://{address}/gui");
-        wait_for_gui_ready_at(&url, Duration::from_secs(2), Duration::from_millis(10)).unwrap();
+        wait_for_gui_ready_at(
+            &url,
+            Duration::from_secs(2),
+            Duration::from_millis(10),
+        )
+        .unwrap();
         server.join().unwrap();
     }
 
