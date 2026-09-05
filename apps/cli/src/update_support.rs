@@ -197,7 +197,13 @@ pub(super) fn validate_source_location(source: &str) -> anyhow::Result<()> {
 pub(super) fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8>> {
     validate_source_location(source)?;
     if is_remote_source(source) {
-        let response = ureq::get(source).timeout(Duration::from_secs(5)).call()?;
+        let response = match ureq::get(source).timeout(Duration::from_secs(5)).call() {
+            Ok(response) => response,
+            Err(ureq::Error::Status(404, _)) if is_canonical_stable_platform_manifest(source) => {
+                anyhow::bail!("{}", unpublished_stable_release_message());
+            }
+            Err(error) => return Err(error.into()),
+        };
         let reader = response.into_reader();
         let mut bytes = Vec::new();
         let limit = maximum.saturating_add(1) as u64;
@@ -213,6 +219,22 @@ pub(super) fn read_source(source: &str, maximum: usize) -> anyhow::Result<Vec<u8
         }
         Ok(bytes)
     }
+}
+
+fn is_canonical_stable_platform_manifest(source: &str) -> bool {
+    source.starts_with(
+        "https://github.com/amaansyed27/Takokit/releases/latest/download/release-manifest-",
+    ) && source.ends_with(".json")
+}
+
+fn unpublished_stable_release_message() -> String {
+    let platform = match std::env::consts::OS {
+        "macos" => "macOS",
+        "windows" => "Windows",
+        "linux" => "Linux",
+        other => other,
+    };
+    format!("No stable {platform} release is currently published.")
 }
 
 fn is_remote_source(source: &str) -> bool {
@@ -334,6 +356,24 @@ mod tests {
             validate_source_location("ftp://updates.example.test/release-manifest.json").is_err()
         );
         assert!(validate_source_location(r"C:\Temp\Takokit\release-manifest.json").is_ok());
+    }
+
+    #[test]
+    fn canonical_stable_platform_manifest_is_recognized() {
+        assert!(is_canonical_stable_platform_manifest(
+            "https://github.com/amaansyed27/Takokit/releases/latest/download/release-manifest-macos-arm64.json"
+        ));
+        assert!(!is_canonical_stable_platform_manifest(
+            "https://updates.example.test/release-manifest-macos-arm64.json"
+        ));
+    }
+
+    #[test]
+    fn unpublished_release_message_is_product_facing() {
+        let message = unpublished_stable_release_message();
+        assert!(message.starts_with("No stable "));
+        assert!(!message.contains("404"));
+        assert!(!message.contains("HTTP"));
     }
 
     #[test]
