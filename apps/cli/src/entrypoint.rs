@@ -10,7 +10,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     let started = Instant::now();
-    let show_timing = !std::env::args_os().any(|argument| argument == OsStr::new("--daemon-child"));
+    let show_timing = timing_enabled();
     let result = takokit_cli::run().await;
 
     if show_timing {
@@ -27,6 +27,30 @@ pub async fn run() -> anyhow::Result<()> {
 fn build_id_requested() -> bool {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
     arguments.len() == 1 && arguments[0] == OsStr::new("--build-id")
+}
+
+fn timing_enabled() -> bool {
+    let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if arguments
+        .iter()
+        .any(|argument| argument == OsStr::new("--daemon-child"))
+    {
+        return false;
+    }
+    if std::env::var("TAKOKIT_OUTPUT")
+        .map(|value| value.eq_ignore_ascii_case("json"))
+        .unwrap_or(false)
+    {
+        return false;
+    }
+    !arguments.windows(2).any(|pair| {
+        pair[0] == OsStr::new("--output") && pair[1].to_string_lossy().eq_ignore_ascii_case("json")
+    }) && !arguments.iter().any(|argument| {
+        argument
+            .to_string_lossy()
+            .strip_prefix("--output=")
+            .is_some_and(|value| value.eq_ignore_ascii_case("json"))
+    })
 }
 
 fn format_duration(duration: Duration) -> String {

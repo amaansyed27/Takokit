@@ -1,22 +1,18 @@
 //! Human-readable and JSON rendering for package, plan, and runner views.
 
 use super::*;
-use std::io::IsTerminal;
 
 mod human;
 pub(crate) use human::{print_serializable, print_value};
 
 pub(crate) fn set_json_output(enabled: bool) {
-    if enabled || !std::io::stdout().is_terminal() {
-        std::env::set_var("TAKOKIT_OUTPUT", "json");
-    }
+    std::env::set_var("TAKOKIT_OUTPUT", if enabled { "json" } else { "human" });
 }
 
 pub(crate) fn json_output_requested() -> bool {
-    !std::io::stdout().is_terminal()
-        || std::env::var("TAKOKIT_OUTPUT")
-            .map(|value| value.eq_ignore_ascii_case("json"))
-            .unwrap_or(false)
+    std::env::var("TAKOKIT_OUTPUT")
+        .map(|value| value.eq_ignore_ascii_case("json"))
+        .unwrap_or(false)
 }
 
 pub(crate) fn print_or_json_plan(plan: &ModelPlan, json: bool) -> anyhow::Result<()> {
@@ -171,9 +167,7 @@ pub(crate) fn print_runner_doctor_json(
     manifest: &RunnerManifest,
 ) -> anyhow::Result<()> {
     let layout = runner_runtime_layout(store.root(), manifest);
-    let record = installed_registry
-        .installed_runner_record(&manifest.id)
-        .ok();
+    let record = installed_registry.installed_runner_record(&manifest.id).ok();
     let adapters = if manifest.id == "takokit-python-managed" {
         python_adapter_records(store.root()).unwrap_or_default()
     } else {
