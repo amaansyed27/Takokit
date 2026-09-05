@@ -75,12 +75,11 @@ pub(super) fn download_and_promote_uv(
 
     let result = (|| {
         download_exact(&url, &archive_path)?;
-        let actual_sha = sha256_file(&archive_path).map_err(|error| {
-            PackageError::ArtifactInstallFailed {
+        let actual_sha =
+            sha256_file(&archive_path).map_err(|error| PackageError::ArtifactInstallFailed {
                 artifact: "uv bootstrap".to_string(),
                 reason: error.to_string(),
-            }
-        })?;
+            })?;
         log_source(
             log,
             "upstream_download",
@@ -103,9 +102,7 @@ pub(super) fn download_and_promote_uv(
 
         match asset.archive {
             ArchiveKind::Zip => extract_zip_member(&archive_path, asset.inner_path, &candidate)?,
-            ArchiveKind::TarGz => {
-                extract_tar_member(&archive_path, asset.inner_path, &candidate)?
-            }
+            ArchiveKind::TarGz => extract_tar_member(&archive_path, asset.inner_path, &candidate)?,
         }
         ensure_owner_writable_executable(&candidate)?;
         if !verify_uv_version(&candidate, log)? {
@@ -179,18 +176,18 @@ fn extract_zip_member(
 ) -> PackageResult<()> {
     let bytes = std::fs::read(archive_path)?;
     let cursor = Cursor::new(bytes);
-    let mut archive = zip::ZipArchive::new(cursor).map_err(|error| {
-        PackageError::ArtifactInstallFailed {
+    let mut archive =
+        zip::ZipArchive::new(cursor).map_err(|error| PackageError::ArtifactInstallFailed {
             artifact: "uv bootstrap".to_string(),
             reason: format!("official uv zip is invalid: {error}"),
-        }
-    })?;
-    let mut entry = archive.by_name(inner_path).map_err(|error| {
-        PackageError::ArtifactInstallFailed {
-            artifact: "uv bootstrap".to_string(),
-            reason: format!("official uv zip is missing {inner_path}: {error}"),
-        }
-    })?;
+        })?;
+    let mut entry =
+        archive
+            .by_name(inner_path)
+            .map_err(|error| PackageError::ArtifactInstallFailed {
+                artifact: "uv bootstrap".to_string(),
+                reason: format!("official uv zip is missing {inner_path}: {error}"),
+            })?;
     if !safe_archive_path(Path::new(inner_path)) || entry.is_dir() {
         return Err(PackageError::ArtifactInstallFailed {
             artifact: "uv bootstrap".to_string(),
@@ -321,9 +318,7 @@ mod tests {
 
     #[test]
     fn archive_paths_reject_parent_and_absolute_components() {
-        assert!(safe_archive_path(Path::new(
-            "uv-aarch64-apple-darwin/uv"
-        )));
+        assert!(safe_archive_path(Path::new("uv-aarch64-apple-darwin/uv")));
         assert!(!safe_archive_path(Path::new("../uv")));
         assert!(!safe_archive_path(Path::new("/tmp/uv")));
     }
