@@ -1,0 +1,77 @@
+name: Dependency Security Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - slice/linux-macos-distribution
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm:
+    name: npm audit (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: gui
+            directory: apps/gui
+            lockfile: apps/gui/package-lock.json
+          - project: site
+            directory: site
+            lockfile: site/package-lock.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.lockfile }}
+      - name: Install exact lockfile
+        working-directory: ${{ matrix.directory }}
+        run: npm ci
+      - name: Audit npm dependency tree
+        working-directory: ${{ matrix.directory }}
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --audit-level=high 2>&1 | tee npm-audit.txt
+      - name: Upload npm audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-${{ matrix.project }}
+          path: ${{ matrix.directory }}/npm-audit.txt
+          if-no-files-found: warn
+
+  rustsec:
+    name: RustSec cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned cargo-audit
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit Cargo.lock
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo audit 2>&1 | tee cargo-audit.txt
+      - name: Upload RustSec evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit
+          path: cargo-audit.txt
+          if-no-files-found: warn
