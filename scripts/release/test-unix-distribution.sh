@@ -58,6 +58,7 @@ else
   test -x "$APP/Contents/MacOS/Takokit"
   grep -F 'com.dawnlightlabs.takokit' "$APP/Contents/Info.plist" >/dev/null
   grep -F '<key>CFBundleShortVersionString</key><string>0.3.0</string>' "$APP/Contents/Info.plist" >/dev/null
+  bash "$REPO_ROOT/scripts/release/test-macos-resident.sh" "$APP" "$TAKOKIT_INSTALL_ROOT" "$HOME/.takokit"
 fi
 
 "$TAKOKIT_INSTALL_ROOT/bin/tako" server start >/dev/null
