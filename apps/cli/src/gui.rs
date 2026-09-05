@@ -1,9 +1,9 @@
+#[cfg(target_os = "macos")]
+use std::path::Path;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-#[cfg(target_os = "macos")]
-use std::path::Path;
 use takokit_core::RuntimeConfig;
 use takokit_store::LocalStore;
 
