@@ -74,11 +74,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/gui/package-lock.json
 
-      - name: Install pinned uv runtime bootstrap
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: 0.11.24
-
       - name: Require expected native target
         shell: bash
         run: |
@@ -166,6 +161,16 @@ jobs:
         shell: bash
         run: scripts/release/build-unix.sh --output 'dist/${{ matrix.platform }}-${{ matrix.architecture }}'
 
+      - name: Exercise pristine portable first run
+        shell: bash
+        run: |
+          unset UV
+          bash scripts/release/test-pristine-unix-portable.sh \
+            'dist/${{ matrix.platform }}-${{ matrix.architecture }}/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz' \
+            '${{ matrix.platform }}' \
+            '${{ matrix.architecture }}' \
+            '0.3.0'
+
       - name: Exercise install.sh security fixtures
         if: matrix.platform == 'linux'
         shell: bash
@@ -178,7 +183,7 @@ jobs:
       - name: Exercise installed and portable product
         shell: bash
         run: |
-          export UV="$(command -v uv)"
+          unset UV
           scripts/release/test-unix-distribution.sh \
             'dist/${{ matrix.platform }}-${{ matrix.architecture }}/Takokit-v0.3.0-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz' \
             '${{ matrix.platform }}' \
@@ -235,9 +240,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p candidate
-          # Each downloaded artifact is one directory below accepted/. Only
-          # assemble its release-root files: nested test-update fixtures are
-          # deliberately version 0.3.1 and must never overwrite v0.3.0 inputs.
           find accepted -mindepth 2 -maxdepth 2 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.tar.gz' -o -name '*.json' -o -name '*.sig' -o -name '*.txt' -o -name '*.md' \) -exec cp {} candidate/ \;
           cp candidate/release-manifest.json candidate/release-manifest-windows-x86_64.json
           cp candidate/release-manifest.sig candidate/release-manifest-windows-x86_64.sig
