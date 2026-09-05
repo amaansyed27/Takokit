@@ -106,7 +106,11 @@ fn macos_resident_app() -> Option<PathBuf> {
 #[cfg(target_os = "macos")]
 fn valid_macos_app(path: &Path) -> bool {
     path.join("Contents").join("Info.plist").is_file()
-        && path.join("Contents").join("MacOS").join("Takokit").is_file()
+        && path
+            .join("Contents")
+            .join("MacOS")
+            .join("Takokit")
+            .is_file()
 }
 
 #[cfg(target_os = "macos")]
