@@ -51,7 +51,7 @@ jobs:
         with:
           name: npm-audit-${{ matrix.project }}
           path: ${{ matrix.directory }}/npm-audit.txt
-          if-no-files-found: warn
+          if-no-files-found: error
 
   rustsec:
     name: RustSec cargo audit
@@ -60,18 +60,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install pinned cargo-audit
-        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Install verified cargo-audit 0.22.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz"
+          root="$RUNNER_TEMP/cargo-audit-0.22.2"
+          curl -fsSL \
+            'https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz' \
+            -o "$archive"
+          echo 'ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39  '"$archive" | sha256sum --check
+          rm -rf "$root"
+          mkdir -p "$root"
+          tar -xzf "$archive" -C "$root"
+          audit_bin="$(find "$root" -type f -name cargo-audit -perm -u+x | head -n 1)"
+          test -n "$audit_bin"
+          "$audit_bin" --version
+          echo "CARGO_AUDIT_BIN=$audit_bin" >> "$GITHUB_ENV"
       - name: Audit Cargo.lock
         shell: bash
         run: |
           set -o pipefail
-          cargo audit 2>&1 | tee cargo-audit.txt
+          "$CARGO_AUDIT_BIN" audit --file Cargo.lock 2>&1 | tee cargo-audit.txt
       - name: Upload RustSec evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cargo-audit
           path: cargo-audit.txt
-          if-no-files-found: warn
+          if-no-files-found: error
