@@ -167,7 +167,9 @@ pub(crate) fn print_runner_doctor_json(
     manifest: &RunnerManifest,
 ) -> anyhow::Result<()> {
     let layout = runner_runtime_layout(store.root(), manifest);
-    let record = installed_registry.installed_runner_record(&manifest.id).ok();
+    let record = installed_registry
+        .installed_runner_record(&manifest.id)
+        .ok();
     let adapters = if manifest.id == "takokit-python-managed" {
         python_adapter_records(store.root()).unwrap_or_default()
     } else {
