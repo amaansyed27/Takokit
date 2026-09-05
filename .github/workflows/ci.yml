@@ -65,7 +65,18 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo fmt --all -- --check 2>&1 | tee cargo-fmt.log
+
+      - name: Upload cargo format log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-fmt-${{ matrix.os }}
+          path: cargo-fmt.log
+          if-no-files-found: ignore
 
       - name: Check API namespace and OpenAPI contract
         run: python scripts/check_api_contract.py
@@ -115,21 +126,24 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check uv==0.11.24
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $env:UV = (Get-Command uv.exe -ErrorAction Stop).Source
-          & $env:UV --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item Env:UV -ErrorAction SilentlyContinue
           $env:TAKOKIT_HOME = Join-Path $env:RUNNER_TEMP "takokit-rvc-pull-smoke"
+          Remove-Item $env:TAKOKIT_HOME -Recurse -Force -ErrorAction SilentlyContinue
           $Tako = Join-Path $PWD "target\release\tako.exe"
           & $Tako pull rvc
           if ($LASTEXITCODE -ne 0) {
+            $UvLog = Join-Path $env:TAKOKIT_HOME "logs\uv-bootstrap.log"
+            if (Test-Path $UvLog) { Get-Content $UvLog -Tail 300 }
             $Log = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc\install.log"
             if (Test-Path $Log) { Get-Content $Log -Tail 300 }
             $TrainingLog = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc_training\install.log"
             if (Test-Path $TrainingLog) { Get-Content $TrainingLog -Tail 300 }
             exit $LASTEXITCODE
           }
+          $ManagedUv = Join-Path $env:TAKOKIT_HOME "tools\uv\uv.exe"
+          if (-not (Test-Path $ManagedUv)) { throw "Takokit did not self-bootstrap managed uv" }
+          $UvVersion = (& $ManagedUv --version).Split()[1]
+          if ($UvVersion -ne "0.12.10") { throw "unexpected managed uv version: $UvVersion" }
           $Adapter = Join-Path $env:TAKOKIT_HOME "runners\python-managed\adapters\rvc"
           $Python = Join-Path $Adapter "venv\Scripts\python.exe"
           $Code = 'import importlib.util,pathlib,sys; a=pathlib.Path(sys.argv[1]); s=importlib.util.spec_from_file_location("takokit_rvc",a/"rvc.py"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.install_fairseq_import_stub(); sys.path.insert(0,str(a/"source")); from rvc.modules.vc.modules import VC; assert VC is not None; print("managed RVC converter import: ok")'
@@ -283,10 +297,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
 
       - name: Install site dependencies
         working-directory: site
-        run: npm install
+        run: npm ci
 
       - name: Validate registry-backed site
         working-directory: site
