@@ -45,7 +45,8 @@ $Report = [ordered]@{
     startup_ensures_managed_server = $false; serve_detects_running_server = $false; top_level_stop = $false
     server_death_keeps_resident_alive = $false; start_after_server_death = $false
     quit_stops_verified_server = $false; port_released_after_quit = $false
-    foreground_stopped_by_top_level_stop = $false; foreign_port_process_not_killed = $false
+    foreground_preserved_by_top_level_stop = $false; foreground_preserved_by_resident_quit = $false
+    foreign_port_process_not_killed = $false
 }
 
 try {
@@ -96,12 +97,22 @@ try {
     Start-Sleep -Milliseconds 750; Assert-True (-not $AttachedResident.HasExited) 'Resident did not coexist with foreground serve.'
     $StopForeground = Start-Background $TakoExe @('stop'); $OwnedProcesses.Add($StopForeground)
     Assert-True ($StopForeground.WaitForExit(15000)) 'tako stop did not return for foreground serve.'
-    Assert-True ($Foreground.WaitForExit(15000)) 'Foreground serve did not exit after tako stop.'
-    Wait-Until { -not (Test-Port $Port) } 10 'Foreground port remained open.'
+    Start-Sleep -Milliseconds 500
+    Assert-True (-not $Foreground.HasExited) 'tako stop killed a developer-owned foreground serve.'
+    Assert-True (Test-Port $Port) 'Developer-owned foreground port closed after tako stop.'
     Assert-True (-not $AttachedResident.HasExited) 'Resident exited with foreground server.'
-    $Report.foreground_stopped_by_top_level_stop = $true
+    $Report.foreground_preserved_by_top_level_stop = $true
+
     $AttachedQuit = Start-Background $ApplicationExe @('--quit'); $OwnedProcesses.Add($AttachedQuit)
-    $AttachedQuit.WaitForExit(5000) | Out-Null; $AttachedResident.WaitForExit(10000) | Out-Null
+    Assert-True ($AttachedQuit.WaitForExit(5000)) 'Quit request beside foreground serve did not return.'
+    Assert-True ($AttachedResident.WaitForExit(10000)) 'Resident did not exit beside foreground serve.'
+    Assert-True (-not $Foreground.HasExited) 'Quit Takokit killed a developer-owned foreground serve.'
+    Assert-True (Test-Port $Port) 'Developer-owned foreground port closed after Quit Takokit.'
+    $Report.foreground_preserved_by_resident_quit = $true
+
+    Stop-Process -Id $Foreground.Id -ErrorAction Stop
+    Assert-True ($Foreground.WaitForExit(10000)) 'Foreground serve did not exit during acceptance cleanup.'
+    Wait-Until { -not (Test-Port $Port) } 10 'Foreground port remained open after acceptance cleanup.'
 
     $Python = (Get-Command python -ErrorAction Stop).Source
     $Foreign = Start-Background $Python @('-m', 'http.server', [string]$Port, '--bind', '127.0.0.1'); $OwnedProcesses.Add($Foreign)
