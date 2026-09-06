@@ -28,6 +28,11 @@ function Test-Port([int]$TargetPort) {
         $client.EndConnect($result); return $true
     } catch { return $false } finally { $client.Dispose() }
 }
+function Get-FreePort {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    try { return ([Net.IPEndPoint]$listener.LocalEndpoint).Port } finally { $listener.Stop() }
+}
 
 $TakoExe = (Resolve-Path -LiteralPath $TakoExe).Path
 if (-not $ApplicationExe) { $ApplicationExe = Join-Path (Split-Path $TakoExe) 'Takokit.exe' }
@@ -114,15 +119,18 @@ try {
     Assert-True ($Foreground.WaitForExit(10000)) 'Foreground serve did not exit during acceptance cleanup.'
     Wait-Until { -not (Test-Port $Port) } 10 'Foreground port remained open after acceptance cleanup.'
 
+    $ForeignPort = Get-FreePort
+    $env:TAKOKIT_PORT = [string]$ForeignPort
     $Python = (Get-Command python -ErrorAction Stop).Source
-    $Foreign = Start-Background $Python @('-m', 'http.server', [string]$Port, '--bind', '127.0.0.1'); $OwnedProcesses.Add($Foreign)
-    Wait-Until { Test-Port $Port } 10 'Foreign port fixture did not start.'
+    $Foreign = Start-Background $Python @('-m', 'http.server', [string]$ForeignPort, '--bind', '127.0.0.1'); $OwnedProcesses.Add($Foreign)
+    Wait-Until { Test-Port $ForeignPort } 10 "Foreign port fixture did not start on fresh port $ForeignPort."
     $ForeignResident = Start-Background $ApplicationExe @('--background'); $OwnedProcesses.Add($ForeignResident)
     Start-Sleep -Milliseconds 750
     $ForeignQuit = Start-Background $ApplicationExe @('--quit'); $OwnedProcesses.Add($ForeignQuit)
     $ForeignQuit.WaitForExit(5000) | Out-Null
     Assert-True ($ForeignResident.WaitForExit(10000)) 'Resident did not exit beside a foreign process.'
     Assert-True (-not $Foreign.HasExited) 'Quit Takokit killed an unrelated process.'
+    Assert-True (Test-Port $ForeignPort) 'Foreign process stopped listening after Quit Takokit.'
     $Report.foreign_port_process_not_killed = $true
 
     $ReportPath = Join-Path $RunRoot 'resident-acceptance.json'
