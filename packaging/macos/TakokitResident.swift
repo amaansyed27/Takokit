@@ -525,6 +525,6 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
 }
 
 let app = NSApplication.shared
-let delegate = TakokitAppDelegate()
+private let delegate = TakokitAppDelegate()
 app.delegate = delegate
 app.run()
