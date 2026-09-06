@@ -31,7 +31,7 @@ pub(super) fn uv_asset() -> PackageResult<UvAsset> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("windows", "x86_64") => Ok(UvAsset {
             asset: "uv-x86_64-pc-windows-msvc.zip",
-            inner_path: "uv-x86_64-pc-windows-msvc/uv.exe",
+            inner_path: "uv.exe",
             sha256: "f65744f94072152b1f86ba2aace4d01f1124d9a8ecb235805039e3718c36cac2",
             archive: ArchiveKind::Zip,
         }),
