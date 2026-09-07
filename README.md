@@ -2,7 +2,7 @@
 
 Takokit is a Rust-first local voice AI runtime: an Ollama-like pull, run, inspect, update, and remove experience for text-to-speech, speech-to-text, consent-backed voice cloning, voice conversion, and custom voice workflows.
 
-> **Release maturity:** every Takokit `0.x.x` release is **Beta**. `1.0.0` is the first Stable release target.
+> **Release maturity:** Takokit remains **Beta** throughout the `0.x.y` series. Routine Beta releases increment only `y`; changing `x` or promoting to `1.0.0` Stable happens only when the repository owner explicitly requests it.
 
 Takokit exposes one shared runtime through:
 
