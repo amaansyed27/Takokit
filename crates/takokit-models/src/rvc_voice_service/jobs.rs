@@ -427,9 +427,6 @@ fn hide_windows_console(command: &mut Command) {
     command.creation_flags(0x0800_0000);
 }
 
-#[cfg(not(windows))]
-fn hide_windows_console(_command: &mut Command) {}
-
 fn process_is_running(pid: u32) -> bool {
     #[cfg(windows)]
     {
