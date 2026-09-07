@@ -35,10 +35,7 @@ pub(crate) fn timeout_from_env(name: &str, default: Duration) -> Duration {
         .unwrap_or(default)
 }
 
-pub(crate) fn wait_with_output_timeout(
-    mut child: Child,
-    timeout: Duration,
-) -> io::Result<Output> {
+pub(crate) fn wait_with_output_timeout(mut child: Child, timeout: Duration) -> io::Result<Output> {
     let pid = child.id();
     drop(child.stdin.take());
     let stdout = child.stdout.take().map(spawn_reader);
@@ -156,9 +153,7 @@ where
     })
 }
 
-fn collect_reader(
-    reader: Option<thread::JoinHandle<io::Result<Vec<u8>>>>,
-) -> io::Result<Vec<u8>> {
+fn collect_reader(reader: Option<thread::JoinHandle<io::Result<Vec<u8>>>>) -> io::Result<Vec<u8>> {
     let Some(reader) = reader else {
         return Ok(Vec::new());
     };
@@ -177,7 +172,7 @@ const EPERM: i32 = 1;
 const ESRCH: i32 = 3;
 
 #[cfg(unix)]
-extern "C" {
+unsafe extern "C" {
     fn getpgid(pid: i32) -> i32;
     fn kill(pid: i32, sig: i32) -> i32;
 }
