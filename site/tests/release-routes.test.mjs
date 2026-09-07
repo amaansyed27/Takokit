@@ -7,6 +7,8 @@ import {
   StableReleaseUnavailableError,
 } from "../api/_release.js";
 import metadataHandler from "../api/v1/releases/stable/windows-x86_64.js";
+import linuxMetadataHandler from "../api/v1/releases/stable/linux-x86_64.js";
+import macosArmMetadataHandler from "../api/v1/releases/stable/macos-arm64.js";
 import downloadHandler from "../api/download/windows.js";
 
 const installerHash = "a".repeat(64);
@@ -29,6 +31,21 @@ function stableManifest(overrides = {}) {
       url: "https://downloads.example.test/Takokit-v0.1.0-windows-x86_64-installer.exe",
     }],
     ...overrides,
+  };
+}
+
+function stableUnixManifest(platform, architecture) {
+  return {
+    ...stableManifest(),
+    version: "0.3.0",
+    os: platform,
+    architecture,
+    artifacts: [{
+      role: "portable",
+      name: `Takokit-v0.3.0-${platform}-${architecture}.tar.gz`,
+      sha256: installerHash,
+      size: 456,
+    }],
   };
 }
 
@@ -66,18 +83,7 @@ test("stable Windows release projection selects the canonical installer", () => 
 });
 
 test("stable Unix projection selects only the requested portable artifact", () => {
-  const manifest = {
-    ...stableManifest(),
-    version: "0.3.0",
-    os: "linux",
-    architecture: "x86_64",
-    artifacts: [{
-      role: "portable",
-      name: "Takokit-v0.3.0-linux-x86_64.tar.gz",
-      sha256: installerHash,
-      size: 456,
-    }],
-  };
+  const manifest = stableUnixManifest("linux", "x86_64");
   const projected = projectStableUnixRelease(
     manifest,
     "linux",
@@ -89,13 +95,7 @@ test("stable Unix projection selects only the requested portable artifact", () =
 });
 
 test("stable Unix projection rejects target drift and test signing", () => {
-  const manifest = {
-    ...stableManifest(),
-    version: "0.3.0",
-    os: "macos",
-    architecture: "arm64",
-    artifacts: [{ role: "portable", name: "Takokit-v0.3.0-macos-arm64.tar.gz", sha256: installerHash }],
-  };
+  const manifest = stableUnixManifest("macos", "arm64");
   assert.throws(
     () => projectStableUnixRelease(manifest, "linux", "x86_64", "https://example.test/manifest.json"),
     /does not match/,
@@ -103,6 +103,30 @@ test("stable Unix projection rejects target drift and test signing", () => {
   assert.throws(
     () => projectStableUnixRelease({ ...manifest, test_fixture: true, channel: "test" }, "macos", "arm64", "https://example.test/manifest.json"),
     /production stable/,
+  );
+});
+
+test("stable Unix projection exposes only accepted v0.3 targets", () => {
+  assert.doesNotThrow(() => projectStableUnixRelease(
+    stableUnixManifest("linux", "x86_64"),
+    "linux",
+    "x86_64",
+    "https://example.test/linux.json",
+  ));
+  assert.doesNotThrow(() => projectStableUnixRelease(
+    stableUnixManifest("macos", "arm64"),
+    "macos",
+    "arm64",
+    "https://example.test/macos.json",
+  ));
+  assert.throws(
+    () => projectStableUnixRelease(
+      stableUnixManifest("macos", "x86_64"),
+      "macos",
+      "x86_64",
+      "https://example.test/macos-x86.json",
+    ),
+    /not supported/,
   );
 });
 
@@ -150,6 +174,25 @@ test("metadata route exposes projected stable metadata", async () => {
     const body = JSON.parse(response.body);
     assert.equal(body.installer.sha256, installerHash);
     assert.equal(body.test_fixture, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Linux and macOS ARM64 stable routes resolve production metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => responseForJson(stableUnixManifest("linux", "x86_64"));
+    const linuxResponse = mockVercelResponse();
+    await linuxMetadataHandler({}, linuxResponse);
+    assert.equal(linuxResponse.statusCode, 200);
+    assert.equal(JSON.parse(linuxResponse.body).platform, "linux");
+
+    globalThis.fetch = async () => responseForJson(stableUnixManifest("macos", "arm64"));
+    const macosResponse = mockVercelResponse();
+    await macosArmMetadataHandler({}, macosResponse);
+    assert.equal(macosResponse.statusCode, 200);
+    assert.equal(JSON.parse(macosResponse.body).architecture, "arm64");
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,6 +1,7 @@
 const REPOSITORY = "amaansyed27/Takokit";
 const DEFAULT_STABLE_MANIFEST_URL = `https://github.com/${REPOSITORY}/releases/latest/download/release-manifest.json`;
 const TEST_SIGNING_KEY_ID = "takokit-test-fixture-v1";
+const STABLE_UNIX_TARGETS = new Set(["linux:x86_64", "macos:arm64"]);
 
 export class StableReleaseUnavailableError extends Error {
   constructor(message) {
@@ -108,8 +109,7 @@ export async function resolveStableWindowsRelease({
 
 export function projectStableUnixRelease(manifest, platform, architecture, manifestUrl) {
   if (!manifest || typeof manifest !== "object") fail("release manifest is missing");
-  if (![["linux", "x86_64"], ["macos", "arm64"], ["macos", "x86_64"]]
-    .some(([os, arch]) => os === platform && arch === architecture)) {
+  if (!STABLE_UNIX_TARGETS.has(`${platform}:${architecture}`)) {
     fail("requested platform is not supported");
   }
   if (manifest.product !== "Takokit" || manifest.channel !== "stable" || manifest.test_fixture !== false) {

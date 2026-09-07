@@ -1,12 +1,17 @@
 use super::*;
+use crate::process::{
+    configure_owned_process_group, detach_and_reap, terminate_owned_process_tree,
+    timeout_from_env, wait_with_output_timeout,
+};
 use serde_json::{json, Value};
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 use std::fs;
 use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 use takokit_package::{
     install_python_adapter, python_adapter_is_current, python_managed_runner_layout,
@@ -98,7 +103,7 @@ impl RvcVoiceService {
                 "refused to terminate a PID that no longer belongs to this Takokit RVC job",
             ));
         }
-        terminate_owned_tree(pid)?;
+        terminate_owned_process_tree(pid, Duration::from_secs(2)).map_err(storage)?;
         job.status = RvcTrainingJobStatus::Cancelled;
         job.finished_at = Some(now());
         job.failure = None;
@@ -201,7 +206,7 @@ impl RvcVoiceService {
             .stderr(Stdio::piped())
             .env("PYTHONUTF8", "1")
             .env("PYTHONIOENCODING", "utf-8");
-        hide_windows_console(&mut command);
+        configure_owned_process_group(&mut command);
         let mut child = command
             .spawn()
             .map_err(|error| execution(format!("failed to start RVC training adapter: {error}")))?;
@@ -213,7 +218,24 @@ impl RvcVoiceService {
             request,
         )
         .map_err(|error| execution(format!("failed to send RVC adapter request: {error}")))?;
-        let output = child.wait_with_output().map_err(storage)?;
+        let timeout = timeout_from_env(
+            "TAKOKIT_RVC_CONTROL_TIMEOUT_SECONDS",
+            Duration::from_secs(10 * 60),
+        );
+        let operation = request
+            .get("operation")
+            .and_then(Value::as_str)
+            .unwrap_or("worker");
+        let output = wait_with_output_timeout(child, timeout).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::TimedOut {
+                execution(format!(
+                    "RVC {operation} timed out after {} seconds and was terminated",
+                    timeout.as_secs()
+                ))
+            } else {
+                storage(error)
+            }
+        })?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let value: Value =
             serde_json::from_str(stdout.lines().last().unwrap_or("{}")).map_err(|error| {
@@ -321,15 +343,11 @@ impl RvcVoiceService {
             .stderr(Stdio::null())
             .env("PYTHONUTF8", "1")
             .env("PYTHONIOENCODING", "utf-8");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x0800_0000 | 0x0000_0200);
-        }
+        configure_owned_process_group(&mut command);
         let child = command
             .spawn()
             .map_err(|error| invalid(format!("failed to start managed RVC worker: {error}")))?;
-        job.owner_pid = Some(child.id());
+        job.owner_pid = Some(detach_and_reap(child));
         self.store.save_job(&job)?;
         let mut project = project;
         project.latest_job_id = Some(job_id);
@@ -449,42 +467,30 @@ fn process_matches_job(pid: u32, request_path: &Path) -> bool {
                 && line.contains("rvc_training.py")
         });
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
-        fs::read(format!("/proc/{pid}/cmdline"))
+        return fs::read(format!("/proc/{pid}/cmdline"))
             .ok()
             .is_some_and(|bytes| {
                 let text = String::from_utf8_lossy(&bytes);
                 text.contains("rvc_training.py")
                     && text.contains(request_path.to_string_lossy().as_ref())
-            })
+            });
     }
-}
-
-fn terminate_owned_tree(pid: u32) -> TakokitResult<()> {
-    #[cfg(windows)]
+    #[cfg(all(unix, not(target_os = "linux")))]
     {
-        let mut command = Command::new("taskkill");
-        command.args(["/PID", &pid.to_string(), "/T", "/F"]);
-        hide_windows_console(&mut command);
-        let status = command.status().map_err(storage)?;
-        if !status.success() {
-            return Err(invalid(format!(
-                "taskkill could not terminate Takokit RVC job PID {pid}"
-            )));
-        }
+        let output = Command::new("ps")
+            .args(["-ww", "-p", &pid.to_string(), "-o", "command="])
+            .output();
+        return output.ok().is_some_and(|output| {
+            if !output.status.success() {
+                return false;
+            }
+            let line = String::from_utf8_lossy(&output.stdout);
+            line.contains("rvc_training.py")
+                && line.contains(request_path.to_string_lossy().as_ref())
+        });
     }
-    #[cfg(not(windows))]
-    {
-        let status = Command::new("kill")
-            .args(["-TERM", &pid.to_string()])
-            .status()
-            .map_err(storage)?;
-        if !status.success() {
-            return Err(invalid(format!(
-                "could not terminate Takokit RVC job PID {pid}"
-            )));
-        }
-    }
-    Ok(())
+    #[allow(unreachable_code)]
+    false
 }
