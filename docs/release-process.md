@@ -2,10 +2,22 @@
 
 Takokit uses reviewed branches, exact-commit CI, signed release metadata, and deliberate tags. Public artifacts for one version must come from one accepted source commit.
 
-## Maturity policy
+## Maturity and version policy
 
-- `0.x.x` — **Beta**. Public and updateable; compatibility/UX can still evolve before 1.0.
-- `1.0.0` — first **Stable** release target and first stable compatibility commitment.
+Takokit remains **Beta** throughout the `0.x.y` series.
+
+During Beta, the default release rule is:
+
+```text
+0.x.y -> 0.x.(y+1)
+```
+
+For example, after `0.3.0`, the next routine release is `0.3.1`.
+
+- Increment `y` for ordinary Beta releases.
+- Do not change `x` unless the repository owner explicitly requests that change.
+- Do not promote Takokit to Stable merely because a release is approved or published.
+- `1.0.0` is used for Stable only when the repository owner explicitly declares the Stable transition.
 
 A beta label never justifies fake artifacts, unsupported-platform claims, or skipping integrity/security gates.
 
@@ -93,6 +105,8 @@ Do not point the public site at a version/tag before that tag and its release as
 5. verify a previously installed supported version discovers the update,
 6. deploy/verify release-facing site copy,
 7. close release tracking issues only after the published state is proven.
+
+The word `stable` in an update-channel or release-metadata path means the approved public channel; it does not by itself change Takokit's product maturity from Beta to Stable.
 
 ## Failure handling
 
