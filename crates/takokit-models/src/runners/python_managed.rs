@@ -3,6 +3,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 use takokit_core::{
     ErrorCode, SpeechRequest, SpeechResponse, TakokitError, TakokitResult, TrainVoiceRequest,
@@ -18,6 +19,7 @@ use uuid::Uuid;
 mod conversion;
 mod protocol;
 
+use crate::process::{timeout_from_env, wait_with_output_timeout};
 use protocol::{decode_adapter_response, ManagedAdapterRequest, ManagedAdapterResponse};
 
 use super::{
@@ -370,8 +372,17 @@ fn run_adapter(
         .map_err(|error| {
             TakokitError::Audio(format!("could not send {adapter} request: {error}"))
         })?;
-    let output = child.wait_with_output().map_err(|error| {
-        TakokitError::Audio(format!("could not wait for {adapter} adapter: {error}"))
+    let timeout = adapter_timeout(payload.operation);
+    let output = wait_with_output_timeout(child, timeout).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::TimedOut {
+            TakokitError::Audio(format!(
+                "{adapter} {} timed out after {} seconds and was terminated",
+                payload.operation,
+                timeout.as_secs()
+            ))
+        } else {
+            TakokitError::Audio(format!("could not wait for {adapter} adapter: {error}"))
+        }
     })?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let response = decode_adapter_response(&output.stdout).ok_or_else(|| {
@@ -391,6 +402,20 @@ fn run_adapter(
         )));
     }
     Ok(response)
+}
+
+fn adapter_timeout(operation: &str) -> Duration {
+    if operation == "train" {
+        timeout_from_env(
+            "TAKOKIT_TRAINING_TIMEOUT_SECONDS",
+            Duration::from_secs(12 * 60 * 60),
+        )
+    } else {
+        timeout_from_env(
+            "TAKOKIT_ADAPTER_TIMEOUT_SECONDS",
+            Duration::from_secs(30 * 60),
+        )
+    }
 }
 
 fn validate_file_output(

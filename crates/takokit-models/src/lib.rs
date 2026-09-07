@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod mock;
+mod process;
 pub mod registry;
 pub mod runners;
 pub mod rvc_voice_service;

@@ -11,7 +11,6 @@
     { "source": "/v1/releases/stable/windows-x86_64.json", "destination": "/api/v1/releases/stable/windows-x86_64" },
     { "source": "/v1/releases/stable/linux-x86_64.json", "destination": "/api/v1/releases/stable/linux-x86_64" },
     { "source": "/v1/releases/stable/macos-arm64.json", "destination": "/api/v1/releases/stable/macos-arm64" },
-    { "source": "/v1/releases/stable/macos-x86_64.json", "destination": "/api/v1/releases/stable/macos-x86_64" },
     { "source": "/download/windows", "destination": "/api/download/windows" },
     { "source": "/((?!api/|v1/|assets/|brand/|install\\.ps1$|install\\.sh$|download/windows/?$).*)", "destination": "/" }
   ],

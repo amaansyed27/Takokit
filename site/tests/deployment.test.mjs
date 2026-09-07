@@ -23,6 +23,9 @@ test("SPA, stable release, direct download, and raw installer routes are explici
   assert.equal(config.cleanUrls, true);
   assert.ok(config.rewrites.some((rule) => rule.source === "/v1/registry.json"));
   assert.ok(config.rewrites.some((rule) => rule.source === "/v1/releases/stable/windows-x86_64.json"));
+  assert.ok(config.rewrites.some((rule) => rule.source === "/v1/releases/stable/linux-x86_64.json"));
+  assert.ok(config.rewrites.some((rule) => rule.source === "/v1/releases/stable/macos-arm64.json"));
+  assert.ok(!config.rewrites.some((rule) => rule.source === "/v1/releases/stable/macos-x86_64.json"));
   assert.ok(config.rewrites.some((rule) => rule.source === "/download/windows"));
   const spa = config.rewrites.find((rule) => rule.destination === "/");
   assert.ok(spa);
