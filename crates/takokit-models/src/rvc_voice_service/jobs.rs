@@ -1,7 +1,7 @@
 use super::*;
 use crate::process::{
-    configure_owned_process_group, detach_and_reap, terminate_owned_process_tree,
-    timeout_from_env, wait_with_output_timeout,
+    configure_owned_process_group, detach_and_reap, terminate_owned_process_tree, timeout_from_env,
+    wait_with_output_timeout,
 };
 use serde_json::{json, Value};
 #[cfg(target_os = "linux")]
