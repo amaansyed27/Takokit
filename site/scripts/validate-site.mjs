@@ -136,7 +136,16 @@ for (const forbidden of ["v0.1.0", "Linux and macOS packages are coming later", 
 }
 
 const releaseDocs = await readSite("src/docs/pages/release.js");
-for (const requiredText of ["every 0.x.x release is Beta", "1.0.0", "Windows 10/11 x86_64", "Linux x86_64", "macOS 12+ arm64", "takokit-release-v1"]) {
+for (const requiredText of [
+  "Takokit remains Beta throughout the 0.x.y series",
+  "Default beta release bump: y = y + 1",
+  "Change x only when the maintainer explicitly requests it",
+  "1.0.0",
+  "Windows 10/11 x86_64",
+  "Linux x86_64",
+  "macOS 12+ arm64",
+  "takokit-release-v1",
+]) {
   if (!releaseDocs.includes(requiredText)) throw new Error(`release policy docs are missing ${requiredText}`);
 }
 
