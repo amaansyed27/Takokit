@@ -106,6 +106,7 @@ def check_release_and_platform_copy() -> None:
         "README.md": read("README.md"),
         "getting-started": read("site/src/docs/pages/getting-started.js"),
         "release-docs": read("site/src/docs/pages/release.js"),
+        "release-process": read("docs/release-process.md"),
         "platform-ui": read("site/src/lib/platform.js"),
         "download-page": read("site/src/pages/DownloadPage.jsx"),
     }
@@ -115,7 +116,13 @@ def check_release_and_platform_copy() -> None:
         "install.ps1", "install.sh", "1.0.0",
     ]:
         require(combined, required, "release-facing documentation")
-    require(files["release-docs"], "every 0.x.x release is Beta", "beta policy")
+
+    require(files["release-docs"], "Takokit remains Beta throughout the 0.x.y series", "beta policy")
+    require(files["release-docs"], "Default beta release bump: y = y + 1", "beta version bump policy")
+    require(files["release-docs"], "Change x only when the maintainer explicitly requests it", "beta version bump policy")
+    require(files["release-process"], "0.x.y -> 0.x.(y+1)", "release process version policy")
+    require(files["release-process"], "Do not promote Takokit to Stable", "release process maturity policy")
+
     for stale in [
         "Linux and macOS packages are coming later", "Packaging is not available yet",
         "One Windows runtime", "apps/desktop", "planned separately under Issue #68",
