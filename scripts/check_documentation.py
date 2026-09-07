@@ -46,43 +46,17 @@ def check_cli_contract() -> None:
     args = read("apps/cli/src/args.rs")
     interfaces = read("site/src/docs/pages/interfaces.js")
     mapping = {
-        "Start": "tako start",
-        "Stop": "tako stop",
-        "Serve": "tako serve",
-        "Server": "tako server",
-        "Gui": "tako gui",
-        "Doctor": "tako doctor",
-        "Version": "tako version",
-        "Status": "tako status",
-        "Storage": "tako storage",
-        "Update": "tako update",
-        "Reset": "tako reset",
-        "Licenses": "tako licenses",
-        "Capabilities": "tako capabilities",
-        "Models": "tako models",
-        "Runners": "tako runners",
-        "CustomModel": "tako custom-model",
-        "Voice": "tako voice",
-        "Library": "tako library",
-        "Speak": "tako speak",
-        "Pull": "tako pull",
-        "Show": "tako show",
-        "Plan": "tako plan",
-        "Rm": "tako rm",
-        "List": "tako list",
-        "Run": "tako run",
-        "Ps": "tako ps",
-        "Runner": "tako runner",
-        "Adapter": "tako adapter",
-        "Sessions": "tako sessions",
-        "Quickstart": "tako quickstart",
-        "Deps": "tako deps",
-        "Samples": "tako samples",
-        "Test": "tako test",
-        "Transcribe": "tako transcribe",
-        "Clone": "tako clone",
-        "Convert": "tako convert",
-        "Train": "tako train",
+        "Start": "tako start", "Stop": "tako stop", "Serve": "tako serve", "Server": "tako server",
+        "Gui": "tako gui", "Doctor": "tako doctor", "Version": "tako version", "Status": "tako status",
+        "Storage": "tako storage", "Update": "tako update", "Reset": "tako reset", "Licenses": "tako licenses",
+        "Capabilities": "tako capabilities", "Models": "tako models", "Runners": "tako runners",
+        "CustomModel": "tako custom-model", "Voice": "tako voice", "Library": "tako library",
+        "Speak": "tako speak", "Pull": "tako pull", "Show": "tako show", "Plan": "tako plan",
+        "Rm": "tako rm", "List": "tako list", "Run": "tako run", "Ps": "tako ps",
+        "Runner": "tako runner", "Adapter": "tako adapter", "Sessions": "tako sessions",
+        "Quickstart": "tako quickstart", "Deps": "tako deps", "Samples": "tako samples",
+        "Test": "tako test", "Transcribe": "tako transcribe", "Clone": "tako clone",
+        "Convert": "tako convert", "Train": "tako train",
     }
     for variant, command in mapping.items():
         if not re.search(rf"^\s*{re.escape(variant)}(?:\s*\{{|\s*\(|,)", args, re.MULTILINE):
@@ -95,13 +69,16 @@ def check_cli_contract() -> None:
     rvc = read("apps/cli/src/args/rvc.rs")
     voice_docs = read("site/src/docs/pages/voice-workflows.js")
     for variant in [
-        "Create", "Samples", "Inspect", "Presets", "Preflight", "Prepare", "Train",
-        "Status", "Logs", "Cancel", "Recover", "Checkpoints", "Indexes", "Activate",
-        "Test", "Import", "Export", "Verify", "ImportPackage", "Remove",
+        "Create", "Samples", "Inspect", "Presets", "Preflight", "Prepare", "Train", "Status",
+        "Logs", "Cancel", "Recover", "Checkpoints", "Indexes", "Activate", "Test", "Import",
+        "Export", "Verify", "ImportPackage", "Remove",
     ]:
         if variant not in rvc:
             raise SystemExit(f"RVC source command disappeared: {variant}")
-    for command in ["tako voice rvc create", "tako voice rvc preflight", "tako voice rvc train", "tako voice rvc export", "tako voice rvc verify"]:
+    for command in [
+        "tako voice rvc create", "tako voice rvc preflight", "tako voice rvc train",
+        "tako voice rvc export", "tako voice rvc verify",
+    ]:
         require(voice_docs, command, "Advanced RVC docs")
 
 
@@ -109,9 +86,7 @@ def check_api_contract() -> None:
     inventory = read("docs/api-route-inventory.md")
     developer = read("site/src/docs/pages/developers.js")
     for route in [
-        "GET /v1/models",
-        "GET /v1/models/{model}",
-        "POST /v1/audio/speech",
+        "GET /v1/models", "GET /v1/models/{model}", "POST /v1/audio/speech",
         "POST /v1/audio/transcriptions",
     ]:
         require(inventory, route, "API route inventory")
@@ -120,7 +95,9 @@ def check_api_contract() -> None:
     require(developer, "OpenAI-compatible audio", "public API docs")
     for unsupported in ["Chat completions", "Responses", "Embeddings", "Images"]:
         require(developer, unsupported, "public API compatibility matrix")
-    if re.search(r"full OpenAI compatibility|general OpenAI-compatible server", developer, re.I):
+    # Negative warnings such as “do not describe Takokit as a general OpenAI-compatible
+    # server” are intentional. Only positive support claims are forbidden here.
+    if re.search(r"\b(?:supports?|provides?)\s+(?:full|general)\s+OpenAI", developer, re.I):
         raise SystemExit("public docs overclaim OpenAI compatibility")
 
 
@@ -134,22 +111,14 @@ def check_release_and_platform_copy() -> None:
     }
     combined = "\n".join(files.values())
     for required in [
-        "v0.3.0",
-        "Windows x86_64",
-        "Linux x86_64",
-        "Apple Silicon",
-        "install.ps1",
-        "install.sh",
-        "1.0.0",
+        "v0.3.0", "Windows x86_64", "Linux x86_64", "Apple Silicon",
+        "install.ps1", "install.sh", "1.0.0",
     ]:
         require(combined, required, "release-facing documentation")
     require(files["release-docs"], "every 0.x.x release is Beta", "beta policy")
     for stale in [
-        "Linux and macOS packages are coming later",
-        "Packaging is not available yet",
-        "One Windows runtime",
-        "apps/desktop",
-        "planned separately under Issue #68",
+        "Linux and macOS packages are coming later", "Packaging is not available yet",
+        "One Windows runtime", "apps/desktop", "planned separately under Issue #68",
     ]:
         for where, text in files.items():
             forbid(text, stale, where)

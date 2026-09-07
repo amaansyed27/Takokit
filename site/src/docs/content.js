@@ -73,9 +73,12 @@ export const DOC_GROUPS = [
   },
 ];
 
+const { "rvc-packages": _legacyRvcPackages, ...CANONICAL_VOICE_WORKFLOW_DOCS } = VOICE_WORKFLOW_DOCS;
+void _legacyRvcPackages;
+
 export const DOCS = {
   ...GETTING_STARTED_DOCS,
-  ...VOICE_WORKFLOW_DOCS,
+  ...CANONICAL_VOICE_WORKFLOW_DOCS,
   ...INTERFACE_DOCS,
   ...DEVELOPER_DOCS,
   ...MANAGE_DOCS,
@@ -86,16 +89,22 @@ export const DOC_ORDER = DOC_GROUPS.flatMap((group) =>
   group.pages.map(([id, title]) => ({ id, title, group: group.title })),
 );
 
+function canonicalSlug(slug) {
+  return slug === "rvc-packages" ? "advanced-rvc" : slug;
+}
+
 export function findDoc(slug) {
-  return DOCS[slug] || null;
+  return DOCS[canonicalSlug(slug)] || null;
 }
 
 export function findDocGroup(slug) {
-  return DOC_GROUPS.find((group) => group.pages.some(([id]) => id === slug)) || null;
+  const target = canonicalSlug(slug);
+  return DOC_GROUPS.find((group) => group.pages.some(([id]) => id === target)) || null;
 }
 
 export function adjacentDocs(slug) {
-  const index = DOC_ORDER.findIndex((item) => item.id === slug);
+  const target = canonicalSlug(slug);
+  const index = DOC_ORDER.findIndex((item) => item.id === target);
   return {
     previous: index > 0 ? DOC_ORDER[index - 1] : null,
     next: index >= 0 && index < DOC_ORDER.length - 1 ? DOC_ORDER[index + 1] : null,

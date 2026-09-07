@@ -24,16 +24,20 @@ test("homepage uses the simplified Takokit landing flow", async () => {
   assert.match(home, /className="takokit-landing"/);
 });
 
-test("hero rotates only the model reference while keeping the pull command stable", async () => {
+test("hero presents the multi-platform beta and keeps the rotating pull command stable", async () => {
   const hero = await source("src/components/landing/LandingHero.jsx");
   const command = await source("src/components/landing/RollingPullCommand.jsx");
   const styles = await source("src/styles/landing/hero.css");
   assert.doesNotMatch(hero, /useScrollProgress|PlatformInstall/);
   assert.match(hero, /landing-hero__wave/);
   assert.match(hero, /Run open voice models locally/);
+  assert.match(hero, /public beta/);
+  assert.match(hero, /Windows, Linux, and macOS/);
   assert.match(hero, /RollingPullCommand/);
-  assert.match(hero, /Download for Windows/);
+  assert.match(hero, /Install Takokit/);
   assert.match(hero, /Browse models/);
+  assert.match(hero, /Read docs/);
+  assert.doesNotMatch(hero, /Download for Windows|One Windows runtime/);
   assert.match(command, /tako pull \$\{model\}/);
   for (const model of ["kokoro", "whisper-tiny", "chatterbox", "rvc"]) {
     assert.ok(command.includes(model), `missing rotating model ${model}`);
@@ -51,12 +55,7 @@ test("task shortcuts use user-facing labels and shareable model filter URLs", as
   assert.match(capabilities, /RouteLink/);
   assert.match(styles, /animation-timeline: view\(\)/);
   assert.match(styles, /capability-copy-left/);
-  for (const capability of [
-    "Generate speech",
-    "Transcribe audio",
-    "Clone a voice",
-    "Convert a voice",
-  ]) {
+  for (const capability of ["Generate speech", "Transcribe audio", "Clone a voice", "Convert a voice"]) {
     assert.ok(capabilities.includes(capability), `missing ${capability}`);
   }
   for (const task of ["speech", "transcription", "cloning", "conversion"]) {
