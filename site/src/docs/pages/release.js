@@ -9,7 +9,7 @@ export const RELEASE_DOCS = {
         code: `0.x.y   Beta — public, usable, updateable, but interfaces and platform behavior can still evolve
 Default beta release bump: y = y + 1 (for example 0.3.0 → 0.3.1)
 Change x only when the maintainer explicitly requests it
-Stable is published only when the maintainer explicitly declares the Stable transition; do not infer it from a routine release`,
+1.0.0   Stable only when the maintainer explicitly declares the Stable transition; never infer it from a routine release`,
       },
       {
         id: "beta-expectations",
