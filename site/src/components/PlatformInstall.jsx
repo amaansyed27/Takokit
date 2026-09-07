@@ -36,12 +36,10 @@ export function PlatformInstall({ heading = "Install Takokit" }) {
       </div>
 
       <div role="tabpanel" className="platform-panel">
-        <p className="platform-install-label">{details.label} · {details.available ? details.shell : "Coming later"}</p>
-        {command ? (
-          <CommandBar label="Windows PowerShell install command">{command}</CommandBar>
-        ) : (
-          <p className="platform-unavailable" role="status">{details.label} packages are not available yet.</p>
-        )}
+        <p className="platform-install-label">
+          {details.label} · {details.architecture} · {details.shell}
+        </p>
+        <CommandBar label={`${details.label} install command`}>{command}</CommandBar>
         <p className="platform-install-note">{details.note}</p>
       </div>
     </section>

@@ -40,6 +40,16 @@
   object-fit: contain;
 }
 
+.brand-stage {
+  border: 1px solid color-mix(in srgb, var(--gold-dark) 55%, var(--line));
+  padding: 0.16rem 0.32rem;
+  color: var(--gold-dark);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .site-nav {
   display: flex;
   align-items: center;

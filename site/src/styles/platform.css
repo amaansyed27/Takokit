@@ -6,7 +6,7 @@
 
 .platform-install {
   width: 100%;
-  max-width: 760px;
+  max-width: 900px;
   margin-block: 1.5rem 3rem;
   border-block: 1px solid var(--line);
   padding-block: 1.25rem;
@@ -20,7 +20,7 @@
 }
 
 .platform-install h2,
-.windows-download h2 {
+.platform-release-card h2 {
   margin-bottom: 0;
   font-size: clamp(1.2rem, 3vw, 1.65rem);
   letter-spacing: -0.025em;
@@ -49,7 +49,7 @@
 }
 
 .platform-panel {
-  min-height: 150px;
+  min-height: 145px;
 }
 
 .platform-install-label {
@@ -60,40 +60,52 @@
 }
 
 .platform-install .command-bar,
-.windows-download .command-bar {
+.platform-release-card .command-bar {
   margin-block: 0.65rem;
 }
 
 .platform-install-note,
-.windows-download__security,
-.windows-download__requirement {
+.platform-release-card__security,
+.platform-release-card__note,
+.platform-release-card__status {
   max-width: 680px;
   margin-bottom: 0;
   color: var(--muted);
   font-size: 0.82rem;
+  line-height: 1.6;
 }
 
-.platform-unavailable {
-  margin-block: 0.9rem 0.5rem;
-  border-left: 3px solid var(--line-strong, var(--line));
-  padding: 0.65rem 0.8rem;
-  color: var(--ink-soft);
-}
-
-.windows-download {
-  max-width: 760px;
+.platform-release-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 1100px;
   margin-block: 2rem 3rem;
+  border: 1px solid var(--line);
+  background: var(--line);
 }
 
-.windows-download .eyebrow {
-  margin-bottom: 0.4rem;
+.platform-release-card {
+  min-width: 0;
+  padding: 1.4rem;
+  background: var(--paper-bright);
+}
+
+.platform-release-card .eyebrow {
+  margin-bottom: 0.45rem;
+}
+
+.platform-release-card__status {
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-weight: 700;
 }
 
 .download-divider {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin-block: 1.4rem;
+  margin-block: 1.1rem;
   color: var(--muted);
   font-size: 0.78rem;
 }
@@ -124,17 +136,6 @@
   transform: translateY(-1px);
 }
 
-.download-primary:disabled {
-  border-color: var(--line);
-  background: transparent;
-  color: var(--muted);
-  cursor: not-allowed;
-}
-
-.windows-download__requirement {
-  margin-top: 0.85rem;
-}
-
 .hero-quickstart {
   display: grid;
   max-width: 420px;
@@ -146,6 +147,12 @@
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .platform-release-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {

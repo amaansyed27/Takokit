@@ -13,20 +13,21 @@ export function LandingHero() {
         </div>
 
         <div className="landing-hero__copy">
-          <p className="landing-kicker">Local voice runtime</p>
+          <p className="landing-kicker">Local voice runtime · public beta</p>
           <h1 id="landing-hero-title">Run open voice models locally.</h1>
           <p className="landing-hero__summary">
-            One Windows runtime for speech generation, transcription, voice cloning, and conversion through the CLI, TUI, and local browser GUI.
+            Pull and run speech generation, transcription, voice cloning, voice conversion, and custom voice workflows through one local runtime on Windows, Linux, and macOS.
           </p>
 
           <div className="landing-hero__quickstart">
-            <span>Pull any supported model</span>
+            <span>One registry. One runtime. Any interface.</span>
             <RollingPullCommand />
           </div>
 
           <div className="landing-actions">
-            <RouteLink href="/download" className="landing-button landing-button--primary">Download for Windows</RouteLink>
+            <RouteLink href="/download" className="landing-button landing-button--primary">Install Takokit</RouteLink>
             <RouteLink href="/models" className="landing-button">Browse models</RouteLink>
+            <RouteLink href="/docs" className="landing-button">Read docs</RouteLink>
           </div>
         </div>
 
