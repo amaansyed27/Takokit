@@ -5,7 +5,7 @@ const links = [
   ["/models", "Models"],
   ["/docs", "Docs"],
   ["https://github.com/amaansyed27/Takokit", "GitHub"],
-  ["/download", "Download"],
+  ["/download", "Install"],
 ];
 
 export function SiteHeader({ pathname }) {
@@ -17,6 +17,7 @@ export function SiteHeader({ pathname }) {
         <RouteLink href="/" className="brand" aria-label="Takokit home">
           <img src="/brand/takokit-mark.svg" alt="" />
           <span>TAKOKIT</span>
+          <small className="brand-stage">BETA</small>
         </RouteLink>
         <button
           className="menu-button"

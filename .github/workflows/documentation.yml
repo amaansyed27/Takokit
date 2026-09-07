@@ -1,0 +1,59 @@
+name: Documentation
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - slice/final-documentation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Documentation contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build data
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/gui/package-lock.json
+            site/package-lock.json
+
+      - name: Check documentation drift and links
+        run: python scripts/check_documentation.py
+
+      - name: Check API contract
+        run: python scripts/check_api_contract.py
+
+      - name: Install and check public site/docs
+        working-directory: site
+        run: |
+          npm ci
+          npm run check
+
+      - name: Build Rust documentation with warnings denied
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+      - name: Audit repository file sizes
+        run: python scripts/audit_file_sizes.py

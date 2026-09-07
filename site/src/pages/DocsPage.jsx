@@ -17,11 +17,17 @@ function DocSection({ section }) {
         <a href={`#${section.id}`}>{section.title}</a>
       </h2>
       {section.body?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      {section.items?.length ? (
+        <ul className="docs-list">
+          {section.items.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      ) : null}
       {section.commands?.map((command) => (
         <DocsCodeBlock key={command} label="Command">{command}</DocsCodeBlock>
       ))}
-      {section.code && <DocsCodeBlock label="Example">{section.code}</DocsCodeBlock>}
+      {section.code && <DocsCodeBlock label={section.codeLabel || "Example"}>{section.code}</DocsCodeBlock>}
       {section.note && <aside className="docs-note"><strong>Note</strong><p>{section.note}</p></aside>}
+      {section.warning && <aside className="docs-note docs-note--warning"><strong>Important</strong><p>{section.warning}</p></aside>}
     </section>
   );
 }
