@@ -1,18 +1,20 @@
 export const RELEASE_DOCS = {
   "beta-status": {
     title: "Beta status",
-    intro: "Takokit uses semantic versioning with an explicit maturity policy: every 0.x.x release is Beta; 1.0.0 is the first Stable release target.",
+    intro: "Takokit remains Beta throughout the 0.x.y series. Release numbering and promotion to Stable are explicit maintainer decisions rather than automatic consequences of shipping a release.",
     sections: [
       {
         id: "policy",
         title: "Version policy",
-        code: `0.x.x   Beta — public, usable, updateable, but interfaces and platform behavior can still evolve
-1.0.0   Stable — first stable compatibility commitment`,
+        code: `0.x.y   Beta — public, usable, updateable, but interfaces and platform behavior can still evolve
+Default beta release bump: y = y + 1 (for example 0.3.0 → 0.3.1)
+Change x only when the maintainer explicitly requests it
+Stable is published only when the maintainer explicitly declares the Stable transition; do not infer it from a routine release`,
       },
       {
         id: "beta-expectations",
         title: "What Beta means",
-        items: ["Real signed release artifacts and update metadata", "Evidence-based platform/model support labels", "Breaking changes remain possible before 1.0.0 when required to fix architecture or safety", "Release notes should call out migrations and changed behavior", "Bugs and rough edges are expected to be reported rather than hidden"],
+        items: ["Real signed release artifacts and update metadata", "Evidence-based platform/model support labels", "Breaking changes remain possible before Stable when required to fix architecture or safety", "Release notes should call out migrations and changed behavior", "Bugs and rough edges are expected to be reported rather than hidden"],
       },
       {
         id: "model-evidence",
