@@ -11,10 +11,10 @@ use takokit_core::{
 };
 use takokit_package::{validate_speech_request, ExecutionPlan, RunnerKind};
 
-use crate::process::configure_owned_process_group;
 use self::onnx::OnnxRunner;
 use self::python_managed::PythonManagedRunner;
 use self::whispercpp::WhisperCppRunner;
+use crate::process::configure_owned_process_group;
 
 pub(crate) fn configure_runner_command(command: &mut std::process::Command) {
     // Runner requests are serialized as UTF-8 JSON. Python otherwise inherits the
