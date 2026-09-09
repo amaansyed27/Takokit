@@ -9,7 +9,6 @@ authors.workspace = true
 [dependencies]
 serde.workspace = true
 thiserror.workspace = true
-toml.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
