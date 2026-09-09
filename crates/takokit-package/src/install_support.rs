@@ -1,10 +1,22 @@
 //! Transactional install-record construction and filesystem persistence helpers.
 
 use crate::*;
+use fs2::FileExt;
 use std::{
+    fs::{File, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ModelInstallJournal {
+    schema_version: u32,
+    manifest_existed: bool,
+    record_existed: bool,
+}
+
+const MODEL_INSTALL_JOURNAL_SCHEMA: u32 = 1;
 
 pub(crate) fn installed_model_record(
     manifest: &ModelManifest,
@@ -108,79 +120,224 @@ pub(crate) fn write_model_install_files(
     manifest_toml: &str,
     record_toml: &str,
 ) -> PackageResult<()> {
-    let manifest_tmp = sibling_temp_path(manifest_path);
-    let record_tmp = sibling_temp_path(record_path);
-    std::fs::write(&manifest_tmp, manifest_toml)?;
-    std::fs::write(&record_tmp, record_toml).map_err(|error| {
-        let _ = std::fs::remove_file(&manifest_tmp);
-        let _ = std::fs::remove_file(&record_tmp);
-        PackageError::Io(error)
-    })?;
+    ensure_parent(manifest_path)?;
+    ensure_parent(record_path)?;
+    let lock = open_model_install_lock(manifest_path)?;
+    lock.lock_exclusive()?;
+    recover_model_install_files_locked(manifest_path, record_path)?;
 
-    let manifest_backup = backup_existing_file(manifest_path).map_err(|error| {
-        let _ = std::fs::remove_file(&manifest_tmp);
-        let _ = std::fs::remove_file(&record_tmp);
-        error
-    })?;
-    if let Err(error) = std::fs::rename(&manifest_tmp, manifest_path) {
-        let _ = std::fs::remove_file(&manifest_tmp);
-        let _ = std::fs::remove_file(&record_tmp);
-        restore_backup(manifest_path, manifest_backup);
-        return Err(PackageError::Io(error));
+    let manifest_new = transaction_sidecar(manifest_path, "txn-new");
+    let record_new = transaction_sidecar(record_path, "txn-new");
+    let manifest_backup = transaction_sidecar(manifest_path, "txn-bak");
+    let record_backup = transaction_sidecar(record_path, "txn-bak");
+    let journal_path = transaction_sidecar(manifest_path, "install-txn.json");
+    let journal_new = transaction_sidecar(manifest_path, "install-txn.new");
+
+    write_synced(&manifest_new, manifest_toml.as_bytes())?;
+    if let Err(error) = write_synced(&record_new, record_toml.as_bytes()) {
+        let _ = remove_file_if_exists(manifest_new.clone());
+        return Err(error);
     }
 
-    let record_backup = match backup_existing_file(record_path) {
-        Ok(backup) => backup,
-        Err(error) => {
-            let _ = std::fs::remove_file(&record_tmp);
-            let _ = std::fs::remove_file(manifest_path);
-            restore_backup(manifest_path, manifest_backup);
-            return Err(error);
-        }
+    let manifest_existed = regular_file_exists(manifest_path)?;
+    let record_existed = regular_file_exists(record_path)?;
+    if manifest_existed {
+        copy_synced(manifest_path, &manifest_backup)?;
+    }
+    if record_existed {
+        copy_synced(record_path, &record_backup)?;
+    }
+
+    let journal = ModelInstallJournal {
+        schema_version: MODEL_INSTALL_JOURNAL_SCHEMA,
+        manifest_existed,
+        record_existed,
     };
-    if let Err(error) = std::fs::rename(&record_tmp, record_path) {
-        let _ = std::fs::remove_file(&record_tmp);
-        let _ = std::fs::remove_file(manifest_path);
-        restore_backup(manifest_path, manifest_backup);
-        restore_backup(record_path, record_backup);
-        return Err(PackageError::Io(error));
-    }
+    write_synced(&journal_new, &serde_json::to_vec_pretty(&journal)?)?;
+    std::fs::rename(&journal_new, &journal_path)?;
+    sync_parent(&journal_path);
 
-    remove_backup(manifest_backup);
-    remove_backup(record_backup);
+    if let Err(error) = replace_target(manifest_path, &manifest_new) {
+        let _ = recover_model_install_files_locked(manifest_path, record_path);
+        return Err(error);
+    }
+    if let Err(error) = replace_target(record_path, &record_new) {
+        let _ = recover_model_install_files_locked(manifest_path, record_path);
+        return Err(error);
+    }
+    sync_parent(manifest_path);
+    sync_parent(record_path);
+
+    // Removing the journal is the commit point. If the process dies before this,
+    // the next reader deterministically restores both previous files. If it dies
+    // after this, both new files are already durable and stale backups are harmless.
+    remove_file_if_exists(journal_path)?;
+    sync_parent(manifest_path);
+    let _ = remove_file_if_exists(manifest_backup);
+    let _ = remove_file_if_exists(record_backup);
     Ok(())
 }
 
-fn sibling_temp_path(path: &Path) -> PathBuf {
-    let file_name = path
+pub(crate) fn recover_model_install_files(
+    manifest_path: &Path,
+    record_path: &Path,
+) -> PackageResult<()> {
+    ensure_parent(manifest_path)?;
+    ensure_parent(record_path)?;
+    let lock = open_model_install_lock(manifest_path)?;
+    lock.lock_exclusive()?;
+    recover_model_install_files_locked(manifest_path, record_path)
+}
+
+fn recover_model_install_files_locked(
+    manifest_path: &Path,
+    record_path: &Path,
+) -> PackageResult<()> {
+    let manifest_new = transaction_sidecar(manifest_path, "txn-new");
+    let record_new = transaction_sidecar(record_path, "txn-new");
+    let manifest_backup = transaction_sidecar(manifest_path, "txn-bak");
+    let record_backup = transaction_sidecar(record_path, "txn-bak");
+    let journal_path = transaction_sidecar(manifest_path, "install-txn.json");
+    let journal_new = transaction_sidecar(manifest_path, "install-txn.new");
+
+    if journal_path.is_file() {
+        let source = std::fs::read(&journal_path)?;
+        let journal: ModelInstallJournal = serde_json::from_slice(&source)?;
+        if journal.schema_version != MODEL_INSTALL_JOURNAL_SCHEMA {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: manifest_path.display().to_string(),
+                reason: "unsupported model install transaction journal schema".to_string(),
+            });
+        }
+        restore_transaction_target(
+            manifest_path,
+            &manifest_backup,
+            journal.manifest_existed,
+        )?;
+        restore_transaction_target(record_path, &record_backup, journal.record_existed)?;
+        remove_file_if_exists(journal_path.clone())?;
+        sync_parent(&journal_path);
+    }
+
+    // Sidecars without a journal are either from a committed transaction or from
+    // a crash before the journal became durable. In both cases canonical files are
+    // authoritative and these files are safe to discard.
+    let _ = remove_file_if_exists(manifest_new);
+    let _ = remove_file_if_exists(record_new);
+    let _ = remove_file_if_exists(manifest_backup);
+    let _ = remove_file_if_exists(record_backup);
+    let _ = remove_file_if_exists(journal_new);
+    Ok(())
+}
+
+fn restore_transaction_target(
+    target: &Path,
+    backup: &Path,
+    previously_existed: bool,
+) -> PackageResult<()> {
+    if previously_existed {
+        if !backup.is_file() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: target.display().to_string(),
+                reason: format!(
+                    "model install recovery is missing required backup {}",
+                    backup.display()
+                ),
+            });
+        }
+        let restore = transaction_sidecar(target, "txn-restore");
+        copy_synced(backup, &restore)?;
+        replace_target(target, &restore)?;
+        sync_parent(target);
+    } else {
+        remove_file_if_exists(target.to_path_buf())?;
+        sync_parent(target);
+    }
+    Ok(())
+}
+
+fn open_model_install_lock(manifest_path: &Path) -> PackageResult<File> {
+    let path = transaction_sidecar(manifest_path, "install-txn.lock");
+    Ok(OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(path)?)
+}
+
+fn transaction_sidecar(path: &Path, suffix: &str) -> PathBuf {
+    let name = path
         .file_name()
         .and_then(|value| value.to_str())
-        .unwrap_or("install");
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos().to_string())
-        .unwrap_or_else(|_| timestamp_now());
-    path.with_file_name(format!("{file_name}.{suffix}.tmp"))
+        .unwrap_or("model");
+    path.with_file_name(format!("{name}.{suffix}"))
 }
 
-fn backup_existing_file(path: &Path) -> PackageResult<Option<PathBuf>> {
-    if !path.exists() {
-        return Ok(None);
+fn write_synced(path: &Path, bytes: &[u8]) -> PackageResult<()> {
+    remove_file_if_exists(path.to_path_buf())?;
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+fn copy_synced(source: &Path, destination: &Path) -> PackageResult<()> {
+    let metadata = std::fs::symlink_metadata(source)?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: source.display().to_string(),
+            reason: "model install metadata must be a regular file".to_string(),
+        });
     }
-    let backup_path = sibling_temp_path(path).with_extension("bak");
-    std::fs::rename(path, &backup_path)?;
-    Ok(Some(backup_path))
+    remove_file_if_exists(destination.to_path_buf())?;
+    std::fs::copy(source, destination)?;
+    File::open(destination)?.sync_all()?;
+    Ok(())
 }
 
-fn restore_backup(path: &Path, backup: Option<PathBuf>) {
-    if let Some(backup) = backup {
-        let _ = std::fs::rename(backup, path);
+fn replace_target(target: &Path, replacement: &Path) -> PackageResult<()> {
+    match std::fs::symlink_metadata(target) {
+        Ok(metadata) if metadata.file_type().is_symlink() || metadata.is_file() => {
+            std::fs::remove_file(target)?;
+        }
+        Ok(_) => {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: target.display().to_string(),
+                reason: "model install metadata path is not a regular file".to_string(),
+            })
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    std::fs::rename(replacement, target)?;
+    Ok(())
+}
+
+fn regular_file_exists(path: &Path) -> PackageResult<bool> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(PackageError::ArtifactInstallFailed {
+            artifact: path.display().to_string(),
+            reason: "model install metadata path cannot be a symlink".to_string(),
+        }),
+        Ok(metadata) if metadata.is_file() => Ok(true),
+        Ok(_) => Err(PackageError::ArtifactInstallFailed {
+            artifact: path.display().to_string(),
+            reason: "model install metadata path is not a regular file".to_string(),
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.into()),
     }
 }
 
-fn remove_backup(backup: Option<PathBuf>) {
-    if let Some(backup) = backup {
-        let _ = std::fs::remove_file(backup);
+fn sync_parent(path: &Path) {
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        if let Ok(directory) = File::open(parent) {
+            let _ = directory.sync_all();
+        }
     }
 }
 
@@ -204,5 +361,84 @@ pub(crate) fn remove_file_if_exists(path: PathBuf) -> PackageResult<()> {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(PackageError::Io(error)),
+    }
+}
+
+fn ensure_parent(path: &Path) -> PackageResult<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_install_pair_commits_together() {
+        let temp = tempfile::tempdir().unwrap();
+        let manifest = temp.path().join("models/fixture.toml");
+        let record = temp.path().join("installed-models/fixture.toml");
+        write_model_install_files(&manifest, &record, "manifest-v1", "record-v1").unwrap();
+        write_model_install_files(&manifest, &record, "manifest-v2", "record-v2").unwrap();
+        assert_eq!(std::fs::read_to_string(manifest).unwrap(), "manifest-v2");
+        assert_eq!(std::fs::read_to_string(record).unwrap(), "record-v2");
+    }
+
+    #[test]
+    fn interrupted_pair_update_rolls_back_both_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let manifest = temp.path().join("models/fixture.toml");
+        let record = temp.path().join("installed-models/fixture.toml");
+        ensure_parent(&manifest).unwrap();
+        ensure_parent(&record).unwrap();
+        std::fs::write(&manifest, "manifest-old").unwrap();
+        std::fs::write(&record, "record-old").unwrap();
+
+        let manifest_backup = transaction_sidecar(&manifest, "txn-bak");
+        let record_backup = transaction_sidecar(&record, "txn-bak");
+        copy_synced(&manifest, &manifest_backup).unwrap();
+        copy_synced(&record, &record_backup).unwrap();
+        let journal = ModelInstallJournal {
+            schema_version: MODEL_INSTALL_JOURNAL_SCHEMA,
+            manifest_existed: true,
+            record_existed: true,
+        };
+        std::fs::write(
+            transaction_sidecar(&manifest, "install-txn.json"),
+            serde_json::to_vec_pretty(&journal).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(&manifest, "manifest-new").unwrap();
+        std::fs::write(&record, "record-new").unwrap();
+
+        recover_model_install_files(&manifest, &record).unwrap();
+        assert_eq!(std::fs::read_to_string(manifest).unwrap(), "manifest-old");
+        assert_eq!(std::fs::read_to_string(record).unwrap(), "record-old");
+    }
+
+    #[test]
+    fn interrupted_first_install_removes_half_committed_pair() {
+        let temp = tempfile::tempdir().unwrap();
+        let manifest = temp.path().join("models/fixture.toml");
+        let record = temp.path().join("installed-models/fixture.toml");
+        ensure_parent(&manifest).unwrap();
+        ensure_parent(&record).unwrap();
+        let journal = ModelInstallJournal {
+            schema_version: MODEL_INSTALL_JOURNAL_SCHEMA,
+            manifest_existed: false,
+            record_existed: false,
+        };
+        std::fs::write(
+            transaction_sidecar(&manifest, "install-txn.json"),
+            serde_json::to_vec_pretty(&journal).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(&manifest, "half-new").unwrap();
+
+        recover_model_install_files(&manifest, &record).unwrap();
+        assert!(!manifest.exists());
+        assert!(!record.exists());
     }
 }
