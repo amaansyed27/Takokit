@@ -4,9 +4,10 @@ use crate::{
     runtime_command::configure_managed_command, ArtifactEntry, ModelManifest, PackageError,
     PackageResult,
 };
+use fs2::FileExt;
 use sha2::{Digest, Sha256};
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -38,24 +39,45 @@ pub(crate) fn install_artifact(
             artifact: artifact.name.clone(),
         });
     }
-    let temp_path = downloads_dir.join(format!(
-        "{}.{}.part",
-        sanitize_file_name(&artifact.name),
-        timestamp_now()
-    ));
+
+    std::fs::create_dir_all(downloads_dir)?;
+    std::fs::create_dir_all(blob_dir)?;
+    let (temp_path, lock_path) = download_paths(downloads_dir, &expected);
+    let lock = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&lock_path)?;
+    lock.lock_exclusive()?;
+
+    let final_path = blob_dir.join(&expected);
+    if verified_artifact(&final_path, &expected, artifact.bytes) {
+        return Ok(final_path);
+    }
+    if final_path.exists() {
+        remove_regular_file(&final_path)?;
+    }
+
+    if let (Some(expected_bytes), Ok(metadata)) = (artifact.bytes, std::fs::metadata(&temp_path)) {
+        if metadata.len() > expected_bytes {
+            remove_regular_file(&temp_path)?;
+        }
+    }
+
     download_to_temp(url, &artifact.name, &temp_path)?;
     if let Some(expected_bytes) = artifact.bytes {
         let actual_bytes = std::fs::metadata(&temp_path)
             .map(|metadata| metadata.len())
-            .map_err(|error| {
-                let _ = std::fs::remove_file(&temp_path);
-                PackageError::ArtifactInstallFailed {
-                    artifact: artifact.name.clone(),
-                    reason: error.to_string(),
-                }
+            .map_err(|error| PackageError::ArtifactInstallFailed {
+                artifact: artifact.name.clone(),
+                reason: error.to_string(),
             })?;
         if actual_bytes != expected_bytes {
-            let _ = std::fs::remove_file(&temp_path);
+            // Preserve a short partial so the next pull can resume it. An oversized
+            // partial is never useful and could make a Range retry unsafe.
+            if actual_bytes > expected_bytes {
+                let _ = remove_regular_file(&temp_path);
+            }
             return Err(PackageError::ArtifactInstallFailed {
                 artifact: artifact.name.clone(),
                 reason: format!("expected {expected_bytes} bytes, got {actual_bytes}"),
@@ -67,49 +89,62 @@ pub(crate) fn install_artifact(
         reason: error.to_string(),
     })?;
     if actual != expected {
-        let _ = std::fs::remove_file(&temp_path);
+        // A completed file with the wrong digest cannot be resumed safely.
+        let _ = remove_regular_file(&temp_path);
         return Err(PackageError::ArtifactChecksumMismatch {
             artifact: artifact.name.clone(),
             expected,
             actual,
         });
     }
-    let final_path = blob_dir.join(&expected);
+
     if final_path.exists() {
-        let valid_existing = artifact.bytes.is_none_or(|expected_bytes| {
-            std::fs::metadata(&final_path)
-                .map(|metadata| metadata.len() == expected_bytes)
-                .unwrap_or(false)
-        }) && sha256_file(&final_path)
-            .map(|actual| actual == expected)
-            .unwrap_or(false);
-        if valid_existing {
-            let _ = std::fs::remove_file(&temp_path);
-        } else {
-            std::fs::remove_file(&final_path).map_err(|error| {
-                PackageError::ArtifactInstallFailed {
-                    artifact: artifact.name.clone(),
-                    reason: error.to_string(),
-                }
-            })?;
-            std::fs::rename(&temp_path, &final_path).map_err(|error| {
-                let _ = std::fs::remove_file(&temp_path);
-                PackageError::ArtifactInstallFailed {
-                    artifact: artifact.name.clone(),
-                    reason: error.to_string(),
-                }
-            })?;
-        }
-    } else {
-        std::fs::rename(&temp_path, &final_path).map_err(|error| {
-            let _ = std::fs::remove_file(&temp_path);
-            PackageError::ArtifactInstallFailed {
-                artifact: artifact.name.clone(),
-                reason: error.to_string(),
-            }
-        })?;
+        remove_regular_file(&final_path)?;
     }
+    std::fs::rename(&temp_path, &final_path).map_err(|error| {
+        PackageError::ArtifactInstallFailed {
+            artifact: artifact.name.clone(),
+            reason: error.to_string(),
+        }
+    })?;
     Ok(final_path)
+}
+
+fn download_paths(downloads_dir: &Path, expected_sha256: &str) -> (PathBuf, PathBuf) {
+    (
+        downloads_dir.join(format!("{expected_sha256}.part")),
+        downloads_dir.join(format!("{expected_sha256}.lock")),
+    )
+}
+
+fn verified_artifact(path: &Path, expected_sha256: &str, expected_bytes: Option<u64>) -> bool {
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return false;
+    }
+    if expected_bytes.is_some_and(|bytes| metadata.len() != bytes) {
+        return false;
+    }
+    sha256_file(path)
+        .map(|actual| actual == expected_sha256)
+        .unwrap_or(false)
+}
+
+fn remove_regular_file(path: &Path) -> PackageResult<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || metadata.is_file() => {
+            std::fs::remove_file(path)?;
+            Ok(())
+        }
+        Ok(_) => Err(PackageError::ArtifactInstallFailed {
+            artifact: path.display().to_string(),
+            reason: "managed artifact path is not a regular file".to_string(),
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 pub(crate) fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<()> {
@@ -130,12 +165,12 @@ pub(crate) fn download_to_temp(url: &str, artifact: &str, temp_path: &Path) -> P
         })?;
     let mut output = File::create(temp_path)?;
     std::io::copy(&mut input, &mut output).map_err(|error| {
-        let _ = std::fs::remove_file(temp_path);
         PackageError::ArtifactDownloadFailed {
             artifact: artifact.to_string(),
             reason: error.to_string(),
         }
     })?;
+    output.sync_data()?;
     Ok(())
 }
 
@@ -180,29 +215,46 @@ fn download_with_curl(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
     if output.status.success() {
         Ok(true)
     } else {
-        let _ = std::fs::remove_file(temp_path);
-        Err(PackageError::ArtifactDownloadFailed {
-            artifact: artifact.to_string(),
-            reason: format!(
-                "managed curl transport exited with {} after retries: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        })
+        // Keep the .part file. ureq is a real fallback transport and can either
+        // resume it with HTTP Range or restart it when the origin ignores Range.
+        Ok(false)
     }
 }
 
 fn download_with_ureq(url: &str, artifact: &str, temp_path: &Path) -> PackageResult<()> {
     for attempt in 1..=DOWNLOAD_ATTEMPTS {
-        let result = ureq::get(url).call();
-        match result {
+        let existing = std::fs::metadata(temp_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        let mut request = ureq::get(url);
+        if existing > 0 {
+            request = request.set("Range", &format!("bytes={existing}-"));
+        }
+
+        match request.call() {
             Ok(response) => {
+                let status = response.status();
+                let append = existing > 0 && status == 206;
+                let mut options = OpenOptions::new();
+                options.create(true).write(true);
+                if append {
+                    options.append(true);
+                } else {
+                    // A 200 response to a Range request means the origin ignored
+                    // Range. Restart from byte zero rather than duplicating data.
+                    options.truncate(true);
+                }
+                let mut file = options.open(temp_path)?;
                 let mut reader = response.into_reader();
-                let mut file = File::create(temp_path)?;
                 match std::io::copy(&mut reader, &mut file) {
-                    Ok(_) => return Ok(()),
+                    Ok(_) => {
+                        file.sync_data()?;
+                        return Ok(());
+                    }
                     Err(error) => {
-                        let _ = std::fs::remove_file(temp_path);
+                        // Preserve the bytes already written. A later attempt or a
+                        // future Takokit process can continue from this exact file.
+                        let _ = file.sync_data();
                         if attempt < DOWNLOAD_ATTEMPTS {
                             thread::sleep(download_retry_delay(attempt));
                             continue;
@@ -217,9 +269,13 @@ fn download_with_ureq(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
                 }
             }
             Err(ureq::Error::Status(status, response)) => {
+                // 416 can mean a previously interrupted download already reached
+                // EOF. Let the caller perform the authoritative size + SHA check.
+                if status == 416 && existing > 0 {
+                    return Ok(());
+                }
                 let body = response.into_string().unwrap_or_default();
                 if attempt < DOWNLOAD_ATTEMPTS && retryable_http_status(status) {
-                    let _ = std::fs::remove_file(temp_path);
                     thread::sleep(download_retry_delay(attempt));
                     continue;
                 }
@@ -229,7 +285,6 @@ fn download_with_ureq(url: &str, artifact: &str, temp_path: &Path) -> PackageRes
                 });
             }
             Err(ureq::Error::Transport(error)) => {
-                let _ = std::fs::remove_file(temp_path);
                 if attempt < DOWNLOAD_ATTEMPTS {
                     thread::sleep(download_retry_delay(attempt));
                     continue;
@@ -352,16 +407,12 @@ fn sanitize_file_name(name: &str) -> String {
         })
         .collect()
 }
-fn timestamp_now() -> String {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs().to_string())
-        .unwrap_or_else(|_| "0".to_string())
-}
 
 #[cfg(test)]
 mod tests {
-    use super::retryable_http_status;
+    use super::{download_paths, retryable_http_status, verified_artifact};
+    use sha2::{Digest, Sha256};
+    use std::fs;
 
     #[test]
     fn retries_only_transient_upstream_statuses() {
@@ -371,5 +422,27 @@ mod tests {
         assert!(retryable_http_status(503));
         assert!(!retryable_http_status(400));
         assert!(!retryable_http_status(404));
+    }
+
+    #[test]
+    fn resumable_download_paths_are_stable_across_processes() {
+        let root = tempfile::tempdir().unwrap();
+        let digest = "a".repeat(64);
+        let first = download_paths(root.path(), &digest);
+        let second = download_paths(root.path(), &digest);
+        assert_eq!(first, second);
+        assert_eq!(first.0, root.path().join(format!("{digest}.part")));
+        assert_eq!(first.1, root.path().join(format!("{digest}.lock")));
+    }
+
+    #[test]
+    fn verified_artifact_rejects_symlinks_and_wrong_content() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("blob");
+        fs::write(&path, b"takokit").unwrap();
+        let digest = format!("{:x}", Sha256::digest(b"takokit"));
+        assert!(verified_artifact(&path, &digest, Some(7)));
+        assert!(!verified_artifact(&path, &digest, Some(8)));
+        assert!(!verified_artifact(&path, &"0".repeat(64), Some(7)));
     }
 }
