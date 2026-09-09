@@ -11,7 +11,7 @@ pub struct RuntimeConfig {
     pub storage_root: PathBuf,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct StoredRuntimeConfig {
     host: Option<String>,
     port: Option<u16>,
@@ -44,7 +44,48 @@ impl RuntimeConfig {
 
 fn load_stored_runtime_config(storage_root: &Path) -> Option<StoredRuntimeConfig> {
     let source = std::fs::read_to_string(storage_root.join("config.toml")).ok()?;
-    toml::from_str(&source).ok()
+    Some(parse_stored_runtime_config(&source))
+}
+
+fn parse_stored_runtime_config(source: &str) -> StoredRuntimeConfig {
+    let mut config = StoredRuntimeConfig::default();
+    for raw_line in source.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() || line.starts_with('[') {
+            continue;
+        }
+        let Some((raw_key, raw_value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = raw_key.trim();
+        let value = raw_value.trim();
+        match key {
+            "host" => {
+                if let Some(host) = parse_quoted_string(value).and_then(nonempty) {
+                    config.host = Some(host);
+                }
+            }
+            "port" => {
+                if let Ok(port) = value.parse::<u16>() {
+                    config.port = Some(port);
+                }
+            }
+            _ => {}
+        }
+    }
+    config
+}
+
+fn parse_quoted_string(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    if bytes.len() < 2 {
+        return None;
+    }
+    let quote = bytes[0];
+    if !matches!(quote, b'\'' | b'"') || bytes[bytes.len() - 1] != quote {
+        return None;
+    }
+    Some(value[1..value.len() - 1].to_string())
 }
 
 fn resolve_host(environment: Option<String>, stored: Option<String>) -> String {
@@ -93,6 +134,15 @@ mod tests {
         assert_eq!(stored.host.as_deref(), Some("localhost"));
         assert_eq!(stored.port, Some(6060));
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn config_parser_ignores_unknown_and_invalid_values() {
+        let stored = parse_stored_runtime_config(
+            "unknown = true\nhost = localhost\nport = nope\nhost = '::1' # local\nport = 6060\n",
+        );
+        assert_eq!(stored.host.as_deref(), Some("::1"));
+        assert_eq!(stored.port, Some(6060));
     }
 
     #[test]
