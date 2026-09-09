@@ -61,7 +61,7 @@ private struct RuntimeEndpoint {
             return StoredRuntimeEndpoint()
         }
         var endpoint = StoredRuntimeEndpoint()
-        for rawLine in source.split(whereSeparator: \ .isNewline) {
+        for rawLine in source.split(whereSeparator: { $0.isNewline }) {
             let line = String(rawLine).split(separator: "#", maxSplits: 1).first.map(String.init) ?? ""
             let parts = line.split(separator: "=", maxSplits: 1).map {
                 String($0).trimmingCharacters(in: .whitespacesAndNewlines)
