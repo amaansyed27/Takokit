@@ -1,5 +1,5 @@
 use super::*;
-use std::io::Read;
+use std::io::{Read, Write};
 
 pub(super) fn active_session_unlocked(root: &Path) -> TakokitResult<Option<Uuid>> {
     let path = root.join("active-session");
@@ -300,7 +300,7 @@ fn restore_backup(path: &Path, backup: &Path) -> TakokitResult<()> {
     Ok(())
 }
 
-fn backup_path(path: &Path) -> PathBuf {
+pub(super) fn backup_path(path: &Path) -> PathBuf {
     let name = path
         .file_name()
         .and_then(|value| value.to_str())
