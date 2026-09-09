@@ -1,11 +1,13 @@
 use super::*;
+use fs2::FileExt;
+use std::{fs::OpenOptions, io::Write};
 
 pub(super) fn materialize_owned_artifact(
     root: &Path,
     relative: &Path,
 ) -> PackageResult<ProviderOwnedArtifact> {
     validate_relative_cache_path(relative)?;
-    let source = root.join("cache").join(relative);
+    let source = canonical_provider_cache_file(root, relative)?;
     let metadata = fs::metadata(&source)?;
     if !metadata.is_file() {
         return Err(PackageError::ArtifactInstallFailed {
@@ -14,12 +16,16 @@ pub(super) fn materialize_owned_artifact(
         });
     }
     let sha256 = sha256_file(&source)?;
-    let blob = provider_blob_root(root).join(&sha256[0..2]).join(&sha256);
+    let blob = provider_blob_path(root, &sha256)?;
     if !blob.is_file() {
         if let Some(parent) = blob.parent() {
             fs::create_dir_all(parent)?;
         }
-        let temporary = blob.with_extension(format!("tmp-{}", std::process::id()));
+        let temporary = blob.with_extension(format!(
+            "tmp-{}-{}",
+            std::process::id(),
+            now_nanos()
+        ));
         remove_path_if_present(&temporary)?;
         link_or_copy(&source, &temporary)?;
         if sha256_file(&temporary)? != sha256 {
@@ -71,6 +77,13 @@ pub(super) fn provider_blob_root(root: &Path) -> PathBuf {
     root.join("blobs").join("provider").join("sha256")
 }
 
+pub(super) fn provider_blob_path(root: &Path, sha256: &str) -> PackageResult<PathBuf> {
+    validate_sha256(sha256)?;
+    Ok(provider_blob_root(root)
+        .join(&sha256[0..2])
+        .join(sha256))
+}
+
 pub(super) fn migration_journal_path(root: &Path) -> PathBuf {
     root.join("runtime")
         .join("storage-migration-provider-ownership.json")
@@ -108,8 +121,10 @@ pub(super) fn read_all_ledgers(root: &Path) -> PackageResult<Vec<ModelProviderOw
     paths.sort();
     let mut ledgers = Vec::new();
     for path in paths {
-        let ledger: ModelProviderOwnership = serde_json::from_slice(&fs::read(path)?)?;
+        recover_atomic_json(&path)?;
+        let ledger: ModelProviderOwnership = serde_json::from_slice(&fs::read(&path)?)?;
         if ledger.schema_version == PROVIDER_OWNERSHIP_SCHEMA {
+            validate_ledger(root, &ledger)?;
             ledgers.push(ledger);
         }
     }
@@ -131,16 +146,15 @@ pub(super) fn collect_unused_blobs_ignoring(
     retained: &mut Vec<ProviderCleanupItem>,
 ) -> PackageResult<()> {
     let ledgers = read_all_ledgers(root)?;
-    let referenced = ledgers
+    let mut referenced = HashSet::new();
+    for ledger in ledgers
         .iter()
         .filter(|ledger| !ignored_models.contains(&ledger.model_id))
-        .flat_map(|ledger| {
-            ledger
-                .artifacts
-                .iter()
-                .map(|artifact| artifact.blob_path.clone())
-        })
-        .collect::<HashSet<_>>();
+    {
+        for artifact in &ledger.artifacts {
+            referenced.insert(provider_blob_path(root, &artifact.sha256)?);
+        }
+    }
     let blobs = provider_blob_root(root);
     let mut files = Vec::new();
     collect_files(&blobs, &mut files)?;
@@ -167,17 +181,22 @@ pub(super) fn collect_unused_blobs_ignoring(
     Ok(())
 }
 
-pub(super) fn verify_ledger_blobs(ledger: &ModelProviderOwnership) -> PackageResult<()> {
+pub(super) fn verify_ledger_blobs(
+    root: &Path,
+    ledger: &ModelProviderOwnership,
+) -> PackageResult<()> {
+    validate_ledger(root, ledger)?;
     for artifact in &ledger.artifacts {
-        if !artifact.blob_path.is_file()
-            || fs::metadata(&artifact.blob_path)?.len() != artifact.bytes
-            || sha256_file(&artifact.blob_path)? != artifact.sha256
+        let blob = provider_blob_path(root, &artifact.sha256)?;
+        if !blob.is_file()
+            || fs::metadata(&blob)?.len() != artifact.bytes
+            || sha256_file(&blob)? != artifact.sha256
         {
             return Err(PackageError::ArtifactInstallFailed {
                 artifact: ledger.model_id.clone(),
                 reason: format!(
                     "durable provider blob verification failed: {}",
-                    artifact.blob_path.display()
+                    blob.display()
                 ),
             });
         }
@@ -194,38 +213,71 @@ pub(super) fn scan_cache_files(
     if !current.exists() {
         return Ok(());
     }
-    let metadata = fs::metadata(current)?;
-    if metadata.is_file() {
-        let relative =
-            current
-                .strip_prefix(base)
-                .map_err(|_| PackageError::ArtifactInstallFailed {
-                    artifact: provider.to_string(),
-                    reason: "provider cache path escaped its provider root".to_string(),
-                })?;
-        let relative = PathBuf::from(provider).join(relative);
-        let modified_nanos = metadata
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        files.insert(
-            relative,
-            FileSignature {
-                bytes: metadata.len(),
-                modified_nanos,
-            },
-        );
+
+    let link_metadata = fs::symlink_metadata(current)?;
+    if link_metadata.file_type().is_symlink() {
+        let canonical_base = fs::canonicalize(base)?;
+        let canonical_target = fs::canonicalize(current)?;
+        if !canonical_target.starts_with(&canonical_base) {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: current.display().to_string(),
+                reason: "provider cache symlink escaped its provider root".to_string(),
+            });
+        }
+        let metadata = fs::metadata(&canonical_target)?;
+        if metadata.is_dir() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: current.display().to_string(),
+                reason: "provider cache directory symlinks are not supported".to_string(),
+            });
+        }
+        if metadata.is_file() {
+            record_cache_file(base, current, provider, metadata, files)?;
+        }
         return Ok(());
     }
-    if metadata.is_dir() {
+
+    if link_metadata.is_file() {
+        record_cache_file(base, current, provider, link_metadata, files)?;
+        return Ok(());
+    }
+    if link_metadata.is_dir() {
         let mut entries = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             scan_cache_files(base, &entry.path(), provider, files)?;
         }
     }
+    Ok(())
+}
+
+fn record_cache_file(
+    base: &Path,
+    current: &Path,
+    provider: &str,
+    metadata: fs::Metadata,
+    files: &mut BTreeMap<PathBuf, FileSignature>,
+) -> PackageResult<()> {
+    let relative = current
+        .strip_prefix(base)
+        .map_err(|_| PackageError::ArtifactInstallFailed {
+            artifact: provider.to_string(),
+            reason: "provider cache path escaped its provider root".to_string(),
+        })?;
+    let relative = PathBuf::from(provider).join(relative);
+    let modified_nanos = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    files.insert(
+        relative,
+        FileSignature {
+            bytes: metadata.len(),
+            modified_nanos,
+        },
+    );
     Ok(())
 }
 
@@ -374,20 +426,162 @@ fn validate_relative_cache_path(path: &Path) -> PackageResult<()> {
     Ok(())
 }
 
+fn canonical_provider_cache_file(root: &Path, relative: &Path) -> PackageResult<PathBuf> {
+    validate_relative_cache_path(relative)?;
+    let provider = relative
+        .components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .unwrap_or_default();
+    let provider_root = root.join("cache").join(provider);
+    let canonical_root = fs::canonicalize(&provider_root).map_err(|error| {
+        PackageError::ArtifactInstallFailed {
+            artifact: relative.display().to_string(),
+            reason: format!("could not resolve provider cache root: {error}"),
+        }
+    })?;
+    let source = root.join("cache").join(relative);
+    let canonical_source = fs::canonicalize(&source).map_err(|error| {
+        PackageError::ArtifactInstallFailed {
+            artifact: relative.display().to_string(),
+            reason: format!("could not resolve provider cache artifact: {error}"),
+        }
+    })?;
+    if !canonical_source.starts_with(&canonical_root) {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: relative.display().to_string(),
+            reason: "provider cache artifact escaped its provider root".to_string(),
+        });
+    }
+    Ok(canonical_source)
+}
+
+fn validate_sha256(value: &str) -> PackageResult<()> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: value.to_string(),
+            reason: "provider blob SHA-256 is invalid".to_string(),
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn validate_ledger(
+    root: &Path,
+    ledger: &ModelProviderOwnership,
+) -> PackageResult<()> {
+    if ledger.schema_version != PROVIDER_OWNERSHIP_SCHEMA {
+        return Err(PackageError::ArtifactInstallFailed {
+            artifact: ledger.model_id.clone(),
+            reason: "provider ownership ledger schema mismatch".to_string(),
+        });
+    }
+    for artifact in &ledger.artifacts {
+        validate_relative_cache_path(&artifact.relative_cache_path)?;
+        validate_sha256(&artifact.sha256)?;
+        let expected_blob = provider_blob_path(root, &artifact.sha256)?;
+        // blob_path is retained in schema v1 for backwards compatibility, but it
+        // is never trusted for reads/deletes. New ledgers always write the derived
+        // Takokit-owned location.
+        if artifact.blob_path.as_os_str().is_empty() {
+            return Err(PackageError::ArtifactInstallFailed {
+                artifact: ledger.model_id.clone(),
+                reason: "provider ownership ledger contains an empty blob path".to_string(),
+            });
+        }
+        let _ = expected_blob;
+    }
+    Ok(())
+}
+
 pub(super) fn write_json_atomic(path: &Path, value: &impl Serialize) -> PackageResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let temporary = path.with_extension(format!("tmp-{}-{}", std::process::id(), now()));
-    fs::write(&temporary, serde_json::to_vec_pretty(value)?)?;
-    if path.exists() {
-        fs::remove_file(path)?;
-    }
-    fs::rename(&temporary, path).map_err(|error| {
-        let _ = fs::remove_file(&temporary);
-        PackageError::Io(error)
-    })?;
+
+    let lock_path = path.with_extension("lock");
+    let lock = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(lock_path)?;
+    lock.lock_exclusive()?;
+
+    recover_atomic_json(path)?;
+    let temporary = path.with_extension(format!(
+        "tmp-{}-{}",
+        std::process::id(),
+        now_nanos()
+    ));
+    let source = serde_json::to_vec_pretty(value)?;
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)?;
+    file.write_all(&source)?;
+    file.sync_all()?;
+    drop(file);
+
+    replace_atomic_json(path, &temporary)?;
+    sync_parent(path);
     Ok(())
+}
+
+pub(super) fn recover_atomic_json(path: &Path) -> PackageResult<()> {
+    #[cfg(windows)]
+    {
+        let backup = atomic_backup_path(path);
+        if !path.exists() && backup.is_file() {
+            fs::rename(&backup, path)?;
+        } else if path.exists() && backup.exists() {
+            remove_path_if_present(&backup)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn replace_atomic_json(path: &Path, temporary: &Path) -> PackageResult<()> {
+    fs::rename(temporary, path).map_err(Into::into)
+}
+
+#[cfg(windows)]
+fn replace_atomic_json(path: &Path, temporary: &Path) -> PackageResult<()> {
+    if !path.exists() {
+        return fs::rename(temporary, path).map_err(Into::into);
+    }
+    let backup = atomic_backup_path(path);
+    remove_path_if_present(&backup)?;
+    fs::rename(path, &backup)?;
+    match fs::rename(temporary, path) {
+        Ok(()) => {
+            remove_path_if_present(&backup)?;
+            Ok(())
+        }
+        Err(error) => {
+            let _ = fs::rename(&backup, path);
+            let _ = remove_path_if_present(temporary);
+            Err(error.into())
+        }
+    }
+}
+
+#[cfg(windows)]
+fn atomic_backup_path(path: &Path) -> PathBuf {
+    path.with_extension("bak")
+}
+
+fn sync_parent(path: &Path) {
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        if let Ok(directory) = fs::File::open(parent) {
+            let _ = directory.sync_all();
+        }
+    }
 }
 
 fn safe_id(value: &str) -> String {
@@ -408,4 +602,11 @@ pub(super) fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+fn now_nanos() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos()
 }
