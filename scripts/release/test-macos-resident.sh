@@ -11,6 +11,7 @@ TAKO="$INSTALL_ROOT/bin/tako"
 [ -x "$APP_BIN" ] || { echo "installed Takokit.app executable is missing: $APP_BIN" >&2; exit 1; }
 [ -x "$TAKO" ] || { echo "installed Takokit CLI is missing: $TAKO" >&2; exit 1; }
 command -v swiftc >/dev/null 2>&1 || { echo "swiftc is required for macOS resident acceptance" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 is required for macOS resident acceptance" >&2; exit 1; }
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/takokit-macos-resident.XXXXXX")"
 RESIDENT_PID=
@@ -32,6 +33,18 @@ trap cleanup EXIT HUP INT TERM
 export TAKOKIT_INSTALL_ROOT="$INSTALL_ROOT"
 export TAKOKIT_HOME="$TAKOKIT_HOME_ROOT"
 export TAKOKIT_APP_PATH="$APP"
+# Deliberately use a non-default free port. This proves the Rust runtime and
+# native macOS resident resolve the same endpoint contract instead of each
+# carrying an independent 127.0.0.1:5050 assumption.
+export TAKOKIT_PORT="$(python3 - <<'PY'
+import socket
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+PY
+)"
+export TAKOKIT_HOST=127.0.0.1
+API_BASE="http://${TAKOKIT_HOST}:${TAKOKIT_PORT}"
 
 cat > "$WORK/terminate-running-app.swift" <<'SWIFT'
 import AppKit
@@ -50,7 +63,7 @@ SWIFT
 swiftc "$WORK/terminate-running-app.swift" -framework AppKit -o "$WORK/terminate-running-app"
 
 identity_mode() {
-  curl -fsS --max-time 1 http://127.0.0.1:5050/api/v1/daemon/identity 2>/dev/null |
+  curl -fsS --max-time 1 "$API_BASE/api/v1/daemon/identity" 2>/dev/null |
     python3 -c 'import json,sys; print(json.load(sys.stdin).get("mode", ""))' 2>/dev/null || true
 }
 
@@ -59,13 +72,13 @@ require_identity() {
   for _ in $(seq 1 100); do
     mode="$(identity_mode)"
     if [ "$mode" = "$expected" ]; then
-      curl -fsS --max-time 1 http://127.0.0.1:5050/api/v1/daemon/identity |
-        python3 -c 'import json,os,pathlib,sys; d=json.load(sys.stdin); root=pathlib.Path(os.environ["TAKOKIT_INSTALL_ROOT"]).resolve(); exe=pathlib.Path(d["executable"]).resolve(); assert exe.parent == root/"bin", (exe, root); assert d["host"] in ("127.0.0.1","localhost","::1"); assert int(d["port"]) == 5050'
+      curl -fsS --max-time 1 "$API_BASE/api/v1/daemon/identity" |
+        python3 -c 'import json,os,pathlib,sys; d=json.load(sys.stdin); root=pathlib.Path(os.environ["TAKOKIT_INSTALL_ROOT"]).resolve(); exe=pathlib.Path(d["executable"]).resolve(); assert exe.parent == root/"bin", (exe, root); assert d["host"] == os.environ["TAKOKIT_HOST"]; assert int(d["port"]) == int(os.environ["TAKOKIT_PORT"])'
       return 0
     fi
     sleep 0.1
   done
-  echo "expected Takokit daemon identity mode '$expected', got '$(identity_mode)'" >&2
+  echo "expected Takokit daemon identity mode '$expected' at $API_BASE, got '$(identity_mode)'" >&2
   return 1
 }
 
@@ -126,4 +139,4 @@ for _ in $(seq 1 100); do
 done
 [ -z "$(identity_mode)" ] || { echo "direct developer server did not stop during test cleanup" >&2; exit 1; }
 
-echo "macOS installed resident lifecycle acceptance passed"
+echo "macOS installed resident lifecycle acceptance passed on shared endpoint $API_BASE"
