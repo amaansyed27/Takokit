@@ -1,7 +1,7 @@
 use fs2::FileExt;
 use std::{
     fs::{File, OpenOptions},
-    io::{BufReader, Read, Write},
+    io::{Read, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -106,17 +106,21 @@ impl WorkspaceStore {
     }
 
     pub fn active_session(&self) -> TakokitResult<Option<Uuid>> {
-        let path = self.root.join("active-session");
-        let Some(value) = read_recoverable_file(&path)? else {
+        if !self.root.is_dir() {
             return Ok(None);
-        };
-        let value = String::from_utf8(value).map_err(storage_error)?;
-        Ok(Uuid::parse_str(value.trim()).ok())
+        }
+        let _lock = self.lock()?;
+        active_session_unlocked(&self.root)
     }
 
     pub fn set_active_session(&self, id: Uuid) -> TakokitResult<()> {
         self.ensure_layout()?;
         let _lock = self.lock()?;
+        if !self.session_dir(id).is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "cannot activate missing workspace session {id}"
+            )));
+        }
         self.set_active_session_unlocked(id)
     }
 
@@ -133,7 +137,7 @@ impl WorkspaceStore {
         let _lock = self.lock()?;
         let mut summary = self.read_summary(id)?;
         let events_path = self.session_dir(id).join("events.jsonl");
-        let events = read_events_recovering_torn_tail(&events_path)?;
+        let events = read_events_recovering_torn_tail(&events_path, id)?;
         let reconciled = reconcile_summary(&summary, &events);
         if reconciled != summary {
             self.write_summary(&reconciled)?;
@@ -219,10 +223,7 @@ impl WorkspaceStore {
             summary.last_model = Some(model.clone());
         }
         if summary.title.starts_with("Takokit session ") {
-            summary.title = match &event.model {
-                Some(model) => format!("{} · {model}", event.task.label()),
-                None => event.task.label().to_string(),
-            };
+            summary.title = generated_session_title(&event);
         }
         self.write_summary(&summary)?;
         self.set_active_session_unlocked(session_id)?;
@@ -235,8 +236,16 @@ impl WorkspaceStore {
         filename: &str,
         content: &str,
     ) -> TakokitResult<PathBuf> {
+        self.ensure_layout()?;
         let filename = safe_filename(filename)?;
-        let directory = self.session_outputs_dir(session_id);
+        let _lock = self.lock()?;
+        let session_dir = self.session_dir(session_id);
+        if !session_dir.is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "cannot write output for missing workspace session {session_id}"
+            )));
+        }
+        let directory = session_dir.join("outputs");
         std::fs::create_dir_all(&directory).map_err(storage_error)?;
         let path = directory.join(filename);
         replace_file(&path, content.as_bytes())?;
@@ -254,7 +263,7 @@ impl WorkspaceStore {
         }
         std::fs::remove_dir_all(directory).map_err(storage_error)?;
         if active_session_unlocked(&self.root)? == Some(id) {
-            let _ = std::fs::remove_file(self.root.join("active-session"));
+            clear_active_session_state(&self.root)?;
         }
         Ok(true)
     }
@@ -265,30 +274,17 @@ impl WorkspaceStore {
 
     fn read_summary(&self, id: Uuid) -> TakokitResult<SessionSummary> {
         let path = self.summary_path(id);
-        let source = read_recoverable_file(&path)?.ok_or_else(|| {
-            TakokitError::Storage(format!(
-                "could not read session {id} at {}: file does not exist",
-                path.display()
-            ))
-        })?;
-        match serde_json::from_slice(&source) {
-            Ok(summary) => Ok(summary),
-            Err(primary_error) => {
-                let backup = backup_path(&path);
-                if backup.is_file() {
-                    let backup_source = std::fs::read(&backup).map_err(storage_error)?;
-                    let summary: SessionSummary = serde_json::from_slice(&backup_source)
-                        .map_err(|backup_error| {
-                            TakokitError::Storage(format!(
-                                "session {id} metadata and backup are invalid: {primary_error}; backup: {backup_error}"
-                            ))
-                        })?;
-                    restore_backup(&path, &backup)?;
-                    Ok(summary)
-                } else {
-                    Err(storage_error(primary_error))
+        let backup = backup_path(&path);
+
+        match read_summary_file(&path) {
+            Ok(Some(summary)) => {
+                if backup.exists() {
+                    let _ = std::fs::remove_file(&backup);
                 }
+                Ok(summary)
             }
+            Ok(None) => recover_summary_backup(id, &path, &backup, None),
+            Err(primary_error) => recover_summary_backup(id, &path, &backup, Some(primary_error)),
         }
     }
 
@@ -320,11 +316,121 @@ impl Drop for WorkspaceLock {
 
 fn active_session_unlocked(root: &Path) -> TakokitResult<Option<Uuid>> {
     let path = root.join("active-session");
-    let Some(value) = read_recoverable_file(&path)? else {
+    let backup = backup_path(&path);
+
+    let id = match read_uuid_file(&path) {
+        Ok(Some(id)) => {
+            if backup.exists() {
+                let _ = std::fs::remove_file(&backup);
+            }
+            Some(id)
+        }
+        Ok(None) => recover_uuid_backup(&path, &backup, None)?,
+        Err(primary_error) => recover_uuid_backup(&path, &backup, Some(primary_error))?,
+    };
+
+    let Some(id) = id else {
         return Ok(None);
     };
-    let value = String::from_utf8(value).map_err(storage_error)?;
-    Ok(Uuid::parse_str(value.trim()).ok())
+    if !root.join("sessions").join(id.to_string()).is_dir() {
+        clear_active_session_state(root)?;
+        return Ok(None);
+    }
+    Ok(Some(id))
+}
+
+fn clear_active_session_state(root: &Path) -> TakokitResult<()> {
+    let path = root.join("active-session");
+    let backup = backup_path(&path);
+    for candidate in [&path, &backup] {
+        match std::fs::remove_file(candidate) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(storage_error(error)),
+        }
+    }
+    sync_parent(&path);
+    Ok(())
+}
+
+fn read_uuid_file(path: &Path) -> TakokitResult<Option<Uuid>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let source = std::fs::read_to_string(path).map_err(storage_error)?;
+    let id = Uuid::parse_str(source.trim()).map_err(|error| {
+        TakokitError::Storage(format!(
+            "workspace active-session state {} is invalid: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(id))
+}
+
+fn recover_uuid_backup(
+    path: &Path,
+    backup: &Path,
+    primary_error: Option<TakokitError>,
+) -> TakokitResult<Option<Uuid>> {
+    match read_uuid_file(backup) {
+        Ok(Some(id)) => {
+            restore_backup(path, backup)?;
+            Ok(Some(id))
+        }
+        Ok(None) => match primary_error {
+            Some(error) => Err(error),
+            None => Ok(None),
+        },
+        Err(backup_error) => match primary_error {
+            Some(primary_error) => Err(TakokitError::Storage(format!(
+                "workspace active-session state and backup are invalid: {primary_error}; backup: {backup_error}"
+            ))),
+            None => Err(backup_error),
+        },
+    }
+}
+
+fn read_summary_file(path: &Path) -> TakokitResult<Option<SessionSummary>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let source = std::fs::read(path).map_err(storage_error)?;
+    serde_json::from_slice(&source)
+        .map(Some)
+        .map_err(storage_error)
+}
+
+fn recover_summary_backup(
+    id: Uuid,
+    path: &Path,
+    backup: &Path,
+    primary_error: Option<TakokitError>,
+) -> TakokitResult<SessionSummary> {
+    match read_summary_file(backup) {
+        Ok(Some(summary)) => {
+            if summary.id != id {
+                return Err(TakokitError::Storage(format!(
+                    "session {id} backup metadata identifies session {}",
+                    summary.id
+                )));
+            }
+            restore_backup(path, backup)?;
+            Ok(summary)
+        }
+        Ok(None) => match primary_error {
+            Some(error) => Err(error),
+            None => Err(TakokitError::Storage(format!(
+                "could not read session {id} at {}: file does not exist",
+                path.display()
+            ))),
+        },
+        Err(backup_error) => match primary_error {
+            Some(primary_error) => Err(TakokitError::Storage(format!(
+                "session {id} metadata and backup are invalid: {primary_error}; backup: {backup_error}"
+            ))),
+            None => Err(backup_error),
+        },
+    }
 }
 
 fn reconcile_summary(summary: &SessionSummary, events: &[SessionEvent]) -> SessionSummary {
@@ -341,6 +447,9 @@ fn reconcile_summary(summary: &SessionSummary, events: &[SessionEvent]) -> Sessi
             .iter()
             .rev()
             .find_map(|event| event.model.clone());
+        if reconciled.title.starts_with("Takokit session ") {
+            reconciled.title = generated_session_title(&events[0]);
+        }
     } else {
         reconciled.last_task = None;
         reconciled.last_model = None;
@@ -349,7 +458,17 @@ fn reconcile_summary(summary: &SessionSummary, events: &[SessionEvent]) -> Sessi
     reconciled
 }
 
-fn read_events_recovering_torn_tail(path: &Path) -> TakokitResult<Vec<SessionEvent>> {
+fn generated_session_title(event: &SessionEvent) -> String {
+    match &event.model {
+        Some(model) => format!("{} · {model}", event.task.label()),
+        None => event.task.label().to_string(),
+    }
+}
+
+fn read_events_recovering_torn_tail(
+    path: &Path,
+    expected_session: Uuid,
+) -> TakokitResult<Vec<SessionEvent>> {
     if !path.is_file() {
         return Ok(Vec::new());
     }
@@ -375,10 +494,19 @@ fn read_events_recovering_torn_tail(path: &Path) -> TakokitResult<Vec<SessionEve
         }
         match serde_json::from_slice::<SessionEvent>(line) {
             Ok(event) => {
+                if event.session_id != expected_session {
+                    return Err(TakokitError::Storage(format!(
+                        "session event log {} contains event {} for session {} instead of {}",
+                        path.display(),
+                        event.id,
+                        event.session_id,
+                        expected_session
+                    )));
+                }
                 events.push(event);
                 valid_bytes += raw_line.len();
             }
-            Err(error) if is_last && !ends_with_newline => {
+            Err(_) if is_last && !ends_with_newline => {
                 let file = OpenOptions::new()
                     .write(true)
                     .open(path)
@@ -465,23 +593,6 @@ fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
         std::fs::remove_file(path).map_err(storage_error)?;
     }
     std::fs::rename(temporary, path).map_err(storage_error)
-}
-
-fn read_recoverable_file(path: &Path) -> TakokitResult<Option<Vec<u8>>> {
-    if path.is_file() {
-        let bytes = std::fs::read(path).map_err(storage_error)?;
-        let backup = backup_path(path);
-        if backup.exists() {
-            let _ = std::fs::remove_file(backup);
-        }
-        return Ok(Some(bytes));
-    }
-    let backup = backup_path(path);
-    if backup.is_file() {
-        restore_backup(path, &backup)?;
-        return std::fs::read(path).map(Some).map_err(storage_error);
-    }
-    Ok(None)
 }
 
 fn restore_backup(path: &Path, backup: &Path) -> TakokitResult<()> {
@@ -613,6 +724,32 @@ mod tests {
     }
 
     #[test]
+    fn default_title_is_recovered_from_first_durable_event() {
+        let root = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::new(root.path());
+        let session = store.create_session(None).unwrap();
+        let event = SessionEvent {
+            id: Uuid::new_v4(),
+            session_id: session.summary.id,
+            timestamp: session.summary.created_at + 1,
+            task: SessionTask::SpeechToText,
+            state: SessionEventState::Completed,
+            model: Some("whisper-tiny".into()),
+            input: None,
+            source_path: None,
+            output_path: None,
+            text: None,
+            message: None,
+        };
+        let mut encoded = serde_json::to_vec(&event).unwrap();
+        encoded.push(b'\n');
+        std::fs::write(store.session_dir(session.summary.id).join("events.jsonl"), encoded).unwrap();
+
+        let recovered = store.read_session(session.summary.id).unwrap();
+        assert_eq!(recovered.summary.title, "Speech to text · whisper-tiny");
+    }
+
+    #[test]
     fn torn_final_event_is_truncated_without_losing_valid_events() {
         let root = tempfile::tempdir().unwrap();
         let store = WorkspaceStore::new(root.path());
@@ -656,5 +793,77 @@ mod tests {
         assert_eq!(recovered.summary.title, "recover me");
         assert!(path.is_file());
         assert!(!backup.exists());
+    }
+
+    #[test]
+    fn corrupt_primary_summary_recovers_from_valid_backup() {
+        let root = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::new(root.path());
+        let session = store.create_session(Some("recover me")).unwrap();
+        let path = store.summary_path(session.summary.id);
+        let backup = backup_path(&path);
+        std::fs::copy(&path, &backup).unwrap();
+        std::fs::write(&path, b"{torn").unwrap();
+
+        let recovered = store.read_session(session.summary.id).unwrap();
+        assert_eq!(recovered.summary.title, "recover me");
+        assert!(serde_json::from_slice::<SessionSummary>(&std::fs::read(&path).unwrap()).is_ok());
+        assert!(!backup.exists());
+    }
+
+    #[test]
+    fn corrupt_active_session_recovers_from_valid_backup() {
+        let root = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::new(root.path());
+        let session = store.create_session(Some("active")).unwrap();
+        let path = store.root().join("active-session");
+        let backup = backup_path(&path);
+        std::fs::copy(&path, &backup).unwrap();
+        std::fs::write(&path, b"torn").unwrap();
+
+        assert_eq!(store.active_session().unwrap(), Some(session.summary.id));
+        assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), session.summary.id.to_string());
+        assert!(!backup.exists());
+    }
+
+    #[test]
+    fn removed_active_session_does_not_resurrect_from_backup() {
+        let root = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::new(root.path());
+        let session = store.create_session(Some("remove")).unwrap();
+        let path = store.root().join("active-session");
+        let backup = backup_path(&path);
+        std::fs::copy(&path, &backup).unwrap();
+
+        assert!(store.remove_session(session.summary.id).unwrap());
+        assert_eq!(store.active_session().unwrap(), None);
+        assert!(!path.exists());
+        assert!(!backup.exists());
+    }
+
+    #[test]
+    fn foreign_session_event_is_rejected() {
+        let root = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::new(root.path());
+        let session = store.create_session(Some("one")).unwrap();
+        let other = Uuid::new_v4();
+        let event = SessionEvent {
+            id: Uuid::new_v4(),
+            session_id: other,
+            timestamp: session.summary.created_at + 1,
+            task: SessionTask::Diagnostics,
+            state: SessionEventState::Completed,
+            model: None,
+            input: None,
+            source_path: None,
+            output_path: None,
+            text: None,
+            message: None,
+        };
+        let mut encoded = serde_json::to_vec(&event).unwrap();
+        encoded.push(b'\n');
+        std::fs::write(store.session_dir(session.summary.id).join("events.jsonl"), encoded).unwrap();
+
+        assert!(store.read_session(session.summary.id).is_err());
     }
 }
