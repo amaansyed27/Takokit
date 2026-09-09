@@ -6,10 +6,11 @@
 //! without redownloading the model.
 
 use crate::{artifact_io::sha256_file, PackageError, PackageResult};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
-    fs,
+    fs::{self, File, OpenOptions},
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -101,6 +102,28 @@ struct MigrationJournal {
     updated_at_unix: u64,
 }
 
+struct ProviderOwnershipGuard(File);
+
+impl Drop for ProviderOwnershipGuard {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+
+fn acquire_provider_ownership_lock(root: &Path) -> PackageResult<ProviderOwnershipGuard> {
+    let path = root.join("runtime").join("provider-ownership.lock");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(path)?;
+    file.lock_exclusive()?;
+    Ok(ProviderOwnershipGuard(file))
+}
+
 pub fn snapshot_provider_cache(root: &Path) -> PackageResult<ProviderCacheSnapshot> {
     let mut files = BTreeMap::new();
     for provider in PROVIDERS {
@@ -115,6 +138,10 @@ pub fn capture_provider_ownership(
     model_id: &str,
     before: &ProviderCacheSnapshot,
 ) -> PackageResult<ModelProviderOwnership> {
+    // Normal model pulls already hold the global maintenance lock across the
+    // before/after interval. This narrower lock additionally serializes the
+    // ledger read-modify-write itself for direct callers and migrations.
+    let _guard = acquire_provider_ownership_lock(root)?;
     let after = snapshot_provider_cache(root)?;
     let existing = read_model_provider_ownership(root, model_id)?;
     let mut selected = BTreeSet::new();
@@ -152,6 +179,7 @@ pub fn capture_provider_ownership(
 }
 
 pub fn ensure_provider_cache_from_ownership(root: &Path, model_id: &str) -> PackageResult<u64> {
+    let _guard = acquire_provider_ownership_lock(root)?;
     let Some(ownership) = read_model_provider_ownership(root, model_id)? else {
         return Ok(0);
     };
@@ -160,27 +188,33 @@ pub fn ensure_provider_cache_from_ownership(root: &Path, model_id: &str) -> Pack
     for artifact in ownership.artifacts {
         validate_relative_cache_path(&artifact.relative_cache_path)?;
         let destination = cache_root.join(&artifact.relative_cache_path);
-        let valid = fs::metadata(&destination)
-            .ok()
-            .is_some_and(|metadata| metadata.is_file() && metadata.len() == artifact.bytes);
+        let valid = fs::symlink_metadata(&destination).ok().is_some_and(|metadata| {
+            !metadata.file_type().is_symlink()
+                && metadata.is_file()
+                && metadata.len() == artifact.bytes
+                && sha256_file(&destination)
+                    .map(|actual| actual == artifact.sha256)
+                    .unwrap_or(false)
+        });
         if valid {
             continue;
         }
-        if !artifact.blob_path.is_file() {
+
+        // Schema v1 stores blob_path, but recovery never trusts a persisted path.
+        // The only authoritative location is derived from Takokit's root + digest.
+        let blob = provider_blob_path(root, &artifact.sha256)?;
+        if !blob.is_file() {
             return Err(PackageError::ArtifactInstallFailed {
                 artifact: model_id.to_string(),
-                reason: format!(
-                    "durable provider blob is missing: {}",
-                    artifact.blob_path.display()
-                ),
+                reason: format!("durable provider blob is missing: {}", blob.display()),
             });
         }
-        if sha256_file(&artifact.blob_path)? != artifact.sha256 {
+        if sha256_file(&blob)? != artifact.sha256 {
             return Err(PackageError::ArtifactInstallFailed {
                 artifact: model_id.to_string(),
                 reason: format!(
                     "durable provider blob failed SHA-256 verification: {}",
-                    artifact.blob_path.display()
+                    blob.display()
                 ),
             });
         }
@@ -188,7 +222,7 @@ pub fn ensure_provider_cache_from_ownership(root: &Path, model_id: &str) -> Pack
             fs::create_dir_all(parent)?;
         }
         remove_path_if_present(&destination)?;
-        link_or_copy(&artifact.blob_path, &destination)?;
+        link_or_copy(&blob, &destination)?;
         restored = restored.saturating_add(artifact.bytes);
     }
     Ok(restored)
@@ -199,6 +233,7 @@ pub fn read_model_provider_ownership(
     model_id: &str,
 ) -> PackageResult<Option<ModelProviderOwnership>> {
     let path = ownership_path(root, model_id);
+    recover_atomic_json(&path)?;
     if !path.is_file() {
         return Ok(None);
     }
@@ -209,6 +244,7 @@ pub fn read_model_provider_ownership(
             reason: "provider ownership ledger schema/model identity mismatch".to_string(),
         });
     }
+    validate_ledger(root, &ownership)?;
     Ok(Some(ownership))
 }
 
@@ -277,7 +313,7 @@ pub fn provider_ownership_status(root: &Path) -> PackageResult<ProviderOwnership
     let fully_owned = pending.is_empty()
         && ledgers
             .iter()
-            .all(|ledger| verify_ledger_blobs(ledger).is_ok());
+            .all(|ledger| verify_ledger_blobs(root, ledger).is_ok());
     Ok(ProviderOwnershipStatus {
         schema_version: PROVIDER_OWNERSHIP_SCHEMA,
         provider_cache_files,
@@ -295,6 +331,7 @@ pub fn clean_provider_storage(
     scope: &str,
     dry_run: bool,
 ) -> PackageResult<ProviderCleanupReport> {
+    let _guard = acquire_provider_ownership_lock(root)?;
     let mut removed = Vec::new();
     let mut retained = Vec::new();
     match scope {
@@ -380,6 +417,7 @@ pub fn remove_model_provider_ownership(
     model_id: &str,
     dry_run: bool,
 ) -> PackageResult<ProviderCleanupReport> {
+    let _guard = acquire_provider_ownership_lock(root)?;
     let ledger_path = ownership_path(root, model_id);
     let mut ignored = HashSet::new();
     ignored.insert(model_id.to_string());
@@ -495,5 +533,41 @@ mod tests {
             .retained
             .iter()
             .any(|item| item.category == "huggingface"));
+    }
+
+    #[test]
+    fn persisted_blob_path_cannot_redirect_rehydration_outside_takokit() {
+        let root = tempfile::tempdir().unwrap();
+        let provider = root.path().join("cache/huggingface");
+        fs::create_dir_all(&provider).unwrap();
+        let before = snapshot_provider_cache(root.path()).unwrap();
+        fs::write(provider.join("weights.bin"), b"owned-by-takokit").unwrap();
+        let mut ownership =
+            capture_provider_ownership(root.path(), "fixture-model", &before).unwrap();
+        let external = root.path().join("external.bin");
+        fs::write(&external, b"foreign-data").unwrap();
+        ownership.artifacts[0].blob_path = external.clone();
+        write_model_provider_ownership(root.path(), &ownership).unwrap();
+        fs::remove_file(provider.join("weights.bin")).unwrap();
+
+        ensure_provider_cache_from_ownership(root.path(), "fixture-model").unwrap();
+        assert_eq!(fs::read(provider.join("weights.bin")).unwrap(), b"owned-by-takokit");
+        assert_eq!(fs::read(external).unwrap(), b"foreign-data");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn provider_cache_symlink_cannot_escape_provider_root() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let provider = root.path().join("cache/huggingface");
+        fs::create_dir_all(&provider).unwrap();
+        let external = root.path().join("outside.bin");
+        fs::write(&external, b"foreign").unwrap();
+        symlink(&external, provider.join("weights.bin")).unwrap();
+
+        let error = snapshot_provider_cache(root.path()).unwrap_err().to_string();
+        assert!(error.contains("escaped its provider root"));
     }
 }
