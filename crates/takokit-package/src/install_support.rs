@@ -287,7 +287,10 @@ fn copy_synced(source: &Path, destination: &Path) -> PackageResult<()> {
     }
     remove_file_if_exists(destination.to_path_buf())?;
     std::fs::copy(source, destination)?;
-    File::open(destination)?.sync_all()?;
+    OpenOptions::new()
+        .write(true)
+        .open(destination)?
+        .sync_all()?;
     Ok(())
 }
 
