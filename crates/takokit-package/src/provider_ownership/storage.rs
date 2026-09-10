@@ -395,9 +395,9 @@ fn atomic_backup_path(path: &Path) -> PathBuf {
     path.with_extension("bak")
 }
 
-fn sync_parent(path: &Path) {
+fn sync_parent(_path: &Path) {
     #[cfg(unix)]
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = _path.parent() {
         if let Ok(directory) = fs::File::open(parent) {
             let _ = directory.sync_all();
         }

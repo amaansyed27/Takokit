@@ -304,9 +304,9 @@ pub(super) fn backup_path(path: &Path) -> PathBuf {
     path.with_file_name(format!("{name}.bak"))
 }
 
-fn sync_parent(path: &Path) {
+fn sync_parent(_path: &Path) {
     #[cfg(unix)]
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = _path.parent() {
         if let Ok(directory) = File::open(parent) {
             let _ = directory.sync_all();
         }

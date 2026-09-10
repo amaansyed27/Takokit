@@ -327,9 +327,9 @@ fn regular_file_exists(path: &Path) -> PackageResult<bool> {
     }
 }
 
-fn sync_parent(path: &Path) {
+fn sync_parent(_path: &Path) {
     #[cfg(unix)]
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = _path.parent() {
         if let Ok(directory) = File::open(parent) {
             let _ = directory.sync_all();
         }
