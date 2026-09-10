@@ -1,0 +1,78 @@
+name: P1 Workspace Windows Fixer
+
+on:
+  push:
+    branches:
+      - fix/p1-stability-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Fix Windows workspace durability handles
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/takokit-store/src/workspace/recovery.rs")
+          source = path.read_text()
+          old_backup = '''        File::open(&backup)
+            .and_then(|file| file.sync_all())
+            .map_err(storage_error)?;'''
+          new_backup = '''        OpenOptions::new()
+            .write(true)
+            .open(&backup)
+            .and_then(|file| file.sync_all())
+            .map_err(storage_error)?;'''
+          if source.count(old_backup) != 1:
+              raise SystemExit("backup durable-copy target did not match exactly once")
+          source = source.replace(old_backup, new_backup, 1)
+
+          old_restore = '''    File::open(&temporary)
+        .and_then(|file| file.sync_all())
+        .map_err(storage_error)?;'''
+          new_restore = '''    OpenOptions::new()
+        .write(true)
+        .open(&temporary)
+        .and_then(|file| file.sync_all())
+        .map_err(storage_error)?;'''
+          if source.count(old_restore) != 1:
+              raise SystemExit("restore durable-copy target did not match exactly once")
+          path.write_text(source.replace(old_restore, new_restore, 1))
+          PY
+          cargo fmt --all
+
+      - name: Verify server tests on Windows
+        shell: pwsh
+        env:
+          RUSTFLAGS: -D warnings
+        run: |
+          cargo test -p takokit-server --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No workspace changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/takokit-store/src/workspace/recovery.rs
+          git commit -m "fix(store): use writable handles for Windows durability flushes"
+          git push origin HEAD:fix/p1-stability-hardening
