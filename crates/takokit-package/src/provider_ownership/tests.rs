@@ -1,4 +1,6 @@
+use super::support::write_model_provider_ownership;
 use super::*;
+use std::fs;
 
 #[test]
 fn capture_hardlinks_cache_bytes_into_durable_blob_and_rehydrates() {
