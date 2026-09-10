@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event.head_commit.message == 'Merge P1 test release publisher'
+    if: startsWith(github.event.head_commit.message, 'ci: trigger P1 test prerelease')
     runs-on: ubuntu-latest
     steps:
       - name: Download accepted P1 cross-platform candidate
