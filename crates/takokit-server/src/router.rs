@@ -84,11 +84,7 @@ async fn local_security(
     request: Request<Body>,
     next: Next,
 ) -> Response {
-    let is_loopback = state
-        .config
-        .host
-        .parse::<std::net::IpAddr>()
-        .is_ok_and(|address| address.is_loopback());
+    let is_loopback = configured_host_is_loopback(&state.config.host);
     if !is_loopback {
         let expected = std::env::var("TAKOKIT_API_TOKEN").unwrap_or_default();
         let supplied = request
@@ -104,14 +100,12 @@ async fn local_security(
         if let Some(host) = request
             .headers()
             .get(header::HOST)
-            .and_then(|v| v.to_str().ok())
+            .and_then(|value| value.to_str().ok())
         {
-            let name = host
-                .split(':')
-                .next()
-                .unwrap_or(host)
-                .trim_matches(['[', ']']);
-            if !matches!(name, "127.0.0.1" | "::1" | "localhost") {
+            let Some(name) = host_header_name(host) else {
+                return security_error(StatusCode::FORBIDDEN, "invalid_host");
+            };
+            if !configured_host_is_loopback(name) {
                 return security_error(StatusCode::FORBIDDEN, "invalid_host");
             }
         }
@@ -120,17 +114,56 @@ async fn local_security(
             .get(header::ORIGIN)
             .and_then(|value| value.to_str().ok())
         {
-            let allowed = [
-                format!("http://127.0.0.1:{}", state.config.port),
-                format!("http://localhost:{}", state.config.port),
-                format!("http://[::1]:{}", state.config.port),
-            ];
+            let allowed = loopback_origins(&state.config);
             if !allowed.iter().any(|value| value == origin) {
                 return security_error(StatusCode::FORBIDDEN, "origin_not_allowed");
             }
         }
     }
     next.run(request).await
+}
+
+fn configured_host_is_loopback(host: &str) -> bool {
+    let host = host.trim().trim_start_matches('[').trim_end_matches(']');
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
+
+fn host_header_name(host: &str) -> Option<&str> {
+    let host = host.trim();
+    if host.is_empty() {
+        return None;
+    }
+    if let Some(rest) = host.strip_prefix('[') {
+        let end = rest.find(']')?;
+        let name = &rest[..end];
+        let suffix = &rest[end + 1..];
+        if !suffix.is_empty() && (!suffix.starts_with(':') || suffix[1..].parse::<u16>().is_err()) {
+            return None;
+        }
+        return (!name.is_empty()).then_some(name);
+    }
+    match host.rsplit_once(':') {
+        Some((name, port)) if !name.contains(':') && port.parse::<u16>().is_ok() => {
+            (!name.is_empty()).then_some(name)
+        }
+        Some(_) if host.contains(':') => Some(host),
+        _ => Some(host),
+    }
+}
+
+fn loopback_origins(config: &takokit_core::RuntimeConfig) -> Vec<String> {
+    let mut allowed = vec![
+        config.local_base_url(),
+        format!("http://127.0.0.1:{}", config.port),
+        format!("http://localhost:{}", config.port),
+        format!("http://[::1]:{}", config.port),
+    ];
+    allowed.sort();
+    allowed.dedup();
+    allowed
 }
 
 fn security_error(status: StatusCode, code: &'static str) -> Response {
@@ -316,12 +349,17 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
 }
 
 fn validate_bind_security(state: &AppState) -> anyhow::Result<()> {
-    let address = state
-        .config
-        .host
+    let host = state.config.host.trim();
+    let is_loopback = configured_host_is_loopback(host);
+    let is_ip = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
         .parse::<std::net::IpAddr>()
-        .with_context(|| format!("invalid Takokit host {}", state.config.host))?;
-    if !address.is_loopback()
+        .is_ok();
+    if !is_loopback && !is_ip {
+        anyhow::bail!("invalid Takokit host {}", state.config.host);
+    }
+    if !is_loopback
         && std::env::var("TAKOKIT_API_TOKEN")
             .ok()
             .is_none_or(|token| token.trim().len() < 24)

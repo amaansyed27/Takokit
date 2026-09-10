@@ -23,7 +23,9 @@ impl InstalledRegistry {
     }
 
     pub fn installed_model(&self, id: &str) -> PackageResult<ModelManifest> {
-        std::fs::read_to_string(self.model_manifest_path(id))
+        let manifest_path = self.model_manifest_path(id);
+        recover_model_install_files(&manifest_path, &self.model_record_path(id))?;
+        std::fs::read_to_string(manifest_path)
             .map_err(|error| match error.kind() {
                 std::io::ErrorKind::NotFound => PackageError::ModelNotInstalled(id.to_string()),
                 _ => PackageError::Io(error),
@@ -32,19 +34,20 @@ impl InstalledRegistry {
     }
 
     pub fn installed_model_record(&self, id: &str) -> PackageResult<InstalledModelRecord> {
-        std::fs::read_to_string(self.model_record_path(id))
+        let manifest_path = self.model_manifest_path(id);
+        let record_path = self.model_record_path(id);
+        recover_model_install_files(&manifest_path, &record_path)?;
+        std::fs::read_to_string(&record_path)
             .map_err(|error| match error.kind() {
                 std::io::ErrorKind::NotFound => PackageError::ModelNotInstalled(id.to_string()),
                 _ => PackageError::Io(error),
             })
             .and_then(|source| Ok(toml::from_str(&source)?))
             .or_else(|error| match error {
-                PackageError::ModelNotInstalled(_) if self.model_manifest_path(id).is_file() => {
-                    let manifest = self.installed_model(id)?;
-                    Ok(installed_model_record(
-                        &manifest,
-                        self.model_manifest_path(id),
-                    ))
+                PackageError::ModelNotInstalled(_) if manifest_path.is_file() => {
+                    let source = std::fs::read_to_string(&manifest_path)?;
+                    let manifest: ModelManifest = toml::from_str(&source)?;
+                    Ok(installed_model_record(&manifest, manifest_path))
                 }
                 _ => Err(error),
             })
@@ -75,6 +78,7 @@ impl InstalledRegistry {
     }
 
     pub fn installed_model_records(&self) -> PackageResult<Vec<InstalledModelRecord>> {
+        self.recover_pending_model_transactions()?;
         read_manifest_dir(&self.root.join("installed-models"))
     }
 
@@ -83,7 +87,12 @@ impl InstalledRegistry {
     }
 
     pub fn is_model_installed(&self, id: &str) -> bool {
-        self.model_record_path(id).is_file() || self.model_manifest_path(id).is_file()
+        let manifest_path = self.model_manifest_path(id);
+        let record_path = self.model_record_path(id);
+        if recover_model_install_files(&manifest_path, &record_path).is_err() {
+            return false;
+        }
+        record_path.is_file() || manifest_path.is_file()
     }
 
     pub fn is_runner_installed(&self, id: &str) -> bool {
@@ -232,13 +241,20 @@ impl InstalledRegistry {
         record.status = InstalledPackageStatus::Ready;
         record.note = note.into();
         record.installed_at = timestamp_now();
-        std::fs::write(self.model_record_path(id), toml::to_string_pretty(&record)?)?;
+        let manifest = self.installed_model(id)?;
+        write_model_install_files(
+            &self.model_manifest_path(id),
+            &self.model_record_path(id),
+            &toml::to_string_pretty(&manifest)?,
+            &toml::to_string_pretty(&record)?,
+        )?;
         Ok(())
     }
 
     pub fn remove_model(&self, id: &str) -> PackageResult<bool> {
         let manifest_path = self.model_manifest_path(id);
         let record_path = self.model_record_path(id);
+        recover_model_install_files(&manifest_path, &record_path)?;
         if !manifest_path.exists() && !record_path.exists() {
             return Err(PackageError::ModelNotInstalled(id.to_string()));
         }
@@ -287,6 +303,26 @@ impl InstalledRegistry {
             .parent()
             .map(Path::to_path_buf)
             .unwrap_or_else(|| self.root.clone())
+    }
+
+    fn recover_pending_model_transactions(&self) -> PackageResult<()> {
+        let models = self.root.join("models");
+        if !models.is_dir() {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(&models)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            let Some(manifest_name) = name.strip_suffix(".install-txn.json") else {
+                continue;
+            };
+            if !manifest_name.ends_with(".toml") {
+                continue;
+            }
+            let id = manifest_name.trim_end_matches(".toml");
+            recover_model_install_files(&models.join(manifest_name), &self.model_record_path(id))?;
+        }
+        Ok(())
     }
 
     fn install_artifacts(

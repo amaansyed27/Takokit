@@ -1,7 +1,7 @@
 use fs2::FileExt;
 use std::{
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Write},
+    io::Write,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -9,6 +9,9 @@ use takokit_core::{
     NewSessionEvent, SessionEvent, SessionRecord, SessionSummary, TakokitError, TakokitResult,
 };
 use uuid::Uuid;
+
+mod recovery;
+use recovery::*;
 
 const WORKSPACE_VERSION: &str = "1";
 
@@ -65,6 +68,7 @@ impl WorkspaceStore {
 
     pub fn create_session(&self, title: Option<&str>) -> TakokitResult<SessionRecord> {
         self.ensure_layout()?;
+        let _lock = self.lock()?;
         let id = Uuid::new_v4();
         let timestamp = now();
         let session_dir = self.session_dir(id);
@@ -82,7 +86,7 @@ impl WorkspaceStore {
         };
         self.write_summary(&summary)?;
         replace_file(&session_dir.join("events.jsonl"), b"")?;
-        self.set_active_session(id)?;
+        self.set_active_session_unlocked(id)?;
         Ok(SessionRecord {
             summary,
             events: Vec::new(),
@@ -105,32 +109,42 @@ impl WorkspaceStore {
     }
 
     pub fn active_session(&self) -> TakokitResult<Option<Uuid>> {
-        let path = self.root.join("active-session");
-        if !path.is_file() {
+        if !self.root.is_dir() {
             return Ok(None);
         }
-        let value = std::fs::read_to_string(path).map_err(storage_error)?;
-        Ok(Uuid::parse_str(value.trim()).ok())
+        let _lock = self.lock()?;
+        active_session_unlocked(&self.root)
     }
 
     pub fn set_active_session(&self, id: Uuid) -> TakokitResult<()> {
         self.ensure_layout()?;
+        let _lock = self.lock()?;
+        if !self.session_dir(id).is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "cannot activate missing workspace session {id}"
+            )));
+        }
+        self.set_active_session_unlocked(id)
+    }
+
+    fn set_active_session_unlocked(&self, id: Uuid) -> TakokitResult<()> {
         replace_file(&self.root.join("active-session"), id.to_string().as_bytes())
     }
 
     pub fn read_session(&self, id: Uuid) -> TakokitResult<SessionRecord> {
-        let summary = self.read_summary(id)?;
+        if !self.root.is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "workspace session {id} does not exist"
+            )));
+        }
+        let _lock = self.lock()?;
+        let mut summary = self.read_summary(id)?;
         let events_path = self.session_dir(id).join("events.jsonl");
-        let mut events = Vec::new();
-        if events_path.is_file() {
-            let reader = BufReader::new(File::open(events_path).map_err(storage_error)?);
-            for line in reader.lines() {
-                let line = line.map_err(storage_error)?;
-                if line.trim().is_empty() {
-                    continue;
-                }
-                events.push(serde_json::from_str(&line).map_err(storage_error)?);
-            }
+        let events = read_events_recovering_torn_tail(&events_path, id)?;
+        let reconciled = reconcile_summary(&summary, &events);
+        if reconciled != summary {
+            self.write_summary(&reconciled)?;
+            summary = reconciled;
         }
         Ok(SessionRecord { summary, events })
     }
@@ -150,21 +164,21 @@ impl WorkspaceStore {
             let Ok(id) = Uuid::parse_str(&entry.file_name().to_string_lossy()) else {
                 continue;
             };
-            let Ok(summary) = self.read_summary(id) else {
+            let Ok(record) = self.read_session(id) else {
                 continue;
             };
             if let Some(query) = query_lower.as_deref() {
-                let summary_text = serde_json::to_string(&summary)
+                let summary_text = serde_json::to_string(&record.summary)
                     .map_err(storage_error)?
                     .to_lowercase();
-                let events_text = std::fs::read_to_string(entry.path().join("events.jsonl"))
-                    .unwrap_or_default()
+                let events_text = serde_json::to_string(&record.events)
+                    .map_err(storage_error)?
                     .to_lowercase();
                 if !summary_text.contains(query) && !events_text.contains(query) {
                     continue;
                 }
             }
-            sessions.push(summary);
+            sessions.push(record.summary);
         }
         sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
         Ok(sessions)
@@ -191,14 +205,15 @@ impl WorkspaceStore {
             text: event.text,
             message: event.message,
         };
-        let line = serde_json::to_string(&event).map_err(storage_error)?;
+        let mut encoded = serde_json::to_vec(&event).map_err(storage_error)?;
+        encoded.push(b'\n');
         let events_path = self.session_dir(session_id).join("events.jsonl");
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(events_path)
             .map_err(storage_error)?;
-        writeln!(file, "{line}").map_err(storage_error)?;
+        file.write_all(&encoded).map_err(storage_error)?;
         file.sync_data().map_err(storage_error)?;
 
         summary.updated_at = event.timestamp;
@@ -211,13 +226,10 @@ impl WorkspaceStore {
             summary.last_model = Some(model.clone());
         }
         if summary.title.starts_with("Takokit session ") {
-            summary.title = match &event.model {
-                Some(model) => format!("{} · {model}", event.task.label()),
-                None => event.task.label().to_string(),
-            };
+            summary.title = generated_session_title(&event);
         }
         self.write_summary(&summary)?;
-        self.set_active_session(session_id)?;
+        self.set_active_session_unlocked(session_id)?;
         Ok(event)
     }
 
@@ -227,8 +239,16 @@ impl WorkspaceStore {
         filename: &str,
         content: &str,
     ) -> TakokitResult<PathBuf> {
+        self.ensure_layout()?;
         let filename = safe_filename(filename)?;
-        let directory = self.session_outputs_dir(session_id);
+        let _lock = self.lock()?;
+        let session_dir = self.session_dir(session_id);
+        if !session_dir.is_dir() {
+            return Err(TakokitError::Storage(format!(
+                "cannot write output for missing workspace session {session_id}"
+            )));
+        }
+        let directory = session_dir.join("outputs");
         std::fs::create_dir_all(&directory).map_err(storage_error)?;
         let path = directory.join(filename);
         replace_file(&path, content.as_bytes())?;
@@ -236,13 +256,17 @@ impl WorkspaceStore {
     }
 
     pub fn remove_session(&self, id: Uuid) -> TakokitResult<bool> {
+        if !self.root.is_dir() {
+            return Ok(false);
+        }
+        let _lock = self.lock()?;
         let directory = self.session_dir(id);
         if !directory.exists() {
             return Ok(false);
         }
         std::fs::remove_dir_all(directory).map_err(storage_error)?;
-        if self.active_session()? == Some(id) {
-            let _ = std::fs::remove_file(self.root.join("active-session"));
+        if active_session_unlocked(&self.root)? == Some(id) {
+            clear_active_session_state(&self.root)?;
         }
         Ok(true)
     }
@@ -252,14 +276,7 @@ impl WorkspaceStore {
     }
 
     fn read_summary(&self, id: Uuid) -> TakokitResult<SessionSummary> {
-        let path = self.summary_path(id);
-        let source = std::fs::read_to_string(&path).map_err(|error| {
-            TakokitError::Storage(format!(
-                "could not read session {id} at {}: {error}",
-                path.display()
-            ))
-        })?;
-        serde_json::from_str(&source).map_err(storage_error)
+        read_summary_recovering(id, &self.summary_path(id))
     }
 
     fn write_summary(&self, summary: &SessionSummary) -> TakokitResult<()> {
@@ -311,40 +328,6 @@ fn safe_filename(filename: &str) -> TakokitResult<&str> {
     Ok(value)
 }
 
-fn replace_file(path: &Path, bytes: &[u8]) -> TakokitResult<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(storage_error)?;
-    }
-    let temporary = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
-    std::fs::write(&temporary, bytes).map_err(storage_error)?;
-    replace_file_platform(path, &temporary)
-}
-
-#[cfg(not(windows))]
-fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
-    std::fs::rename(temporary, path).map_err(storage_error)
-}
-
-#[cfg(windows)]
-fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
-    if !path.exists() {
-        return std::fs::rename(temporary, path).map_err(storage_error);
-    }
-    let backup = path.with_extension(format!("bak-{}", Uuid::new_v4()));
-    std::fs::rename(path, &backup).map_err(storage_error)?;
-    match std::fs::rename(temporary, path) {
-        Ok(()) => {
-            let _ = std::fs::remove_file(backup);
-            Ok(())
-        }
-        Err(error) => {
-            let _ = std::fs::rename(backup, path);
-            let _ = std::fs::remove_file(temporary);
-            Err(storage_error(error))
-        }
-    }
-}
-
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -357,60 +340,4 @@ fn storage_error(error: impl std::fmt::Display) -> TakokitError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use takokit_core::{SessionEventState, SessionTask};
-
-    #[test]
-    fn listing_empty_workspace_does_not_create_tako() {
-        let root = std::env::temp_dir().join(format!("takokit-empty-workspace-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&root).unwrap();
-        let store = WorkspaceStore::new(&root);
-        assert!(store.list_sessions(None).unwrap().is_empty());
-        assert!(!root.join(".tako").exists());
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn workspace_sessions_persist_events_outputs_and_search() {
-        let root = std::env::temp_dir().join(format!("takokit-workspace-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&root).expect("workspace");
-        let store = WorkspaceStore::new(&root);
-        let session = store.create_session(None).expect("session");
-        let output = store
-            .write_text_output(session.summary.id, "transcript.txt", "hello world")
-            .expect("output");
-        store
-            .append_event(
-                session.summary.id,
-                NewSessionEvent {
-                    task: SessionTask::SpeechToText,
-                    state: SessionEventState::Completed,
-                    model: Some("whisper-tiny".into()),
-                    input: None,
-                    source_path: Some(root.join("audio.wav")),
-                    output_path: Some(output),
-                    text: Some("hello world".into()),
-                    message: None,
-                },
-            )
-            .expect("event");
-        let record = store.read_session(session.summary.id).expect("record");
-        assert_eq!(record.events.len(), 1);
-        assert_eq!(record.summary.output_count, 1);
-        assert_eq!(store.list_sessions(Some("hello world")).unwrap().len(), 1);
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn summary_replacement_supports_multiple_updates() {
-        let root = std::env::temp_dir().join(format!("takokit-replace-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&root).unwrap();
-        let store = WorkspaceStore::new(&root);
-        let session = store.create_session(Some("one")).unwrap();
-        store.set_active_session(session.summary.id).unwrap();
-        store.set_active_session(session.summary.id).unwrap();
-        assert_eq!(store.active_session().unwrap(), Some(session.summary.id));
-        let _ = std::fs::remove_dir_all(root);
-    }
-}
+mod tests;

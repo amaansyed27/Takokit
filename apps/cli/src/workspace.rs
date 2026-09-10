@@ -227,8 +227,9 @@ mod tests {
         let root = std::env::temp_dir().join(format!("takokit-cli-stale-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let store = WorkspaceStore::new(&root);
+        store.ensure_layout().unwrap();
         let stale = Uuid::new_v4();
-        store.set_active_session(stale).unwrap();
+        std::fs::write(store.root().join("active-session"), stale.to_string()).unwrap();
 
         let context = CliWorkspace::resolve(Some(root.clone()), None, false, "recovered").unwrap();
 

@@ -6,6 +6,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    fs::OpenOptions,
+    io::Write,
     path::{Path as FsPath, PathBuf},
     time::UNIX_EPOCH,
 };
@@ -30,8 +32,8 @@ pub struct WorkspaceFileSummary {
 
 pub async fn workspace_files(headers: HeaderMap) -> Result<Json<serde_json::Value>, ApiError> {
     let store = crate::workspace::store_from_headers(&headers).map_err(ApiError)?;
-    let root = workspace_files_root(store.workspace_root());
-    let files = tokio::task::spawn_blocking(move || list_workspace_files(&root))
+    let workspace_root = store.workspace_root().to_path_buf();
+    let files = tokio::task::spawn_blocking(move || list_workspace_files(&workspace_root))
         .await
         .map_err(|error| {
             ApiError(TakokitError::Execution(format!(
@@ -67,23 +69,14 @@ pub async fn upload_workspace_file(
                 .to_string(),
         )));
     }
-    let root = workspace_files_root(store.workspace_root());
+    let workspace_root = store.workspace_root().to_path_buf();
     let bytes = body.to_vec();
     let summary =
         tokio::task::spawn_blocking(move || -> Result<WorkspaceFileSummary, TakokitError> {
-            std::fs::create_dir_all(&root).map_err(|error| {
-                TakokitError::Storage(format!(
-                    "could not create workspace files directory {}: {error}",
-                    root.display()
-                ))
+            let root = canonical_workspace_files_root(&workspace_root, true)?.ok_or_else(|| {
+                TakokitError::Storage("workspace files directory was not created".to_string())
             })?;
-            let destination = unique_destination(&root, &name);
-            std::fs::write(&destination, bytes).map_err(|error| {
-                TakokitError::Storage(format!(
-                    "could not save workspace file {}: {error}",
-                    destination.display()
-                ))
-            })?;
+            let destination = create_unique_workspace_file(&root, &name, &bytes)?;
             workspace_file_summary(&destination)
         })
         .await
@@ -157,12 +150,61 @@ fn workspace_files_root(workspace_root: &FsPath) -> PathBuf {
     workspace_root.join(".tako").join("files")
 }
 
-fn list_workspace_files(root: &FsPath) -> Result<Vec<WorkspaceFileSummary>, TakokitError> {
-    if !root.is_dir() {
-        return Ok(Vec::new());
+fn canonical_workspace_files_root(
+    workspace_root: &FsPath,
+    create: bool,
+) -> Result<Option<PathBuf>, TakokitError> {
+    let canonical_workspace = std::fs::canonicalize(workspace_root).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not resolve workspace root {}: {error}",
+            workspace_root.display()
+        ))
+    })?;
+    let root = workspace_files_root(workspace_root);
+    if create {
+        std::fs::create_dir_all(&root).map_err(|error| {
+            TakokitError::Storage(format!(
+                "could not create workspace files directory {}: {error}",
+                root.display()
+            ))
+        })?;
+    } else if !root.exists() {
+        return Ok(None);
     }
+
+    let metadata = std::fs::symlink_metadata(&root).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not inspect workspace files directory {}: {error}",
+            root.display()
+        ))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(TakokitError::Storage(
+            "workspace files directory must be a real directory inside the workspace".to_string(),
+        ));
+    }
+    let canonical_root = std::fs::canonicalize(&root).map_err(|error| {
+        TakokitError::Storage(format!(
+            "could not resolve workspace files directory {}: {error}",
+            root.display()
+        ))
+    })?;
+    if !canonical_root.starts_with(&canonical_workspace) {
+        return Err(TakokitError::Storage(
+            "workspace files directory escaped the selected workspace".to_string(),
+        ));
+    }
+    Ok(Some(canonical_root))
+}
+
+fn list_workspace_files(
+    workspace_root: &FsPath,
+) -> Result<Vec<WorkspaceFileSummary>, TakokitError> {
+    let Some(root) = canonical_workspace_files_root(workspace_root, false)? else {
+        return Ok(Vec::new());
+    };
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(root).map_err(|error| {
+    for entry in std::fs::read_dir(&root).map_err(|error| {
         TakokitError::Storage(format!(
             "could not read workspace files at {}: {error}",
             root.display()
@@ -170,7 +212,13 @@ fn list_workspace_files(root: &FsPath) -> Result<Vec<WorkspaceFileSummary>, Tako
     })? {
         let entry = entry.map_err(|error| TakokitError::Storage(error.to_string()))?;
         let path = entry.path();
-        if path.is_file() && supported_file(&path).is_some() {
+        let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            continue;
+        }
+        if supported_file(&path).is_some() {
             files.push(workspace_file_summary(&path)?);
         }
     }
@@ -196,12 +244,17 @@ fn workspace_file_summary(path: &FsPath) -> Result<WorkspaceFileSummary, Takokit
     let (kind, content_type) = supported_file(path).ok_or_else(|| {
         TakokitError::InvalidRequest(format!("unsupported workspace file: {}", path.display()))
     })?;
-    let metadata = std::fs::metadata(path).map_err(|error| {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
         TakokitError::Storage(format!(
             "could not inspect workspace file {}: {error}",
             path.display()
         ))
     })?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(TakokitError::Storage(
+            "workspace file must be a regular file".to_string(),
+        ));
+    }
     let modified_at = metadata
         .modified()
         .ok()
@@ -226,14 +279,90 @@ fn resolve_workspace_file(workspace_root: &FsPath, id: &str) -> Result<PathBuf, 
             "invalid workspace file id".to_string(),
         )));
     }
-    let path = workspace_files_root(workspace_root).join(name);
-    if !path.is_file() {
-        return Err(ApiError(TakokitError::InvalidRequest(format!(
+    let root = canonical_workspace_files_root(workspace_root, false)
+        .map_err(ApiError)?
+        .ok_or_else(|| {
+            ApiError(TakokitError::InvalidRequest(
+                "workspace file does not exist".to_string(),
+            ))
+        })?;
+    let path = root.join(name);
+    let metadata = std::fs::symlink_metadata(&path).map_err(|_| {
+        ApiError(TakokitError::InvalidRequest(format!(
             "workspace file does not exist: {}",
             path.display()
-        ))));
+        )))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(ApiError(TakokitError::InvalidRequest(
+            "workspace file must be a regular file inside the workspace".to_string(),
+        )));
     }
-    Ok(path)
+    let canonical = std::fs::canonicalize(&path).map_err(|error| {
+        ApiError(TakokitError::Storage(format!(
+            "could not resolve workspace file {}: {error}",
+            path.display()
+        )))
+    })?;
+    if !canonical.starts_with(&root) {
+        return Err(ApiError(TakokitError::InvalidRequest(
+            "workspace file escaped the workspace files directory".to_string(),
+        )));
+    }
+    Ok(canonical)
+}
+
+fn create_unique_workspace_file(
+    root: &FsPath,
+    name: &str,
+    bytes: &[u8],
+) -> Result<PathBuf, TakokitError> {
+    for index in 1..10_000 {
+        let candidate_name = if index == 1 {
+            name.to_string()
+        } else {
+            suffixed_file_name(name, index)
+        };
+        let destination = root.join(candidate_name);
+        match OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&destination)
+        {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
+                    let _ = std::fs::remove_file(&destination);
+                    return Err(TakokitError::Storage(format!(
+                        "could not save workspace file {}: {error}",
+                        destination.display()
+                    )));
+                }
+                return Ok(destination);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(TakokitError::Storage(format!(
+                    "could not create workspace file {}: {error}",
+                    destination.display()
+                )))
+            }
+        }
+    }
+    Err(TakokitError::Storage(
+        "could not allocate a unique workspace file name".to_string(),
+    ))
+}
+
+fn suffixed_file_name(name: &str, index: usize) -> String {
+    let path = FsPath::new(name);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("file");
+    match path.extension().and_then(|value| value.to_str()) {
+        Some(extension) => format!("{stem}-{index}.{extension}"),
+        None => format!("{stem}-{index}"),
+    }
 }
 
 fn sanitize_file_name(raw: &str) -> Result<String, ApiError> {
@@ -264,30 +393,6 @@ fn sanitize_file_name(raw: &str) -> Result<String, ApiError> {
         )));
     }
     Ok(cleaned.trim().to_string())
-}
-
-fn unique_destination(root: &FsPath, name: &str) -> PathBuf {
-    let direct = root.join(name);
-    if !direct.exists() {
-        return direct;
-    }
-    let path = FsPath::new(name);
-    let stem = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("file");
-    let extension = path.extension().and_then(|value| value.to_str());
-    for index in 2..10_000 {
-        let candidate = match extension {
-            Some(extension) => format!("{stem}-{index}.{extension}"),
-            None => format!("{stem}-{index}"),
-        };
-        let destination = root.join(candidate);
-        if !destination.exists() {
-            return destination;
-        }
-    }
-    root.join(format!("{}-{name}", uuid::Uuid::new_v4()))
 }
 
 fn supported_file(path: &FsPath) -> Option<(&'static str, &'static str)> {
@@ -336,9 +441,38 @@ mod tests {
     fn listing_missing_library_does_not_create_workspace_state() {
         let root = std::env::temp_dir().join(format!("takokit-files-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
-        let files_root = workspace_files_root(&root);
-        assert!(list_workspace_files(&files_root).unwrap().is_empty());
+        assert!(list_workspace_files(&root).unwrap().is_empty());
         assert!(!root.join(".tako").exists());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn create_new_upload_allocation_never_overwrites_existing_file() {
+        let root = tempfile::tempdir().unwrap();
+        let workspace = root.path();
+        let files = canonical_workspace_files_root(workspace, true)
+            .unwrap()
+            .unwrap();
+        std::fs::write(files.join("notes.txt"), b"original").unwrap();
+        let created = create_unique_workspace_file(&files, "notes.txt", b"second").unwrap();
+        assert_eq!(created.file_name().unwrap(), "notes-2.txt");
+        assert_eq!(std::fs::read(files.join("notes.txt")).unwrap(), b"original");
+        assert_eq!(std::fs::read(created).unwrap(), b"second");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workspace_content_rejects_symlink_escape() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let files = canonical_workspace_files_root(root.path(), true)
+            .unwrap()
+            .unwrap();
+        let external = root.path().join("secret.txt");
+        std::fs::write(&external, b"foreign").unwrap();
+        symlink(&external, files.join("linked.txt")).unwrap();
+        assert!(resolve_workspace_file(root.path(), "linked.txt").is_err());
+        assert!(list_workspace_files(root.path()).unwrap().is_empty());
     }
 }

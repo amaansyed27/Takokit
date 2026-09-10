@@ -1,0 +1,96 @@
+name: P1 Stability Acceptance
+
+on:
+  push:
+    branches:
+      - fix/p1-stability-hardening
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribution:
+    name: Cross-platform distribution regression
+    uses: ./.github/workflows/slice6-cross-platform.yml
+    with:
+      production_release: false
+
+  npm:
+    name: npm audit (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: gui
+            directory: apps/gui
+            lockfile: apps/gui/package-lock.json
+          - project: site
+            directory: site
+            lockfile: site/package-lock.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.lockfile }}
+      - name: Install exact lockfile
+        working-directory: ${{ matrix.directory }}
+        run: npm ci
+      - name: Audit npm dependency tree
+        working-directory: ${{ matrix.directory }}
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --audit-level=high 2>&1 | tee npm-audit.txt
+      - name: Upload npm audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-npm-audit-${{ matrix.project }}
+          path: ${{ matrix.directory }}/npm-audit.txt
+          if-no-files-found: error
+
+  rustsec:
+    name: RustSec cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install verified cargo-audit 0.22.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz"
+          root="$RUNNER_TEMP/cargo-audit-0.22.2"
+          curl -fsSL \
+            'https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz' \
+            -o "$archive"
+          echo 'ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39  '"$archive" | sha256sum --check
+          rm -rf "$root"
+          mkdir -p "$root"
+          tar -xzf "$archive" -C "$root"
+          audit_bin="$(find "$root" -type f -name cargo-audit -perm -u+x | head -n 1)"
+          test -n "$audit_bin"
+          "$audit_bin" --version
+          echo "CARGO_AUDIT_BIN=$audit_bin" >> "$GITHUB_ENV"
+      - name: Audit Cargo.lock
+        shell: bash
+        run: |
+          set -o pipefail
+          "$CARGO_AUDIT_BIN" audit --file Cargo.lock 2>&1 | tee cargo-audit.txt
+      - name: Upload RustSec evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-cargo-audit
+          path: cargo-audit.txt
+          if-no-files-found: error

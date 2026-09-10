@@ -2,8 +2,25 @@ import AppKit
 import Darwin
 import Foundation
 
-private let apiBase = "http://127.0.0.1:5050"
-private let guiURL = URL(string: "\(apiBase)/gui")!
+private struct RuntimeEndpoint {
+    let storageRoot: URL
+    let host: String
+    let port: Int
+
+    var authority: String {
+        let value: String
+        if host.contains(":") && !host.hasPrefix("[") {
+            value = "[\(host)]"
+        } else {
+            value = host
+        }
+        return "\(value):\(port)"
+    }
+
+    var apiBase: String { "http://\(authority)" }
+    var guiURL: URL? { URL(string: "\(apiBase)/gui") }
+}
+
 private let reopenNotification = Notification.Name("com.dawnlightlabs.takokit.open-gui")
 
 private enum ServerState {
@@ -25,6 +42,7 @@ private enum ServerState {
 private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var runtimeRoot: URL?
+    private var runtimeEndpoint: RuntimeEndpoint?
     private var expectedBuildID = ""
     private var updateVersion: String?
     private var updateCheckRunning = false
@@ -53,9 +71,11 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
         do {
             let root = try resolveRuntimeRoot()
             runtimeRoot = root
+            runtimeEndpoint = try resolveRuntimeEndpoint()
             expectedBuildID = readBuildID(root: root)
             try ensureLogDirectory()
-            log("resident starting; runtime_root=\(root.path); explicit_launch=\(explicitLaunch)")
+            let endpoint = runtimeEndpoint?.authority ?? "unresolved"
+            log("resident starting; runtime_root=\(root.path); endpoint=\(endpoint); explicit_launch=\(explicitLaunch)")
             installStatusItem()
             ensureServer(openGUIWhenReady: explicitLaunch)
             checkForUpdates(showResult: false)
@@ -165,9 +185,13 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
     }
 
     @objc private func copyAPIURL() {
+        guard let endpoint = runtimeEndpoint else {
+            showError("Takokit endpoint is unavailable", detail: "Restart Takokit after repairing the local runtime configuration.")
+            return
+        }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString("\(apiBase)/v1", forType: .string)
+        pasteboard.setString("\(endpoint.apiBase)/v1", forType: .string)
     }
 
     @objc private func startServer() {
@@ -217,9 +241,10 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
 
     @objc private func showAbout() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0"
+        let api = runtimeEndpoint.map { "\($0.apiBase)/v1" } ?? "unavailable"
         let alert = NSAlert()
         alert.messageText = "Takokit \(version)"
-        alert.informativeText = "Local voice AI runtime\n\nGUI: browser-based\nAPI: http://127.0.0.1:5050/v1"
+        alert.informativeText = "Local voice AI runtime\n\nGUI: browser-based\nAPI: \(api)"
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -232,6 +257,12 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
     private func ensureServer(openGUIWhenReady: Bool) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
+            guard let endpoint = self.runtimeEndpoint else {
+                DispatchQueue.main.async {
+                    self.showError("Takokit endpoint is unavailable", detail: "Restart Takokit after repairing the local runtime configuration.")
+                }
+                return
+            }
             var state = self.inspectServer()
             if case .stopped = state {
                 let result = self.runTako(["--output", "json", "start"])
@@ -247,11 +278,17 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
             switch state {
             case .managed, .direct:
                 if openGUIWhenReady {
+                    guard let guiURL = endpoint.guiURL else {
+                        DispatchQueue.main.async {
+                            self.showError("Takokit GUI URL is invalid", detail: "Configured endpoint: \(endpoint.authority)")
+                        }
+                        return
+                    }
                     DispatchQueue.main.async { NSWorkspace.shared.open(guiURL) }
                 }
             case .stopped:
                 DispatchQueue.main.async {
-                    self.showError("Takokit server did not become ready", detail: "See ~/.takokit/logs for server and resident logs.")
+                    self.showError("Takokit server did not become ready", detail: "See \(endpoint.storageRoot.path)/logs for server and resident logs.")
                 }
             case let .unavailable(detail):
                 DispatchQueue.main.async {
@@ -276,9 +313,15 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
 
     private func inspectServer() -> ServerState {
         guard let root = runtimeRoot else { return .unavailable("Takokit runtime is unresolved") }
-        let endpoint = URL(string: "\(apiBase)/api/v1/daemon/identity")!
-        var request = URLRequest(url: endpoint)
+        guard let endpoint = runtimeEndpoint else { return .unavailable("Takokit endpoint is unresolved") }
+        guard let identityURL = URL(string: "\(endpoint.apiBase)/api/v1/daemon/identity") else {
+            return .unavailable("Configured Takokit endpoint is invalid: \(endpoint.authority)")
+        }
+        var request = URLRequest(url: identityURL)
         request.timeoutInterval = 0.45
+        if let token = ProcessInfo.processInfo.environment["TAKOKIT_API_TOKEN"], token.count >= 24 {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let semaphore = DispatchSemaphore(value: 0)
         var data: Data?
         var response: URLResponse?
@@ -294,7 +337,7 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
         }
         if error != nil { return .stopped }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, let data else {
-            return .unavailable("Port 5050 is occupied by an unverified process")
+            return .unavailable("Configured endpoint \(endpoint.authority) is occupied by an unverified process")
         }
         guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let mode = value["mode"] as? String,
@@ -302,15 +345,15 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
               let buildID = value["build_id"] as? String,
               let host = value["host"] as? String,
               let port = value["port"] as? Int else {
-            return .unavailable("Port 5050 returned an invalid Takokit identity")
+            return .unavailable("Configured endpoint \(endpoint.authority) returned an invalid Takokit identity")
         }
         let executableParent = URL(fileURLWithPath: executable).standardizedFileURL.deletingLastPathComponent()
         let trustedBin = root.appendingPathComponent("bin", isDirectory: true).standardizedFileURL
         guard executableParent.path == trustedBin.path,
-              port == 5050,
-              ["127.0.0.1", "localhost", "::1"].contains(host),
+              port == endpoint.port,
+              host == endpoint.host,
               expectedBuildID.isEmpty || buildID == expectedBuildID else {
-            return .unavailable("Port 5050 is not the verified Takokit runtime for this installation")
+            return .unavailable("Configured endpoint \(endpoint.authority) is not the verified Takokit runtime for this installation")
         }
         switch mode {
         case "managed": return .managed
@@ -378,6 +421,29 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
         if validRuntimeRoot(standard) { return standard }
 
         throw NSError(domain: "Takokit", code: 2, userInfo: [NSLocalizedDescriptionKey: "Takokit.app could not find its matching runtime. Reinstall Takokit with the supported install.sh path or keep a portable Takokit.app inside its extracted package."])
+    }
+
+    private func resolveRuntimeEndpoint() throws -> RuntimeEndpoint {
+        let result = runTako(["--runtime-endpoint"])
+        guard result.status == 0,
+              let data = result.stdout.data(using: .utf8),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let host = value["host"] as? String,
+              let port = value["port"] as? Int,
+              let storageRoot = value["storage_root"] as? String,
+              !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !storageRoot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              (0...65535).contains(port) else {
+            let detail = result.status == 0
+                ? "Takokit CLI returned invalid runtime endpoint configuration"
+                : (result.stderr.isEmpty ? result.stdout : result.stderr)
+            throw NSError(domain: "Takokit", code: 6, userInfo: [NSLocalizedDescriptionKey: detail])
+        }
+        return RuntimeEndpoint(
+            storageRoot: URL(fileURLWithPath: storageRoot).standardizedFileURL,
+            host: host,
+            port: port
+        )
     }
 
     private func validRuntimeRoot(_ root: URL) -> Bool {
@@ -484,13 +550,31 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
         )
     }
 
+    private func storageRootForLogs() -> URL {
+        if let endpoint = runtimeEndpoint {
+            return endpoint.storageRoot
+        }
+        if let explicit = ProcessInfo.processInfo.environment["TAKOKIT_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicit.isEmpty {
+            return URL(fileURLWithPath: explicit).standardizedFileURL
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".takokit", isDirectory: true)
+            .standardizedFileURL
+    }
+
     private func ensureLogDirectory() throws {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".takokit/logs", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: storageRootForLogs().appendingPathComponent("logs", isDirectory: true),
+            withIntermediateDirectories: true
+        )
     }
 
     private func log(_ message: String) {
-        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".takokit/logs/resident-macos.log")
+        let root = storageRootForLogs()
+        let logs = root.appendingPathComponent("logs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        let url = logs.appendingPathComponent("resident-macos.log")
         let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         if !FileManager.default.fileExists(atPath: url.path) {
@@ -508,7 +592,9 @@ private final class TakokitAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
         let alert = NSAlert()
         alert.alertStyle = .critical
         alert.messageText = title
-        alert.informativeText = detail.isEmpty ? "See ~/.takokit/logs/resident-macos.log" : detail
+        alert.informativeText = detail.isEmpty
+            ? "See \(storageRootForLogs().path)/logs/resident-macos.log"
+            : detail
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

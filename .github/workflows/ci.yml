@@ -9,6 +9,7 @@ on:
       - slice/interactive-stabilization
       - slice/advanced-rvc-cloning
       - slice/linux-macos-distribution
+      - 'fix/**'
 
 permissions:
   contents: read

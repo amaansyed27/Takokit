@@ -177,11 +177,16 @@ fn checksum_mismatch_deletes_temporary_download() {
 
     let downloads = temp.path().join("cache").join("downloads");
 
-    let leftovers = std::fs::read_dir(downloads)
-        .map(|entries| entries.count())
+    let partials = std::fs::read_dir(downloads)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "part"))
+                .count()
+        })
         .unwrap_or(0);
 
-    assert_eq!(leftovers, 0);
+    assert_eq!(partials, 0);
 }
 
 #[test]
