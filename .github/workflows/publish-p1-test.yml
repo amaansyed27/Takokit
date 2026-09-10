@@ -1,0 +1,79 @@
+name: Publish P1 Test Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-p1-test-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.head_commit.message == 'Merge P1 test release publisher'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download accepted P1 cross-platform candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh run download 34442743283 \
+            --repo '${{ github.repository }}' \
+            --name 'takokit-v0.3.0-cross-platform-candidate-ba9722d23c95641a6e1e6f70e2fdf46a8c75774f' \
+            --dir release-assets
+
+      - name: Verify accepted provenance and required downloads
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('release-assets')
+          index = json.loads((root / 'release-index.json').read_text())
+          assert index['version'] == '0.3.0', index
+          assert index['commit_sha'] == 'ba9722d23c95641a6e1e6f70e2fdf46a8c75774f', index
+          required = [
+              'Takokit-v0.3.0-windows-x86_64-installer.exe',
+              'Takokit-v0.3.0-windows-x86_64.zip',
+              'Takokit-v0.3.0-windows-x86_64-update.zip',
+              'Takokit-v0.3.0-linux-x86_64.tar.gz',
+              'Takokit-v0.3.0-macos-arm64.tar.gz',
+              'SHA256SUMS.txt',
+              'release-manifest.json',
+              'release-index.json',
+              'release-index.sig',
+          ]
+          for name in required:
+              assert (root / name).is_file(), name
+          PY
+
+      - name: Publish Takokit v0.3.0 P1 test prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'EOF'
+          # Takokit v0.3.0 P1 Test
+
+          P1 stability-hardening test build for manual validation before the next stable patch release.
+
+          Includes download/install durability, managed-provider ownership and cleanup hardening, workspace/project recovery and file-safety improvements, managed Python adapter readiness fixes, and cross-platform packaging hardening.
+
+          Built from accepted P1 commit `ba9722d23c95641a6e1e6f70e2fdf46a8c75774f`, now merged into `main` via `9fd71b8b8cb3c461c9275a2a623cd1f359c41f72`.
+          EOF
+
+          gh release create 'v0.3.0-p1' \
+            --repo '${{ github.repository }}' \
+            --target 'ba9722d23c95641a6e1e6f70e2fdf46a8c75774f' \
+            --title 'Takokit v0.3.0 P1 Test' \
+            --notes-file release-notes.md \
+            --prerelease \
+            release-assets/*
