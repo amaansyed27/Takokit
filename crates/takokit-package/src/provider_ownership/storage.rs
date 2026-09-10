@@ -1,6 +1,34 @@
 use super::*;
 use fs2::FileExt;
-use std::{fs::OpenOptions, io::Write};
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::Component,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+pub(super) fn ownership_path(root: &Path, model_id: &str) -> PathBuf {
+    root.join("manifests")
+        .join("ownership")
+        .join("models")
+        .join(format!("{}.json", safe_id(model_id)))
+}
+
+pub(super) fn provider_blob_root(root: &Path) -> PathBuf {
+    root.join("blobs").join("provider").join("sha256")
+}
+
+pub(super) fn provider_blob_path(root: &Path, sha256: &str) -> PackageResult<PathBuf> {
+    validate_sha256(sha256)?;
+    Ok(provider_blob_root(root)
+        .join(&sha256[0..2])
+        .join(sha256))
+}
+
+pub(super) fn migration_journal_path(root: &Path) -> PathBuf {
+    root.join("runtime")
+        .join("storage-migration-provider-ownership.json")
+}
 
 pub(super) fn scan_cache_files(
     base: &Path,
@@ -255,7 +283,7 @@ pub(super) fn canonical_provider_cache_file(
     Ok(canonical_source)
 }
 
-pub(super) fn validate_sha256(value: &str) -> PackageResult<()> {
+fn validate_sha256(value: &str) -> PackageResult<()> {
     if value.len() != 64
         || !value
             .bytes()
@@ -375,7 +403,7 @@ fn sync_parent(path: &Path) {
     }
 }
 
-pub(super) fn safe_id(value: &str) -> String {
+fn safe_id(value: &str) -> String {
     value
         .chars()
         .map(|character| {
@@ -395,7 +423,7 @@ pub(super) fn now() -> u64 {
         .as_secs()
 }
 
-fn now_nanos() -> u128 {
+pub(super) fn now_nanos() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
