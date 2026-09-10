@@ -1,9 +1,13 @@
-use super::*;
 use super::storage::{
     canonical_provider_cache_file, collect_files, link_or_copy, now_nanos, ownership_path,
     provider_blob_path, provider_blob_root, recover_atomic_json, remove_path_if_present,
     validate_ledger, validate_relative_cache_path, write_json_atomic,
 };
+use super::{
+    ModelProviderOwnership, ProviderCleanupItem, ProviderOwnedArtifact, PROVIDER_OWNERSHIP_SCHEMA,
+};
+use crate::{artifact_io::sha256_file, PackageError, PackageResult};
+use std::{collections::HashSet, fs, path::Path};
 
 pub(super) fn materialize_owned_artifact(
     root: &Path,
