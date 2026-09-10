@@ -30,26 +30,14 @@ jobs:
 
           path = Path("crates/takokit-store/src/workspace/recovery.rs")
           source = path.read_text()
-          old_backup = '''        File::open(&backup)
-            .and_then(|file| file.sync_all())
-            .map_err(storage_error)?;'''
-          new_backup = '''        OpenOptions::new()
-            .write(true)
-            .open(&backup)
-            .and_then(|file| file.sync_all())
-            .map_err(storage_error)?;'''
+          old_backup = "        File::open(&backup)\n            .and_then(|file| file.sync_all())\n            .map_err(storage_error)?;"
+          new_backup = "        OpenOptions::new()\n            .write(true)\n            .open(&backup)\n            .and_then(|file| file.sync_all())\n            .map_err(storage_error)?;"
           if source.count(old_backup) != 1:
               raise SystemExit("backup durable-copy target did not match exactly once")
           source = source.replace(old_backup, new_backup, 1)
 
-          old_restore = '''    File::open(&temporary)
-        .and_then(|file| file.sync_all())
-        .map_err(storage_error)?;'''
-          new_restore = '''    OpenOptions::new()
-        .write(true)
-        .open(&temporary)
-        .and_then(|file| file.sync_all())
-        .map_err(storage_error)?;'''
+          old_restore = "    File::open(&temporary)\n        .and_then(|file| file.sync_all())\n        .map_err(storage_error)?;"
+          new_restore = "    OpenOptions::new()\n        .write(true)\n        .open(&temporary)\n        .and_then(|file| file.sync_all())\n        .map_err(storage_error)?;"
           if source.count(old_restore) != 1:
               raise SystemExit("restore durable-copy target did not match exactly once")
           path.write_text(source.replace(old_restore, new_restore, 1))
