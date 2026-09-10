@@ -1,0 +1,60 @@
+name: P1 Windows Warning Fixer
+
+on:
+  push:
+    branches:
+      - fix/p1-stability-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Fix cfg-gated parameter warnings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = [
+              Path("crates/takokit-store/src/workspace/recovery.rs"),
+              Path("crates/takokit-package/src/install_support.rs"),
+              Path("crates/takokit-package/src/provider_ownership/storage.rs"),
+          ]
+          for path in paths:
+              source = path.read_text()
+              old = "fn sync_parent(path: &Path) {\n    #[cfg(unix)]\n    if let Some(parent) = path.parent() {"
+              new = "fn sync_parent(_path: &Path) {\n    #[cfg(unix)]\n    if let Some(parent) = _path.parent() {"
+              if old not in source:
+                  raise SystemExit(f"sync_parent target did not match in {path}")
+              path.write_text(source.replace(old, new, 1))
+          PY
+          cargo fmt --all
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No warning fixes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            crates/takokit-store/src/workspace/recovery.rs \
+            crates/takokit-package/src/install_support.rs \
+            crates/takokit-package/src/provider_ownership/storage.rs
+          git commit -m "fix(windows): silence cfg-gated sync warnings"
+          git push origin HEAD:fix/p1-stability-hardening
