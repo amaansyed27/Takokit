@@ -128,7 +128,11 @@ mod tests {
     fn stored_runtime_config_is_loaded() {
         let root = std::env::temp_dir().join(format!("takokit-config-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("config.toml"), "host = \"localhost\"\nport = 6060\n").unwrap();
+        std::fs::write(
+            root.join("config.toml"),
+            "host = \"localhost\"\nport = 6060\n",
+        )
+        .unwrap();
 
         let stored = load_stored_runtime_config(&root).unwrap();
         assert_eq!(stored.host.as_deref(), Some("localhost"));

@@ -140,9 +140,7 @@ fn host_header_name(host: &str) -> Option<&str> {
         let end = rest.find(']')?;
         let name = &rest[..end];
         let suffix = &rest[end + 1..];
-        if !suffix.is_empty()
-            && (!suffix.starts_with(':') || suffix[1..].parse::<u16>().is_err())
-        {
+        if !suffix.is_empty() && (!suffix.starts_with(':') || suffix[1..].parse::<u16>().is_err()) {
             return None;
         }
         return (!name.is_empty()).then_some(name);

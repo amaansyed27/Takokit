@@ -40,10 +40,7 @@ pub(super) fn clear_active_session_state(root: &Path) -> TakokitResult<()> {
     Ok(())
 }
 
-pub(super) fn read_summary_recovering(
-    id: Uuid,
-    path: &Path,
-) -> TakokitResult<SessionSummary> {
+pub(super) fn read_summary_recovering(id: Uuid, path: &Path) -> TakokitResult<SessionSummary> {
     let backup = backup_path(path);
     match read_summary_file(path) {
         Ok(Some(summary)) if summary.id == id => {
@@ -79,10 +76,7 @@ pub(super) fn reconcile_summary(
     if let Some(last) = events.last() {
         reconciled.updated_at = reconciled.updated_at.max(last.timestamp);
         reconciled.last_task = Some(last.task);
-        reconciled.last_model = events
-            .iter()
-            .rev()
-            .find_map(|event| event.model.clone());
+        reconciled.last_model = events.iter().rev().find_map(|event| event.model.clone());
         if reconciled.title.starts_with("Takokit session ") {
             reconciled.title = generated_session_title(&events[0]);
         }
@@ -120,7 +114,9 @@ pub(super) fn read_events_recovering_torn_tail(
     let ends_with_newline = source.ends_with(b"\n");
     let mut events = Vec::new();
     let mut valid_bytes = 0_usize;
-    let lines = source.split_inclusive(|byte| *byte == b'\n').collect::<Vec<_>>();
+    let lines = source
+        .split_inclusive(|byte| *byte == b'\n')
+        .collect::<Vec<_>>();
     for (index, raw_line) in lines.iter().enumerate() {
         let is_last = index + 1 == lines.len();
         let line = raw_line.strip_suffix(b"\n").unwrap_or(raw_line);

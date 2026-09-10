@@ -320,10 +320,7 @@ impl InstalledRegistry {
                 continue;
             }
             let id = manifest_name.trim_end_matches(".toml");
-            recover_model_install_files(
-                &models.join(manifest_name),
-                &self.model_record_path(id),
-            )?;
+            recover_model_install_files(&models.join(manifest_name), &self.model_record_path(id))?;
         }
         Ok(())
     }

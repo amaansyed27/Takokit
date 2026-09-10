@@ -74,13 +74,20 @@ fn stale_summary_is_reconciled_from_durable_events() {
     };
     let mut encoded = serde_json::to_vec(&event).unwrap();
     encoded.push(b'\n');
-    std::fs::write(store.session_dir(session.summary.id).join("events.jsonl"), encoded).unwrap();
+    std::fs::write(
+        store.session_dir(session.summary.id).join("events.jsonl"),
+        encoded,
+    )
+    .unwrap();
 
     let recovered = store.read_session(session.summary.id).unwrap();
     assert_eq!(recovered.summary.event_count, 1);
     assert_eq!(recovered.summary.output_count, 1);
     assert_eq!(recovered.summary.last_task, Some(SessionTask::SpeechToText));
-    assert_eq!(recovered.summary.last_model.as_deref(), Some("whisper-tiny"));
+    assert_eq!(
+        recovered.summary.last_model.as_deref(),
+        Some("whisper-tiny")
+    );
     assert_eq!(recovered.summary.title, "keep title");
 }
 
@@ -104,7 +111,11 @@ fn default_title_is_recovered_from_first_durable_event() {
     };
     let mut encoded = serde_json::to_vec(&event).unwrap();
     encoded.push(b'\n');
-    std::fs::write(store.session_dir(session.summary.id).join("events.jsonl"), encoded).unwrap();
+    std::fs::write(
+        store.session_dir(session.summary.id).join("events.jsonl"),
+        encoded,
+    )
+    .unwrap();
 
     let recovered = store.read_session(session.summary.id).unwrap();
     assert_eq!(recovered.summary.title, "Speech to text · whisper-tiny");
@@ -200,7 +211,10 @@ fn corrupt_active_session_recovers_from_valid_backup() {
     std::fs::write(&path, b"torn").unwrap();
 
     assert_eq!(store.active_session().unwrap(), Some(session.summary.id));
-    assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), session.summary.id.to_string());
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap().trim(),
+        session.summary.id.to_string()
+    );
     assert!(!backup.exists());
 }
 
@@ -240,7 +254,11 @@ fn foreign_session_event_is_rejected() {
     };
     let mut encoded = serde_json::to_vec(&event).unwrap();
     encoded.push(b'\n');
-    std::fs::write(store.session_dir(session.summary.id).join("events.jsonl"), encoded).unwrap();
+    std::fs::write(
+        store.session_dir(session.summary.id).join("events.jsonl"),
+        encoded,
+    )
+    .unwrap();
 
     assert!(store.read_session(session.summary.id).is_err());
 }

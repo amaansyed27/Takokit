@@ -209,11 +209,7 @@ fn recover_model_install_files_locked(
                 reason: "unsupported model install transaction journal schema".to_string(),
             });
         }
-        restore_transaction_target(
-            manifest_path,
-            &manifest_backup,
-            journal.manifest_existed,
-        )?;
+        restore_transaction_target(manifest_path, &manifest_backup, journal.manifest_existed)?;
         restore_transaction_target(record_path, &record_backup, journal.record_existed)?;
         remove_file_if_exists(journal_path.clone())?;
         sync_parent(&journal_path);
@@ -275,10 +271,7 @@ fn transaction_sidecar(path: &Path, suffix: &str) -> PathBuf {
 
 fn write_synced(path: &Path, bytes: &[u8]) -> PackageResult<()> {
     remove_file_if_exists(path.to_path_buf())?;
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
     file.write_all(bytes)?;
     file.sync_all()?;
     Ok(())
@@ -318,10 +311,12 @@ fn replace_target(target: &Path, replacement: &Path) -> PackageResult<()> {
 
 fn regular_file_exists(path: &Path) -> PackageResult<bool> {
     match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => Err(PackageError::ArtifactInstallFailed {
-            artifact: path.display().to_string(),
-            reason: "model install metadata path cannot be a symlink".to_string(),
-        }),
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err(PackageError::ArtifactInstallFailed {
+                artifact: path.display().to_string(),
+                reason: "model install metadata path cannot be a symlink".to_string(),
+            })
+        }
         Ok(metadata) if metadata.is_file() => Ok(true),
         Ok(_) => Err(PackageError::ArtifactInstallFailed {
             artifact: path.display().to_string(),

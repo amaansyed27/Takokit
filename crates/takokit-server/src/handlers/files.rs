@@ -197,7 +197,9 @@ fn canonical_workspace_files_root(
     Ok(Some(canonical_root))
 }
 
-fn list_workspace_files(workspace_root: &FsPath) -> Result<Vec<WorkspaceFileSummary>, TakokitError> {
+fn list_workspace_files(
+    workspace_root: &FsPath,
+) -> Result<Vec<WorkspaceFileSummary>, TakokitError> {
     let Some(root) = canonical_workspace_files_root(workspace_root, false)? else {
         return Ok(Vec::new());
     };

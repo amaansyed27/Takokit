@@ -28,11 +28,7 @@ pub(super) fn materialize_owned_artifact(
         if let Some(parent) = blob.parent() {
             fs::create_dir_all(parent)?;
         }
-        let temporary = blob.with_extension(format!(
-            "tmp-{}-{}",
-            std::process::id(),
-            now_nanos()
-        ));
+        let temporary = blob.with_extension(format!("tmp-{}-{}", std::process::id(), now_nanos()));
         remove_path_if_present(&temporary)?;
         link_or_copy(&source, &temporary)?;
         if sha256_file(&temporary)? != sha256 {

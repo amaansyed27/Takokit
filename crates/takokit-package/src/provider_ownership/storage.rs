@@ -26,9 +26,7 @@ pub(super) fn provider_blob_root(root: &Path) -> PathBuf {
 
 pub(super) fn provider_blob_path(root: &Path, sha256: &str) -> PackageResult<PathBuf> {
     validate_sha256(sha256)?;
-    Ok(provider_blob_root(root)
-        .join(&sha256[0..2])
-        .join(sha256))
+    Ok(provider_blob_root(root).join(&sha256[0..2]).join(sha256))
 }
 
 pub(super) fn migration_journal_path(root: &Path) -> PathBuf {
@@ -303,10 +301,7 @@ fn validate_sha256(value: &str) -> PackageResult<()> {
     Ok(())
 }
 
-pub(super) fn validate_ledger(
-    root: &Path,
-    ledger: &ModelProviderOwnership,
-) -> PackageResult<()> {
+pub(super) fn validate_ledger(root: &Path, ledger: &ModelProviderOwnership) -> PackageResult<()> {
     if ledger.schema_version != PROVIDER_OWNERSHIP_SCHEMA {
         return Err(PackageError::ArtifactInstallFailed {
             artifact: ledger.model_id.clone(),
