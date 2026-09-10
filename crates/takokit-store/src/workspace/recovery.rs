@@ -175,7 +175,9 @@ pub(super) fn replace_file(path: &Path, bytes: &[u8]) -> TakokitResult<()> {
     let backup = backup_path(path);
     if path.is_file() {
         std::fs::copy(path, &backup).map_err(storage_error)?;
-        File::open(&backup)
+        OpenOptions::new()
+            .write(true)
+            .open(&backup)
             .and_then(|file| file.sync_all())
             .map_err(storage_error)?;
     }
@@ -287,7 +289,9 @@ fn replace_file_platform(path: &Path, temporary: &Path) -> TakokitResult<()> {
 fn restore_backup(path: &Path, backup: &Path) -> TakokitResult<()> {
     let temporary = path.with_extension(format!("restore-{}", Uuid::new_v4()));
     std::fs::copy(backup, &temporary).map_err(storage_error)?;
-    File::open(&temporary)
+    OpenOptions::new()
+        .write(true)
+        .open(&temporary)
         .and_then(|file| file.sync_all())
         .map_err(storage_error)?;
     replace_file_platform(path, &temporary)?;
