@@ -351,13 +351,13 @@ pub(super) fn write_json_atomic(path: &Path, value: &impl Serialize) -> PackageR
     Ok(())
 }
 
-pub(super) fn recover_atomic_json(path: &Path) -> PackageResult<()> {
+pub(super) fn recover_atomic_json(_path: &Path) -> PackageResult<()> {
     #[cfg(windows)]
     {
-        let backup = atomic_backup_path(path);
-        if !path.exists() && backup.is_file() {
-            fs::rename(&backup, path)?;
-        } else if path.exists() && backup.exists() {
+        let backup = atomic_backup_path(_path);
+        if !_path.exists() && backup.is_file() {
+            fs::rename(&backup, _path)?;
+        } else if _path.exists() && backup.exists() {
             remove_path_if_present(&backup)?;
         }
     }

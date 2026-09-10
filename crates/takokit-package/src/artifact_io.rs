@@ -399,15 +399,6 @@ pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
     }
     Ok(format!("{:x}", hasher.finalize()))
 }
-fn sanitize_file_name(name: &str) -> String {
-    name.chars()
-        .map(|ch| match ch {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-' | '_' => ch,
-            _ => '_',
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::{download_paths, retryable_http_status, verified_artifact};
