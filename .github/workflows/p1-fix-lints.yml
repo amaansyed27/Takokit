@@ -1,0 +1,94 @@
+name: P1 Lint Fixer
+
+on:
+  push:
+    branches:
+      - fix/p1-stability-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Apply targeted lint fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          storage = Path("crates/takokit-package/src/provider_ownership/storage.rs")
+          source = storage.read_text()
+          old = '''pub(super) fn recover_atomic_json(path: &Path) -> PackageResult<()> {
+              #[cfg(windows)]
+              {
+                  let backup = atomic_backup_path(path);
+                  if !path.exists() && backup.is_file() {
+                      fs::rename(&backup, path)?;
+                  } else if path.exists() && backup.exists() {
+                      remove_path_if_present(&backup)?;
+                  }
+              }
+              Ok(())
+          }'''
+          new = '''pub(super) fn recover_atomic_json(_path: &Path) -> PackageResult<()> {
+              #[cfg(windows)]
+              {
+                  let backup = atomic_backup_path(_path);
+                  if !_path.exists() && backup.is_file() {
+                      fs::rename(&backup, _path)?;
+                  } else if _path.exists() && backup.exists() {
+                      remove_path_if_present(&backup)?;
+                  }
+              }
+              Ok(())
+          }'''
+          if old not in source:
+              raise SystemExit("recover_atomic_json target did not match")
+          storage.write_text(source.replace(old, new, 1))
+
+          artifact = Path("crates/takokit-package/src/artifact_io.rs")
+          source = artifact.read_text()
+          source, count = re.subn(
+              r'\nfn sanitize_file_name\(name: &str\) -> String \{.*?\n\}\n\n(?=#\[cfg\(test\)\])',
+              '\n',
+              source,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("sanitize_file_name target did not match")
+          artifact.write_text(source)
+          PY
+
+          cargo fmt --all
+
+      - name: Verify package compiles cleanly
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo check -p takokit-package
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No lint changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/takokit-package/src/artifact_io.rs crates/takokit-package/src/provider_ownership/storage.rs
+          git commit -m "fix(package): resolve hardening lint regressions"
+          git push origin HEAD:fix/p1-stability-hardening
